@@ -1,0 +1,31 @@
+---
+description: 图标资源优先从 iconfont.cn 下载；勿使用 Adobe 版权图标
+alwaysApply: true
+---
+
+# 图标资源约定
+
+## 优先级
+
+找不到合适图标时，按此顺序：
+
+1. **优先**：[iconfont 阿里巴巴矢量图标库](https://www.iconfont.cn/)（用户可登录后下载 SVG）  
+2. 其次：本仓库已有的 `psDemo/resources/icons/`  
+3. 再次：开源图标（如 GIMP `gimp-data` 中 GPL 图标，若本地有子模块）  
+4. 最后：临时用汉字/字母占位，并在注释标明「待替换」
+
+## 禁止
+
+- **不要**直接使用 Adobe Photoshop 官方图标资源（版权）  
+- 不要使用来源不明、许可不清的图标包  
+
+## 落地要求
+
+- 下载的 SVG 放到 `psDemo/resources/icons/`，并加入 `resources.qrc`  
+- 命名建议：`tool-<name>.svg`（如 `tool-brush.svg`）  
+- 暗色主题下优先选**单色/线框**或可改 `fill/stroke` 为浅色的 SVG  
+- 在 `docs/tech-notes.md` 简要记录图标来源（iconfont 项目/关键词即可）  
+
+## 自动化注意
+
+Agent 若无法代替浏览器登录下载，应：给出 iconfont 搜索关键词清单 → 用户下载 SVG 到约定目录 → Agent 负责接线 `qrc` 与按钮。

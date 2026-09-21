@@ -29,11 +29,28 @@
 
 ## 技术点日志
 
-实现过程中把难点记在这里，例如：
+### 2026-09 — iconfont 图标与工具分组
 
-- 合成顺序与预乘 Alpha
-- `QImage` ↔ `cv::Mat` 零拷贝或浅拷贝生命周期
-- 大图滚动/缩放性能；CUDA 上传下载开销
-- 撤销内存占用
+- 使用 `resources/icons/tools/*.png`（英文文件名）替换自绘 SVG。
+- 工具栏占位支持多工具：左键用当前子工具，右键弹出同组列表（对齐 PS 飞出菜单）；多子工具时图标右下角画小三角。
+- 形状组：矩形 / 椭圆 / 三角 / 直线；选框组：矩形选框 / 椭圆选框；填充组：油漆桶 / 渐变。
 
-（尚无实现条目。）
+- 主窗口加载 `:/styles/dark.qss`。
+- 图标约定：**优先 [iconfont.cn](https://www.iconfont.cn/)**（见 `icon-sources.mdc` / `docs/iconfont-icons.md`）；禁止 Adobe 官方图标；资源文件名用英文。
+- 自绘 SVG 仍保留在 `resources/icons/*.svg` 作回退；工具箱已切到 `:/icons/tools/*.png`。
+
+- 现状：`ui/layerpanel.*` 可增删/显隐/透明度/排序；**实现时未逐项对照** `gimp-master` layers dock。
+- 约定：下次改版必须先读 GIMP 对应 widgets，再改行为与 UI；注释中已标【待对照 GIMP】。
+- 列表行序与 `LayerStack` 下标相反（UI 顶 = 栈顶）。
+
+### 2026-09 — 预乘 Alpha 合成（Compositor）
+
+- 图层缓冲统一为 `QImage::Format_ARGB32_Premultiplied`，避免直通/预乘混用导致脏边。
+- `blendNormalPremultiplied`：`out = src + dst * (1 - src.a)`（已含 opacity 缩放 src）。
+- `LayerStack` 使用 `std::vector<unique_ptr>`，因 Qt6 `QVector` 对不可拷贝类型不友好。
+
+### 待记
+
+- `QImage` ↔ `cv::Mat` 生命周期
+- CUDA 上传开销
+- 撤销瓦片内存

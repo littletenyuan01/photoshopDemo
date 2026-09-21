@@ -1,0 +1,20 @@
+---
+description: 实现功能须对照 gimp-master；禁止凭印象擅自扩功能
+alwaysApply: true
+---
+
+# 对照 GIMP 实现（强制）
+
+## 要求
+
+1. **写/改功能代码前**：先在 `gimp-master` 中定位对应模块（如 layers dock、paint、selection），阅读职责边界后再设计本项目的瘦身版  
+2. **注释或 docs 中写明**：参考了 GIMP 的哪些路径/概念；本项目简化掉了什么  
+3. **禁止**：用户未明确要求时擅自新开功能；禁止只凭 Photoshop 使用习惯或聊天里的架构脑补落地  
+
+## 当前已知债
+
+- `LayerPanel`：**先留用**，实现时未逐项对照 GIMP layers UI；下次改版须对照 `gimp-master`（如 `app/widgets` 图层相关 dock）再改  
+
+## 与注释
+
+凡新写代码必须按 `code-comments.mdc` 写中文注释；对照 GIMP 的结论也要写进注释或 `docs/`。

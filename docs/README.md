@@ -19,6 +19,9 @@
 | [features.md](features.md) | 功能清单与使用说明 |
 | [code-map.md](code-map.md) | 重点代码与文件索引 |
 | [tech-notes.md](tech-notes.md) | 技术点与设计决策 |
+| [iconfont-icons.md](iconfont-icons.md) | 从 iconfont 下载工具图标的清单 |
+| [scope-estimate.md](scope-estimate.md) | 图层/选区/蒙版等功能评估与工作量 |
+| [completeness.md](completeness.md) | 除编辑能力外，怎样才算完善 |
 | [cursor-role-prompt.md](cursor-role-prompt.md) | 可粘贴的 Cursor 角色 Prompt |
 
 ## 维护约定

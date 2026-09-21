@@ -10,8 +10,10 @@
 ```text
 photoshopDemo/
 ├── psDemo/                 # Qt 应用（qmake：psDemo.pro）
-│   ├── main.cpp
-│   ├── mainwindow.h/.cpp/.ui
+│   ├── domain/             # 文档 / 图层（真相数据）
+│   ├── engine/             # 合成等算法
+│   ├── ui/                 # CanvasView 等视图
+│   ├── mainwindow.*        # 主窗口壳 + .ui
 │   └── ...
 ├── docs/                   # 技术文档（本目录，随代码更新）
 ├── wiki/                   # 项目 Wiki（目标、路线、构建）
@@ -24,22 +26,27 @@ photoshopDemo/
 
 | 能力 | 状态 | 说明 |
 |------|------|------|
-| 主窗口 | 已实现 | 空 `QMainWindow`，待挂画布与面板 |
-| 文档/图层模型 | 计划中 | — |
-| 画布合成预览 | 计划中 | — |
+| 主窗口 | 已实现 | 菜单：新建 / 打开 / 视图缩放；中央为画布 |
+| 文档/图层模型 | 已实现（基础） | `ImageDocument` + `Layer` + `LayerStack` |
+| 画布合成预览 | 已实现（基础） | `Compositor`（Normal+透明度）+ `CanvasView` |
+| 图层面板 | 已实现（基础） | 新建/删除/显隐/透明度/上下移/重命名 |
+| 打开位图 | 已实现 | PNG/JPEG/BMP/WebP → 单层文档 |
+| 缩放/平移 | 已实现 | 滚轮缩放；中键或 Alt+左键拖拽；适应窗口 |
 | 画笔 / 橡皮 | 计划中 | — |
 | 撤销 / 重做 | 计划中 | — |
-| 打开 / 导出 | 计划中 | — |
+| 导出 | 计划中 | — |
 
 ## 技术栈
 
 - 语言：C++17
-- UI：Qt Widgets
+- UI：Qt Widgets（界面用 `.ui`）
 - 构建：qmake（`psDemo.pro`），Qt Creator 开发
-- 算法 / 加速（允许）：**OpenCV**、**CUDA**、CPU 多线程 / 并行；无 GPU 时主链路应可回退 CPU
+- 像素：`QImage` Format_ARGB32_Premultiplied
+- 算法 / 加速（允许）：**OpenCV**、**CUDA**、CPU 并行；无 GPU 时主链路应可回退 CPU
 
 ## 相关入口
 
 - 构建说明：`wiki/Build.md`
-- 功能闭环定义：`wiki/Feature-Pipeline.md`
-- 架构规划：`wiki/Architecture.md`（规划）与 `docs/architecture.md`（实现对照）
+- 架构：`docs/architecture.md`
+- 功能：`docs/features.md`
+- 代码索引：`docs/code-map.md`

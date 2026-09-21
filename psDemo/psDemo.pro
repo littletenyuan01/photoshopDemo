@@ -1,20 +1,42 @@
-QT += widgets
+QT += widgets svg
 
 CONFIG += c++17
 
-# You can make your code fail to compile if it uses deprecated APIs.
-# In order to do so, uncomment the following line.
-#DEFINES += QT_DISABLE_DEPRECATED_BEFORE=0x060000    # disables all the APIs deprecated before Qt 6.0.0
+INCLUDEPATH += $$PWD
 
 SOURCES += \
     main.cpp \
-    mainwindow.cpp
+    mainwindow.cpp \
+    domain/layer.cpp \
+    domain/layerstack.cpp \
+    domain/imagedocument.cpp \
+    engine/compositor.cpp \
+    ui/canvasview.cpp \
+    ui/layerpanel.cpp \
+    ui/toolbox.cpp \
+    ui/tooloptionsbar.cpp
 
 HEADERS += \
-    mainwindow.h
+    mainwindow.h \
+    domain/blendmode.h \
+    domain/layer.h \
+    domain/layerstack.h \
+    domain/imagedocument.h \
+    engine/compositor.h \
+    tools/toolid.h \
+    ui/canvasview.h \
+    ui/layerpanel.h \
+    ui/toolbox.h \
+    ui/tooloptionsbar.h
 
 FORMS += \
-    mainwindow.ui
+    mainwindow.ui \
+    ui/layerpanel.ui \
+    ui/toolbox.ui \
+    ui/tooloptionsbar.ui
+
+RESOURCES += \
+    resources.qrc
 
 # Default rules for deployment.
 qnx: target.path = /tmp/$${TARGET}/bin

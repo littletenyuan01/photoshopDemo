@@ -6,28 +6,53 @@
 
 | 文件 | 职责 | 状态 |
 |------|------|------|
-| `psDemo/main.cpp` | `QApplication` 创建与事件循环 | 已实现 |
-| `psDemo/mainwindow.h` | `MainWindow` 声明 | 已实现（空壳） |
-| `psDemo/mainwindow.cpp` | 加载 `.ui` | 已实现（空壳） |
-| `psDemo/mainwindow.ui` | Qt Designer 布局（界面改动优先改此文件） | 已实现（空中央区） |
-| `psDemo/psDemo.pro` | qmake：C++17 + widgets；`FORMS` 列出全部 `.ui` | 已实现 |
+| `psDemo/main.cpp` | `QApplication` 入口 | 已实现 |
+| `psDemo/mainwindow.h/.cpp` | 持有文档、菜单动作、挂接画布 | 已实现 |
+| `psDemo/mainwindow.ui` | 主窗口布局；中央提升为 `CanvasView` | 已实现 |
+| `psDemo/psDemo.pro` | 源文件与 `INCLUDEPATH` | 已实现 |
 
-**约定**：新增窗口/对话框/面板时增加对应 `.ui`，并加入 `FORMS`。画布等自绘控件可无代码实现，但其外层停靠与工具栏仍用 `.ui` 排布。详见 `.cursor/rules/qt-ui-forms.mdc`。
+## domain（文档真相）
 
-## 计划中的关键类型（占位名，落地后改名并补说明）
+| 文件 | 职责 |
+|------|------|
+| `domain/blendmode.h` | 混合模式枚举（现仅 Normal） |
+| `domain/layer.h/.cpp` | 单层像素与属性 |
+| `domain/layerstack.h/.cpp` | 图层列表（`std::vector<unique_ptr>`） |
+| `domain/imagedocument.h/.cpp` | 文档：尺寸、栈、活动层、信号 |
+
+## engine
+
+| 文件 | 职责 |
+|------|------|
+| `engine/compositor.h/.cpp` | 预乘 Alpha 的 Normal 合成；可按矩形脏区合成 |
+
+**要点**：`blendNormalPremultiplied` 按扫描线混合，为后续蒙版/混合模式预留同一入口。
+
+## ui
+
+| 文件 | 职责 |
+|------|------|
+| `ui/canvasview.h/.cpp` | 显示合成缓存；缩放/平移；监听 `documentChanged` |
+| `ui/layerpanel.ui/.h/.cpp` | 图层面板：列表/显隐/透明度/增删排序 |
+| `ui/toolbox.ui/.h/.cpp` | 左侧工具箱 + 前/背景色（对齐 GIMP Toolbox 结构） |
+| `ui/tooloptionsbar.ui/.h/.cpp` | 工具选项栏（显示当前工具名） |
+| `tools/toolid.h` | 工具枚举（对应 GIMP ToolInfo 思路） |
+
+## 计划中
+
 | 计划类型 | 预期职责 |
 |----------|----------|
-| `ImageDocument` | 文档：尺寸、图层列表、活动层 |
-| `Layer` | 单层像素与属性（可见、透明度、混合） |
-| `Compositor` | 多层合成到预览 `QImage` |
-| `BrushTool` / `EraserTool` | 输入事件 → 像素修改 |
+| `Selection` | 文档级选区 mask |
+| `LayerMask` / `AdjustmentLayer` | 蒙版与调整层 |
+| `LayerPanel`（`.ui`） | ~~计划~~ 已实现：`ui/layerpanel.*` |
+| `PaintEngine` / `BrushTool` | 像素写入 |
 | `HistoryStack` | 撤销 / 重做 |
-| `ImageIO` | 打开 / 导出 |
+| `RasterIO` / `ProjectIO` | 导出与工程文件 |
 
 ## 摘录约定
 
-补充重点代码时：
-
 1. 写清文件路径与符号名  
-2. 用简短说明解释「为什么重要」，避免大段粘贴  
-3. 若逻辑非显然，可附 5–20 行关键片段  
+2. 短说明「为什么重要」  
+3. 非显然逻辑可附 5–20 行关键片段  
+
+**代码注释**：关键类与算法须在源码中写中文注释，见 `.cursor/rules/code-comments.mdc`。
