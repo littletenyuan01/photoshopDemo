@@ -1,69 +1,208 @@
-# Prerequisites
-*.d
+# ============================================================================
+# photoshopDemo — Git ignore
+# Covers: Qt/qmake, CMake, Qt Creator, MSVC, MinGW, IDE, OS junk
+# ============================================================================
 
-# Compiled Object files
-*.slo
-*.lo
-*.o
-*.obj
-
-# Precompiled Headers
-*.gch
-*.pch
-
-# Linker files
-*.ilk
-
-# Debugger Files
-*.pdb
-
-# Compiled Dynamic libraries
-*.so
-*.dylib
-*.dll
-*.so.*
-
-
-# Fortran module files
-*.mod
-*.smod
-
-# Compiled Static libraries
-*.lai
-*.la
-*.a
-*.lib
-
-# Executables
-*.exe
-*.out
-*.app
-
-# Build directories
+# ---------------------------------------------------------------------------
+# Build outputs & shadow builds
+# ---------------------------------------------------------------------------
 build/
 Build/
 build-*/
+**/build/
+**/Build/
+**/build-*/
+debug/
+release/
+Debug/
+Release/
+out/
+bin/
+lib/
+*.Debug
+*.Release
 
-# CMake generated files
-CMakeFiles/
-CMakeCache.txt
-cmake_install.cmake
+# ---------------------------------------------------------------------------
+# Compiled / linked artifacts
+# ---------------------------------------------------------------------------
+*.o
+*.obj
+*.lo
+*.slo
+*.a
+*.la
+*.lai
+*.lib
+*.so
+*.so.*
+*.dylib
+*.dll
+*.exe
+*.out
+*.app
+*.exp
+*.ilk
+*.map
+*.pdb
+*.idb
+*.dwo
+*.gch
+*.pch
+*.res
+*.d
+
+# ---------------------------------------------------------------------------
+# Qt / qmake generated
+# ---------------------------------------------------------------------------
 Makefile
+Makefile.*
+!Makefile.am
+*.pro.user
+*.pro.user.*
+*.qbs.user
+*.qbs.user.*
+*.qmlproject.user
+*.qmlproject.user.*
+*.autosave
+*.qm
+moc_*.cpp
+moc_*.h
+ui_*.h
+qrc_*.cpp
+*_pch.h.cpp
+*_resource.rc
+.qmake.cache
+.qmake.stash
+**/.qmake.cache
+**/.qmake.stash
+**/.qmlls.ini
+.moc/
+.obj/
+.pch/
+.rcc/
+.uic/
+.qt/
+.qtcreator/
+**/.qtcreator/
+
+# ---------------------------------------------------------------------------
+# CMake
+# ---------------------------------------------------------------------------
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+CTestTestfile.cmake
+CPackConfig.cmake
+CPackSourceConfig.cmake
 install_manifest.txt
 compile_commands.json
+CMakeSettings.json
+CMakeUserPresets.json
+Testing/
+_deps/
+cmake-build-*/
+.cmake/
 
-# Temporary files
+# ---------------------------------------------------------------------------
+# Visual Studio / MSVC
+# ---------------------------------------------------------------------------
+.vs/
+*.sln
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+*.vcxproj
+*.vcxproj.*
+*.vcproj
+*vcproj.*.*.user
+*.ncb
+*.sdf
+*.opensdf
+*.VC.db
+*.VC.VC.opendb
+ipch/
+*.aps
+*.ipch
+
+# ---------------------------------------------------------------------------
+# Qt Creator / CLion / VS Code / other IDEs
+# ---------------------------------------------------------------------------
+CMakeLists.txt.user*
+*.creator.user*
+.idea/
+*.iml
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json.example
+*.code-workspace
+
+# ---------------------------------------------------------------------------
+# vcpkg / package managers
+# ---------------------------------------------------------------------------
+vcpkg_installed/
+vcpkg_installed_*/
+.vcpkg-root
+
+# ---------------------------------------------------------------------------
+# Temporary / backup / editor
+# ---------------------------------------------------------------------------
+*~
 *.tmp
+*.temp
 *.log
 *.bak
 *.swp
-
-# vcpkg
-vcpkg_installed/
-
-# debug information files
-*.dwo
-
-# test output & cache
-Testing/
+*.swo
+.*.swp
+*.orig
+*.rej
+*.flc
+.#*
+*.*#
+tags
+TAGS
 .cache/
+*.autosave
+
+# ---------------------------------------------------------------------------
+# OS junk
+# ---------------------------------------------------------------------------
+.DS_Store
+.AppleDouble
+.LSOverride
+.directory
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+*.stackdump
+
+# ---------------------------------------------------------------------------
+# Python (scripts / tooling)
+# ---------------------------------------------------------------------------
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.env
+.env.*
+!.env.example
+
+# ---------------------------------------------------------------------------
+# Test / coverage / profiling
+# ---------------------------------------------------------------------------
+*.gcda
+*.gcno
+*.gcov
+coverage/
+*.profraw
+*.profdata
+*.trace
+
+# ---------------------------------------------------------------------------
+# Local dumps (keep intentional sample images under assets/ tracked)
+# ---------------------------------------------------------------------------
+captures/
+screenshots/local/

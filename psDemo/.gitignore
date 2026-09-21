@@ -1,0 +1,42 @@
+﻿# ============================================================================
+# psDemo — Qt/qmake local ignores (repo root .gitignore is the main ruleset)
+# ============================================================================
+
+*~
+*.autosave
+*.qm
+
+# qmake / moc / uic / rcc outputs (also covered at repo root)
+moc_*.cpp
+moc_*.h
+ui_*.h
+qrc_*.cpp
+*_pch.h.cpp
+*_resource.rc
+Makefile*
+.qmake.cache
+.qmake.stash
+**/.qmlls.ini
+
+# Qt Creator
+*.pro.user*
+*.qbs.user*
+CMakeLists.txt.user*
+.qtcreator/
+/build*/
+debug/
+release/
+Debug/
+Release/
+
+# Generated helper dirs (in-source builds)
+.moc/
+.obj/
+.pch/
+.rcc/
+.uic/
+
+# OS
+.DS_Store
+.directory
+Thumbs.db

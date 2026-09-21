@@ -1,0 +1,25 @@
+---
+description: Qt 界面改动必须使用并同步维护 .ui 文件，便于 Designer 调整
+alwaysApply: true
+---
+
+# Qt UI：必须维护 .ui 文件
+
+涉及界面的新增或修改时，**同时生成/更新对应的 `.ui` 文件**（Qt Designer），不要只在纯 C++ 里堆控件布局。
+
+## 要求
+
+1. **新窗口 / 对话框 / 较复杂面板**：先建 `.ui`，再用 `uic` 生成的 `Ui::*` 装配（与现有 `mainwindow.ui` 一致）
+2. **改布局、菜单、控件属性**：优先改 `.ui`，再改槽函数与业务逻辑；避免只改 `.cpp` 导致 Designer 打开后布局对不上
+3. **`.pro` 同步**：新 `.ui` 加入 `FORMS +=`；配套 `SOURCES` / `HEADERS` 一并更新
+4. **文档**：界面结构变化时更新 `docs/`（如 `features.md` / `code-map.md` 中的 UI 说明）
+
+## 允许的例外（需在回复里说明原因）
+
+- 极简单、纯代码动态生成的临时控件（如运行时才知道数量的列表项）
+- 自定义 `QWidget` 的 `paintEvent` 自绘（画布等）；其**外层容器/停靠区仍应用 `.ui` 排布**
+
+## 反例
+
+- 在 `MainWindow` 构造函数里手写大量 `new QPushButton` + `QHBoxLayout`，却不提供可打开的 `.ui`
+- 改了界面外观却只动 `.cpp`，`.ui` 仍是旧布局
