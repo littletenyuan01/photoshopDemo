@@ -173,6 +173,7 @@ void MainWindow::setDocument(std::unique_ptr<Ps::ImageDocument> document)
     m_document = std::move(document);
     // 画布与图层面板都不拥有文档，只借用指针
     ui->canvasWorkspace->canvasView()->setDocument(m_document.get());
+    ui->canvasWorkspace->notifyDocumentChanged();
     ui->layerPanel->setDocument(m_document.get());
     updateWindowTitle();
 }

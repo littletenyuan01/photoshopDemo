@@ -7,6 +7,7 @@
 ### 主窗口壳
 
 - **说明**：菜单栏按 Photoshop 中文版顶层顺序；其下为工具选项栏；左侧工具箱 + 画布 + 右侧图层。
+- **窗口尺寸**：启动时**最大化**（对齐 Photoshop Windows 常见行为）；`.ui` 设计几何约 1440×900，最小 1024×640。Photoshop 本身无固定客户区像素。
 - **布局文件**：`mainwindow.ui`、`ui/toolbox.ui`、`ui/tooloptionsbar.ui`、`ui/layerpanel.ui`、`ui/canvasworkspace.ui`
 - **已可点**：新建、打开、退出；视图缩放；窗口→图层；工具切换；画笔/橡皮绘制活动层；抓手平移；缩放工具；前景/背景色；关于。
 - **灰色菜单项**：尚未实现功能占位。
@@ -14,8 +15,11 @@
 
 ### 标尺与画布居中
 
-- **说明**：工作区上/左有像素标尺（`RulerWidget`），布局在 `canvasworkspace.ui`；文档打开后默认 `zoomFit` 居中。
-- **对照 GIMP**：`gimp_display_shell_rulers_update` 用 lower/upper 同步视口；本项目仅像素单位，无参考线。
+- **说明**：工作区上/左有像素标尺（`RulerWidget`），右/下有滚动条；布局在 `canvasworkspace.ui`；文档打开后默认 `zoomFit` 居中。
+- **平移约束**：图像小于视口时锁定居中，不能拖出窗口；大于视口时可滚动，边缘钳制，整幅图不会移出可视区。
+- **滚动条**：水平/竖直轨道**始终显示**（对齐 PS）；仅当文档超出视口时滑块才有可拖行程。
+- **底栏状态**：水平滚动条左侧显示缩放%与文档尺寸（`canvasdocstatusbar.ui`，对齐 PS 截图）；› 可切换像素/厘米显示。
+- **对照 GIMP**：`gimp_display_shell_rulers_update` + display scroll；本项目仅像素单位，无参考线。
 - **限制**：尚无单位切换（cm/inch）、尚无从标尺拖出参考线。
 
 ### 左侧工具箱

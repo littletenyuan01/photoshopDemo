@@ -14,6 +14,7 @@ SOURCES += \
     engine/paintengine.cpp \
     ui/canvasview.cpp \
     ui/canvasworkspace.cpp \
+    ui/canvasdocstatusbar.cpp \
     ui/rulerwidget.cpp \
     ui/layerpanel.cpp \
     ui/toolbox.cpp \
@@ -30,6 +31,7 @@ HEADERS += \
     tools/toolid.h \
     ui/canvasview.h \
     ui/canvasworkspace.h \
+    ui/canvasdocstatusbar.h \
     ui/rulerwidget.h \
     ui/layerpanel.h \
     ui/toolbox.h \
@@ -38,6 +40,7 @@ HEADERS += \
 FORMS += \
     mainwindow.ui \
     ui/canvasworkspace.ui \
+    ui/canvasdocstatusbar.ui \
     ui/layerpanel.ui \
     ui/toolbox.ui \
     ui/tooloptionsbar.ui

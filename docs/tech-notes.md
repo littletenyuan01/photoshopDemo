@@ -29,6 +29,19 @@
 
 ## 技术点日志
 
+### 2026-09 — 画布底栏状态（缩放 / 文档信息）
+
+- 新增 `CanvasDocStatusBar`（`canvasdocstatusbar.ui`）：缩放编辑框 + 尺寸文案 + › 菜单。
+- 放在水平滚动条左侧（对齐用户 PS 截图）；缩放随 `viewChanged` 更新，可回车改缩放。
+- 文档信息默认按 72 ppi 换算厘米显示；菜单可切像素。分辨率字段尚未进 domain。
+
+### 2026-09 — 画布滚动条与平移钳制
+
+- `canvasworkspace.ui` 增加水平/竖直 `QScrollBar`（对齐 PS 画布区）。
+- `CanvasView::clampOffset`：小图居中锁定；大图边缘钳制，禁止整幅拖出视口。
+- 滚动条与 `setScrollOffset` / `scrollX|Y` 双向同步。
+- Qt 在 `min==max` 时会禁用滚动条；完整可见时用假行程保持 AlwaysOn 外观。
+
 ### 2026-09 — 标尺与画布居中
 
 - 新增 `CanvasWorkspace`（`canvasworkspace.ui`）：左上角块 + 顶/左 `RulerWidget` + `CanvasView`。

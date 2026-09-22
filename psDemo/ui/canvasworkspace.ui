@@ -15,10 +15,42 @@
   </property>
   <property name="styleSheet">
    <string notr="true">QWidget#CanvasWorkspace { background-color: #2d2d2d; }
-QWidget#rulerCorner {
+QWidget#rulerCorner, QWidget#scrollCorner {
   background-color: #4a4a4a;
-  border-right: 1px solid #2a2a2a;
-  border-bottom: 1px solid #2a2a2a;
+  border: 1px solid #2a2a2a;
+}
+QScrollBar:horizontal, QScrollBar:vertical {
+  background: #3a3a3a;
+  border: 1px solid #2a2a2a;
+}
+QScrollBar:horizontal {
+  height: 14px;
+  margin: 0px;
+}
+QScrollBar:vertical {
+  width: 14px;
+  margin: 0px;
+}
+QScrollBar::groove:horizontal, QScrollBar::groove:vertical {
+  background: #3a3a3a;
+  border: none;
+}
+QScrollBar::handle:horizontal, QScrollBar::handle:vertical {
+  background: #686868;
+  border-radius: 3px;
+  min-height: 24px;
+  min-width: 24px;
+}
+QScrollBar::handle:horizontal:hover, QScrollBar::handle:vertical:hover {
+  background: #7a7a7a;
+}
+QScrollBar::add-line, QScrollBar::sub-line {
+  width: 0px;
+  height: 0px;
+  background: none;
+}
+QScrollBar::add-page, QScrollBar::sub-page {
+  background: #3a3a3a;
 }</string>
   </property>
   <layout class="QGridLayout" name="gridLayout">
@@ -37,6 +69,7 @@ QWidget#rulerCorner {
    <property name="spacing">
     <number>0</number>
    </property>
+   <!-- 顶行：角 | 水平标尺 | 占位对齐竖滚动条 -->
    <item row="0" column="0">
     <widget class="QWidget" name="rulerCorner">
      <property name="minimumSize">
@@ -67,11 +100,28 @@ QWidget#rulerCorner {
        <height>20</height>
       </size>
      </property>
-     <property name="orientation" stdset="0">
-      <enum>Qt::Orientation::Horizontal</enum>
+    </widget>
+   </item>
+   <item row="0" column="2">
+    <widget class="QWidget" name="rulerScrollSpacer">
+     <property name="minimumSize">
+      <size>
+       <width>14</width>
+       <height>20</height>
+      </size>
+     </property>
+     <property name="maximumSize">
+      <size>
+       <width>14</width>
+       <height>20</height>
+      </size>
+     </property>
+     <property name="styleSheet">
+      <string notr="true">background-color: #4a4a4a;</string>
      </property>
     </widget>
    </item>
+   <!-- 中行：竖标尺 | 画布 | 竖滚动条 -->
    <item row="1" column="0">
     <widget class="RulerWidget" name="vRuler" native="true">
      <property name="minimumSize">
@@ -86,13 +136,123 @@ QWidget#rulerCorner {
        <height>16777215</height>
       </size>
      </property>
-     <property name="orientation" stdset="0">
-      <enum>Qt::Orientation::Vertical</enum>
-     </property>
     </widget>
    </item>
    <item row="1" column="1">
     <widget class="CanvasView" name="canvasView" native="true"/>
+   </item>
+   <item row="1" column="2">
+    <widget class="QScrollBar" name="vScrollBar">
+     <property name="orientation">
+      <enum>Qt::Orientation::Vertical</enum>
+     </property>
+     <property name="minimumSize">
+      <size>
+       <width>14</width>
+       <height>0</height>
+      </size>
+     </property>
+     <property name="maximumSize">
+      <size>
+       <width>14</width>
+       <height>16777215</height>
+      </size>
+     </property>
+    </widget>
+   </item>
+   <!-- 底行：标尺占位 | 状态条+水平滚动条 | 右下角（对齐 PS 底栏） -->
+   <item row="2" column="0">
+    <widget class="QWidget" name="scrollRulerSpacer">
+     <property name="minimumSize">
+      <size>
+       <width>20</width>
+       <height>22</height>
+      </size>
+     </property>
+     <property name="maximumSize">
+      <size>
+       <width>20</width>
+       <height>22</height>
+      </size>
+     </property>
+     <property name="styleSheet">
+      <string notr="true">background-color: #4a4a4a;</string>
+     </property>
+    </widget>
+   </item>
+   <item row="2" column="1">
+    <widget class="QWidget" name="bottomBarHost">
+     <property name="minimumSize">
+      <size>
+       <width>0</width>
+       <height>22</height>
+      </size>
+     </property>
+     <property name="maximumSize">
+      <size>
+       <width>16777215</width>
+       <height>22</height>
+      </size>
+     </property>
+     <property name="styleSheet">
+      <string notr="true">QWidget#bottomBarHost { background-color: #4a4a4a; }</string>
+     </property>
+     <layout class="QHBoxLayout" name="bottomBarLayout">
+      <property name="spacing">
+       <number>0</number>
+      </property>
+      <property name="leftMargin">
+       <number>0</number>
+      </property>
+      <property name="topMargin">
+       <number>0</number>
+      </property>
+      <property name="rightMargin">
+       <number>0</number>
+      </property>
+      <property name="bottomMargin">
+       <number>0</number>
+      </property>
+      <item>
+       <widget class="CanvasDocStatusBar" name="docStatusBar" native="true"/>
+      </item>
+      <item>
+       <widget class="QScrollBar" name="hScrollBar">
+        <property name="orientation">
+         <enum>Qt::Orientation::Horizontal</enum>
+        </property>
+        <property name="minimumSize">
+         <size>
+          <width>0</width>
+          <height>22</height>
+         </size>
+        </property>
+        <property name="maximumSize">
+         <size>
+          <width>16777215</width>
+          <height>22</height>
+         </size>
+        </property>
+       </widget>
+      </item>
+     </layout>
+    </widget>
+   </item>
+   <item row="2" column="2">
+    <widget class="QWidget" name="scrollCorner">
+     <property name="minimumSize">
+      <size>
+       <width>14</width>
+       <height>22</height>
+      </size>
+     </property>
+     <property name="maximumSize">
+      <size>
+       <width>14</width>
+       <height>22</height>
+      </size>
+     </property>
+    </widget>
    </item>
   </layout>
  </widget>
@@ -107,6 +267,11 @@ QWidget#rulerCorner {
    <extends>QWidget</extends>
    <header>ui/canvasview.h</header>
    <container>1</container>
+  </customwidget>
+  <customwidget>
+   <class>CanvasDocStatusBar</class>
+   <extends>QWidget</extends>
+   <header>ui/canvasdocstatusbar.h</header>
   </customwidget>
  </customwidgets>
  <resources/>

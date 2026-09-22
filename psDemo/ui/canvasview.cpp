@@ -42,7 +42,6 @@ void CanvasView::setDocument(Ps::ImageDocument *document)
             update();
         });
         rebuildCache();
-        // 尺寸有效则立即居中适应；否则等 resizeEvent
         if (width() > 50 && height() > 50)
             zoomFit();
         else
@@ -55,13 +54,92 @@ void CanvasView::setDocument(Ps::ImageDocument *document)
     }
 }
 
+QSizeF CanvasView::contentSize() const
+{
+    if (!m_document)
+        return {};
+    return QSizeF(m_document->width() * m_zoom, m_document->height() * m_zoom);
+}
+
+void CanvasView::clampOffset()
+{
+    if (!m_document) {
+        m_offset = QPointF();
+        return;
+    }
+
+    const QSizeF content = contentSize();
+    const qreal vw = width();
+    const qreal vh = height();
+
+    // 小于视口：强制居中，禁止拖出窗口
+    if (content.width() <= vw)
+        m_offset.setX((vw - content.width()) * 0.5);
+    else
+        // 大于视口：左缘 ∈ [vw-contentW, 0]，右缘始终不离开视口右侧以外的空洞无限拖
+        m_offset.setX(qBound(vw - content.width(), m_offset.x(), 0.0));
+
+    if (content.height() <= vh)
+        m_offset.setY((vh - content.height()) * 0.5);
+    else
+        m_offset.setY(qBound(vh - content.height(), m_offset.y(), 0.0));
+}
+
+int CanvasView::scrollMaxX() const
+{
+    const qreal extra = contentSize().width() - width();
+    return extra > 0.5 ? qCeil(extra) : 0;
+}
+
+int CanvasView::scrollMaxY() const
+{
+    const qreal extra = contentSize().height() - height();
+    return extra > 0.5 ? qCeil(extra) : 0;
+}
+
+int CanvasView::scrollX() const
+{
+    if (scrollMaxX() <= 0)
+        return 0;
+    // offset.x 为负或较小表示向右看了更多内容；scroll = -offset.x（左对齐时 0）
+    return qBound(0, qRound(-m_offset.x()), scrollMaxX());
+}
+
+int CanvasView::scrollY() const
+{
+    if (scrollMaxY() <= 0)
+        return 0;
+    return qBound(0, qRound(-m_offset.y()), scrollMaxY());
+}
+
+void CanvasView::setScrollOffset(int scrollX, int scrollY)
+{
+    if (!m_document)
+        return;
+
+    const QSizeF content = contentSize();
+    if (content.width() <= width())
+        m_offset.setX((width() - content.width()) * 0.5);
+    else
+        m_offset.setX(-qreal(qBound(0, scrollX, scrollMaxX())));
+
+    if (content.height() <= height())
+        m_offset.setY((height() - content.height()) * 0.5);
+    else
+        m_offset.setY(-qreal(qBound(0, scrollY, scrollMaxY())));
+
+    clampOffset();
+    update();
+    notifyViewChanged();
+}
+
 void CanvasView::setZoom(qreal zoom)
 {
-    // 以视口中心为锚点缩放，避免菜单缩放时画布「跑偏」
     const QPointF anchorWidget(width() * 0.5, height() * 0.5);
     const QPointF anchorImage = widgetToImage(anchorWidget);
     m_zoom = qBound(0.05, zoom, 32.0);
     m_offset = anchorWidget - anchorImage * m_zoom;
+    clampOffset();
     update();
     notifyViewChanged();
 }
@@ -101,8 +179,9 @@ void CanvasView::centerOnImage()
         notifyViewChanged();
         return;
     }
-    const QSizeF size(m_document->width() * m_zoom, m_document->height() * m_zoom);
+    const QSizeF size = contentSize();
     m_offset = QPointF((width() - size.width()) * 0.5, (height() - size.height()) * 0.5);
+    clampOffset();
     update();
     notifyViewChanged();
 }
@@ -163,6 +242,7 @@ void CanvasView::wheelEvent(QWheelEvent *event)
     const qreal factor = event->angleDelta().y() > 0 ? 1.1 : (1.0 / 1.1);
     m_zoom = qBound(0.05, m_zoom * factor, 32.0);
     m_offset = mouse - before * m_zoom;
+    clampOffset();
     update();
     notifyViewChanged();
     event->accept();
@@ -193,6 +273,7 @@ void CanvasView::mousePressEvent(QMouseEvent *event)
             const QPointF before = (mouse - m_offset) / m_zoom;
             m_zoom = qBound(0.05, m_zoom * 1.25, 32.0);
             m_offset = mouse - before * m_zoom;
+            clampOffset();
             update();
             notifyViewChanged();
             event->accept();
@@ -211,6 +292,7 @@ void CanvasView::mousePressEvent(QMouseEvent *event)
         const QPointF before = (mouse - m_offset) / m_zoom;
         m_zoom = qBound(0.05, m_zoom / 1.25, 32.0);
         m_offset = mouse - before * m_zoom;
+        clampOffset();
         update();
         notifyViewChanged();
         event->accept();
@@ -229,6 +311,7 @@ void CanvasView::mouseMoveEvent(QMouseEvent *event)
         const QPoint delta = event->pos() - m_lastMousePos;
         m_lastMousePos = event->pos();
         m_offset += delta;
+        clampOffset();
         update();
         notifyViewChanged();
         event->accept();
@@ -265,10 +348,13 @@ void CanvasView::mouseReleaseEvent(QMouseEvent *event)
 void CanvasView::resizeEvent(QResizeEvent *event)
 {
     QWidget::resizeEvent(event);
-    if (m_pendingFit && width() > 50 && height() > 50)
+    if (m_pendingFit && width() > 50 && height() > 50) {
         zoomFit();
-    else
+    } else {
+        clampOffset();
+        update();
         notifyViewChanged();
+    }
 }
 
 void CanvasView::leaveEvent(QEvent *event)
@@ -305,7 +391,7 @@ QRectF CanvasView::imageRectInWidget() const
 {
     if (!m_document)
         return {};
-    return QRectF(m_offset, QSizeF(m_document->width() * m_zoom, m_document->height() * m_zoom));
+    return QRectF(m_offset, contentSize());
 }
 
 void CanvasView::drawCheckerboard(QPainter &painter, const QRect &rect) const
