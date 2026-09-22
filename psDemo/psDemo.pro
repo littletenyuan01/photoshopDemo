@@ -13,6 +13,8 @@ SOURCES += \
     engine/compositor.cpp \
     engine/paintengine.cpp \
     ui/canvasview.cpp \
+    ui/canvasworkspace.cpp \
+    ui/rulerwidget.cpp \
     ui/layerpanel.cpp \
     ui/toolbox.cpp \
     ui/tooloptionsbar.cpp
@@ -27,12 +29,15 @@ HEADERS += \
     engine/paintengine.h \
     tools/toolid.h \
     ui/canvasview.h \
+    ui/canvasworkspace.h \
+    ui/rulerwidget.h \
     ui/layerpanel.h \
     ui/toolbox.h \
     ui/tooloptionsbar.h
 
 FORMS += \
     mainwindow.ui \
+    ui/canvasworkspace.ui \
     ui/layerpanel.ui \
     ui/toolbox.ui \
     ui/tooloptionsbar.ui

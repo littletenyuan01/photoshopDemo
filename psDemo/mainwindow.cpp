@@ -3,6 +3,8 @@
 
 #include "domain/imagedocument.h"
 #include "domain/layer.h"
+#include "ui/canvasview.h"
+#include "ui/canvasworkspace.h"
 #include "ui/toolbox.h"
 #include "ui/tooloptionsbar.h"
 
@@ -51,6 +53,8 @@ void MainWindow::setupMenus()
 
 void MainWindow::setupToolbox()
 {
+    CanvasView *canvas = ui->canvasWorkspace->canvasView();
+
     // 工具箱 → 选项栏 + 画布（绘制/抓手/缩放）
     connect(ui->toolBox, &ToolBox::toolChanged, this, &MainWindow::onToolChanged);
     connect(ui->toolBox, &ToolBox::foregroundColorChanged,
@@ -62,32 +66,32 @@ void MainWindow::setupToolbox()
 
     const Ps::ToolId tool = ui->toolBox->currentTool();
     ui->toolOptionsBar->setCurrentTool(tool);
-    ui->canvasView->setCurrentTool(tool);
-    ui->canvasView->setForegroundColor(ui->toolBox->foregroundColor());
-    ui->canvasView->setBackgroundColor(ui->toolBox->backgroundColor());
-    ui->canvasView->setBrushDiameter(ui->toolOptionsBar->brushDiameter());
+    canvas->setCurrentTool(tool);
+    canvas->setForegroundColor(ui->toolBox->foregroundColor());
+    canvas->setBackgroundColor(ui->toolBox->backgroundColor());
+    canvas->setBrushDiameter(ui->toolOptionsBar->brushDiameter());
 }
 
 void MainWindow::onToolChanged(Ps::ToolId id)
 {
     ui->toolOptionsBar->setCurrentTool(id);
-    ui->canvasView->setCurrentTool(id);
+    ui->canvasWorkspace->canvasView()->setCurrentTool(id);
     statusBar()->showMessage(tr("当前工具已切换"), 1500);
 }
 
 void MainWindow::onBrushDiameterChanged(int diameter)
 {
-    ui->canvasView->setBrushDiameter(diameter);
+    ui->canvasWorkspace->canvasView()->setBrushDiameter(diameter);
 }
 
 void MainWindow::onForegroundColorChanged(const QColor &color)
 {
-    ui->canvasView->setForegroundColor(color);
+    ui->canvasWorkspace->canvasView()->setForegroundColor(color);
 }
 
 void MainWindow::onBackgroundColorChanged(const QColor &color)
 {
-    ui->canvasView->setBackgroundColor(color);
+    ui->canvasWorkspace->canvasView()->setBackgroundColor(color);
 }
 
 void MainWindow::onNewDocument()
@@ -129,22 +133,24 @@ void MainWindow::onOpenDocument()
 
 void MainWindow::onZoomFit()
 {
-    ui->canvasView->zoomFit();
+    ui->canvasWorkspace->canvasView()->zoomFit();
 }
 
 void MainWindow::onZoomActual()
 {
-    ui->canvasView->zoomActual();
+    ui->canvasWorkspace->canvasView()->zoomActual();
 }
 
 void MainWindow::onZoomIn()
 {
-    ui->canvasView->setZoom(ui->canvasView->zoom() * 1.25);
+    CanvasView *canvas = ui->canvasWorkspace->canvasView();
+    canvas->setZoom(canvas->zoom() * 1.25);
 }
 
 void MainWindow::onZoomOut()
 {
-    ui->canvasView->setZoom(ui->canvasView->zoom() / 1.25);
+    CanvasView *canvas = ui->canvasWorkspace->canvasView();
+    canvas->setZoom(canvas->zoom() / 1.25);
 }
 
 void MainWindow::onToggleLayerPanel(bool visible)
@@ -166,7 +172,7 @@ void MainWindow::setDocument(std::unique_ptr<Ps::ImageDocument> document)
 {
     m_document = std::move(document);
     // 画布与图层面板都不拥有文档，只借用指针
-    ui->canvasView->setDocument(m_document.get());
+    ui->canvasWorkspace->canvasView()->setDocument(m_document.get());
     ui->layerPanel->setDocument(m_document.get());
     updateWindowTitle();
 }

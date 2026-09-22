@@ -42,25 +42,38 @@ void CanvasView::setDocument(Ps::ImageDocument *document)
             update();
         });
         rebuildCache();
-        zoomFit();
+        // 尺寸有效则立即居中适应；否则等 resizeEvent
+        if (width() > 50 && height() > 50)
+            zoomFit();
+        else
+            m_pendingFit = true;
     } else {
         m_cache = QImage();
+        m_pendingFit = false;
         update();
+        notifyViewChanged();
     }
 }
 
 void CanvasView::setZoom(qreal zoom)
 {
+    // 以视口中心为锚点缩放，避免菜单缩放时画布「跑偏」
+    const QPointF anchorWidget(width() * 0.5, height() * 0.5);
+    const QPointF anchorImage = widgetToImage(anchorWidget);
     m_zoom = qBound(0.05, zoom, 32.0);
+    m_offset = anchorWidget - anchorImage * m_zoom;
     update();
+    notifyViewChanged();
 }
 
 void CanvasView::zoomFit()
 {
+    m_pendingFit = false;
     if (!m_document || m_document->width() <= 0 || m_document->height() <= 0) {
         m_zoom = 1.0;
         m_offset = QPointF();
         update();
+        notifyViewChanged();
         return;
     }
 
@@ -68,20 +81,30 @@ void CanvasView::zoomFit()
     const qreal sx = (width() - margin * 2) / m_document->width();
     const qreal sy = (height() - margin * 2) / m_document->height();
     m_zoom = qBound(0.05, qMin(sx, sy), 32.0);
-
-    const QSizeF size(m_document->width() * m_zoom, m_document->height() * m_zoom);
-    m_offset = QPointF((width() - size.width()) * 0.5, (height() - size.height()) * 0.5);
-    update();
+    centerOnImage();
 }
 
 void CanvasView::zoomActual()
 {
+    m_pendingFit = false;
     if (!m_document)
         return;
     m_zoom = 1.0;
+    centerOnImage();
+}
+
+void CanvasView::centerOnImage()
+{
+    if (!m_document) {
+        m_offset = QPointF();
+        update();
+        notifyViewChanged();
+        return;
+    }
     const QSizeF size(m_document->width() * m_zoom, m_document->height() * m_zoom);
     m_offset = QPointF((width() - size.width()) * 0.5, (height() - size.height()) * 0.5);
     update();
+    notifyViewChanged();
 }
 
 void CanvasView::setCurrentTool(Ps::ToolId id)
@@ -138,16 +161,15 @@ void CanvasView::wheelEvent(QWheelEvent *event)
     const QPointF before = (mouse - m_offset) / m_zoom;
 
     const qreal factor = event->angleDelta().y() > 0 ? 1.1 : (1.0 / 1.1);
-    setZoom(m_zoom * factor);
-
+    m_zoom = qBound(0.05, m_zoom * factor, 32.0);
     m_offset = mouse - before * m_zoom;
     update();
+    notifyViewChanged();
     event->accept();
 }
 
 void CanvasView::mousePressEvent(QMouseEvent *event)
 {
-    // 中键，或 Alt+左键：始终平移（不占用画笔左键）
     if (event->button() == Qt::MiddleButton
         || (event->button() == Qt::LeftButton && (event->modifiers() & Qt::AltModifier))) {
         m_panning = true;
@@ -158,7 +180,6 @@ void CanvasView::mousePressEvent(QMouseEvent *event)
     }
 
     if (event->button() == Qt::LeftButton && m_document) {
-        // 抓手工具：左键拖动画布（对齐 PS Hand / GIMP Move？此处仅视图平移）
         if (m_tool == Ps::ToolId::Hand) {
             m_panning = true;
             m_lastMousePos = event->pos();
@@ -167,13 +188,13 @@ void CanvasView::mousePressEvent(QMouseEvent *event)
             return;
         }
 
-        // 缩放工具：左键放大，Alt+左键已留给平移；右键缩小
         if (m_tool == Ps::ToolId::Zoom) {
             const QPointF mouse = event->position();
             const QPointF before = (mouse - m_offset) / m_zoom;
-            setZoom(m_zoom * 1.25);
+            m_zoom = qBound(0.05, m_zoom * 1.25, 32.0);
             m_offset = mouse - before * m_zoom;
             update();
+            notifyViewChanged();
             event->accept();
             return;
         }
@@ -188,9 +209,10 @@ void CanvasView::mousePressEvent(QMouseEvent *event)
     if (event->button() == Qt::RightButton && m_tool == Ps::ToolId::Zoom && m_document) {
         const QPointF mouse = event->position();
         const QPointF before = (mouse - m_offset) / m_zoom;
-        setZoom(m_zoom / 1.25);
+        m_zoom = qBound(0.05, m_zoom / 1.25, 32.0);
         m_offset = mouse - before * m_zoom;
         update();
+        notifyViewChanged();
         event->accept();
         return;
     }
@@ -200,11 +222,15 @@ void CanvasView::mousePressEvent(QMouseEvent *event)
 
 void CanvasView::mouseMoveEvent(QMouseEvent *event)
 {
+    if (m_document)
+        emit cursorImagePosChanged(widgetToImage(event->position()), true);
+
     if (m_panning) {
         const QPoint delta = event->pos() - m_lastMousePos;
         m_lastMousePos = event->pos();
         m_offset += delta;
         update();
+        notifyViewChanged();
         event->accept();
         return;
     }
@@ -239,6 +265,16 @@ void CanvasView::mouseReleaseEvent(QMouseEvent *event)
 void CanvasView::resizeEvent(QResizeEvent *event)
 {
     QWidget::resizeEvent(event);
+    if (m_pendingFit && width() > 50 && height() > 50)
+        zoomFit();
+    else
+        notifyViewChanged();
+}
+
+void CanvasView::leaveEvent(QEvent *event)
+{
+    emit cursorImagePosChanged(QPointF(), false);
+    QWidget::leaveEvent(event);
 }
 
 void CanvasView::rebuildCache()
@@ -248,6 +284,11 @@ void CanvasView::rebuildCache()
         return;
     }
     m_cache = Ps::Compositor::composite(*m_document);
+}
+
+void CanvasView::notifyViewChanged()
+{
+    emit viewChanged();
 }
 
 QPointF CanvasView::imageToWidget(const QPointF &imagePos) const

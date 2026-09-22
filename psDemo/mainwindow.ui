@@ -42,7 +42,7 @@
        <widget class="ToolBox" name="toolBox" native="true"/>
       </item>
       <item>
-       <widget class="CanvasView" name="canvasView" native="true"/>
+       <widget class="CanvasWorkspace" name="canvasWorkspace" native="true"/>
       </item>
       <item>
        <widget class="LayerPanel" name="layerPanel" native="true">
@@ -770,9 +770,9 @@
  </widget>
  <customwidgets>
   <customwidget>
-   <class>CanvasView</class>
+   <class>CanvasWorkspace</class>
    <extends>QWidget</extends>
-   <header>ui/canvasview.h</header>
+   <header>ui/canvasworkspace.h</header>
    <container>1</container>
   </customwidget>
   <customwidget>

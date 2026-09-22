@@ -22,9 +22,10 @@ class ImageDocument;
  *
  * 整体布局对齐 Photoshop：
  *   顶：菜单栏 → 工具选项栏
- *   中：左侧工具箱 | 画布 | 右侧图层面板
+ *   中：左侧工具箱 | 标尺+画布工作区 | 右侧图层面板
  *
  * 工具箱结构参考 GIMP GimpToolbox（按钮区 + 前/背景色）。
+ * 标尺工作区参考 GIMP display shell（hrule/vrule + canvas）。
  */
 class MainWindow : public QMainWindow
 {

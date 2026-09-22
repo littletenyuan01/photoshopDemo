@@ -29,6 +29,13 @@
 
 ## 技术点日志
 
+### 2026-09 — 标尺与画布居中
+
+- 新增 `CanvasWorkspace`（`canvasworkspace.ui`）：左上角块 + 顶/左 `RulerWidget` + `CanvasView`。
+- 【对照 GIMP】`gimp_display_shell_rulers_update`：lower/upper = 视口边在图像坐标中的值；本项目用 `-offset/zoom`。
+- 文档载入后 `zoomFit` 居中；首次 `resize` 若尺寸未就绪则延迟 fit，避免偏左上。
+- `RulerWidget` 为自绘例外（无独立 .ui）；外壳必须用 `.ui`。
+
 ### 2026-09 — 画笔 / 橡皮（PaintEngine）
 
 - 【对照 GIMP】`app/tools`（事件）与 `app/paint/GimpPaintCore`（写缓冲）分离；本项目为 `CanvasView` 事件 + `PaintEngine` dab。

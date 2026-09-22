@@ -33,7 +33,9 @@
 
 | 文件 | 职责 |
 |------|------|
-| `ui/canvasview.h/.cpp` | 合成缓存显示；缩放/平移；画笔/橡皮/抓手/缩放工具事件 |
+| `ui/canvasview.h/.cpp` | 合成缓存显示；缩放/平移/居中；画笔等工具事件 |
+| `ui/canvasworkspace.ui/.h/.cpp` | 顶/左标尺 + 画布拼装（对齐 PS/GIMP display 壳） |
+| `ui/rulerwidget.h/.cpp` | 像素标尺自绘（外层由 workspace.ui 排布） |
 | `ui/layerpanel.ui/.h/.cpp` | 图层面板：列表/显隐/透明度/增删排序 |
 | `ui/toolbox.ui/.h/.cpp` | 左侧工具箱 + 前/背景色（对齐 GIMP Toolbox 结构） |
 | `ui/tooloptionsbar.ui/.h/.cpp` | 工具选项栏（名称 + 画笔直径） |
