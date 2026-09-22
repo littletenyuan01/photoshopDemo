@@ -11,6 +11,7 @@ SOURCES += \
     domain/layerstack.cpp \
     domain/imagedocument.cpp \
     engine/compositor.cpp \
+    engine/paintengine.cpp \
     ui/canvasview.cpp \
     ui/layerpanel.cpp \
     ui/toolbox.cpp \
@@ -23,6 +24,7 @@ HEADERS += \
     domain/layerstack.h \
     domain/imagedocument.h \
     engine/compositor.h \
+    engine/paintengine.h \
     tools/toolid.h \
     ui/canvasview.h \
     ui/layerpanel.h \

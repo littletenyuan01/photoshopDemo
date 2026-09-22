@@ -29,6 +29,13 @@
 
 ## 技术点日志
 
+### 2026-09 — 画笔 / 橡皮（PaintEngine）
+
+- 【对照 GIMP】`app/tools`（事件）与 `app/paint/GimpPaintCore`（写缓冲）分离；本项目为 `CanvasView` 事件 + `PaintEngine` dab。
+- 圆形径向渐变 dab；`strokeSegment` 按直径比例间距插值，避免拖动断笔。
+- 画笔 `SourceOver`，橡皮 `DestinationOut`；只改 `activeLayer()->pixels()`。
+- 未做：撤销瓦片、选区 mask、流量/硬度 UI、笔刷预设。
+
 ### 2026-09 — iconfont 图标与工具分组
 
 - 使用 `resources/icons/tools/*.png`（英文文件名）替换自绘 SVG。

@@ -44,6 +44,9 @@ private slots:
     void onToggleLayerPanel(bool visible);
     void onAbout();
     void onToolChanged(Ps::ToolId id);
+    void onBrushDiameterChanged(int diameter);
+    void onForegroundColorChanged(const QColor &color);
+    void onBackgroundColorChanged(const QColor &color);
 
 private:
     void setDocument(std::unique_ptr<Ps::ImageDocument> document);

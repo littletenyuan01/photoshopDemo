@@ -4,6 +4,7 @@
 #include "domain/imagedocument.h"
 #include "domain/layer.h"
 #include "ui/toolbox.h"
+#include "ui/tooloptionsbar.h"
 
 #include <QFileDialog>
 #include <QImageReader>
@@ -50,15 +51,43 @@ void MainWindow::setupMenus()
 
 void MainWindow::setupToolbox()
 {
-    // 工具箱选中 → 选项栏显示名称（绘制逻辑尚未接入）
+    // 工具箱 → 选项栏 + 画布（绘制/抓手/缩放）
     connect(ui->toolBox, &ToolBox::toolChanged, this, &MainWindow::onToolChanged);
-    ui->toolOptionsBar->setCurrentTool(ui->toolBox->currentTool());
+    connect(ui->toolBox, &ToolBox::foregroundColorChanged,
+            this, &MainWindow::onForegroundColorChanged);
+    connect(ui->toolBox, &ToolBox::backgroundColorChanged,
+            this, &MainWindow::onBackgroundColorChanged);
+    connect(ui->toolOptionsBar, &ToolOptionsBar::brushDiameterChanged,
+            this, &MainWindow::onBrushDiameterChanged);
+
+    const Ps::ToolId tool = ui->toolBox->currentTool();
+    ui->toolOptionsBar->setCurrentTool(tool);
+    ui->canvasView->setCurrentTool(tool);
+    ui->canvasView->setForegroundColor(ui->toolBox->foregroundColor());
+    ui->canvasView->setBackgroundColor(ui->toolBox->backgroundColor());
+    ui->canvasView->setBrushDiameter(ui->toolOptionsBar->brushDiameter());
 }
 
 void MainWindow::onToolChanged(Ps::ToolId id)
 {
     ui->toolOptionsBar->setCurrentTool(id);
+    ui->canvasView->setCurrentTool(id);
     statusBar()->showMessage(tr("当前工具已切换"), 1500);
+}
+
+void MainWindow::onBrushDiameterChanged(int diameter)
+{
+    ui->canvasView->setBrushDiameter(diameter);
+}
+
+void MainWindow::onForegroundColorChanged(const QColor &color)
+{
+    ui->canvasView->setForegroundColor(color);
+}
+
+void MainWindow::onBackgroundColorChanged(const QColor &color)
+{
+    ui->canvasView->setBackgroundColor(color);
 }
 
 void MainWindow::onNewDocument()

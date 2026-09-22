@@ -25,17 +25,18 @@
 | 文件 | 职责 |
 |------|------|
 | `engine/compositor.h/.cpp` | 预乘 Alpha 的 Normal 合成；可按矩形脏区合成 |
+| `engine/paintengine.h/.cpp` | 圆形 dab / 线段插值；画笔 SourceOver、橡皮 DestinationOut |
 
-**要点**：`blendNormalPremultiplied` 按扫描线混合，为后续蒙版/混合模式预留同一入口。
+**要点**：`blendNormalPremultiplied` 按扫描线混合；绘制与合成分离（对齐 GIMP paint vs projection）。
 
 ## ui
 
 | 文件 | 职责 |
 |------|------|
-| `ui/canvasview.h/.cpp` | 显示合成缓存；缩放/平移；监听 `documentChanged` |
+| `ui/canvasview.h/.cpp` | 合成缓存显示；缩放/平移；画笔/橡皮/抓手/缩放工具事件 |
 | `ui/layerpanel.ui/.h/.cpp` | 图层面板：列表/显隐/透明度/增删排序 |
 | `ui/toolbox.ui/.h/.cpp` | 左侧工具箱 + 前/背景色（对齐 GIMP Toolbox 结构） |
-| `ui/tooloptionsbar.ui/.h/.cpp` | 工具选项栏（显示当前工具名） |
+| `ui/tooloptionsbar.ui/.h/.cpp` | 工具选项栏（名称 + 画笔直径） |
 | `tools/toolid.h` | 工具枚举（对应 GIMP ToolInfo 思路） |
 
 ## 计划中
@@ -44,8 +45,6 @@
 |----------|----------|
 | `Selection` | 文档级选区 mask |
 | `LayerMask` / `AdjustmentLayer` | 蒙版与调整层 |
-| `LayerPanel`（`.ui`） | ~~计划~~ 已实现：`ui/layerpanel.*` |
-| `PaintEngine` / `BrushTool` | 像素写入 |
 | `HistoryStack` | 撤销 / 重做 |
 | `RasterIO` / `ProjectIO` | 导出与工程文件 |
 

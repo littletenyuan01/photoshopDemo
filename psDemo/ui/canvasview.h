@@ -1,8 +1,10 @@
 #ifndef CANVASVIEW_H
 #define CANVASVIEW_H
 
+#include "tools/toolid.h"
+
+#include <QColor>
 #include <QWidget>
-#include <memory>
 
 namespace Ps {
 class ImageDocument;
@@ -10,8 +12,8 @@ class ImageDocument;
 
 /**
  * 画布视图（ui）。
- * 职责类似 GIMP 的 display：只负责显示与视图变换，不拥有图层像素。
- * 文档指针由 MainWindow 持有；本类监听 documentChanged 后重合成缓存。
+ * 职责类似 GIMP display：显示与视图变换；并把指针事件交给当前工具逻辑。
+ * 像素写入不在本类内算算法，而是调用 engine/PaintEngine（对齐 GIMP tools↔paint 分离）。
  *
  * 坐标：
  * - 图像坐标：文档像素 (0,0)-(w,h)
@@ -33,6 +35,15 @@ public:
     void zoomFit();
     void zoomActual();
 
+    void setCurrentTool(Ps::ToolId id);
+    Ps::ToolId currentTool() const { return m_tool; }
+
+    void setForegroundColor(const QColor &c);
+    void setBackgroundColor(const QColor &c);
+    /** 画笔/橡皮直径（图像像素），内部存为半径。 */
+    void setBrushDiameter(int diameter);
+    int brushDiameter() const { return qRound(m_brushRadius * 2.0); }
+
 protected:
     void paintEvent(QPaintEvent *event) override;
     void wheelEvent(QWheelEvent *event) override;
@@ -44,16 +55,31 @@ protected:
 private:
     void rebuildCache();
     QPointF imageToWidget(const QPointF &imagePos) const;
+    QPointF widgetToImage(const QPointF &widgetPos) const;
     QRectF imageRectInWidget() const;
-    /** 透明区域衬底，便于看出半透明像素。 */
     void drawCheckerboard(QPainter &painter, const QRect &rect) const;
+    void updateToolCursor();
+
+    /** 是否为「在活动层写像素」的工具。 */
+    bool isPaintTool() const;
+    void beginPaintStroke(const QPointF &imagePos);
+    void continuePaintStroke(const QPointF &imagePos);
+    void endPaintStroke();
 
     Ps::ImageDocument *m_document = nullptr;
-    QImage m_cache;          // 最近一次合成结果（图像坐标）
+    QImage m_cache;
     qreal m_zoom = 1.0;
-    QPointF m_offset;        // 图像左上角在 widget 中的位置
+    QPointF m_offset;
     bool m_panning = false;
     QPoint m_lastMousePos;
+
+    Ps::ToolId m_tool = Ps::ToolId::Move;
+    QColor m_fg {Qt::black};
+    QColor m_bg {Qt::white};
+    qreal m_brushRadius = 10.0; // 直径默认 20
+
+    bool m_painting = false;
+    QPointF m_lastPaintPos; // 上一颗 dab / 线段起点（图像坐标）
 };
 
 #endif // CANVASVIEW_H

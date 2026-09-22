@@ -6,6 +6,8 @@ ToolOptionsBar::ToolOptionsBar(QWidget *parent)
     , ui(new Ui::ToolOptionsBar)
 {
     ui->setupUi(this);
+    connect(ui->brushSizeSpin, qOverload<int>(&QSpinBox::valueChanged),
+            this, &ToolOptionsBar::brushDiameterChanged);
     setCurrentTool(Ps::ToolId::Move);
 }
 
@@ -14,9 +16,48 @@ ToolOptionsBar::~ToolOptionsBar()
     delete ui;
 }
 
+int ToolOptionsBar::brushDiameter() const
+{
+    return ui->brushSizeSpin->value();
+}
+
+void ToolOptionsBar::setBrushDiameter(int diameter)
+{
+    ui->brushSizeSpin->blockSignals(true);
+    ui->brushSizeSpin->setValue(qBound(1, diameter, 500));
+    ui->brushSizeSpin->blockSignals(false);
+}
+
 void ToolOptionsBar::setCurrentTool(Ps::ToolId id)
 {
+    m_tool = id;
     ui->toolNameLabel->setText(toolDisplayName(id));
+    updateForTool(id);
+}
+
+void ToolOptionsBar::updateForTool(Ps::ToolId id)
+{
+    const bool paintLike = (id == Ps::ToolId::Brush || id == Ps::ToolId::Eraser);
+    ui->sizeLabel->setVisible(paintLike);
+    ui->brushSizeSpin->setVisible(paintLike);
+
+    switch (id) {
+    case Ps::ToolId::Brush:
+        ui->hintLabel->setText(tr("左键在活动层绘制；Alt+左键平移"));
+        break;
+    case Ps::ToolId::Eraser:
+        ui->hintLabel->setText(tr("左键擦除活动层；Alt+左键平移"));
+        break;
+    case Ps::ToolId::Hand:
+        ui->hintLabel->setText(tr("拖拽平移画布"));
+        break;
+    case Ps::ToolId::Zoom:
+        ui->hintLabel->setText(tr("左键放大，右键缩小"));
+        break;
+    default:
+        ui->hintLabel->setText(tr("该工具逻辑尚未接入"));
+        break;
+    }
 }
 
 QString ToolOptionsBar::toolDisplayName(Ps::ToolId id)
