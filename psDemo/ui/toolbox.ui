@@ -6,19 +6,19 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>52</width>
+    <width>46</width>
     <height>640</height>
    </rect>
   </property>
   <property name="minimumSize">
    <size>
-    <width>48</width>
+    <width>42</width>
     <height>200</height>
    </size>
   </property>
   <property name="maximumSize">
    <size>
-    <width>56</width>
+    <width>48</width>
     <height>16777215</height>
    </size>
   </property>
@@ -49,9 +49,13 @@ QToolButton {
 }
 QToolButton:hover { background-color: #6e6e6e; }
 QToolButton:checked { background-color: #3d6ea0; border-color: #6aa8e0; }
-QPushButton#fgButton, QPushButton#bgButton {
-  border: 1px solid #333;
-  border-radius: 2px;
+QPushButton#fgButton {
+  border: 2px solid #f0f0f0;
+  border-radius: 1px;
+}
+QPushButton#bgButton {
+  border: 1px solid #222;
+  border-radius: 1px;
 }
 QToolButton#swapColorsButton, QToolButton#defaultColorsButton {
   font-size: 9px;
@@ -64,13 +68,13 @@ QToolButton#swapColorsButton, QToolButton#defaultColorsButton {
     <number>2</number>
    </property>
    <property name="leftMargin">
-    <number>3</number>
+    <number>2</number>
    </property>
    <property name="topMargin">
     <number>4</number>
    </property>
    <property name="rightMargin">
-    <number>3</number>
+    <number>2</number>
    </property>
    <property name="bottomMargin">
     <number>4</number>
@@ -91,7 +95,7 @@ QToolButton#swapColorsButton, QToolButton#defaultColorsButton {
        <rect>
         <x>0</x>
         <y>0</y>
-        <width>40</width>
+        <width>36</width>
         <height>480</height>
        </rect>
       </property>
@@ -184,58 +188,53 @@ QToolButton#swapColorsButton, QToolButton#defaultColorsButton {
        </layout>
       </item>
       <item>
-       <layout class="QGridLayout" name="swatchGrid">
-        <property name="horizontalSpacing">
-         <number>0</number>
+       <!-- 【对照 GIMP】gimpfgbgeditor：背景右下、前景左上重叠；交换只改颜色，位置固定 -->
+       <widget class="QWidget" name="swatchHost" native="true">
+        <property name="minimumSize">
+         <size>
+          <width>36</width>
+          <height>34</height>
+         </size>
         </property>
-        <property name="verticalSpacing">
-         <number>0</number>
+        <property name="maximumSize">
+         <size>
+          <width>36</width>
+          <height>34</height>
+         </size>
         </property>
-        <item row="1" column="0">
-         <widget class="QPushButton" name="bgButton">
-          <property name="minimumSize">
-           <size>
-            <width>22</width>
-            <height>22</height>
-           </size>
-          </property>
-          <property name="maximumSize">
-           <size>
-            <width>22</width>
-            <height>22</height>
-           </size>
-          </property>
-          <property name="toolTip">
-           <string>背景色</string>
-          </property>
-          <property name="text">
-           <string/>
-          </property>
-         </widget>
-        </item>
-        <item row="0" column="1">
-         <widget class="QPushButton" name="fgButton">
-          <property name="minimumSize">
-           <size>
-            <width>22</width>
-            <height>22</height>
-           </size>
-          </property>
-          <property name="maximumSize">
-           <size>
-            <width>22</width>
-            <height>22</height>
-           </size>
-          </property>
-          <property name="toolTip">
-           <string>前景色</string>
-          </property>
-          <property name="text">
-           <string/>
-          </property>
-         </widget>
-        </item>
-       </layout>
+        <widget class="QPushButton" name="bgButton">
+         <property name="geometry">
+          <rect>
+           <x>12</x>
+           <y>12</y>
+           <width>22</width>
+           <height>22</height>
+          </rect>
+         </property>
+         <property name="toolTip">
+          <string>背景色</string>
+         </property>
+         <property name="text">
+          <string/>
+         </property>
+        </widget>
+        <widget class="QPushButton" name="fgButton">
+         <property name="geometry">
+          <rect>
+           <x>0</x>
+           <y>0</y>
+           <width>24</width>
+           <height>24</height>
+          </rect>
+         </property>
+         <property name="toolTip">
+          <string>前景色（画笔等使用）</string>
+         </property>
+         <property name="text">
+          <string/>
+         </property>
+        </widget>
+       </widget>
       </item>
      </layout>
     </widget>

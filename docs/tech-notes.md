@@ -58,16 +58,19 @@
 
 ### 2026-09 — iconfont 图标与工具分组
 
-- 使用 `resources/icons/tools/*.png`（英文文件名）替换自绘 SVG。
+- 使用 `resources/icons/tools/*.png`（英文文件名）。
 - 工具栏占位支持多工具：左键用当前子工具，右键弹出同组列表（对齐 PS 飞出菜单）；多子工具时图标右下角画小三角。
 - 形状组：矩形 / 椭圆 / 三角 / 直线；选框组：矩形选框 / 椭圆选框；填充组：油漆桶 / 渐变。
 
 - 主窗口加载 `:/styles/dark.qss`。
 - 图标约定：**优先 [iconfont.cn](https://www.iconfont.cn/)**（见 `icon-sources.mdc` / `docs/iconfont-icons.md`）；禁止 Adobe 官方图标；资源文件名用英文。
-- 自绘 SVG 仍保留在 `resources/icons/*.svg` 作回退；工具箱已切到 `:/icons/tools/*.png`。
+- 工具箱路径：`:/icons/tools/*.png`。旧自绘 `tool-*.svg` 已移除。
 
-- 现状：`ui/layerpanel.*` 可增删/显隐/透明度/排序；**实现时未逐项对照** `gimp-master` layers dock。
-- 约定：下次改版必须先读 GIMP 对应 widgets，再改行为与 UI；注释中已标【待对照 GIMP】。
+### 2026-09 — 图层/通道/路径面板（对照 GIMP 结构）
+
+- 【对照 GIMP】`gimpitemtreeview` + `gimplayertreeview` / `gimpchanneltreeview` / `gimppathtreeview`；dock 注册见 `dialogs-constructors.c`（三个独立 list view）。
+- 本项目：`ItemTreePanel` 基类 → `Layer/Channel/PathTreePanel`；`LayerPanel` 仅为 PS 式 Tab 壳（GIMP 里由用户把三 dock 叠 notebook）。
+- 图层已接文档；通道/路径占位。未做：独立 actions/commands 层、分量编辑器、路径 stroke。
 - 列表行序与 `LayerStack` 下标相反（UI 顶 = 栈顶）。
 
 ### 2026-09 — 预乘 Alpha 合成（Compositor）

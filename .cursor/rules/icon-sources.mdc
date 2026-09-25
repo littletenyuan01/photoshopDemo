@@ -21,10 +21,9 @@ alwaysApply: true
 
 ## 落地要求
 
-- 下载的 SVG 放到 `psDemo/resources/icons/`，并加入 `resources.qrc`  
-- 命名建议：`tool-<name>.svg`（如 `tool-brush.svg`）  
-- 暗色主题下优先选**单色/线框**或可改 `fill/stroke` 为浅色的 SVG  
-- 在 `docs/tech-notes.md` 简要记录图标来源（iconfont 项目/关键词即可）  
+- 下载图标放到 `psDemo/resources/icons/tools/`（PNG，英文文件名），并加入 `resources.qrc`
+- 命名建议：`tools/<name>.png`（如 `brush.png`）；暗色主题优先单色/线框
+- 在 `docs/iconfont-icons.md` / `tech-notes.md` 记录来源（iconfont 关键词即可）
 
 ## 自动化注意
 

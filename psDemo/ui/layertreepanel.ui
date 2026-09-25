@@ -1,0 +1,535 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>LayerTreePanel</class>
+ <widget class="QWidget" name="LayerTreePanel">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>280</width>
+    <height>480</height>
+   </rect>
+  </property>
+  <property name="styleSheet">
+   <string notr="true">QLabel { color: #d0d0d0; font-size: 11px; }
+QComboBox {
+  background-color: #2a2a2a; color: #eee; border: 1px solid #1a1a1a;
+  border-radius: 2px; padding: 1px 4px; min-height: 20px; font-size: 11px;
+}
+QComboBox::drop-down { border: none; width: 16px; }
+QComboBox QAbstractItemView {
+  background-color: #2a2a2a; color: #eee; selection-background-color: #2d5a8a;
+}
+QListWidget {
+  background-color: #323232; color: #eee; border: none; outline: none; font-size: 12px;
+}
+QListWidget::item { padding: 4px 2px; min-height: 36px; }
+QListWidget::item:selected { background-color: #555555; }
+QListWidget::item:hover:!selected { background-color: #404040; }
+QFrame#optionsHost, QFrame#toolbarHost { background-color: #3a3a3a; border: none; }
+QFrame#toolbarHost { border-top: 1px solid #2a2a2a; }
+QToolButton {
+  background-color: transparent; color: #ddd; border: 1px solid transparent;
+  border-radius: 2px; padding: 2px; font-size: 11px; min-width: 22px; min-height: 22px;
+}
+QToolButton:hover { background-color: #4e4e4e; }
+QToolButton:checked { background-color: #2d5a8a; border-color: #4a8ac0; }
+QToolButton:disabled { color: #666; }</string>
+  </property>
+  <layout class="QVBoxLayout" name="rootLayout">
+   <property name="spacing">
+    <number>0</number>
+   </property>
+   <property name="leftMargin">
+    <number>0</number>
+   </property>
+   <property name="topMargin">
+    <number>0</number>
+   </property>
+   <property name="rightMargin">
+    <number>0</number>
+   </property>
+   <property name="bottomMargin">
+    <number>0</number>
+   </property>
+   <item>
+    <widget class="QFrame" name="optionsHost">
+     <property name="frameShape">
+      <enum>QFrame::Shape::NoFrame</enum>
+     </property>
+     <layout class="QVBoxLayout" name="optionsLayout">
+      <property name="spacing">
+       <number>4</number>
+      </property>
+      <property name="leftMargin">
+       <number>6</number>
+      </property>
+      <property name="topMargin">
+       <number>6</number>
+      </property>
+      <property name="rightMargin">
+       <number>6</number>
+      </property>
+      <property name="bottomMargin">
+       <number>4</number>
+      </property>
+      <item>
+       <layout class="QHBoxLayout" name="filterRow">
+        <property name="spacing">
+         <number>2</number>
+        </property>
+        <item>
+         <widget class="QComboBox" name="filterKindCombo">
+          <property name="minimumSize">
+           <size>
+            <width>72</width>
+            <height>0</height>
+           </size>
+          </property>
+          <property name="toolTip">
+           <string>按类型筛选</string>
+          </property>
+          <item>
+           <property name="text">
+            <string>类型</string>
+           </property>
+          </item>
+          <item>
+           <property name="text">
+            <string>名称</string>
+           </property>
+          </item>
+          <item>
+           <property name="text">
+            <string>效果</string>
+           </property>
+          </item>
+         </widget>
+        </item>
+        <item>
+         <widget class="QToolButton" name="filterPixel">
+          <property name="checkable">
+           <bool>true</bool>
+          </property>
+          <property name="text">
+           <string>像素</string>
+          </property>
+          <property name="toolTip">
+           <string>筛选像素图层</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QToolButton" name="filterAdjust">
+          <property name="checkable">
+           <bool>true</bool>
+          </property>
+          <property name="text">
+           <string>调整</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QToolButton" name="filterType">
+          <property name="checkable">
+           <bool>true</bool>
+          </property>
+          <property name="text">
+           <string>T</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QToolButton" name="filterShape">
+          <property name="checkable">
+           <bool>true</bool>
+          </property>
+          <property name="text">
+           <string>形</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QToolButton" name="filterSmart">
+          <property name="checkable">
+           <bool>true</bool>
+          </property>
+          <property name="text">
+           <string>智</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <spacer name="filterSpacer">
+          <property name="orientation">
+           <enum>Qt::Orientation::Horizontal</enum>
+          </property>
+          <property name="sizeHint" stdset="0">
+           <size>
+            <width>8</width>
+            <height>10</height>
+           </size>
+          </property>
+         </spacer>
+        </item>
+        <item>
+         <widget class="QToolButton" name="filterToggle">
+          <property name="checkable">
+           <bool>true</bool>
+          </property>
+          <property name="text">
+           <string>○</string>
+          </property>
+          <property name="toolTip">
+           <string>打开/关闭图层筛选</string>
+          </property>
+         </widget>
+        </item>
+       </layout>
+      </item>
+      <item>
+       <layout class="QHBoxLayout" name="blendRow">
+        <property name="spacing">
+         <number>6</number>
+        </property>
+        <item>
+         <widget class="QComboBox" name="blendModeCombo">
+          <property name="sizePolicy">
+           <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
+            <horstretch>1</horstretch>
+            <verstretch>0</verstretch>
+           </sizepolicy>
+          </property>
+          <property name="toolTip">
+           <string>混合模式</string>
+          </property>
+          <item>
+           <property name="text">
+            <string>正常</string>
+           </property>
+          </item>
+          <item>
+           <property name="text">
+            <string>正片叠底</string>
+           </property>
+          </item>
+          <item>
+           <property name="text">
+            <string>滤色</string>
+           </property>
+          </item>
+          <item>
+           <property name="text">
+            <string>叠加</string>
+           </property>
+          </item>
+         </widget>
+        </item>
+        <item>
+         <widget class="QLabel" name="opacityLabel">
+          <property name="text">
+           <string>不透明度:</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QSlider" name="opacitySlider">
+          <property name="sizePolicy">
+           <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
+            <horstretch>1</horstretch>
+            <verstretch>0</verstretch>
+           </sizepolicy>
+          </property>
+          <property name="maximum">
+           <number>100</number>
+          </property>
+          <property name="value">
+           <number>100</number>
+          </property>
+          <property name="orientation">
+           <enum>Qt::Orientation::Horizontal</enum>
+          </property>
+          <property name="toolTip">
+           <string>图层不透明度</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QLabel" name="opacityValueLabel">
+          <property name="minimumSize">
+           <size>
+            <width>36</width>
+            <height>0</height>
+           </size>
+          </property>
+          <property name="text">
+           <string>100%</string>
+          </property>
+          <property name="alignment">
+           <set>Qt::AlignmentFlag::AlignRight|Qt::AlignmentFlag::AlignTrailing|Qt::AlignmentFlag::AlignVCenter</set>
+          </property>
+         </widget>
+        </item>
+       </layout>
+      </item>
+      <item>
+       <layout class="QHBoxLayout" name="lockRow">
+        <property name="spacing">
+         <number>2</number>
+        </property>
+        <item>
+         <widget class="QLabel" name="lockLabel">
+          <property name="text">
+           <string>锁定:</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QToolButton" name="lockTransparent">
+          <property name="checkable">
+           <bool>true</bool>
+          </property>
+          <property name="text">
+           <string>□</string>
+          </property>
+          <property name="toolTip">
+           <string>锁定透明像素</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QToolButton" name="lockImage">
+          <property name="checkable">
+           <bool>true</bool>
+          </property>
+          <property name="text">
+           <string>画</string>
+          </property>
+          <property name="toolTip">
+           <string>锁定图像像素</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QToolButton" name="lockPosition">
+          <property name="checkable">
+           <bool>true</bool>
+          </property>
+          <property name="text">
+           <string>十</string>
+          </property>
+          <property name="toolTip">
+           <string>锁定位置</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QToolButton" name="lockAll">
+          <property name="checkable">
+           <bool>true</bool>
+          </property>
+          <property name="text">
+           <string>锁</string>
+          </property>
+          <property name="toolTip">
+           <string>锁定全部</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <spacer name="lockSpacer">
+          <property name="orientation">
+           <enum>Qt::Orientation::Horizontal</enum>
+          </property>
+          <property name="sizeHint" stdset="0">
+           <size>
+            <width>8</width>
+            <height>10</height>
+           </size>
+          </property>
+         </spacer>
+        </item>
+        <item>
+         <widget class="QLabel" name="fillLabel">
+          <property name="text">
+           <string>填充:</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QSlider" name="fillSlider">
+          <property name="sizePolicy">
+           <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
+            <horstretch>1</horstretch>
+            <verstretch>0</verstretch>
+           </sizepolicy>
+          </property>
+          <property name="maximum">
+           <number>100</number>
+          </property>
+          <property name="value">
+           <number>100</number>
+          </property>
+          <property name="orientation">
+           <enum>Qt::Orientation::Horizontal</enum>
+          </property>
+          <property name="toolTip">
+           <string>填充不透明度</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QLabel" name="fillValueLabel">
+          <property name="minimumSize">
+           <size>
+            <width>36</width>
+            <height>0</height>
+           </size>
+          </property>
+          <property name="text">
+           <string>100%</string>
+          </property>
+          <property name="alignment">
+           <set>Qt::AlignmentFlag::AlignRight|Qt::AlignmentFlag::AlignTrailing|Qt::AlignmentFlag::AlignVCenter</set>
+          </property>
+         </widget>
+        </item>
+       </layout>
+      </item>
+     </layout>
+    </widget>
+   </item>
+   <item>
+    <widget class="QListWidget" name="itemList">
+     <property name="selectionMode">
+      <enum>QAbstractItemView::SelectionMode::SingleSelection</enum>
+     </property>
+    </widget>
+   </item>
+   <item>
+    <widget class="QFrame" name="toolbarHost">
+     <property name="minimumSize">
+      <size>
+       <width>0</width>
+       <height>28</height>
+      </size>
+     </property>
+     <property name="maximumSize">
+      <size>
+       <width>16777215</width>
+       <height>28</height>
+      </size>
+     </property>
+     <property name="frameShape">
+      <enum>QFrame::Shape::NoFrame</enum>
+     </property>
+     <layout class="QHBoxLayout" name="toolbarLayout">
+      <property name="spacing">
+       <number>0</number>
+      </property>
+      <property name="leftMargin">
+       <number>4</number>
+      </property>
+      <property name="topMargin">
+       <number>2</number>
+      </property>
+      <property name="rightMargin">
+       <number>4</number>
+      </property>
+      <property name="bottomMargin">
+       <number>2</number>
+      </property>
+      <item>
+       <widget class="QToolButton" name="btnLinkLayers">
+        <property name="enabled">
+         <bool>false</bool>
+        </property>
+        <property name="text">
+         <string>L</string>
+        </property>
+        <property name="toolTip">
+         <string>链接图层</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QToolButton" name="btnLayerStyle">
+        <property name="text">
+         <string>fx</string>
+        </property>
+        <property name="toolTip">
+         <string>添加图层样式</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QToolButton" name="btnLayerMask">
+        <property name="text">
+         <string>M</string>
+        </property>
+        <property name="toolTip">
+         <string>添加图层蒙版</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QToolButton" name="btnAdjustment">
+        <property name="text">
+         <string>◐</string>
+        </property>
+        <property name="toolTip">
+         <string>创建新的填充或调整图层</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QToolButton" name="btnNewGroup">
+        <property name="text">
+         <string>G</string>
+        </property>
+        <property name="toolTip">
+         <string>创建新组</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QToolButton" name="btnNew">
+        <property name="text">
+         <string>+</string>
+        </property>
+        <property name="toolTip">
+         <string>创建新图层</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QToolButton" name="btnDelete">
+        <property name="text">
+         <string>X</string>
+        </property>
+        <property name="toolTip">
+         <string>删除图层</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <spacer name="toolbarSpacer">
+        <property name="orientation">
+         <enum>Qt::Orientation::Horizontal</enum>
+        </property>
+        <property name="sizeHint" stdset="0">
+         <size>
+          <width>40</width>
+          <height>10</height>
+         </size>
+        </property>
+       </spacer>
+      </item>
+     </layout>
+    </widget>
+   </item>
+  </layout>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>

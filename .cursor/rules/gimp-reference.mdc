@@ -13,7 +13,9 @@ alwaysApply: true
 
 ## 当前已知债
 
-- `LayerPanel`：**先留用**，实现时未逐项对照 GIMP layers UI；下次改版须对照 `gimp-master`（如 `app/widgets` 图层相关 dock）再改  
+- 右侧面板：**结构已对照** GIMP `ItemTreeView` → `Layer/Channel/PathTreeView`（见 `ui/itemtreepanel.*` 等）；外观用 PS 三 Tab 壳（`LayerPanel`）
+- 通道 / 路径：仅 UI 骨架，无 domain；底栏尚未抽成独立 actions/commands 层
+- 图层：已接线文档增删/显隐/透明度；Mode/锁/蒙版/组等仍为占位
 
 ## 与注释
 

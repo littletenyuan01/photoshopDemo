@@ -6,14 +6,14 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>260</width>
-    <height>480</height>
+    <width>280</width>
+    <height>520</height>
    </rect>
   </property>
   <property name="minimumSize">
    <size>
-    <width>220</width>
-    <height>200</height>
+    <width>240</width>
+    <height>220</height>
    </size>
   </property>
   <property name="windowTitle">
@@ -21,156 +21,105 @@
   </property>
   <property name="styleSheet">
    <string notr="true">QWidget#LayerPanel {
-  background-color: #3c3c3c;
+  background-color: #3a3a3a;
   border-left: 1px solid #222;
 }
-QLabel { color: #e0e0e0; }
-QListWidget {
-  background-color: #333;
-  color: #eee;
-  border: 1px solid #222;
+QTabWidget#panelTabs::pane {
+  border: none;
+  background-color: #3a3a3a;
+  top: -1px;
 }
-QToolButton {
-  background-color: #4a4a4a;
-  color: #eee;
-  border: 1px solid #2a2a2a;
+QTabWidget#panelTabs QTabBar::tab {
+  background-color: #2e2e2e;
+  color: #b8b8b8;
+  border: none;
+  padding: 6px 12px;
+  margin-right: 1px;
+  min-width: 48px;
+}
+QTabWidget#panelTabs QTabBar::tab:selected {
+  background-color: #3a3a3a;
+  color: #f0f0f0;
+}
+QTabWidget#panelTabs QTabBar::tab:hover:!selected {
+  background-color: #353535;
+  color: #ddd;
+}
+QToolButton#btnPanelMenu {
+  font-size: 14px;
+  font-weight: bold;
+  color: #ddd;
+  background: transparent;
+  border: none;
+  padding: 4px 8px;
+}
+QToolButton#btnPanelMenu:hover {
+  background-color: #4e4e4e;
 }</string>
   </property>
-  <layout class="QVBoxLayout" name="verticalLayout">
+  <layout class="QVBoxLayout" name="rootLayout">
    <property name="spacing">
-    <number>6</number>
+    <number>0</number>
    </property>
    <property name="leftMargin">
-    <number>6</number>
+    <number>0</number>
    </property>
    <property name="topMargin">
-    <number>6</number>
+    <number>0</number>
    </property>
    <property name="rightMargin">
-    <number>6</number>
+    <number>0</number>
    </property>
    <property name="bottomMargin">
-    <number>6</number>
+    <number>0</number>
    </property>
    <item>
-    <widget class="QLabel" name="titleLabel">
-     <property name="text">
-      <string>图层</string>
+    <widget class="QTabWidget" name="panelTabs">
+     <property name="currentIndex">
+      <number>0</number>
      </property>
-     <property name="styleSheet">
-      <string notr="true">font-weight: bold;</string>
-     </property>
-    </widget>
-   </item>
-   <item>
-    <layout class="QHBoxLayout" name="opacityLayout">
-     <item>
-      <widget class="QLabel" name="opacityLabel">
-       <property name="text">
-        <string>不透明度</string>
-       </property>
-      </widget>
-     </item>
-     <item>
-      <widget class="QSlider" name="opacitySlider">
-       <property name="maximum">
-        <number>100</number>
-       </property>
-       <property name="value">
-        <number>100</number>
-       </property>
-       <property name="orientation">
-        <enum>Qt::Orientation::Horizontal</enum>
-       </property>
-      </widget>
-     </item>
-     <item>
-      <widget class="QLabel" name="opacityValueLabel">
-       <property name="minimumSize">
-        <size>
-         <width>36</width>
-         <height>0</height>
-        </size>
-       </property>
-       <property name="text">
-        <string>100%</string>
-       </property>
-       <property name="alignment">
-        <set>Qt::AlignmentFlag::AlignRight|Qt::AlignmentFlag::AlignTrailing|Qt::AlignmentFlag::AlignVCenter</set>
-       </property>
-      </widget>
-     </item>
-    </layout>
-   </item>
-   <item>
-    <widget class="QListWidget" name="layerList">
-     <property name="alternatingRowColors">
+     <property name="documentMode">
       <bool>true</bool>
      </property>
-     <property name="selectionMode">
-      <enum>QAbstractItemView::SelectionMode::SingleSelection</enum>
-     </property>
+     <widget class="LayerTreePanel" name="layerTree" native="true">
+      <attribute name="title">
+       <string>图层</string>
+      </attribute>
+     </widget>
+     <widget class="ChannelTreePanel" name="channelTree" native="true">
+      <attribute name="title">
+       <string>通道</string>
+      </attribute>
+     </widget>
+     <widget class="PathTreePanel" name="pathTree" native="true">
+      <attribute name="title">
+       <string>路径</string>
+      </attribute>
+     </widget>
     </widget>
-   </item>
-   <item>
-    <layout class="QHBoxLayout" name="buttonLayout">
-     <item>
-      <widget class="QToolButton" name="btnAdd">
-       <property name="text">
-        <string>新建</string>
-       </property>
-       <property name="toolTip">
-        <string>新建透明图层</string>
-       </property>
-      </widget>
-     </item>
-     <item>
-      <widget class="QToolButton" name="btnDelete">
-       <property name="text">
-        <string>删除</string>
-       </property>
-       <property name="toolTip">
-        <string>删除当前图层（至少保留一层）</string>
-       </property>
-      </widget>
-     </item>
-     <item>
-      <widget class="QToolButton" name="btnUp">
-       <property name="text">
-        <string>上移</string>
-       </property>
-       <property name="toolTip">
-        <string>在栈中上移（更靠上显示）</string>
-       </property>
-      </widget>
-     </item>
-     <item>
-      <widget class="QToolButton" name="btnDown">
-       <property name="text">
-        <string>下移</string>
-       </property>
-       <property name="toolTip">
-        <string>在栈中下移（更靠下显示）</string>
-       </property>
-      </widget>
-     </item>
-     <item>
-      <spacer name="buttonSpacer">
-       <property name="orientation">
-        <enum>Qt::Orientation::Horizontal</enum>
-       </property>
-       <property name="sizeHint" stdset="0">
-        <size>
-         <width>40</width>
-         <height>20</height>
-        </size>
-       </property>
-      </spacer>
-     </item>
-    </layout>
    </item>
   </layout>
  </widget>
+ <customwidgets>
+  <customwidget>
+   <class>LayerTreePanel</class>
+   <extends>QWidget</extends>
+   <header>ui/layertreepanel.h</header>
+   <container>1</container>
+  </customwidget>
+  <customwidget>
+   <class>ChannelTreePanel</class>
+   <extends>QWidget</extends>
+   <header>ui/channeltreepanel.h</header>
+   <container>1</container>
+  </customwidget>
+  <customwidget>
+   <class>PathTreePanel</class>
+   <extends>QWidget</extends>
+   <header>ui/pathtreepanel.h</header>
+   <container>1</container>
+  </customwidget>
+ </customwidgets>
  <resources/>
  <connections/>
 </ui>

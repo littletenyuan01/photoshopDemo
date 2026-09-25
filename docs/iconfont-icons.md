@@ -32,6 +32,4 @@
 
 目录内尚有未接线图标（`pen.png`、`stamp.png`、`blur.png`、`type-vertical.png` 等），后续加工具时再挂。
 
-## 自绘 SVG
-
-`resources/icons/tool-*.svg` 仍保留作回退，工具箱已不再默认使用。
+旧自绘 `tool-*.svg` 已删除；工具箱只使用 `:/icons/tools/*.png`。

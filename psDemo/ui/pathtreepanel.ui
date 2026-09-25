@@ -1,0 +1,183 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>PathTreePanel</class>
+ <widget class="QWidget" name="PathTreePanel">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>280</width>
+    <height>400</height>
+   </rect>
+  </property>
+  <property name="styleSheet">
+   <string notr="true">QListWidget {
+  background-color: #323232; color: #eee; border: none; outline: none; font-size: 12px;
+}
+QListWidget::item { padding: 4px 2px; min-height: 36px; }
+QListWidget::item:selected { background-color: #555555; }
+QFrame#optionsHost, QFrame#toolbarHost { background-color: #3a3a3a; border: none; }
+QFrame#toolbarHost { border-top: 1px solid #2a2a2a; }
+QToolButton {
+  background-color: transparent; color: #ddd; border: 1px solid transparent;
+  border-radius: 2px; padding: 2px; font-size: 11px; min-width: 22px; min-height: 22px;
+}
+QToolButton:hover { background-color: #4e4e4e; }
+QToolButton:disabled { color: #666; }</string>
+  </property>
+  <layout class="QVBoxLayout" name="rootLayout">
+   <property name="spacing">
+    <number>0</number>
+   </property>
+   <property name="leftMargin">
+    <number>0</number>
+   </property>
+   <property name="topMargin">
+    <number>0</number>
+   </property>
+   <property name="rightMargin">
+    <number>0</number>
+   </property>
+   <property name="bottomMargin">
+    <number>0</number>
+   </property>
+   <item>
+    <widget class="QFrame" name="optionsHost">
+     <property name="minimumSize">
+      <size>
+       <width>0</width>
+       <height>4</height>
+      </size>
+     </property>
+     <property name="maximumSize">
+      <size>
+       <width>16777215</width>
+       <height>4</height>
+      </size>
+     </property>
+     <property name="frameShape">
+      <enum>QFrame::Shape::NoFrame</enum>
+     </property>
+    </widget>
+   </item>
+   <item>
+    <widget class="QListWidget" name="itemList">
+     <property name="selectionMode">
+      <enum>QAbstractItemView::SelectionMode::SingleSelection</enum>
+     </property>
+    </widget>
+   </item>
+   <item>
+    <widget class="QFrame" name="toolbarHost">
+     <property name="minimumSize">
+      <size>
+       <width>0</width>
+       <height>28</height>
+      </size>
+     </property>
+     <property name="maximumSize">
+      <size>
+       <width>16777215</width>
+       <height>28</height>
+      </size>
+     </property>
+     <property name="frameShape">
+      <enum>QFrame::Shape::NoFrame</enum>
+     </property>
+     <layout class="QHBoxLayout" name="toolbarLayout">
+      <property name="spacing">
+       <number>0</number>
+      </property>
+      <property name="leftMargin">
+       <number>4</number>
+      </property>
+      <property name="topMargin">
+       <number>2</number>
+      </property>
+      <property name="rightMargin">
+       <number>4</number>
+      </property>
+      <property name="bottomMargin">
+       <number>2</number>
+      </property>
+      <item>
+       <widget class="QToolButton" name="btnFillPath">
+        <property name="text">
+         <string>■</string>
+        </property>
+        <property name="toolTip">
+         <string>用前景色填充路径</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QToolButton" name="btnStrokePath">
+        <property name="text">
+         <string>○</string>
+        </property>
+        <property name="toolTip">
+         <string>用画笔描边路径</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QToolButton" name="btnPathToSelection">
+        <property name="text">
+         <string>◎</string>
+        </property>
+        <property name="toolTip">
+         <string>将路径作为选区载入</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QToolButton" name="btnSelectionToPath">
+        <property name="text">
+         <string>▣</string>
+        </property>
+        <property name="toolTip">
+         <string>从选区生成工作路径</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QToolButton" name="btnNew">
+        <property name="text">
+         <string>+</string>
+        </property>
+        <property name="toolTip">
+         <string>创建新路径</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QToolButton" name="btnDelete">
+        <property name="text">
+         <string>X</string>
+        </property>
+        <property name="toolTip">
+         <string>删除当前路径</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <spacer name="toolbarSpacer">
+        <property name="orientation">
+         <enum>Qt::Orientation::Horizontal</enum>
+        </property>
+        <property name="sizeHint" stdset="0">
+         <size>
+          <width>40</width>
+          <height>10</height>
+         </size>
+        </property>
+       </spacer>
+      </item>
+     </layout>
+    </widget>
+   </item>
+  </layout>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>

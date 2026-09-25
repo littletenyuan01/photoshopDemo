@@ -1,4 +1,4 @@
-QT += widgets svg
+QT += widgets
 
 CONFIG += c++17
 
@@ -16,9 +16,14 @@ SOURCES += \
     ui/canvasworkspace.cpp \
     ui/canvasdocstatusbar.cpp \
     ui/rulerwidget.cpp \
+    ui/itemtreepanel.cpp \
+    ui/layertreepanel.cpp \
+    ui/channeltreepanel.cpp \
+    ui/pathtreepanel.cpp \
     ui/layerpanel.cpp \
     ui/toolbox.cpp \
-    ui/tooloptionsbar.cpp
+    ui/tooloptionsbar.cpp \
+    ui/colorpickerdialog.cpp
 
 HEADERS += \
     mainwindow.h \
@@ -33,17 +38,26 @@ HEADERS += \
     ui/canvasworkspace.h \
     ui/canvasdocstatusbar.h \
     ui/rulerwidget.h \
+    ui/itemtreepanel.h \
+    ui/layertreepanel.h \
+    ui/channeltreepanel.h \
+    ui/pathtreepanel.h \
     ui/layerpanel.h \
     ui/toolbox.h \
-    ui/tooloptionsbar.h
+    ui/tooloptionsbar.h \
+    ui/colorpickerdialog.h
 
 FORMS += \
     mainwindow.ui \
     ui/canvasworkspace.ui \
     ui/canvasdocstatusbar.ui \
+    ui/layertreepanel.ui \
+    ui/channeltreepanel.ui \
+    ui/pathtreepanel.ui \
     ui/layerpanel.ui \
     ui/toolbox.ui \
-    ui/tooloptionsbar.ui
+    ui/tooloptionsbar.ui \
+    ui/colorpickerdialog.ui
 
 RESOURCES += \
     resources.qrc

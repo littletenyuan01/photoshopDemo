@@ -25,7 +25,8 @@ QT_END_NAMESPACE
  * - 左键：激活该占位当前工具
  * - 右键：弹出同组全部工具（对齐用户提供的 PS 飞出菜单图）
  *
- * 图标来自 resources/icons/tools/（英文文件名 PNG）。
+ * 前/背景色区参考 GIMP GimpFgBgEditor：背景右下、前景左上重叠；
+ * 切换颜色只交换色值，方块前后关系不变（前景始终在上）。
  */
 class ToolBox : public QWidget
 {

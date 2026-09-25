@@ -1,22 +1,7 @@
 <!DOCTYPE RCC>
 <RCC version="1.0">
   <qresource prefix="/icons">
-    <!-- 自绘占位（保留作回退） -->
-    <file alias="tool-move.svg">resources/icons/tool-move.svg</file>
-    <file alias="tool-rect-select.svg">resources/icons/tool-rect-select.svg</file>
-    <file alias="tool-ellipse-select.svg">resources/icons/tool-ellipse-select.svg</file>
-    <file alias="tool-lasso.svg">resources/icons/tool-lasso.svg</file>
-    <file alias="tool-magic-wand.svg">resources/icons/tool-magic-wand.svg</file>
-    <file alias="tool-crop.svg">resources/icons/tool-crop.svg</file>
-    <file alias="tool-eyedropper.svg">resources/icons/tool-eyedropper.svg</file>
-    <file alias="tool-brush.svg">resources/icons/tool-brush.svg</file>
-    <file alias="tool-eraser.svg">resources/icons/tool-eraser.svg</file>
-    <file alias="tool-bucket.svg">resources/icons/tool-bucket.svg</file>
-    <file alias="tool-gradient.svg">resources/icons/tool-gradient.svg</file>
-    <file alias="tool-type.svg">resources/icons/tool-type.svg</file>
-    <file alias="tool-hand.svg">resources/icons/tool-hand.svg</file>
-    <file alias="tool-zoom.svg">resources/icons/tool-zoom.svg</file>
-    <!-- iconfont PNG（英文文件名） -->
+    <!-- iconfont PNG（英文文件名）；工具箱用 :/icons/tools/ -->
     <file alias="tools/move.png">resources/icons/tools/move.png</file>
     <file alias="tools/rect-select.png">resources/icons/tools/rect-select.png</file>
     <file alias="tools/ellipse-select.png">resources/icons/tools/ellipse-select.png</file>
@@ -35,6 +20,8 @@
     <file alias="tools/line.png">resources/icons/tools/line.png</file>
     <file alias="tools/hand.png">resources/icons/tools/hand.png</file>
     <file alias="tools/zoom.png">resources/icons/tools/zoom.png</file>
+    <file alias="ui/check-white.png">resources/icons/ui/check-white.png</file>
+    <file alias="ui/radio-dot-white.png">resources/icons/ui/radio-dot-white.png</file>
   </qresource>
   <qresource prefix="/styles">
     <file alias="dark.qss">resources/styles/dark.qss</file>

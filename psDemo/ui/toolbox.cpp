@@ -1,8 +1,8 @@
 #include "toolbox.h"
 #include "ui_toolbox.h"
+#include "colorpickerdialog.h"
 
 #include <QButtonGroup>
-#include <QColorDialog>
 #include <QContextMenuEvent>
 #include <QIcon>
 #include <QMenu>
@@ -102,7 +102,8 @@ void ToolBox::onSlotClicked(int slotIndex)
 
 void ToolBox::onPickForeground()
 {
-    const QColor c = QColorDialog::getColor(m_fg, this, tr("前景色"));
+    const QColor c = ColorPickerDialog::getColor(
+        m_fg, this, ColorPickerDialog::Mode::Foreground);
     if (!c.isValid())
         return;
     m_fg = c;
@@ -112,7 +113,8 @@ void ToolBox::onPickForeground()
 
 void ToolBox::onPickBackground()
 {
-    const QColor c = QColorDialog::getColor(m_bg, this, tr("背景色"));
+    const QColor c = ColorPickerDialog::getColor(
+        m_bg, this, ColorPickerDialog::Mode::Background);
     if (!c.isValid())
         return;
     m_bg = c;
@@ -139,10 +141,24 @@ void ToolBox::onDefaultColors()
 
 void ToolBox::updateColorButtons()
 {
+    // 前景始终画在上层、浅色粗边；背景在下层右下角 —— 交换只改 fill，不改前后位置
     ui->fgButton->setStyleSheet(
-        QStringLiteral("background-color: %1; border: 1px solid #111;").arg(m_fg.name()));
+        QStringLiteral("QPushButton#fgButton {"
+                       " background-color: %1;"
+                       " border: 2px solid #f0f0f0;"
+                       " border-radius: 1px;"
+                       "}")
+            .arg(m_fg.name()));
     ui->bgButton->setStyleSheet(
-        QStringLiteral("background-color: %1; border: 1px solid #111;").arg(m_bg.name()));
+        QStringLiteral("QPushButton#bgButton {"
+                       " background-color: %1;"
+                       " border: 1px solid #111;"
+                       " border-radius: 1px;"
+                       "}")
+            .arg(m_bg.name()));
+    ui->fgButton->raise();
+    ui->fgButton->setToolTip(tr("前景色（画笔等使用）\n当前：%1").arg(m_fg.name()));
+    ui->bgButton->setToolTip(tr("背景色\n当前：%1").arg(m_bg.name()));
 }
 
 QIcon ToolBox::loadIcon(const QString &path) const
@@ -171,7 +187,7 @@ void ToolBox::refreshSlotButton(int slotIndex)
 
     const ToolItem &item = slot.items[slot.activeIndex];
     QIcon icon = loadIcon(item.iconPath);
-    const QSize sz(22, 22);
+    const QSize sz(20, 20);
     if (slot.items.size() > 1)
         icon = withGroupMark(icon, sz);
 
@@ -246,7 +262,7 @@ void ToolBox::addSlot(const QVector<ToolItem> &items)
     auto *btn = new QToolButton(ui->toolsHost);
     btn->setCheckable(true);
     btn->setAutoRaise(true);
-    btn->setFixedSize(40, 36);
+    btn->setFixedSize(36, 32);
     btn->setContextMenuPolicy(Qt::CustomContextMenu);
     // 右键弹出同组工具（Photoshop 飞出菜单行为）
     connect(btn, &QWidget::customContextMenuRequested, this,
