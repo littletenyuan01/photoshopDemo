@@ -13,5 +13,6 @@ alwaysApply: true
 - **界面**：涉及 UI 须维护 Qt Designer **`.ui` 文件**，便于手工调整（见 `qt-ui-forms.mdc`）
 - **注释**：凡写出的代码，关键处须有中文注释（见 `code-comments.mdc`）；**不得无注释提交关键逻辑**
 - **对照 GIMP**：实现功能须先查 `gimp-master`，禁止凭印象乱写（见 `gimp-reference.mdc`）
+- **交付纪律**：禁止留下「不报错但不工作」的隐患；验证要求与自查表见 `no-latent-bugs.mdc`（**强制**）
 - **图标**：找不到时优先从 [iconfont.cn](https://www.iconfont.cn/) 下载 SVG（见 `icon-sources.mdc`）；禁止用 Adobe 官方图标
 - 规划看 `wiki/`；实现说明看 `docs/`，代码变更必须同步 `docs/`

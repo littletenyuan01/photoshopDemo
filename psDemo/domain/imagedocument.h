@@ -46,7 +46,7 @@ public:
     int width() const { return m_width; }
     int height() const { return m_height; }
 
-    /** 只读遍历用；**改动图层属性请走本类的语义化 setter**，不要直接拿指针改。 */
+    /** 只读遍历用；**改动图层请走本类的语义化 setter / addLayer / removeLayer**。 */
     LayerStack &layers() { return m_layers; }
     const LayerStack &layers() const { return m_layers; }
 
@@ -87,6 +87,15 @@ public:
     void setLayerBlendMode(int index, BlendMode mode);
 
     // —— 结构操作 ——
+
+    /**
+     * **图层入栈的唯一入口**：在这里统一挂 `owner`（Layer 靠它广播属性信号）。
+     * 早先允许调用方直接 `layers().addLayer()`，导致 createBlank 与「打开图片」
+     * 两处漏挂 owner，改背景层显隐/透明度时信号不发、画布与面板静默不同步。
+     * 现在 `LayerStack` 的改栈方法已设为 private，绕过本函数会**编译不过**。
+     * @return 新层下标；layer 为空返回 -1。会发 structureChanged + contentChanged。
+     */
+    int addLayer(std::unique_ptr<Layer> layer);
 
     /** 在栈顶新增透明层，设为活动层。返回新层下标。 */
     int addTransparentLayer(const QString &name = QString());

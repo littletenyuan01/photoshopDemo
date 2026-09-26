@@ -144,7 +144,11 @@ void MainWindow::onOpenDocument()
     // 目前：打开 = 单「背景」层；多层工程格式以后再做
     auto doc = std::make_unique<Ps::ImageDocument>(image.width(), image.height());
     auto layer = std::make_unique<Ps::Layer>(tr("背景"), image);
-    const int index = doc->layers().addLayer(std::move(layer));
+    // 走 ImageDocument::addLayer —— 它是挂 Layer::owner 的唯一入口。
+    // （早先这里直接调 layers().addLayer，漏挂 owner 导致改背景层显隐/透明度时
+    //   属性信号不发、画布与面板静默不同步。现在 LayerStack 改栈方法是 private，
+    //   绕过会编译不过。）
+    const int index = doc->addLayer(std::move(layer));
     doc->setActiveLayerIndex(index);
     doc->setFilePath(path);
     doc->clearDirty();

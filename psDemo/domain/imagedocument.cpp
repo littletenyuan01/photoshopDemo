@@ -17,9 +17,27 @@ std::unique_ptr<ImageDocument> ImageDocument::createBlank(int width, int height,
     auto doc = std::make_unique<ImageDocument>(width, height);
     auto bg = std::make_unique<Layer>(QStringLiteral("背景"), width, height);
     bg->fill(background);
-    const int index = doc->m_layers.addLayer(std::move(bg));
+    // 走 addLayer 而不是 m_layers.addLayer：那里是挂 owner 的唯一位置。
+    // 早先直接调 m_layers.addLayer 漏挂 owner → 改背景层显隐/透明度时属性信号不发、
+    // 画布与面板静默不同步（有实测复现：contentChanged 发 0 次）。
+    const int index = doc->addLayer(std::move(bg));
     doc->m_activeLayerIndex = index;
     return doc;
+}
+
+int ImageDocument::addLayer(std::unique_ptr<Layer> layer)
+{
+    if (!layer)
+        return -1;
+
+    layer->setOwner(this);   // ← 唯一的 owner 挂载点：所有入栈都必须经此
+    const int index = m_layers.addLayer(std::move(layer));
+
+    m_dirty = true;
+    m_dirtyRect = QRect(0, 0, m_width, m_height);
+    emit structureChanged();
+    emit contentChanged();
+    return index;
 }
 
 void ImageDocument::setActiveLayerIndex(int index)
@@ -139,14 +157,11 @@ int ImageDocument::addTransparentLayer(const QString &name)
                                   ? QStringLiteral("图层 %1").arg(m_layers.count() + 1)
                                   : name;
     auto layer = std::make_unique<Layer>(layerName, m_width, m_height);
-    layer->setOwner(this); // 入栈即建立回指，之后属性 setter 可自动广播
-    const int index = m_layers.addLayer(std::move(layer));
+    // addLayer 内挂 owner、发 structureChanged + contentChanged（挂载点只有这一处）
+    const int index = addLayer(std::move(layer));
+
     m_activeLayerIndex = index;
-    m_dirty = true;
-    m_dirtyRect = QRect(0, 0, m_width, m_height);
-    emit structureChanged();
     emit activeLayerChanged(index);
-    emit contentChanged();
     return index;
 }
 
