@@ -8,10 +8,29 @@
 
 - **说明**：菜单栏按 Photoshop 中文版顶层顺序；其下为工具选项栏；左侧工具箱 + 画布 + 右侧图层。
 - **窗口尺寸**：启动时**最大化**（对齐 Photoshop Windows 常见行为）；`.ui` 设计几何约 1440×900，最小 1024×640。Photoshop 本身无固定客户区像素。
-- **布局文件**：`mainwindow.ui`、`ui/toolbox.ui`、`ui/tooloptionsbar.ui`、`ui/layerpanel.ui`、`ui/canvasworkspace.ui`
+- **布局文件**：`mainwindow.ui`、`ui/toolbox.ui`、`ui/tooloptionsbar.ui`、`ui/layerpanel.ui`（右侧 `DockPanel` 壳）、`ui/canvasworkspace.ui`
 - **已可点**：新建、打开、退出；视图缩放；窗口→图层；工具切换；画笔/橡皮绘制活动层；抓手平移；缩放工具；前景/背景色；关于。
 - **灰色菜单项**：尚未实现功能占位。
 - **如何用**：Qt Creator 打开 `psDemo/psDemo.pro` 运行。选画笔后在画布左键拖拽即可绘制。
+
+### 会话与广播（`app/AppSession`）
+
+- **说明**：`AppSession` 是**当前文档的唯一持有者**，并向所有订阅者广播 `documentChanged(doc)`。
+- **为什么重要**：新增面板时只需在 `DockPanel` / `CanvasWorkspace` 的 `setSession` 里多转发一次，
+  **`MainWindow` 不需要改动**；早先要手工连续调用四处 `setDocument`，漏一处即静默不刷新。
+- **对照 GIMP**：`GimpContext` 的 `image-changed` 信号广播。
+
+### 工具层（`tools/`）
+
+- **说明**：工具是**独立状态机**（`Tool` 子类），由 `ToolManager` 按 id 分发事件；
+  画布只把 `QMouseEvent` 归一化成**图像坐标的 `ToolEvent`** 后转发，自身**不含任何工具分支**。
+- **已注册**：移动（占位）、抓手、缩放、画笔、橡皮。未接入逻辑的工具回退到「移动」这个**中性兜底**，
+  切过去不消费事件，而不是意外继承上一个工具的行为。
+- **视图操作**：画布实现 `ViewPort`，工具经 `zoomAt` / `panBy` 请求缩放平移 ——
+  锚点缩放数学只存在于 `CanvasView::zoomAt` 一处。
+- **收益**：新增工具 = 加一个类 + 在 `ToolManager` 注册一行，**`CanvasView` 与 `MainWindow` 都不用改**。
+- **对照 GIMP**：`app/tools/gimptool.c`（虚函数状态机）+ `app/tools/tool_manager.c`（`GimpToolManager`）；
+  `gimpdisplayshell` 只负责绘制。本项目去掉 `GimpToolControl`、选项对象、undo extents。
 
 ### 标尺与画布居中
 
@@ -32,7 +51,9 @@
 
 - **说明**：在**活动层**像素上绘制或擦除；选项栏可调直径。
 - **算法**：`engine/PaintEngine`（圆形 dab + 间距插值）。
-- **对照 GIMP**：tools 管事件、paint 写缓冲；本项目对应 `CanvasView` + `PaintEngine`（无 GEGL/笔刷库）。
+- **对照 GIMP**：tools 管事件、paint 写缓冲；本项目对应 `tools/PaintTool` + `engine/PaintEngine`（无 GEGL/笔刷库）。
+- **实现要点**：`PaintTool` 一个类承担两个工具（只差 `PaintEngine::Mode`）；
+  每次 dab/插值后按「线段包围盒 + 笔刷半径」上报**脏区**（`markDirty(rect)`）。
 - **限制**：尚无硬度滑条、流量、选区约束、撤销。
 
 ### 新建 / 打开文档
@@ -43,20 +64,30 @@
 
 ### 图层模型（基础）
 
-- `Layer`：名称、显隐、透明度、混合模式枚举（目前仅 Normal）、`QImage` 像素。
+- `Layer`：名称、显隐、透明度、混合模式枚举（目前仅 Normal）、`QImage` 像素；
+  **持 `owner` 回指**，属性 setter 内部自动广播 `layerPropertiesChanged`。
 - `LayerStack`：自底向顶有序层列表。
-- `ImageDocument`：尺寸、活动层、脏标记与变更信号。
+- `ImageDocument`：尺寸、活动层、**分级信号**（`pixelsChanged(QRect)` / `layerPropertiesChanged(int)` /
+  `structureChanged()` / `activeLayerChanged(int)` / 汇总 `contentChanged()`）、
+  **累计脏区** `dirtyRect()`，以及供 UI 使用的**语义化 setter**。
+- **约定**：UI **不得**直接改 `Layer`，一律走 `ImageDocument::setLayerVisible/Opacity/Name/BlendMode`；
+  像素写入后必须 `markDirty(rect)`。
 - **限制**：无蒙版/调整层；面板已可操作图层。
 
 ### 合成预览
 
-- `Compositor`：自底向顶 Normal + opacity，预乘 Alpha 混合。
+- `Compositor`：自底向顶 Normal + opacity，预乘 Alpha 混合；**支持按矩形脏区合成**。
 - `CanvasView`：棋盘格透明底、滚轮缩放、中键/Alt+左键平移、适应窗口 / 100%。
+- **限制**：画布目前仍是**全量重合成**（`pixelsChanged` 已带脏区但尚未被消费），见 `wiki/Roadmap.md` Phase 7。
 
 ### 图层面板
 
-- **说明**：右侧 `LayerPanel`（`layerpanel.ui`）；列表上方为视觉上层。
+- **说明**：右侧 `DockPanel` 壳（`layerpanel.ui`）内的 `LayerTreePanel`；列表上方为视觉上层。
 - **操作**：勾选显隐、双击改名、不透明度滑条、新建/删除、上移/下移。
+- **增量更新**：`structureChanged` 才重建列表；`activeLayerChanged` 只同步选中行；
+  `layerPropertiesChanged` 只改受影响那一行 —— **画笔画一笔不会打扰面板的选中项与编辑态**。
+- **不透明度滑条**：拖动中只做百分比预览，**松手（或键盘操作）才提交**给 domain，
+  且提交前做等值判断 → 一次操作 = 一次状态变更（为撤销铺路）。
 - **底栏按钮**：加大可点区域（约 30×30）；线框图标见 `resources/icons/layers/`（链接 / fx / 蒙版 / 调整 / 组 / 新建 / 删除），悬停有中文 tip。
 - **通道 / 路径 Tab**：底栏同样加大；图标分别在 `icons/channels/`、`icons/paths/`（尚无 domain，多为 UI 占位）。
 - **限制**：无缩略图；混合模式/锁等仍多为占位；无撤销（改层后暂不可 Ctrl+Z）；底栏除图层新建/删除外多为 UI 占位。

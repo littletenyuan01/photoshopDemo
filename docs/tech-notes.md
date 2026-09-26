@@ -56,7 +56,7 @@
 
 - **新增 `tools/` 交互层**：`Tool` 基类 + `ToolManager` 注册表 + `Move`/`Hand`/`Zoom`/`Paint` 四个工具。
   `CanvasView::mousePressEvent` 里原先 5 条工具 if 分支全部移除；新增工具只需注册一行。
-  【对照 GIMP】`app/tools/gimptool.c`（虚函数状态机）+ `gimptoolmanager.c`。
+  【对照 GIMP】`app/tools/gimptool.c`（虚函数状态机）+ `app/tools/tool_manager.c`（`GimpToolManager`）。
 - **`CanvasView` 实现 `ViewPort`**：工具通过 `zoomAt`/`panBy` 请求视图操作，
   锚点缩放数学从两处（wheelEvent + 缩放工具）收敛为 `CanvasView::zoomAt` 一处。
 - **`ToolEvent` 预先换算图像坐标**：工具不再需要 zoom/offset，也不引用任何 UI 类型。

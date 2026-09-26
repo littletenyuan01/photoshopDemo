@@ -71,7 +71,7 @@ UI 不得直接改 `Layer`，一律走 `setLayerVisible/Opacity/Name/BlendMode` 
 | `ui/itemtreepanel.h/.cpp` | Item 树面板基类；提供 `applyToolbarIcon` 等共用能力 |
 | `ui/layertreepanel.ui/.h/.cpp` | 图层树：列表/显隐/透明度/增删排序；**增量更新 + 滑条两段提交** |
 | `ui/channeltreepanel.*` / `ui/pathtreepanel.*` | 通道 / 路径树；底栏接线，尚无 domain |
-| `ui/dockpanel.ui/.h/.cpp` | 右侧三 Tab 停靠壳（`.ui` 文件名为 `layerpanel.ui`）；订阅 session 后转发给三个树 |
+| `ui/dockpanel.h/.cpp` | 右侧三 Tab 停靠壳；**`.ui` 文件仍名为 `layerpanel.ui`**（类为 `DockPanel`）；订阅 session 后转发给三个树 |
 | `ui/toolbox.ui/.h/.cpp` | 左侧工具箱 + 前/背景色（对齐 GIMP Toolbox 结构） |
 | `ui/tooloptionsbar.ui/.h/.cpp` | 工具选项栏（名称 + 画笔直径） |
 

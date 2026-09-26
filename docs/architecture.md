@@ -35,72 +35,82 @@ undo / file / xcf                              ← 历史与存盘
 ```mermaid
 flowchart TB
   subgraph UI["ui — Qt Widgets + .ui"]
-    MW[MainWindow]
-    CV[CanvasView]
-    LP[LayerPanel]
-    TP[ToolOptions / ColorBar]
-    MW --> CV
-    MW --> LP
-    MW --> TP
+    MW[MainWindow<br/>只做菜单接线 + 装配]
+    CV[CanvasView<br/>实现 ViewPort]
+    CW[CanvasWorkspace<br/>标尺/滚动条/底栏]
+    DP[DockPanel<br/>三 Tab 停靠壳]
+    IT[ItemTreePanel<br/>Layer/Channel/Path]
+    TB[ToolBox / ToolOptionsBar]
   end
 
-  subgraph APP["app — 会话与命令入口"]
-    AM[AppSession<br/>当前文档/工具]
-    CM[CommandBus<br/>执行并推入历史]
+  subgraph APP["app — 会话与广播"]
+    AM[AppSession<br/>文档唯一持有者 + 广播]
+    CM[CommandBus / Command<br/>未实现 · Phase 6]
   end
 
   subgraph TOOLS["tools — 交互状态机"]
-    TM[ToolManager]
-    BT[BrushTool]
-    ET[EraserTool]
-    ST[SelectTools]
-    MT[MaskEditTool]
-    TM --> BT & ET & ST & MT
+    TM[ToolManager<br/>注册表 + 分发 + 信号转发]
+    MT[MoveTool 占位]
+    HT[HandTool]
+    ZT[ZoomTool]
+    PT[PaintTool<br/>画笔 + 橡皮]
+    TM --> MT & HT & ZT & PT
   end
 
   subgraph DOMAIN["domain — 文档真相"]
-    DOC[ImageDocument]
+    DOC[ImageDocument<br/>分级信号 + 语义化 setter]
     LS[LayerStack]
-    LY[Layer / Mask / AdjLayer]
-    SEL[Selection]
+    LY[Layer<br/>owner 回指]
+    SEL[Selection<br/>未实现]
     DOC --> LS --> LY
-    DOC --> SEL
+    DOC -.-> SEL
   end
 
   subgraph ENGINE["engine — 算法"]
     PE[PaintEngine]
-    COMP[Compositor]
-    ADJ[AdjustOps<br/>Levels/Curves]
-    CVT[ImageConvert<br/>QImage ↔ Mat]
+    COMP[Compositor<br/>脏区接口已留]
+    ADJ[AdjustOps<br/>未实现]
   end
 
-  subgraph HIST["history"]
+  subgraph HIST["history — 未实现"]
     HS[HistoryStack]
-    CMD[Commands]
-    HS --> CMD
   end
 
-  subgraph IO["io"]
+  subgraph IO["io — 未实现"]
     IOR[RasterIO]
     PRJ[ProjectIO]
   end
 
-  UI -->|信号/槽| APP
-  APP --> TOOLS
-  TOOLS -->|生成 Command| CM
-  CM --> HIST
-  CM --> DOMAIN
-  TOOLS --> PE
-  PE --> DOMAIN
-  COMP --> DOMAIN
-  ADJ --> DOMAIN
+  MW --> CW
+  MW --> DP
+  MW --> TB
+  CW --> CV
+  DP --> IT
+
+  %% 文档广播：MainWindow 只交付一次，其余全部靠 AppSession 转发
+  MW -->|setDocument 一次| AM
+  AM -.->|documentChanged| CW
+  AM -.->|documentChanged| IT
+
+  %% 事件流：画布归一化坐标后交给工具层
+  CV -->|ToolEvent 图像坐标| TM
+  TM -->|ViewPort: zoomAt/panBy| CV
+  PT --> PE
+  PE -->|markDirty rect| DOC
+  COMP -->|只读合成| DOC
   CV -->|请求帧| COMP
-  LP -->|改属性| CM
-  IO --> DOMAIN
+
+  %% 工具/面板经语义化 setter 改 domain，Phase 6 起在同一入口 push
+  IT -->|语义化 setter| DOC
+  TM -.->|Phase 6: 生成 Command| CM
+  CM -.-> HIST
+  ADJ -.-> DOC
+  IO -.-> DOC
   ENGINE -.->|可选| OCV[OpenCV / CUDA / 并行]
 ```
 
 **依赖方向（强制）**：`ui → app → tools/domain`；`engine` 被 `tools`/`domain` 调用；**禁止** `domain` 依赖 Qt Widgets。
+图中**实线 = 已实现**，**虚线 = 未实现或规划**。
 
 ---
 
@@ -126,21 +136,37 @@ classDiagram
     +int width
     +int height
     +LayerStack layers
-    +Selection selection
     +int activeLayerIndex
+    +QRect dirtyRect
+    +markDirty(rect)
+    +setLayerVisible(index, bool)
+    +setLayerOpacity(index, qreal)
+    +setLayerName(index, QString)
+    +setLayerBlendMode(index, BlendMode)
+    +signal pixelsChanged(rect)
+    +signal layerPropertiesChanged(index)
+    +signal structureChanged()
+    +signal activeLayerChanged(index)
+    +signal contentChanged()
   }
   class LayerStack {
-    +vector~LayerPtr~ items
-    +move()
-    +add/remove()
+    +vector items
+    +layerAt(i)
+    +addLayer()
+    +takeLayer(i)
+    +moveLayer(from, to)
   }
   class Layer {
     +QString name
     +bool visible
-    +float opacity
-    +BlendMode mode
+    +qreal opacity
+    +BlendMode blendMode
     +QImage pixels
-    +LayerMask* mask
+    +ImageDocument owner
+    +setName()
+    +setVisible()
+    +setOpacity()
+    +setBlendMode()
   }
   class LayerMask {
     +QImage gray
@@ -158,18 +184,23 @@ classDiagram
   }
 
   ImageDocument --> LayerStack
-  ImageDocument --> Selection
+  ImageDocument --> Selection : 未实现
+  Layer ..> ImageDocument : owner 回指（setter 自动广播）
   LayerStack --> Layer
-  LayerStack --> AdjustmentLayer
-  Layer --> LayerMask
-  Layer <|-- AdjustmentLayer
+  LayerStack --> AdjustmentLayer : 未实现
+  Layer --> LayerMask : 未实现
+  Layer <|-- AdjustmentLayer : 未实现
 ```
 
-说明：
+说明（**加粗 = 已实现**）：
 
-- **像素层** `Layer`：持有 `QImage`（建议 Format_ARGB32_Premultiplied）
-- **蒙版** `LayerMask`：同尺寸灰度；合成时 `alpha *= mask`
-- **选区** `Selection`：文档级一张 mask；绘制时与之相交
+- **像素层** `Layer`：持有 `QImage`（**实为 Format_ARGB32_Premultiplied**）；
+  **并通过 `owner()` 回指 `ImageDocument`** —— `setName/setVisible/setOpacity/setBlendMode`
+  内部改值后自动广播 `layerPropertiesChanged`，UI 无需手动 notify。
+- **`ImageDocument`**：除尺寸/栈/活动层外，还有**分级信号**与**累计脏区**（`markDirty(rect)`），
+  以及供 UI 使用的**语义化 setter**（`setLayerVisible/Opacity/Name/BlendMode`）。
+- 蒙版 `LayerMask`：同尺寸灰度；合成时 `alpha *= mask`
+- 选区 `Selection`：文档级一张 mask；绘制时与之相交
 - **调整层**：特殊层，合成阶段对「已合成的下方」做 Levels/Curves（简化非破坏）
 
 ---
@@ -178,22 +209,36 @@ classDiagram
 
 ### 5.1 画笔绘制
 
+> **实线 = 已实现**；`History` 相关为 Phase 6 规划（虚线）。
+
 ```mermaid
 sequenceDiagram
   participant U as CanvasView
-  participant T as BrushTool
+  participant TM as ToolManager
+  participant T as PaintTool
   participant P as PaintEngine
   participant L as Active Layer
-  participant H as History
+  participant D as ImageDocument
   participant C as Compositor
+  participant H as History (Phase 6)
 
-  U->>T: mouseMove(图像坐标)
-  T->>H: beginStroke / 记录脏区瓦片
-  T->>P: dab(pos, size, color, soft)
-  P->>L: 写入像素（∩ Selection ∩ Mask可编辑）
-  T->>C: invalidate(dirtyRect)
-  C-->>U: 更新预览
+  U->>U: widgetToImage() 归一化坐标
+  U->>TM: dispatchMove(ToolEvent 图像坐标)
+  TM->>T: mouseMove(event, ctx, view)
+  Note over T: 校验 buttons 仍含左键（防「粘笔」）
+  T->>P: strokeSegment(pixels, from, to, radius, color, mode)
+  P->>L: 写入像素（SourceOver / DestinationOut）
+  T->>D: markDirty(线段包围盒 + 半径)
+  D-->>U: pixelsChanged(rect) / contentChanged()
+  U->>U: rebuildCache()
+  U->>C: composite(document)
+  C-->>U: 合成图 → 重绘
+  T-.->H: Phase 6: 改像素前 push 瓦片快照
 ```
+
+**与 GIMP 的对应**：`ToolManager` + `PaintTool` ≈ `app/tools`（管事件），
+`PaintEngine` ≈ `app/paint/GimpPaintCore`（写缓冲），`Compositor` ≈ projection（只读合成）。
+【本项目简化】无 GEGL、无笔刷资源库、无选区/蒙版相交（`∩ Selection ∩ Mask` 尚未实现）。
 
 ### 5.2 图层合成（预览 / 导出共用）
 
@@ -211,15 +256,32 @@ flowchart LR
 
 ### 5.3 撤销
 
-推荐 **混合策略**（简历好讲、实现可控）：
+> **决策已定**（见 `docs/tech-notes.md`「撤销」一节）：采用 GIMP 的**推入式（push）+ 每对象一类**，
+> 放弃早先「命令模式 vs 瓦片快照」的二选一。排期见 `wiki/Roadmap.md` Phase 6，**未实现**。
 
-- 属性改动（显隐、透明度、层序）：小命令对象  
-- 像素改动（画笔、蒙版涂抹）：按脏矩形存瓦片快照  
+**语义**：**改动之前**先把旧状态推入栈，而不是事后记录"做了什么"。
+
+| 入口（起步 4 类） | 覆盖 | 落点 |
+|------|------|------|
+| `pushDrawablePixels` | 像素改动（画笔 / 橡皮 / 滤镜） | `tools/PaintTool` 写像素前 |
+| `pushLayerProp` | 显隐 / 不透明度 / 名称 / 混合模式 | `ImageDocument::setLayer*` 内 |
+| `pushLayerStructure` | 新建 / 删除 / 上移 / 下移 / 合并 | `ImageDocument::addTransparentLayer` / `removeLayer` 内 |
+| `pushDocumentProp` | 尺寸 / 分辨率 / 活动层 | `ImageDocument::setActiveLayerIndex` 内 |
 
 ```text
-HistoryStack: undoStack / redoStack
-Command::redo() / undo()
+HistoryStack: undoStack / redoStack（含内存上限，超限丢最老）
 ```
+
+**收口点已就位**：UI 已不直接改 `Layer`（实测 0 处），一律走 `ImageDocument` 的语义化 setter，
+因此 push 只需加在少数几个方法内 —— 这是 Phase 6 能低成本落地的前提。
+另：不透明度滑条已改「松手才提交」，避免撤销栈被滑条淹没。
+
+> 【对照 GIMP】`app/core/gimpimage-undo.h`：`gimp_image_get_undo_stack` /
+> `gimp_image_undo_group_start` / `gimp_image_undo_group_end`（把一次用户操作内的多次 push
+> 合成一个撤销单元），配合 `gimpimage-undo-push.h` 的 50+ 个 `push_*` 入口。
+> 本项目取其**推入式**语义与**分组**思路（如一次笔画 = 一个撤销单元），
+> 不做 `GimpUndoStack` / `GimpUndo` 的 GObject 层次规模。
+> 注意：`contentChanged` 之类**信号不是撤销**，不要指望靠信号重放实现撤销。
 
 ---
 
@@ -295,11 +357,13 @@ psDemo/
 
 ## 8. 落地顺序
 
-> **本节已被 §8.2 取代**（撤销提前、插入「留缝」阶段）。保留此处仅作历史对照。
+> ⚠️ **历史存档，勿据此施工**。本节是重构前的原始顺序，已被 §8.2 取代
+> （撤销提前、插入「留缝」阶段）。其中 `LayerPanel` / `BrushTool` 等**是当时的命名**，
+> 现分别叫 `DockPanel` / `PaintTool`。保留仅为对照规划演进。
 
 1. `domain` 最小文档 + `Compositor` + `CanvasView`  
-2. `LayerPanel` + 图层命令 + `History`  
-3. `BrushTool` + `PaintEngine`  
+2. `LayerPanel`（现 `DockPanel`）+ 图层命令 + `History`  
+3. `BrushTool`（现 `PaintTool`）+ `PaintEngine`  
 4. `Selection` + 选区工具 + 绘制约束  
 5. `LayerMask`  
 6. `AdjustmentLayer` 或破坏式 AdjustOps  

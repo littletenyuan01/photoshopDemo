@@ -62,7 +62,7 @@ tools/
 **收益**：新增工具 = 加一个类 + 在 `ToolManager` 构造函数注册一行，**CanvasView 与 MainWindow 都不用改**。
 
 > 【对照 GIMP】`app/tools/gimptool.c`（基类虚函数 `button_press`/`motion`/`button_release`/
-> `cursor_update`）+ `gimptoolmanager.c` + `gimpdisplayshell` 只负责画（持一堆 `GimpCanvasItem*`）。
+> `cursor_update`）+ `app/tools/tool_manager.c`（`GimpToolManager`）+ `gimpdisplayshell` 只负责画（持一堆 `GimpCanvasItem*`）。
 > 本项目保留形状，去掉 `GimpToolControl`、选项对象、undo extents。
 
 **顺带修掉的真 bug**：原 `CanvasView::setCurrentTool` 只重置 `m_painting`，未清 `m_panning`，
@@ -221,7 +221,7 @@ MainWindow ──setDocument()──> AppSession ──documentChanged(doc)─�
 | 本项目 | GIMP 对应 | 简化掉的部分 |
 |--------|-----------|-------------|
 | `app/AppSession` | `app/core/gimpcontext.c`（`image-changed`） | 多文档、显示列表 |
-| `tools/ToolManager` | `app/tools/gimptoolmanager.c` | 每显示独立工具状态 |
+| `tools/ToolManager` | `app/tools/tool_manager.c`（`GimpToolManager`） | 每显示独立工具状态 |
 | `tools/Tool` | `app/tools/gimptool.c` | `GimpToolControl`、选项对象、undo extents |
 | `tools/ViewPort` | `GimpDisplayShell` 的 scale/scroll 接口 | 旋转/翻转、参考线、网格 |
 | `ui/ItemTreePanel` | `app/widgets/gimpitemtreeview.c` | actions 名字绑定、拖放、多选 |
