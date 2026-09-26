@@ -22,6 +22,24 @@
     <file alias="tools/zoom.png">resources/icons/tools/zoom.png</file>
     <file alias="ui/check-white.png">resources/icons/ui/check-white.png</file>
     <file alias="ui/radio-dot-white.png">resources/icons/ui/radio-dot-white.png</file>
+    <!-- 图层面板底栏（自绘线框 PNG，英文文件名） -->
+    <file alias="layers/link.png">resources/icons/layers/link.png</file>
+    <file alias="layers/fx.png">resources/icons/layers/fx.png</file>
+    <file alias="layers/mask.png">resources/icons/layers/mask.png</file>
+    <file alias="layers/adjustment.png">resources/icons/layers/adjustment.png</file>
+    <file alias="layers/group.png">resources/icons/layers/group.png</file>
+    <file alias="layers/new-layer.png">resources/icons/layers/new-layer.png</file>
+    <file alias="layers/delete.png">resources/icons/layers/delete.png</file>
+    <!-- 通道面板底栏 -->
+    <file alias="channels/load-selection.png">resources/icons/channels/load-selection.png</file>
+    <file alias="channels/save-selection.png">resources/icons/channels/save-selection.png</file>
+    <file alias="channels/new-channel.png">resources/icons/channels/new-channel.png</file>
+    <!-- 路径面板底栏 -->
+    <file alias="paths/fill.png">resources/icons/paths/fill.png</file>
+    <file alias="paths/stroke.png">resources/icons/paths/stroke.png</file>
+    <file alias="paths/to-selection.png">resources/icons/paths/to-selection.png</file>
+    <file alias="paths/from-selection.png">resources/icons/paths/from-selection.png</file>
+    <file alias="paths/new-path.png">resources/icons/paths/new-path.png</file>
   </qresource>
   <qresource prefix="/styles">
     <file alias="dark.qss">resources/styles/dark.qss</file>

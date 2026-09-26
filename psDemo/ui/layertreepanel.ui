@@ -32,6 +32,10 @@ QToolButton {
   background-color: transparent; color: #ddd; border: 1px solid transparent;
   border-radius: 2px; padding: 2px; font-size: 11px; min-width: 22px; min-height: 22px;
 }
+/* 底栏功能按钮：比筛选项更大，便于点按 */
+QFrame#toolbarHost QToolButton {
+  min-width: 30px; min-height: 30px; padding: 3px; border-radius: 3px;
+}
 QToolButton:hover { background-color: #4e4e4e; }
 QToolButton:checked { background-color: #2d5a8a; border-color: #4a8ac0; }
 QToolButton:disabled { color: #666; }</string>
@@ -411,13 +415,13 @@ QToolButton:disabled { color: #666; }</string>
      <property name="minimumSize">
       <size>
        <width>0</width>
-       <height>28</height>
+       <height>36</height>
       </size>
      </property>
      <property name="maximumSize">
       <size>
        <width>16777215</width>
-       <height>28</height>
+       <height>36</height>
       </size>
      </property>
      <property name="frameShape">
@@ -425,7 +429,7 @@ QToolButton:disabled { color: #666; }</string>
      </property>
      <layout class="QHBoxLayout" name="toolbarLayout">
       <property name="spacing">
-       <number>0</number>
+       <number>2</number>
       </property>
       <property name="leftMargin">
        <number>4</number>
@@ -445,70 +449,133 @@ QToolButton:disabled { color: #666; }</string>
          <bool>false</bool>
         </property>
         <property name="text">
-         <string>L</string>
+         <string/>
         </property>
         <property name="toolTip">
          <string>链接图层</string>
+        </property>
+        <property name="iconSize">
+         <size>
+          <width>22</width>
+          <height>22</height>
+         </size>
+        </property>
+        <property name="autoRaise">
+         <bool>true</bool>
         </property>
        </widget>
       </item>
       <item>
        <widget class="QToolButton" name="btnLayerStyle">
         <property name="text">
-         <string>fx</string>
+         <string/>
         </property>
         <property name="toolTip">
-         <string>添加图层样式</string>
+         <string>添加图层样式（fx）</string>
+        </property>
+        <property name="iconSize">
+         <size>
+          <width>22</width>
+          <height>22</height>
+         </size>
+        </property>
+        <property name="autoRaise">
+         <bool>true</bool>
         </property>
        </widget>
       </item>
       <item>
        <widget class="QToolButton" name="btnLayerMask">
         <property name="text">
-         <string>M</string>
+         <string/>
         </property>
         <property name="toolTip">
          <string>添加图层蒙版</string>
+        </property>
+        <property name="iconSize">
+         <size>
+          <width>22</width>
+          <height>22</height>
+         </size>
+        </property>
+        <property name="autoRaise">
+         <bool>true</bool>
         </property>
        </widget>
       </item>
       <item>
        <widget class="QToolButton" name="btnAdjustment">
         <property name="text">
-         <string>◐</string>
+         <string/>
         </property>
         <property name="toolTip">
-         <string>创建新的填充或调整图层</string>
+         <string>创建填充或调整图层</string>
+        </property>
+        <property name="iconSize">
+         <size>
+          <width>22</width>
+          <height>22</height>
+         </size>
+        </property>
+        <property name="autoRaise">
+         <bool>true</bool>
         </property>
        </widget>
       </item>
       <item>
        <widget class="QToolButton" name="btnNewGroup">
         <property name="text">
-         <string>G</string>
+         <string/>
         </property>
         <property name="toolTip">
-         <string>创建新组</string>
+         <string>创建图层组</string>
+        </property>
+        <property name="iconSize">
+         <size>
+          <width>22</width>
+          <height>22</height>
+         </size>
+        </property>
+        <property name="autoRaise">
+         <bool>true</bool>
         </property>
        </widget>
       </item>
       <item>
        <widget class="QToolButton" name="btnNew">
         <property name="text">
-         <string>+</string>
+         <string/>
         </property>
         <property name="toolTip">
-         <string>创建新图层</string>
+         <string>新建图层</string>
+        </property>
+        <property name="iconSize">
+         <size>
+          <width>22</width>
+          <height>22</height>
+         </size>
+        </property>
+        <property name="autoRaise">
+         <bool>true</bool>
         </property>
        </widget>
       </item>
       <item>
        <widget class="QToolButton" name="btnDelete">
         <property name="text">
-         <string>X</string>
+         <string/>
         </property>
         <property name="toolTip">
          <string>删除图层</string>
+        </property>
+        <property name="iconSize">
+         <size>
+          <width>22</width>
+          <height>22</height>
+         </size>
+        </property>
+        <property name="autoRaise">
+         <bool>true</bool>
         </property>
        </widget>
       </item>

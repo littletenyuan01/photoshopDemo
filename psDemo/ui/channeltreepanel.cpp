@@ -3,6 +3,7 @@
 
 #include <QListWidgetItem>
 #include <QSlider>
+#include <QToolButton>
 
 ChannelTreePanel::ChannelTreePanel(QWidget *parent)
     : ItemTreePanel(parent)
@@ -10,6 +11,12 @@ ChannelTreePanel::ChannelTreePanel(QWidget *parent)
 {
     ui->setupUi(this);
     bindSkeleton(ui->optionsHost, ui->itemList, ui->toolbarHost);
+
+    // 底栏图标：channels/* + 共用 delete
+    applyToolbarIcon(ui->btnLoadSelection, QStringLiteral(":/icons/channels/load-selection.png"));
+    applyToolbarIcon(ui->btnSaveSelection, QStringLiteral(":/icons/channels/save-selection.png"));
+    applyToolbarIcon(ui->btnNew, QStringLiteral(":/icons/channels/new-channel.png"));
+    applyToolbarIcon(ui->btnDelete, QStringLiteral(":/icons/layers/delete.png"));
 
     // GIMP：channels-new / channels-delete；选区相关见 channels-selection-*
     connect(ui->btnNew, &QToolButton::clicked, this, &ChannelTreePanel::onNewItem);

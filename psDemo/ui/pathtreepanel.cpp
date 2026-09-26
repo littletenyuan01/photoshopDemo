@@ -2,6 +2,7 @@
 #include "ui_pathtreepanel.h"
 
 #include <QListWidgetItem>
+#include <QToolButton>
 
 PathTreePanel::PathTreePanel(QWidget *parent)
     : ItemTreePanel(parent)
@@ -9,6 +10,15 @@ PathTreePanel::PathTreePanel(QWidget *parent)
 {
     ui->setupUi(this);
     bindSkeleton(ui->optionsHost, ui->itemList, ui->toolbarHost);
+
+    // 底栏图标：paths/* + 共用 delete
+    const QString pathDir = QStringLiteral(":/icons/paths/");
+    applyToolbarIcon(ui->btnFillPath, pathDir + QStringLiteral("fill.png"));
+    applyToolbarIcon(ui->btnStrokePath, pathDir + QStringLiteral("stroke.png"));
+    applyToolbarIcon(ui->btnPathToSelection, pathDir + QStringLiteral("to-selection.png"));
+    applyToolbarIcon(ui->btnSelectionToPath, pathDir + QStringLiteral("from-selection.png"));
+    applyToolbarIcon(ui->btnNew, pathDir + QStringLiteral("new-path.png"));
+    applyToolbarIcon(ui->btnDelete, QStringLiteral(":/icons/layers/delete.png"));
 
     // GIMP：paths-new / paths-delete；另有 fill/stroke/to-selection（paths-actions）
     connect(ui->btnNew, &QToolButton::clicked, this, &PathTreePanel::onNewItem);
