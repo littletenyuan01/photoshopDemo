@@ -49,7 +49,6 @@ ChannelTreePanel::ChannelTreePanel(QWidget *parent)
     , ui(new Ui::ChannelTreePanel)
 {
     ui->setupUi(this);
-    bindSkeleton(ui->optionsHost, ui->itemList, ui->toolbarHost);
 
     ui->itemList->setIconSize(QSize(ItemTreePanel::kThumbSize, ItemTreePanel::kThumbSize));
 
@@ -85,7 +84,9 @@ void ChannelTreePanel::onDocumentChanged()
 {
     if (Ps::ImageDocument *doc = document()) {
         // 像素变化 → 防抖 + 增量；**不再**整表重建（会丢选中项，且每帧重算代价高）
-        connect(doc, &Ps::ImageDocument::contentChanged,
+        // 只订阅 pixelsChanged：contentChanged 是所有信号的汇总，连结构变化/属性变化
+        // 都会走到这里，而那时 refreshFromDocument 刚重建过缩略图 → 白合成一遍。
+        connect(doc, &Ps::ImageDocument::pixelsChanged,
                 this, &ChannelTreePanel::scheduleThumbnailRefresh);
         // 结构真的变了（目前通道行固定，仅换文档时走到）才重建
         connect(doc, &Ps::ImageDocument::structureChanged,

@@ -49,10 +49,6 @@ public:
 private slots:
     /** 会话换文档：重绑文档信号并立即刷新一次。 */
     void onSessionDocumentChanged(Ps::ImageDocument *document);
-    /** 文档像素/结构变化 → 刷新宽高与图层信息。 */
-    void onDocumentContentChanged();
-    /** 换活动图层 → 刷新图层相关行。 */
-    void onActiveLayerChanged(int index);
 
 private:
     /** 分区折叠：切换箭头并显隐内容体。 */

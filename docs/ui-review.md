@@ -160,14 +160,16 @@ MainWindow ──setDocument()──> AppSession ──documentChanged(doc)─�
 |---|------|------|------|
 | 1 | **独立 actions/commands 层未建** | 目前收口在 `ImageDocument` 的语义化 setter；动作的可撤销性、菜单勾选态、快捷键尚无统一注册点 | 与 Phase 6 一并做 |
 | 2 | **`Compositor` 仍全量重合成** | `rebuildCache()` 每次 `contentChanged` 都算整图；`pixelsChanged(rect)` 已带脏区但未被使用 | Phase 7 |
-| 3 | **工具元数据分散三处** | `toolid.h`（枚举）/ `toolbox.cpp`（图标+中文名+快捷键）/ `tooloptionsbar.cpp`（显示名+提示）。新增工具仍要改 3 个文件 | 建议做 `ToolInfo` 注册表（对照 GIMP `GimpToolInfo`） |
+| 3 | **工具元数据分散两处** | `toolid.h`（枚举）/ `toolbox.cpp`（图标+中文名+快捷键）/ `tooloptionsbar.cpp`（显示名+提示）。新增工具仍要改 3 个文件 | 建议做 `ToolInfo` 注册表（对照 GIMP `GimpToolInfo`） |
 | 4 | **`ToolBox` 仍参与路由** | 工具切换经 `MainWindow::onToolChanged` 中转到画布；理想是 `ToolBox` 只发信号、由 session/context 广播 | 建议随 actions 层一并收敛 |
 | 5 | **通道 / 路径面板无 domain** | 列表内容是硬编码占位（RGB/红/绿/蓝、工作路径） | 见 `gimp-reference.mdc` 已知债 |
-| 6 | **`ItemTreePanel::addToolbarButton` 未被使用** | 三个面板都在 `.ui` 里静态声明按钮，此方法目前是死代码 | 要么用起来，要么删 |
-| 7 | **`Tool::statusMessageRequested` 未被消费** | 管理器有转发信号，但无订阅方 | 接入状态栏时用 |
+| 6 | ~~`ItemTreePanel::addToolbarButton` 未被使用~~ | **已删**（连同只服务于它的 `bindSkeleton` 与三段访问器）；三个面板都直接读 `ui->…` | 已完成 |
+| 7 | ~~`Tool::statusMessageRequested` 未被消费~~ | **已删**（连 `ToolManager` 的转发与连接一起删；提示语本来就走 `ToolOptionsBar::currentHint()`） | 已完成 |
 | 8 | **`uic` 会覆盖 `.ui` 里的 `objectName`** | 本仓库的 `.ui` 存在被 Qt Designer 规范化重写的痕迹 | 见 §5 |
 | 9 | **颜色/属性面板的内容是 UI 占位** | 色板分组与色值、渐变/图案预设、调整类型、库类别全是写死的（应从 `.gpl` / `.ggr` 等资源文件读）；底栏动作按钮、对齐按钮无功能 | 接功能时按 §3 的资源载入方式做 |
 | 10 | **前景/背景色未进 domain** | 目前只在 `ToolBox → MainWindow::onForegroundColorChanged → CanvasView` 内部串一条线；**没有**进 `AppSession`，新颜色面板与它不通、工具选项栏也看不到它 | 需 `AppSession` 级的前景色字段 + 广播 |
+| 11 | **同一类控件有两套自绘实现** | `HsvColorWell`（颜色面板）与 `ColorPickerDialog::ColorPlaneWidget/ColorStripWidget`（拾色器）各画一遍「二维色域 + 竖直色相条 + 准星」 | 可抽公共 `HsvFieldWidget`；拾色器有 9 种 Channel 模式、语义更宽，要先设计接口再合并 |
+| 11 | **同一类控件有两套自绘实现** | `HsvColorWell`（颜色面板）与 `ColorPickerDialog::ColorPlaneWidget/ColorStripWidget`（拾色器）各画一遍「二维色域 + 竖直色相 + 准星」 | 可抽公共 `HsvFieldWidget`；拾色器有 9 种 Channel 模式，语义更宽，需先设计接口 |
 
 ---
 
@@ -233,6 +235,10 @@ MainWindow ──setDocument()──> AppSession ──documentChanged(doc)─�
 - [ ] 右侧三块面板底色一致（#3a3a3a），**没有露黑底的行/页**
 - [ ] 右侧栏**两条拖动条可拖**：拖完高度真的变；把颜色面板压到最矮时该页出现滚动条（控件够得着）
 - [ ] 启动时右侧栏默认「图层区最长」，不是被上面两块挤成一条
+- [ ] **连续换两次文档**（新建→打开，或新建→新建）不崩：`AppSession::setDocument` 里
+      旧文档必须活到 `documentChanged` 广播结束（订阅者会在槽里 `disconnect(旧指针)`）
+- [ ] 关闭路径统一弹确认框：右上角 × / 文件→退出 / Alt+F4 / **标题栏 logo 双击**，
+      点「取消」窗口还在、点「退出」才关；脏文档额外提示「未保存」（本版本无保存功能）
 - [ ] 视图缩放四项（适应窗口 / 100% / 放大 / 缩小）正确
 - [ ] 画布外松开鼠标后，绘制不会继续（`buttons` 校验回归点）
 

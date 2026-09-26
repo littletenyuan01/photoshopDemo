@@ -91,7 +91,7 @@ QToolButton:disabled { color: #666; }</string>
          <enum>Qt::Orientation::Horizontal</enum>
         </property>
         <property name="toolTip">
-         <string>通道不透明度</string>
+         <string>通道不透明度（UI 占位：无 channel domain，只动右侧数字）</string>
         </property>
        </widget>
       </item>

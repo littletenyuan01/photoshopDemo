@@ -3,6 +3,7 @@
 
 #include <QButtonGroup>
 #include <QFontComboBox>
+#include <QIcon>
 #include <QSize>
 #include <QSizePolicy>
 #include <QSpinBox>
@@ -14,6 +15,10 @@ ToolOptionsBar::ToolOptionsBar(QWidget *parent)
     , ui(new Ui::ToolOptionsBar)
 {
     ui->setupUi(this);
+
+    // 左侧「家」图标：resources/icons/ui/home.png（对齐 PS 选项条左端入口）
+    ui->homeButton->setIcon(QIcon(QStringLiteral(":/icons/ui/home.png")));
+    ui->homeButton->setIconSize(QSize(18, 18));
 
     // 唯一真正接线的选项：画笔/橡皮直径（其余全是 UI 占位，见头文件说明）
     connect(ui->brushSizeSpin, qOverload<int>(&QSpinBox::valueChanged),
@@ -52,8 +57,6 @@ void ToolOptionsBar::setBrushDiameter(int diameter)
 
 void ToolOptionsBar::setCurrentTool(Ps::ToolId id)
 {
-    m_tool = id;
-
     ui->toolNameLabel->setText(toolDisplayName(id));
 
     // 按工具族整页切换 —— 对照 GIMP `gimp_tools_get_tool_options_gui()`

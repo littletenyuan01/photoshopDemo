@@ -97,6 +97,46 @@ QWidget#ToolOptionsBar QScrollBar::sub-line:horizontal { width: 0; }</string>
     <number>1</number>
    </property>
    <item>
+    <!-- PS 选项条左侧「家」：工作区/预设入口占位；图标 resources/icons/ui/home.png -->
+    <widget class="QToolButton" name="homeButton">
+     <property name="minimumSize">
+      <size>
+       <width>26</width>
+       <height>26</height>
+      </size>
+     </property>
+     <property name="maximumSize">
+      <size>
+       <width>28</width>
+       <height>28</height>
+      </size>
+     </property>
+     <property name="toolTip">
+      <string>主屏幕模式 / 工作区（UI 占位）</string>
+     </property>
+     <property name="text">
+      <string/>
+     </property>
+     <property name="iconSize">
+      <size>
+       <width>18</width>
+       <height>18</height>
+      </size>
+     </property>
+     <property name="autoRaise">
+      <bool>true</bool>
+     </property>
+     <property name="styleSheet">
+      <string notr="true">QToolButton#homeButton {
+  background: transparent;
+  border: none;
+  padding: 2px;
+}
+QToolButton#homeButton:hover { background-color: #5a5a5a; border-radius: 2px; }</string>
+     </property>
+    </widget>
+   </item>
+   <item>
     <widget class="QLabel" name="toolNameLabel">
      <property name="minimumSize">
       <size>

@@ -11,7 +11,6 @@ PathTreePanel::PathTreePanel(QWidget *parent)
     , ui(new Ui::PathTreePanel)
 {
     ui->setupUi(this);
-    bindSkeleton(ui->optionsHost, ui->itemList, ui->toolbarHost);
 
     // 与图层 / 通道两栏保持同样的行高（路径不做像素缩略图，只给标记图标）
     ui->itemList->setIconSize(QSize(ItemTreePanel::kThumbSize, ItemTreePanel::kThumbSize));

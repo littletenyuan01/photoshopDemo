@@ -56,9 +56,6 @@ public:
     Layer *activeLayer();
     const Layer *activeLayer() const;
 
-    QString filePath() const { return m_filePath; }
-    void setFilePath(const QString &path) { m_filePath = path; }
-
     bool isDirty() const { return m_dirty; }
     void clearDirty();
 
@@ -121,7 +118,6 @@ private:
     int m_height = 0;
     LayerStack m_layers;
     int m_activeLayerIndex = -1; // -1 表示无活动层
-    QString m_filePath;
     bool m_dirty = false;
     QRect m_dirtyRect; ///< 累计脏区（图像坐标）
 };

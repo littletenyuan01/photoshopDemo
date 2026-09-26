@@ -39,7 +39,6 @@ void ToolManager::registerTool(std::unique_ptr<Tool> tool)
     if (!tool)
         return;
     Tool *raw = tool.release(); // 所有权转入 m_tools
-    raw->setContext(m_context);
     m_tools.insert(static_cast<int>(raw->id()), raw);
 }
 
@@ -67,15 +66,12 @@ void ToolManager::rewriteConnections()
             this, &ToolManager::repaintRequested);
     connect(m_activeTool, &Tool::cursorChangeRequested,
             this, &ToolManager::cursorChangeRequested);
-    connect(m_activeTool, &Tool::statusMessageRequested,
-            this, &ToolManager::statusMessageRequested);
 }
 
 void ToolManager::setContext(const ToolContext &ctx)
 {
+    // 上下文由管理器持有，每次事件分发时按值传给活动工具（工具不留副本）
     m_context = ctx;
-    if (m_activeTool)
-        m_activeTool->setContext(ctx);
 }
 
 bool ToolManager::setActiveTool(Ps::ToolId id, ViewPort &view)
@@ -92,8 +88,6 @@ bool ToolManager::setActiveTool(Ps::ToolId id, ViewPort &view)
         m_activeTool->deactivate(m_context, view); // 清理拖拽中间态，避免状态「粘住」
 
     m_activeTool = next;
-    if (m_activeTool)
-        m_activeTool->setContext(m_context);
 
     rewriteConnections();
     emit activeToolChanged(activeToolId());

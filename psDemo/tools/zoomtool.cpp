@@ -7,16 +7,6 @@ ZoomTool::ZoomTool(QObject *parent)
 {
 }
 
-QString ZoomTool::displayName() const
-{
-    return tr("缩放工具");
-}
-
-QString ZoomTool::hint() const
-{
-    return tr("左键放大，右键缩小；Alt+左键临时平移");
-}
-
 Qt::CursorShape ZoomTool::cursorShape() const
 {
     return Qt::CrossCursor;

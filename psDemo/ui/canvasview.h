@@ -52,8 +52,6 @@ public:
 
     /** 缩放后文档在视口中的像素尺寸。 */
     QSizeF contentSize() const;
-    /** 当前视口尺寸。 */
-    QSizeF viewportSize() const { return QSizeF(width(), height()); }
 
     /**
      * 由滚动条设置偏移（控件坐标）。
@@ -106,7 +104,6 @@ private:
     QPointF imageToWidget(const QPointF &imagePos) const;
     QPointF widgetToImage(const QPointF &widgetPos) const;
     QRectF imageRectInWidget() const;
-    void drawCheckerboard(QPainter &painter, const QRect &rect) const;
 
     /** 用当前成员状态重建 ToolContext（文档/颜色/笔刷任一变化后调用）。 */
     void refreshToolContext();
@@ -120,7 +117,6 @@ private:
     qreal m_zoom = 1.0;
     QPointF m_offset;
     bool m_panning = false; ///< 通用平移手势（中键 / Alt+左键），由抓手工具承担
-    QPoint m_lastMousePos;
     bool m_pendingFit = false;
 
     Ps::ToolManager *m_toolManager = nullptr;

@@ -40,7 +40,7 @@ enum class ThumbChannel {
  *
  * 【缩略图】三个面板统一在此生成，见 §缩略图 一节。
  *
- * 子类须在 setupUi 后调用 bindSkeleton()，再实现 refreshFromDocument()。
+ * 子类须在 setupUi 后实现 refreshFromDocument()。
  */
 class ItemTreePanel : public QWidget
 {
@@ -98,21 +98,6 @@ protected:
     ~ItemTreePanel() override;
 
     /**
-     * 挂接 .ui 中的三段骨架（须与 GIMP options / tree / button_box 对应）。
-     * 子类 setupUi(this) 之后立刻调用。
-     */
-    void bindSkeleton(QFrame *optionsHost, QListWidget *itemList, QFrame *toolbarHost);
-
-    QFrame *optionsHost() const { return m_optionsHost; }
-    QListWidget *itemList() const { return m_itemList; }
-    QFrame *toolbarHost() const { return m_toolbarHost; }
-
-    /** 在底栏左侧追加按钮（对应 gimp_editor_add_action_button 的简化版）。 */
-    QToolButton *addToolbarButton(const QString &objectName,
-                                  const QString &text,
-                                  const QString &toolTip);
-
-    /**
      * 文档指针已更新、旧信号已断开；子类重绑业务信号并 refresh。
      * 基类默认只调 refreshFromDocument()。
      */
@@ -127,9 +112,6 @@ protected:
 
 private:
     Ps::ImageDocument *m_document = nullptr;
-    QFrame *m_optionsHost = nullptr;
-    QListWidget *m_itemList = nullptr;
-    QFrame *m_toolbarHost = nullptr;
 };
 
 #endif // ITEMTREEPANEL_H

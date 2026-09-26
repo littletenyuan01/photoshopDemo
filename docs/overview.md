@@ -3,6 +3,7 @@
 ## 项目是什么
 
 `photoshopDemo` 是用 **Qt 6 Widgets** 编写的轻量图像编辑 Demo，面向简历与面试演示。  
+产品名 **PhotoshopLite**，运行产物 **PSLite.exe**（工程目录仍为 `psDemo/`）。  
 参考 GIMP 的分层思路（文档 / 图层 / 绘制 / 工具 / 历史），用更小体量实现**可演示闭环**。
 
 ## 仓库布局

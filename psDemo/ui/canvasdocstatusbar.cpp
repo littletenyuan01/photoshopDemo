@@ -11,9 +11,9 @@ CanvasDocStatusBar::CanvasDocStatusBar(QWidget *parent)
 {
     ui->setupUi(this);
     setupInfoMenu();
+    // 只接 editingFinished：回车与失焦都会发它。
+    // 早先还接了 returnPressed，回车时两者都发 → zoomCommitted 发两次、setZoom 跑两遍。
     connect(ui->zoomEdit, &QLineEdit::editingFinished,
-            this, &CanvasDocStatusBar::onZoomEditingFinished);
-    connect(ui->zoomEdit, &QLineEdit::returnPressed,
             this, &CanvasDocStatusBar::onZoomEditingFinished);
     setZoomFactor(1.0);
     refreshDocInfo();

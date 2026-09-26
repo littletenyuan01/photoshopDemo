@@ -5,6 +5,7 @@
 
 #include <QMainWindow>
 
+class QCloseEvent;
 class QResizeEvent;
 
 namespace Ps {
@@ -54,6 +55,14 @@ protected:
      * 因此每次 resize 都按比例重算，**直到用户自己拖过分隔条**为止。
      */
     void resizeEvent(QResizeEvent *event) override;
+
+    /**
+     * 退出前确认（对齐 PS）。所有关闭路径都汇到这里：
+     * 右上角 ×、文件→退出、Alt+F4，以及**标题栏 logo 双击**
+     * （Windows 把它变成 SC_CLOSE，Qt 统一转成 QCloseEvent）。
+     */
+    void closeEvent(QCloseEvent *event) override;
+
 private slots:
     void onNewDocument();
     void onOpenDocument();
@@ -79,11 +88,11 @@ private:
     void createInitialDocument();
     /** 按当前高度给右侧栏三段分配默认比例（颜色 26% / 属性 24% / 图层 50%）。 */
     void applyDefaultRightColumnSizes();
-    void updateWindowTitle(Ps::ImageDocument *document);
 
     Ui::MainWindow *ui;
     Ps::AppSession *m_session = nullptr;
     bool m_rightColumnUserSized = false; ///< 用户拖过分隔条后，不再套用默认比例
+    bool m_closeConfirming = false;      ///< 正在弹退出确认框（防重入）
 };
 
 #endif // MAINWINDOW_H

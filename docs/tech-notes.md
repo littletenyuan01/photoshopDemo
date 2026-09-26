@@ -50,6 +50,102 @@
 
 ## 技术点日志
 
+### 2026-09 — 代码清理：删冗余/死代码，顺手挖出一个「第二次换文档必崩」
+
+> 需求：全面查一遍冗余逻辑与错误代码并修掉。做法：先派一个只读审计扫 `ui/`，
+> 同时自查 app/domain/engine/tools，然后**逐条自己复核证据**再动手（审计报告里有 2 条是错的）。
+
+**P0：连续换两次文档 100% 崩溃（读地址 0）——这是本来就有、不是本轮引入。**
+`git diff HEAD` 显示 `app/appsession.cpp` 未改动，属既有代码：
+
+- `AppSession::setDocument()` 原来是**先 `m_document = std::move(new)`（旧文档当场析构）再 emit**；
+- 三个订阅者拿到新文档后，会对**自己保存的旧指针**调 `disconnect(m_document, nullptr, this, nullptr)`
+  （`canvasview.cpp` / `itemtreepanel.cpp` / `propertiespanel.cpp`）；
+- `QObject::disconnect` 内部要做 `sender->metaObject()` 这种**虚调用** → 在已析构对象上读 vtable。
+  内存没被复用时侥幸能跑，**被新文档复用时就读到空 vtable → 0xC0000005 读地址 0**。
+- 为什么以前没炸：第一次换文档时旧指针是 `nullptr`（直接跳过 disconnect），
+  所以「新建→打开」「打开→打开」这类**第二次**才触发。实测连开 4 个文档 100% 复现。
+
+**修法**（保留原契约「旧文档在本调用返回后即被析构」）：用一个局部 `unique_ptr` 兜住旧文档，
+`m_document` 立刻指向新文档（订阅者拿不到旧的），但旧对象**活到 emit 结束**才析构。
+验证：连换 4 个文档（白/透明/红/蓝）+ 一次「标脏后立刻换文档」（旧防抖还挂着）+ 等防抖窗口，全部走完不崩。
+
+**冗余/死代码清理**（都过了构建，构建 0 error / 0 warning）：
+
+| 项 | 处理 |
+|---|---|
+| 三份透明棋盘格（图层缩略图 / 画布 / 渐变缩略图） | 合并成 `PixmapUtils::paintChecker(rect, cell, light, dark)`，各自保留原配色 |
+| 三份多档 DPR 图标光栅化（`svgIcon` / `twoScaleIcon` / `toolIcon`） | 抽 `ui/pixmaputils.h`（`canvas` + `multiScaleIcon`），`svgIcon`/`twoScaleIcon` 改为一行调用 |
+| `colorspanel` 里手抄的 `canvas/twoScaleIcon/paintChecker` | 删，改用共享实现 |
+| `zoomEdit` 同时连 `editingFinished` + `returnPressed` | 删后者：回车会连发两次 → `zoomCommitted` 发两次、`setZoom` 跑两遍（实测 2 次 → 1 次） |
+| 图层/通道面板缩略图订阅 `contentChanged` | 改订阅 `pixelsChanged`：`contentChanged` 是汇总信号，结构/属性变化也会发，而那时刚重建过 → 白合成一遍 |
+| `ItemTreePanel::addToolbarButton` + `bindSkeleton` + 三个访问器 | 全删（只写不读的骨架绑定；三个面板本来就直读 `ui->…`） |
+| `Tool::displayName()/hint()` 及 4 个工具的 override | 全删（无调用者；工具名/提示实际在 `toolbox.cpp`/`tooloptionsbar.cpp`，是重复维护的两份文案） |
+| `Tool::statusMessageRequested` + `ToolManager` 转发 | 删（无 emit、无订阅；提示语本来走 `ToolOptionsBar::currentHint()`） |
+| `Tool::m_ctx` / `setContext` / `context()` | 删；`markDocumentDirty` 改为**显式收上下文参数**（工具不再留一份只写不读的副本） |
+| `Layer::owner()`、`ImageDocument::filePath()/setFilePath()/m_filePath`、`AppSession::hasDocument()`、`ToolContext::hasDocument()`、`CanvasView::viewportSize()/m_lastMousePos`、`ToolOptionsBar::m_tool`、`HsvColorWell::DragTarget::SwapHint`、`colorspanel.ui` 的 `strip3` | 全删（声明即全部命中，无调用/无读者） |
+| `main.cpp` 里 `showMaximized()` 之前的 `resize()` | 删（紧随其后的最大化会覆盖它，是死逻辑） |
+| `HsvColorWell` 里重复两遍的「收下颜色并同步 HSV」 | 提成 `adoptColor()`；顺带删掉没用到的 `setMouseTracking`、与 `minimumSizeHint` 打架的 `setMinimumHeight` |
+| 4 个「可点但没反应」的图层底栏按钮、填充滑条、图层筛选行、通道不透明度 | 补上 `（UI 占位…）` tooltip（原来只有 tooltip 文本本身，没说没实现） |
+
+**审计报告里被我复核推翻的两条**（提醒自己别照单全收）：
+① 「`onHexEdited` 会重复写一遍 RGB/Hex」——`m_syncing` 守卫已经挡掉了，不成立；
+② 「`syncRecentStrip` 没被换色路径调用」——实际三个换色槽末尾都调了，只有 tooltip 文案（「最近颜色」）与实现不符，已改。
+
+**验证**（`no-latent-bugs.mdc` §3/§9）：临时程序断言「删掉之后原有行为还在」——
+缩略图棋盘格仍有白/灰两色、画布透明区仍铺棋盘、SVG 图标仍出 1x/2x 两档、
+**画一笔后图层与通道缩略图都刷新**（这条专门验 `pixelsChanged` 订阅没改坏）、回车只提交一次缩放。
+另有连换文档的最小复现程序验证崩溃修复。全部通过，临时程序用完即删。
+
+### 2026-09 — 「点标题栏 logo 两下就退出」：别跟系统手势较劲，收到 closeEvent 里问一句
+
+> 用户报：点标题栏左上角的应用 logo，点两下程序就退出了。随后用户自己实测 PS，
+> 确认**单击弹系统菜单、双击关闭**是平台约定（PS 也一样），要求改成
+> 「双击后弹出是否退出的窗口，而不是直接退出」。
+
+**先做了个错的方向**：在 Windows 上子类化顶层 HWND（`SetWindowSubclass`），把
+`WM_NCLBUTTON*`(HTSYSMENU) 那一族消息吞掉，让 logo 变成纯装饰。这条路最后**整体删掉**了：
+
+- 它逆着平台约定走（用户明确说 PS 也这样，不是 bug），还顺带把「单击看系统菜单」也挡了；
+- 只吞双击**没用**：单击会弹出系统菜单并进入**模态菜单循环**，第二下点击被菜单吃掉、
+  根本到不了窗口，于是「双击 = 关闭」的守卫轮不到执行；
+- 为兜住系统菜单直接发来的 `SC_CLOSE`，还得加「刚点过 logo + 光标仍在 logo 上」的
+  时间窗判断 —— 越写越像在跟操作系统打架，而且**没法可靠验证**。
+
+**最终改法**：把所有关闭路径统一收口到 `MainWindow::closeEvent`：
+
+| 关闭路径 | 最终消息 |
+|---|---|
+| 标题栏 logo 双击 | `DefWindowProc` → `WM_SYSCOMMAND`(`SC_CLOSE`) |
+| 右上角 × | `WM_SYSCOMMAND`(`SC_CLOSE`) |
+| 文件→退出 / Alt+F4 | `QWidget::close()` |
+
+三者都变成 `QCloseEvent`，所以只在这一个函数里问一次：「确定要退出 PhotoshopLite 吗？」
+默认按钮停在**取消**；`ImageDocument::isDirty()` 为真时补一句诚实提示
+（本版本没实现保存，退出会丢修改）。`m_closeConfirming` 防重入（对话框本身是嵌套事件循环）。
+
+**验证**（`no-latent-bugs.mdc` §3/§9）：一次性程序把 `WM_SYSCOMMAND(SC_CLOSE)` 与
+`window.close()` 两条路径都跑一遍，断言：弹出的是**模态 QMessageBox**、文案含「退出」、
+脏文档带「未保存」提示、默认按钮是 `RejectRole`、点「取消」后窗口仍在（且可重复两次）、
+点「退出」后窗口才真的关掉。**全部通过**，构建 0 error / 0 warning。
+
+**验证过程本身踩的三个坑（都写进规则 §7/§9 了）**：
+
+1. **真实鼠标注入复现不了「点标题栏 logo」**：`SetCursorPos` + `mouse_event` 打过去，
+   消息日志里**一条 NC 消息都没有**（点位落在窗口边框里、没打到绘制出来的图标上）。
+   差一点就靠「窗口没关」这种空断言宣布通过 —— 是**看日志发现根本没测到**才没上当。
+   **教训：断言前先确认「测试真的碰到了目标」**（对照窗口 + 消息日志）。
+2. **测试弹的真对话框被「人」点掉了**：跑的时候用户正在屏幕前点，第 3 次弹框在 6 秒后
+   被人工点掉，断言因此假失败。→ UI 验证工具要把窗口**挪到屏幕外**
+   （`window.move(-4000, -4000)`）再弹框。
+3. **状态机里遇到阻塞调用**：`window.close()` 会**卡在模态对话框的嵌套循环**里，
+   而把 `timer->start()` 写在步骤末尾 → 状态机再也走不动（实测卡 14.8 秒）。
+   → 必须先排下一拍、再执行阻塞动作。
+
+**用 PowerShell 改文件又踩了一次（规则 §7 第 4 次）**：用 `-replace | Set-Content`
+改这个临时测试文件的调用点，把里面的中文注释写成乱码 —— 临时文件也不例外，
+一律用编辑工具。
+
 ### 2026-09 — 颜色 / 属性面板：三个「不报错就是不生效」的坑
 
 > 需求：照 PS 补出右侧的「颜色/色板/渐变/图案」与「属性/调整/库」两块面板。仍是**只做 UI**。
@@ -118,7 +214,11 @@ Qt 按 **Latin-1** 解码这些字节 → 一个名字都匹配不上：
 - 把颜色面板压到最矮（120）→ 断言颜色页**出现纵向滚动条**（`scrollArea->verticalScrollBar()->isVisible()`），
   即「控件不会够不着」。
 
-### 2026-09 — 性能修复：通道面板刷新（实测 3.7× 提升）
+### 2026-09 — 颜色面板外观对齐 PS 四页截图
+
+- **颜色**：新增 `HsvColorWell`（重叠 FG/BG + 二维 S/V + 竖直色相），替换原水平色相滑杆与一维渐变近似。
+- **色板 / 渐变 / 图案**：统一为「搜索 + 分组树 + 组内 IconMode 方网格 + 底栏（文件夹/加号/删除）」。
+- 渐变改为方缩略图；图案按「树 / 草 / 水滴」分组（占位花纹）。
 
 > 起因：代码复查时用微基准量了一次，发现问题比我预想的严重。
 

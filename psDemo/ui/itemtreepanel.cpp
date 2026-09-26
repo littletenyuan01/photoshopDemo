@@ -1,9 +1,9 @@
 #include "itemtreepanel.h"
 
 #include "domain/imagedocument.h"
+#include "pixmaputils.h"
 
 #include <QFrame>
-#include <QHBoxLayout>
 #include <QIcon>
 #include <QImage>
 #include <QListWidget>
@@ -16,8 +16,10 @@
 
 namespace {
 
-/** 透明底棋盘格边长（与画布 CanvasView 的观感一致）。 */
+/** 缩略图里透明区的棋盘格边长与配色（与画布观感一致）。 */
 constexpr int kCheckerCell = 6;
+const QColor kCheckerLight(0xff, 0xff, 0xff);
+const QColor kCheckerDark(0xcc, 0xcc, 0xcc);
 
 /**
  * 把 src 等比缩小到能放进 size 的矩形；**先大比例快速缩放再平滑收尾**。
@@ -42,18 +44,6 @@ QImage scaledToFit(const QImage &src, const QSize &size)
     return result.scaled(target, Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
 }
 
-/** 在透明画布上先铺棋盘格，再把 img 居中叠上去（用于图层缩略图表现透明区）。 */
-void paintCheckerboard(QPainter &painter, const QRect &rect)
-{
-    for (int y = rect.top(); y <= rect.bottom(); y += kCheckerCell) {
-        for (int x = rect.left(); x <= rect.right(); x += kCheckerCell) {
-            const bool light = ((x / kCheckerCell) + (y / kCheckerCell)) % 2 == 0;
-            painter.fillRect(QRect(x, y, kCheckerCell, kCheckerCell).intersected(rect),
-                             light ? QColor(0xff, 0xff, 0xff) : QColor(0xcc, 0xcc, 0xcc));
-        }
-    }
-}
-
 } // namespace
 
 ItemTreePanel::ItemTreePanel(QWidget *parent)
@@ -62,43 +52,6 @@ ItemTreePanel::ItemTreePanel(QWidget *parent)
 }
 
 ItemTreePanel::~ItemTreePanel() = default;
-
-void ItemTreePanel::bindSkeleton(QFrame *optionsHost, QListWidget *itemList, QFrame *toolbarHost)
-{
-    // 与 GimpItemTreeView 私有结构中的 options_box / 树 / editor button_box 对齐
-    m_optionsHost = optionsHost;
-    m_itemList = itemList;
-    m_toolbarHost = toolbarHost;
-}
-
-QToolButton *ItemTreePanel::addToolbarButton(const QString &objectName,
-                                             const QString &text,
-                                             const QString &toolTip)
-{
-    if (!m_toolbarHost)
-        return nullptr;
-
-    auto *layout = qobject_cast<QHBoxLayout *>(m_toolbarHost->layout());
-    if (!layout)
-        return nullptr;
-
-    auto *btn = new QToolButton(m_toolbarHost);
-    btn->setObjectName(objectName);
-    btn->setText(text);
-    btn->setToolTip(toolTip);
-    btn->setAutoRaise(true);
-
-    // 插在末尾 spacer 之前，保持「图标左对齐、右侧留白」
-    int insertAt = layout->count();
-    for (int i = 0; i < layout->count(); ++i) {
-        if (layout->itemAt(i)->spacerItem()) {
-            insertAt = i;
-            break;
-        }
-    }
-    layout->insertWidget(insertAt, btn);
-    return btn;
-}
 
 void ItemTreePanel::applyToolbarIcon(QToolButton *button,
                                     const QString &resourcePath,
@@ -117,30 +70,19 @@ void ItemTreePanel::applyToolbarIcon(QToolButton *button,
 
 QIcon ItemTreePanel::svgIcon(const QString &resourcePath, int logicalSize)
 {
-    QIcon icon;
     QSvgRenderer renderer(resourcePath);
     if (!renderer.isValid())
-        return icon;
+        return QIcon();
 
-    const int scales[] = {1, 2};
-    for (int s : scales) {
-        const int px = logicalSize * s;
-
-        // 【坑】不要「先设 devicePixelRatio 再 render(painter)」：
-        // QSvgRenderer 会按设备尺寸缩放，而 painter 又叠加一次 DPR 变换 →
-        // 图标被画成 2 倍大，屏幕上只看到左上角一小块。
-        // 正确做法：在与设备像素 1:1 的 QImage 上显式指定目标矩形渲染，最后再给 Pixmap 打 DPR。
-        QImage img(px, px, QImage::Format_ARGB32_Premultiplied);
-        img.fill(Qt::transparent);
-        QPainter painter(&img);
-        renderer.render(&painter, QRectF(0, 0, px, px));
-        painter.end();
-
-        QPixmap pm = QPixmap::fromImage(img);
-        pm.setDevicePixelRatio(qreal(s));
-        icon.addPixmap(pm);
-    }
-    return icon;
+    // 【坑】不要「先设 devicePixelRatio 再 render(painter)」：
+    // QSvgRenderer 会按设备尺寸缩放，而 painter 又叠加一次 DPR 变换 →
+    // 图标被画成 2 倍大，屏幕上只看到左上角一小块。
+    // 正确做法：在 1:1 设备像素的画布上显式指定目标矩形渲染，最后再打 DPR
+    // ——这段样板已收敛到 PixmapUtils::multiScaleIcon。
+    return PixmapUtils::multiScaleIcon(logicalSize, logicalSize, 2,
+                                       [&renderer](QPainter &painter, const QRect &box) {
+                                           renderer.render(&painter, QRectF(box));
+                                       });
 }
 
 // —— 缩略图 ——
@@ -163,7 +105,7 @@ QImage ItemTreePanel::makeLayerThumbnail(const QImage &layerPixels)
                      (box.height() - fitted.height()) / 2,
                      fitted.width(), fitted.height());
     // 先棋盘格再贴图：图层全透明时也能看出「这里有一层」
-    paintCheckerboard(painter, cell);
+    PixmapUtils::paintChecker(painter, cell, kCheckerCell, kCheckerLight, kCheckerDark);
     painter.drawImage(cell.topLeft(), fitted);
     return canvas;
 }
@@ -188,7 +130,7 @@ QImage ItemTreePanel::makeChannelThumbnail(const QImage &composite, ThumbChannel
         const QRect cell((box.width() - fitted.width()) / 2,
                          (box.height() - fitted.height()) / 2,
                          fitted.width(), fitted.height());
-        paintCheckerboard(painter, cell);
+        PixmapUtils::paintChecker(painter, cell, kCheckerCell, kCheckerLight, kCheckerDark);
         painter.drawImage(cell.topLeft(), fitted);
         return canvas;
     }

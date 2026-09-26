@@ -23,9 +23,6 @@ class MoveTool : public Tool
 public:
     explicit MoveTool(QObject *parent = nullptr);
 
-    QString displayName() const override;
-    QString hint() const override;
-
     bool mousePress(const ToolEvent &event, const ToolContext &ctx, ViewPort &view) override;
 };
 

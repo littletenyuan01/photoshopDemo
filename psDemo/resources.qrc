@@ -39,8 +39,12 @@
     <file alias="tools/zoom.png">resources/icons/tools/zoom.png</file>
     <file alias="ui/check-white.png">resources/icons/ui/check-white.png</file>
     <file alias="ui/radio-dot-white.png">resources/icons/ui/radio-dot-white.png</file>
+    <!-- 菜单栏 / 工具选项条 chrome -->
+    <file alias="ui/home.png">resources/icons/ui/home.png</file>
+    <file alias="ui/app-logo.png">resources/icons/ui/app-logo.png</file>
     <!-- 面板通用小图标（属性 / 色板面板底栏与「对齐并分布」） -->
     <file alias="ui/plus.svg">resources/icons/ui/plus.svg</file>
+    <file alias="ui/folder.svg">resources/icons/ui/folder.svg</file>
     <file alias="ui/align-left.svg">resources/icons/ui/align-left.svg</file>
     <file alias="ui/align-hcenter.svg">resources/icons/ui/align-hcenter.svg</file>
     <file alias="ui/align-right.svg">resources/icons/ui/align-right.svg</file>

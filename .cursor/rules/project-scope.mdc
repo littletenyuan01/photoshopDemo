@@ -5,14 +5,14 @@ alwaysApply: true
 
 # 项目约定
 
-- 路径：`photoshopDemo`（应用在 `psDemo/`，Qt Widgets）
+- 路径：`photoshopDemo`（应用在 `psDemo/`，Qt Widgets；产物 `PSLite.exe`，产品名 PhotoshopLite）
 - 目标：简历向仿 Photoshop Demo；参考 GIMP **架构思路**，不搬源码
 - 上限：总体约 **≤ 7 万行**；优先链路完整，不堆功能
 - v1 闭环：打开/新建 → 图层 → 画笔/橡皮 → 合成预览 → 撤销重做 → 导出
 - 技术栈允许：**OpenCV**、**CUDA**、CPU **并行加速**（多线程等）；无 GPU 时主链路应可 CPU 回退
 - **界面**：涉及 UI 须维护 Qt Designer **`.ui` 文件**，便于手工调整（见 `qt-ui-forms.mdc`）
 - **注释**：凡写出的代码，关键处须有中文注释（见 `code-comments.mdc`）；**不得无注释提交关键逻辑**
-- **对照 GIMP**：实现功能须先查 `gimp-master`，禁止凭印象乱写（见 `gimp-reference.mdc`）
+- **参考源分流**：纯 UI 阶段主要对齐 **Photoshop 布局**；功能编写阶段须先对照 **`gimp-master` 代码组织**（见 `gimp-reference.mdc`）
 - **交付纪律**：禁止留下「不报错但不工作」的隐患；验证要求与自查表见 `no-latent-bugs.mdc`（**强制**）
 - **图标**：找不到时优先从 [iconfont.cn](https://www.iconfont.cn/) 下载 SVG（见 `icon-sources.mdc`）；禁止用 Adobe 官方图标
 - 规划看 `wiki/`；实现说明看 `docs/`，代码变更必须同步 `docs/`

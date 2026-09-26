@@ -20,8 +20,6 @@ class ZoomTool : public Tool
 public:
     explicit ZoomTool(QObject *parent = nullptr);
 
-    QString displayName() const override;
-    QString hint() const override;
     Qt::CursorShape cursorShape() const override;
 
     bool mousePress(const ToolEvent &event, const ToolContext &ctx, ViewPort &view) override;

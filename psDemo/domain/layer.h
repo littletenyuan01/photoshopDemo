@@ -64,7 +64,6 @@ public:
 
     /** 由 ImageDocument 在入栈时调用；不取得所有权。 */
     void setOwner(ImageDocument *owner) { m_owner = owner; }
-    ImageDocument *owner() const { return m_owner; }
 
 private:
     /** 通知 owner：本层属性变了（UI 应只更新对应那一行，而非整表重建）。 */

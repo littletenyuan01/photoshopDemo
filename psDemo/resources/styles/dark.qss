@@ -219,18 +219,4 @@ PropertiesPanel QLabel#labelTarget {
   color: #9a9a9a;
   padding: 2px 0;
 }
-/* 颜色页的色相滑杆：彩虹轨 + 浅色滑块（整段样式放这里，.ui 里不再各写一份） */
-ColorsPanel QSlider#hueSlider::groove:horizontal {
-  height: 10px;
-  border: 1px solid #202020;
-  background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
-              stop:0 #ff0000, stop:0.17 #ffff00, stop:0.33 #00ff00,
-              stop:0.5 #00ffff, stop:0.67 #0000ff, stop:0.83 #ff00ff, stop:1 #ff0000);
-}
-ColorsPanel QSlider#hueSlider::handle:horizontal {
-  width: 8px;
-  margin: -4px 0;
-  background-color: #e8e8e8;
-  border: 1px solid #111;
-  border-radius: 2px;
-}
+/* 颜色页主区由 HsvColorWell 自绘（二维色域 + 竖直色相），不再用 QSlider#hueSlider */

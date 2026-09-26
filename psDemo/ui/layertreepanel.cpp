@@ -42,8 +42,6 @@ LayerTreePanel::LayerTreePanel(QWidget *parent)
     , ui(new Ui::LayerTreePanel)
 {
     ui->setupUi(this);
-    // 骨架名与 GimpItemTreeView 的 options / tree / button_box 对应
-    bindSkeleton(ui->optionsHost, ui->itemList, ui->toolbarHost);
 
     // 缩略图列：图标尺寸与行高对齐（缩略图在 ItemTreePanel 内生成）
     ui->itemList->setIconSize(QSize(ItemTreePanel::kThumbSize, ItemTreePanel::kThumbSize));
@@ -124,8 +122,10 @@ void LayerTreePanel::onDocumentChanged()
                 this, &LayerTreePanel::onActiveLayerChanged);
         connect(doc, &Ps::ImageDocument::layerPropertiesChanged,
                 this, &LayerTreePanel::onLayerPropertiesChanged);
-        // 像素改动 → 只安排防抖刷新缩略图，绝不重建列表
-        connect(doc, &Ps::ImageDocument::contentChanged,
+        // 像素改动 → 只安排防抖刷新缩略图，绝不重建列表。
+        // 只订阅 pixelsChanged：contentChanged 是汇总信号，结构/属性变化也会发它，
+        // 而那时上面几个槽刚刷过 → 缩略图会被白算一遍。
+        connect(doc, &Ps::ImageDocument::pixelsChanged,
                 this, &LayerTreePanel::scheduleThumbnailRefresh);
     }
     refreshFromDocument();

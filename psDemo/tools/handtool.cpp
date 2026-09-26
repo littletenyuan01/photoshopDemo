@@ -7,16 +7,6 @@ HandTool::HandTool(QObject *parent)
 {
 }
 
-QString HandTool::displayName() const
-{
-    return tr("抓手工具");
-}
-
-QString HandTool::hint() const
-{
-    return tr("拖拽平移画布；中键或 Alt+左键可在任意工具下临时平移");
-}
-
 Qt::CursorShape HandTool::cursorShape() const
 {
     return m_panning ? Qt::ClosedHandCursor : Qt::OpenHandCursor;

@@ -91,7 +91,7 @@ QToolButton:disabled { color: #666; }</string>
            </size>
           </property>
           <property name="toolTip">
-           <string>按类型筛选</string>
+           <string>按类型筛选（UI 占位：筛选逻辑尚未实现）</string>
           </property>
           <item>
            <property name="text">
@@ -197,7 +197,7 @@ QToolButton:disabled { color: #666; }</string>
            <string>○</string>
           </property>
           <property name="toolTip">
-           <string>打开/关闭图层筛选</string>
+           <string>打开/关闭图层筛选（UI 占位：筛选逻辑尚未实现）</string>
           </property>
          </widget>
         </item>
@@ -390,7 +390,7 @@ QToolButton:disabled { color: #666; }</string>
            <enum>Qt::Orientation::Horizontal</enum>
           </property>
           <property name="toolTip">
-           <string>填充不透明度</string>
+           <string>填充不透明度（UI 占位：尚未进 domain，切层不会回读）</string>
           </property>
          </widget>
         </item>
@@ -483,7 +483,7 @@ QToolButton:disabled { color: #666; }</string>
          <string/>
         </property>
         <property name="toolTip">
-         <string>添加图层样式（fx）</string>
+         <string>添加图层样式（fx）（UI 占位：尚未实现）</string>
         </property>
         <property name="iconSize">
          <size>
@@ -502,7 +502,7 @@ QToolButton:disabled { color: #666; }</string>
          <string/>
         </property>
         <property name="toolTip">
-         <string>添加图层蒙版</string>
+         <string>添加图层蒙版（UI 占位：蒙版尚未进 domain）</string>
         </property>
         <property name="iconSize">
          <size>
@@ -521,7 +521,7 @@ QToolButton:disabled { color: #666; }</string>
          <string/>
         </property>
         <property name="toolTip">
-         <string>创建填充或调整图层</string>
+         <string>创建填充或调整图层（UI 占位：调整层尚未实现）</string>
         </property>
         <property name="iconSize">
          <size>
@@ -540,7 +540,7 @@ QToolButton:disabled { color: #666; }</string>
          <string/>
         </property>
         <property name="toolTip">
-         <string>创建图层组</string>
+         <string>创建图层组（UI 占位：图层组尚未实现）</string>
         </property>
         <property name="iconSize">
          <size>

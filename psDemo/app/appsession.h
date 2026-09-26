@@ -37,11 +37,10 @@ public:
     /**
      * 换文档（传入 nullptr 表示关闭）。旧文档在本调用返回后即被析构，
      * 订阅者收到新指针时必须已丢弃旧文档的一切引用。
+     * 【实现约束】旧文档必须**活到 documentChanged 广播结束**：
+     * 订阅者会在槽里对旧指针调 disconnect()，对象若已析构就是悬垂指针（实测会崩）。
      */
     void setDocument(std::unique_ptr<ImageDocument> document);
-
-    /** 是否有文档。 */
-    bool hasDocument() const { return m_document != nullptr; }
 
 signals:
     /** 当前文档已变更；doc 可能为 nullptr。 */

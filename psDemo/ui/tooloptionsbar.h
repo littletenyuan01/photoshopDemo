@@ -70,7 +70,6 @@ private:
     static QString hintForTool(Ps::ToolId id);
 
     Ui::ToolOptionsBar *ui;
-    Ps::ToolId m_tool = Ps::ToolId::Move;
     QString m_hint;   ///< 当前工具提示语（状态栏用，见 currentHint()）
 };
 

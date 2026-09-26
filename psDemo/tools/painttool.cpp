@@ -28,17 +28,6 @@ PaintTool::PaintTool(Ps::ToolId id, bool eraseMode, QObject *parent)
 {
 }
 
-QString PaintTool::displayName() const
-{
-    return m_erase ? tr("橡皮擦工具") : tr("画笔工具");
-}
-
-QString PaintTool::hint() const
-{
-    return m_erase ? tr("左键擦除活动层；Alt+左键平移")
-                   : tr("左键在活动层绘制；Alt+左键平移");
-}
-
 Qt::CursorShape PaintTool::cursorShape() const
 {
     return Qt::CrossCursor;
@@ -61,7 +50,7 @@ bool PaintTool::mousePress(const ToolEvent &event, const ToolContext &ctx, ViewP
     m_lastImagePos = event.imagePos;
 
     PaintEngine::stampDab(layer->pixels(), event.imagePos, ctx.brushRadius, ctx.foreground, mode);
-    markDocumentDirty(dirtyRectForSegment(event.imagePos, event.imagePos, ctx.brushRadius));
+    markDocumentDirty(ctx, dirtyRectForSegment(event.imagePos, event.imagePos, ctx.brushRadius));
     return true;
 }
 
@@ -83,7 +72,7 @@ bool PaintTool::mouseMove(const ToolEvent &event, const ToolContext &ctx, ViewPo
     // strokeSegment 返回最后一颗 dab 的中心，作为下一段的起点，保证连续
     m_lastImagePos = PaintEngine::strokeSegment(layer->pixels(), m_lastImagePos, event.imagePos,
                                                 ctx.brushRadius, ctx.foreground, mode);
-    markDocumentDirty(dirtyRectForSegment(m_lastImagePos, event.imagePos, ctx.brushRadius));
+    markDocumentDirty(ctx, dirtyRectForSegment(m_lastImagePos, event.imagePos, ctx.brushRadius));
     return true;
 }
 

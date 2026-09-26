@@ -2,6 +2,7 @@
 
 #include "domain/imagedocument.h"
 #include "engine/compositor.h"
+#include "pixmaputils.h"
 #include "tools/handtool.h"
 #include "tools/tool.h"
 #include "tools/toolcontext.h"
@@ -303,7 +304,9 @@ void CanvasView::paintEvent(QPaintEvent *)
     }
 
     const QRectF target = imageRectInWidget();
-    drawCheckerboard(painter, target.toAlignedRect());
+    // 透明区棋盘格（格子 8、白/#c8c8c8）：与面板缩略图同一套实现，见 PixmapUtils
+    PixmapUtils::paintChecker(painter, target.toAlignedRect(), 8,
+                              QColor(255, 255, 255), QColor(200, 200, 200));
     painter.setRenderHint(QPainter::SmoothPixmapTransform, m_zoom < 4.0);
     painter.drawImage(target, m_cache);
 
@@ -352,7 +355,7 @@ void CanvasView::mousePressEvent(QMouseEvent *event)
     // 对齐 PS/GIMP：任何工具下都能临时平移。
     if (Ps::HandTool::isPanGesture(e)) {
         if (Ps::Tool *hand = m_toolManager->tool(Ps::ToolId::Hand)) {
-            hand->setContext(m_toolContext);
+            // 上下文按值传给工具，工具不留副本（见 Tool::markDocumentDirty 的注释）
             m_panning = hand->mousePress(e, m_toolContext, *this);
             if (m_panning) {
                 event->accept();
@@ -477,16 +480,4 @@ QRectF CanvasView::imageRectInWidget() const
     if (!m_document)
         return {};
     return QRectF(m_offset, contentSize());
-}
-
-void CanvasView::drawCheckerboard(QPainter &painter, const QRect &rect) const
-{
-    const int cell = 8;
-    for (int y = rect.top(); y < rect.bottom(); y += cell) {
-        for (int x = rect.left(); x < rect.right(); x += cell) {
-            const bool light = ((x / cell) + (y / cell)) % 2 == 0;
-            painter.fillRect(QRect(x, y, cell, cell).intersected(rect),
-                             light ? QColor(255, 255, 255) : QColor(200, 200, 200));
-        }
-    }
 }

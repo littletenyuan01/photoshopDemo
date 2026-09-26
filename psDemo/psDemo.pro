@@ -2,6 +2,9 @@ QT += widgets svg
 
 CONFIG += c++17
 
+# 产物名 PSLite.exe（目录/仓库仍叫 psDemo/photoshopDemo，避免大范围改路径）
+TARGET = PSLite
+
 INCLUDEPATH += $$PWD
 
 # 分层：app（会话/广播）· domain（文档真相）· engine（算法）· tools（交互状态机）· ui（Qt 界面）
@@ -33,6 +36,7 @@ SOURCES += \
     ui/pathtreepanel.cpp \
     ui/dockpanel.cpp \
     ui/colorspanel.cpp \
+    ui/hsvcolorwell.cpp \
     ui/propertiespanel.cpp \
     ui/toolbox.cpp \
     ui/tooloptionsbar.cpp \
@@ -66,7 +70,9 @@ HEADERS += \
     ui/pathtreepanel.h \
     ui/dockpanel.h \
     ui/panelchrome.h \
+    ui/pixmaputils.h \
     ui/colorspanel.h \
+    ui/hsvcolorwell.h \
     ui/propertiespanel.h \
     ui/toolbox.h \
     ui/tooloptionsbar.h \
@@ -88,6 +94,10 @@ FORMS += \
 
 RESOURCES += \
     resources.qrc
+
+# Windows：把 ICO 嵌进 exe，任务栏 / 资源管理器才显示应用图标
+# （仅 setWindowIcon 往往只影响标题栏小图标，任务栏仍用 exe 默认窗体图标）
+win32: RC_ICONS = resources/icons/ui/app-logo.ico
 
 # Default rules for deployment.
 qnx: target.path = /tmp/$${TARGET}/bin

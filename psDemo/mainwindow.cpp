@@ -12,9 +12,12 @@
 #include "ui/toolbox.h"
 #include "ui/tooloptionsbar.h"
 
+#include <QCloseEvent>
 #include <QFileDialog>
+#include <QIcon>
 #include <QImageReader>
 #include <QMessageBox>
+#include <QPushButton>
 #include <QSplitter>
 
 #include <memory>
@@ -25,6 +28,10 @@ MainWindow::MainWindow(QWidget *parent)
     , m_session(new Ps::AppSession(this))
 {
     ui->setupUi(this); // 菜单与布局均来自 mainwindow.ui
+
+    // 标题栏：产品名 PhotoshopLite；窗口图标（exe 名见 .pro 的 TARGET=PSLite）
+    setWindowTitle(QStringLiteral("PhotoshopLite"));
+    setWindowIcon(QIcon(QStringLiteral(":/icons/ui/app-logo.png")));
 
     // 右侧栏三段可拖动调节高度（QSplitter）；拖不到折叠，靠每段的 minimumHeight 兜底
     for (int i = 0; i < ui->rightSplitter->count(); ++i) {
@@ -75,10 +82,6 @@ void MainWindow::setupSession()
     ui->canvasWorkspace->setSession(m_session);
     ui->dockPanel->setSession(m_session);
     ui->propertiesPanel->setSession(m_session); // 「属性」页展示真实文档/图层数据
-
-    // 标题跟着 session 走
-    connect(m_session, &Ps::AppSession::documentChanged,
-            this, &MainWindow::updateWindowTitle);
 }
 
 void MainWindow::setupToolbox()
@@ -165,7 +168,6 @@ void MainWindow::onOpenDocument()
     //   绕过会编译不过。）
     const int index = doc->addLayer(std::move(layer));
     doc->setActiveLayerIndex(index);
-    doc->setFilePath(path);
     doc->clearDirty();
 
     m_session->setDocument(std::move(doc));
@@ -207,6 +209,42 @@ void MainWindow::resizeEvent(QResizeEvent *event)
         applyDefaultRightColumnSizes();
 }
 
+void MainWindow::closeEvent(QCloseEvent *event)
+{
+    // 关闭统一收口在这里：右上角 ×、文件→退出、Alt+F4、以及**标题栏 logo 双击**
+    // （Windows 把它变成 SC_CLOSE），到最后都是这一个 QCloseEvent，所以只问一次即可。
+    // 【为什么不去挡标题栏 logo 的点击】PS 与 Windows 的行为一致（单击弹系统菜单、
+    // 双击请求关闭），那是平台约定，不是 bug；要改的是「双击就直接没了」这件事本身。
+    if (m_closeConfirming) {
+        event->ignore(); // 已经在问用户了，别再叠一层对话框
+        return;
+    }
+
+    QMessageBox box(this);
+    box.setIcon(QMessageBox::Question);
+    box.setWindowTitle(tr("退出 PhotoshopLite"));
+    box.setText(tr("确定要退出 PhotoshopLite 吗？"));
+    const Ps::ImageDocument *document = m_session ? m_session->document() : nullptr;
+    if (document && document->isDirty()) {
+        // 诚实提示：本版本还没有实现保存，别让用户以为点了「退出」还能找回来
+        box.setInformativeText(tr("当前文档有未保存的修改。本版本尚未实现保存功能，"
+                                  "退出后修改会丢失。"));
+    }
+    QPushButton *quitButton = box.addButton(tr("退出"), QMessageBox::AcceptRole);
+    QPushButton *cancelButton = box.addButton(tr("取消"), QMessageBox::RejectRole);
+    box.setDefaultButton(cancelButton); // 默认停在「取消」，避免回车/手滑直接退出
+
+    m_closeConfirming = true;
+    box.exec();
+    m_closeConfirming = false;
+
+    if (box.clickedButton() != quitButton) {
+        event->ignore();
+        return;
+    }
+    QMainWindow::closeEvent(event);
+}
+
 void MainWindow::applyDefaultRightColumnSizes()
 {
     QSplitter *splitter = ui->rightSplitter;
@@ -221,19 +259,8 @@ void MainWindow::onAbout()
 {
     QMessageBox::about(
         this,
-        tr("关于 photoshopDemo"),
-        tr("photoshopDemo\n"
+        tr("关于 PhotoshopLite"),
+        tr("PhotoshopLite\n"
            "Qt 仿 Photoshop 简历向 Demo。\n"
            "菜单栏顶层结构对齐 Photoshop 中文版；功能按路线图逐步实现。"));
-}
-
-void MainWindow::updateWindowTitle(Ps::ImageDocument *document)
-{
-    QString name = tr("未命名");
-    if (document && !document->filePath().isEmpty())
-        name = document->filePath();
-    else if (document)
-        name = tr("未命名 (%1×%2)").arg(document->width()).arg(document->height());
-
-    setWindowTitle(tr("%1 — photoshopDemo").arg(name));
 }

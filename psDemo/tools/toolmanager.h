@@ -70,8 +70,6 @@ signals:
     void repaintRequested();
     /** 活动工具请求改光标（透传）。 */
     void cursorChangeRequested(Qt::CursorShape shape);
-    /** 活动工具请求状态栏消息（透传）。 */
-    void statusMessageRequested(const QString &msg);
 
 private:
     /** 注册工具，key 取自 tool->id()。 */

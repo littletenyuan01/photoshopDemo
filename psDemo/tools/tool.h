@@ -41,11 +41,6 @@ public:
 
     Ps::ToolId id() const { return m_id; }
 
-    /** 工具显示名与提示（选项栏用）。 */
-    virtual QString displayName() const = 0;
-    /** 状态栏/选项栏的一行提示。 */
-    virtual QString hint() const { return QString(); }
-
     /** 鼠标光标形状（CanvasView 在切换工具后查询）。 */
     virtual Qt::CursorShape cursorShape() const { return Qt::ArrowCursor; }
 
@@ -66,24 +61,23 @@ public:
     /** 工具被切走时调用（清理拖拽中间态）。 */
     virtual void deactivate(const ToolContext &ctx, ViewPort &view);
 
-    void setContext(const ToolContext &ctx) { m_ctx = ctx; }
-    const ToolContext &context() const { return m_ctx; }
-
 signals:
     /** 请求重绘画布。 */
     void repaintRequested();
     /** 光标形状变了，请求画布更新光标。 */
     void cursorChangeRequested(Qt::CursorShape shape);
-    /** 工具希望状态栏显示一条消息（msg 为空表示清除）。 */
-    void statusMessageRequested(const QString &msg);
 
 protected:
-    /** 子类改完像素后调它：标记脏区 + 请求重绘。 */
-    void markDocumentDirty(const QRect &rect);
+    /**
+     * 子类改完像素后调它：标记脏区 + 请求重绘。
+     * 【为什么上下文要传进来】工具不保存 ToolContext 副本（早期版本存了一份 m_ctx，
+     * 只有这里读得到，属于「只写不读」的冗余状态）；上下文由 ToolManager 在每次事件
+     * 分发时按值给出，直接透传即可。
+     */
+    void markDocumentDirty(const ToolContext &ctx, const QRect &rect);
 
 private:
     Ps::ToolId m_id;
-    ToolContext m_ctx;
 };
 
 } // namespace Ps

@@ -88,23 +88,13 @@ void PropertiesPanel::onSessionDocumentChanged(Ps::ImageDocument *document)
     m_document = document;
 
     if (m_document) {
-        // 像素/结构变化都可能改动图层的像素尺寸
+        // 像素/结构变化与换活动图层都只需整块重读，故两个信号共用同一个槽
+        // （早先写成两个只差 Q_UNUSED 的包装槽，纯冗余）
         connect(m_document, &Ps::ImageDocument::contentChanged,
-                this, &PropertiesPanel::onDocumentContentChanged);
+                this, &PropertiesPanel::refreshFromDocument);
         connect(m_document, &Ps::ImageDocument::activeLayerChanged,
-                this, &PropertiesPanel::onActiveLayerChanged);
+                this, &PropertiesPanel::refreshFromDocument);
     }
-    refreshFromDocument();
-}
-
-void PropertiesPanel::onDocumentContentChanged()
-{
-    refreshFromDocument();
-}
-
-void PropertiesPanel::onActiveLayerChanged(int index)
-{
-    Q_UNUSED(index); // 活动图层换了就整块重读，避免两处各写一份取值逻辑
     refreshFromDocument();
 }
 

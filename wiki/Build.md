@@ -13,7 +13,7 @@
 
 1. 打开 `psDemo/psDemo.pro`
 2. 选择 Kit（如 Desktop Qt 6.x MinGW 64-bit）
-3. 构建并运行
+3. 构建并运行（产物 **PSLite.exe**，由 `TARGET = PSLite` 决定）
 
 构建产物默认在 `psDemo/build/...`，已由 `.gitignore` 忽略。
 

@@ -39,6 +39,18 @@
 
 旧自绘 `tool-*.svg` 已删除；工具箱只使用 `:/icons/tools/*.png`。
 
+## 菜单栏 / 工具选项条 chrome
+
+目录：`psDemo/resources/icons/ui/`
+
+| 用途 | 文件 | 说明 |
+|------|------|------|
+| 标题栏 / 任务栏图标 | `app-logo.png` + `app-logo.ico` | 圆角黑底灰色 Ps；`setWindowIcon` + `RC_ICONS` 嵌进 exe |
+| 工具选项条左侧「家」 | `home.png` | `ToolOptionsBar` 的 `homeButton` |
+
+接线：`setWindowTitle("PhotoshopLite")` + `QApplication`/`MainWindow` 的 `setWindowIcon`；
+Windows 另用 `RC_ICONS = app-logo.ico` 嵌进 exe（任务栏靠这个）；产物名 `TARGET = PSLite`；家图标在选项条左端。
+
 ## 图层面板底栏图标
 
 目录：`psDemo/resources/icons/layers/`（英文文件名 PNG）  

@@ -23,8 +23,6 @@ struct ToolContext
     QColor foreground {Qt::black};     ///< 前景色（画笔颜色）
     QColor background {Qt::white};     ///< 背景色
     qreal brushRadius = 10.0;          ///< 画笔半径（图像像素）
-
-    bool hasDocument() const { return document != nullptr; }
 };
 
 /**
