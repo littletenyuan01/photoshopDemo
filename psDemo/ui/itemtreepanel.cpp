@@ -4,7 +4,9 @@
 
 #include <QFrame>
 #include <QHBoxLayout>
+#include <QIcon>
 #include <QListWidget>
+#include <QSize>
 #include <QToolButton>
 
 ItemTreePanel::ItemTreePanel(QWidget *parent)
@@ -49,6 +51,17 @@ QToolButton *ItemTreePanel::addToolbarButton(const QString &objectName,
     }
     layout->insertWidget(insertAt, btn);
     return btn;
+}
+
+void ItemTreePanel::applyToolbarIcon(QToolButton *button, const QString &resourcePath)
+{
+    if (!button)
+        return;
+    button->setIcon(QIcon(resourcePath));
+    button->setIconSize(QSize(22, 22));
+    button->setText(QString());
+    button->setToolButtonStyle(Qt::ToolButtonIconOnly);
+    button->setAutoRaise(true);
 }
 
 void ItemTreePanel::setDocument(Ps::ImageDocument *document)

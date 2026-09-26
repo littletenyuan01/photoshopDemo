@@ -54,6 +54,13 @@ protected:
                                   const QString &toolTip);
 
     /**
+     * 把底栏按钮改成「线框图标 + 中文 tip」的统一外观。
+     * 三个子面板（图层/通道/路径）本是一致的规则，早先在各自 .cpp 里逐字重复了三遍。
+     * 【对照 GIMP】gimp_editor_add_icon_box + gimp_editor_set_action_sensitive 的按钮外观约定。
+     */
+    static void applyToolbarIcon(QToolButton *button, const QString &resourcePath);
+
+    /**
      * 文档指针已更新、旧信号已断开；子类重绑业务信号并 refresh。
      * 基类默认只调 refreshFromDocument()。
      */

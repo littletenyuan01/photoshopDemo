@@ -1,10 +1,13 @@
-﻿#include "mainwindow.h"
+#include "mainwindow.h"
 #include "ui_mainwindow.h"
 
+#include "app/appsession.h"
 #include "domain/imagedocument.h"
 #include "domain/layer.h"
+// 必须早于 ui_mainwindow.h：其中 DockPanel 头文件对 CanvasView 仅有前向声明
 #include "ui/canvasview.h"
 #include "ui/canvasworkspace.h"
+#include "ui/dockpanel.h"
 #include "ui/toolbox.h"
 #include "ui/tooloptionsbar.h"
 
@@ -17,13 +20,14 @@
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
     , ui(new Ui::MainWindow)
+    , m_session(new Ps::AppSession(this))
 {
     ui->setupUi(this); // 菜单与布局均来自 mainwindow.ui
-    setupMenus();
-    setupToolbox();
 
-    // 启动即有可演示文档，避免空白壳
-    setDocument(Ps::ImageDocument::createBlank(800, 600, Qt::white));
+    setupMenus();
+    setupSession();
+    createInitialDocument(); // 启动即有可演示文档，避免空白壳
+    setupToolbox();          // 放在文档之后：工具箱初始状态要与画布一致
 }
 
 MainWindow::~MainWindow()
@@ -44,11 +48,22 @@ void MainWindow::setupMenus()
     connect(ui->actionZoomIn, &QAction::triggered, this, &MainWindow::onZoomIn);
     connect(ui->actionZoomOut, &QAction::triggered, this, &MainWindow::onZoomOut);
 
-    // —— 窗口：显隐右侧图层面板 ——
-    connect(ui->actionWindowLayers, &QAction::toggled, this, &MainWindow::onToggleLayerPanel);
+    // —— 窗口：显隐右侧面板 ——
+    connect(ui->actionWindowLayers, &QAction::toggled, this, &MainWindow::onToggleDockPanel);
 
     // —— 帮助 ——
     connect(ui->actionHelpAbout, &QAction::triggered, this, &MainWindow::onAbout);
+}
+
+void MainWindow::setupSession()
+{
+    // 一次性交付：此后文档变化全部由 AppSession 广播，无需在此逐个转发
+    ui->canvasWorkspace->setSession(m_session);
+    ui->dockPanel->setSession(m_session);
+
+    // 标题跟着 session 走
+    connect(m_session, &Ps::AppSession::documentChanged,
+            this, &MainWindow::updateWindowTitle);
 }
 
 void MainWindow::setupToolbox()
@@ -64,12 +79,18 @@ void MainWindow::setupToolbox()
     connect(ui->toolOptionsBar, &ToolOptionsBar::brushDiameterChanged,
             this, &MainWindow::onBrushDiameterChanged);
 
+    // 用工具箱当前值对齐其余组件（这里同步不经过槽，避免半初始化状态）
     const Ps::ToolId tool = ui->toolBox->currentTool();
     ui->toolOptionsBar->setCurrentTool(tool);
     canvas->setCurrentTool(tool);
     canvas->setForegroundColor(ui->toolBox->foregroundColor());
     canvas->setBackgroundColor(ui->toolBox->backgroundColor());
     canvas->setBrushDiameter(ui->toolOptionsBar->brushDiameter());
+}
+
+void MainWindow::createInitialDocument()
+{
+    m_session->setDocument(Ps::ImageDocument::createBlank(800, 600, Qt::white));
 }
 
 void MainWindow::onToolChanged(Ps::ToolId id)
@@ -96,7 +117,7 @@ void MainWindow::onBackgroundColorChanged(const QColor &color)
 
 void MainWindow::onNewDocument()
 {
-    setDocument(Ps::ImageDocument::createBlank(800, 600, Qt::white));
+    m_session->setDocument(Ps::ImageDocument::createBlank(800, 600, Qt::white));
     statusBar()->showMessage(tr("已新建 800×600 文档"), 3000);
 }
 
@@ -127,7 +148,7 @@ void MainWindow::onOpenDocument()
     doc->setFilePath(path);
     doc->clearDirty();
 
-    setDocument(std::move(doc));
+    m_session->setDocument(std::move(doc));
     statusBar()->showMessage(tr("已打开：%1").arg(path), 4000);
 }
 
@@ -153,9 +174,9 @@ void MainWindow::onZoomOut()
     canvas->setZoom(canvas->zoom() / 1.25);
 }
 
-void MainWindow::onToggleLayerPanel(bool visible)
+void MainWindow::onToggleDockPanel(bool visible)
 {
-    ui->layerPanel->setVisible(visible);
+    ui->dockPanel->setVisible(visible);
 }
 
 void MainWindow::onAbout()
@@ -168,23 +189,13 @@ void MainWindow::onAbout()
            "菜单栏顶层结构对齐 Photoshop 中文版；功能按路线图逐步实现。"));
 }
 
-void MainWindow::setDocument(std::unique_ptr<Ps::ImageDocument> document)
-{
-    m_document = std::move(document);
-    // 画布与图层面板都不拥有文档，只借用指针
-    ui->canvasWorkspace->canvasView()->setDocument(m_document.get());
-    ui->canvasWorkspace->notifyDocumentChanged();
-    ui->layerPanel->setDocument(m_document.get());
-    updateWindowTitle();
-}
-
-void MainWindow::updateWindowTitle()
+void MainWindow::updateWindowTitle(Ps::ImageDocument *document)
 {
     QString name = tr("未命名");
-    if (m_document && !m_document->filePath().isEmpty())
-        name = m_document->filePath();
-    else if (m_document)
-        name = tr("未命名 (%1×%2)").arg(m_document->width()).arg(m_document->height());
+    if (document && !document->filePath().isEmpty())
+        name = document->filePath();
+    else if (document)
+        name = tr("未命名 (%1×%2)").arg(document->width()).arg(document->height());
 
     setWindowTitle(tr("%1 — photoshopDemo").arg(name));
 }

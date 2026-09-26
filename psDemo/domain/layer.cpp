@@ -1,5 +1,7 @@
 #include "layer.h"
 
+#include "imagedocument.h"
+
 #include <QColor>
 #include <QtGlobal>
 
@@ -20,9 +22,44 @@ Layer::Layer(const QString &name, const QImage &pixels)
 {
 }
 
+void Layer::notifyPropertiesChanged()
+{
+    // owner 为空表示该层尚未入栈（构造中/游离层），静默即可
+    if (m_owner)
+        m_owner->notifyLayerPropertiesChanged(*this);
+}
+
+void Layer::setName(const QString &name)
+{
+    if (m_name == name)
+        return;
+    m_name = name;
+    notifyPropertiesChanged();
+}
+
+void Layer::setVisible(bool visible)
+{
+    if (m_visible == visible)
+        return;
+    m_visible = visible;
+    notifyPropertiesChanged();
+}
+
 void Layer::setOpacity(qreal opacity)
 {
-    m_opacity = qBound(0.0, opacity, 1.0);
+    const qreal clamped = qBound(0.0, opacity, 1.0);
+    if (qFuzzyCompare(m_opacity, clamped))
+        return;
+    m_opacity = clamped;
+    notifyPropertiesChanged();
+}
+
+void Layer::setBlendMode(BlendMode mode)
+{
+    if (m_blendMode == mode)
+        return;
+    m_blendMode = mode;
+    notifyPropertiesChanged();
 }
 
 void Layer::fill(const QColor &color)

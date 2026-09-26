@@ -1,9 +1,12 @@
 #include "canvasview.h"
 
 #include "domain/imagedocument.h"
-#include "domain/layer.h"
 #include "engine/compositor.h"
-#include "engine/paintengine.h"
+#include "tools/handtool.h"
+#include "tools/tool.h"
+#include "tools/toolcontext.h"
+#include "tools/toolevent.h"
+#include "tools/toolmanager.h"
 
 #include <QMouseEvent>
 #include <QPainter>
@@ -12,14 +15,25 @@
 
 CanvasView::CanvasView(QWidget *parent)
     : QWidget(parent)
+    , m_toolManager(new Ps::ToolManager(this))
 {
     setMouseTracking(true);
     setFocusPolicy(Qt::StrongFocus);
     setMinimumSize(200, 150);
     setBackgroundRole(QPalette::Dark);
     setAutoFillBackground(true);
+
+    // 工具的请求信号统一由管理器转发上来，此处只连一次
+    connect(m_toolManager, &Ps::ToolManager::repaintRequested,
+            this, qOverload<>(&QWidget::update));
+    connect(m_toolManager, &Ps::ToolManager::cursorChangeRequested,
+            this, [this](Qt::CursorShape shape) { setCursor(shape); });
+
+    refreshToolContext();
     updateToolCursor();
 }
+
+CanvasView::~CanvasView() = default;
 
 void CanvasView::setDocument(Ps::ImageDocument *document)
 {
@@ -30,14 +44,12 @@ void CanvasView::setDocument(Ps::ImageDocument *document)
         disconnect(m_document, nullptr, this, nullptr);
 
     m_document = document;
-    m_painting = false;
 
     if (m_document) {
-        connect(m_document, &Ps::ImageDocument::documentChanged, this, [this]() {
-            rebuildCache();
-            update();
-        });
-        connect(m_document, &Ps::ImageDocument::structureChanged, this, [this]() {
+        // 只订阅「像素变了」与「结构变了」：
+        // 图层属性变化（显隐/透明度）也走 contentChanged，画布需重合成，
+        // 但那是 Compositor 的事，画布不必区分。
+        connect(m_document, &Ps::ImageDocument::contentChanged, this, [this]() {
             rebuildCache();
             update();
         });
@@ -52,7 +64,11 @@ void CanvasView::setDocument(Ps::ImageDocument *document)
         update();
         notifyViewChanged();
     }
+
+    refreshToolContext();
 }
+
+// —— 几何与钳制 ——
 
 QSizeF CanvasView::contentSize() const
 {
@@ -76,7 +92,7 @@ void CanvasView::clampOffset()
     if (content.width() <= vw)
         m_offset.setX((vw - content.width()) * 0.5);
     else
-        // 大于视口：左缘 ∈ [vw-contentW, 0]，右缘始终不离开视口右侧以外的空洞无限拖
+        // 大于视口：左缘 ∈ [vw-contentW, 0]
         m_offset.setX(qBound(vw - content.width(), m_offset.x(), 0.0));
 
     if (content.height() <= vh)
@@ -133,12 +149,39 @@ void CanvasView::setScrollOffset(int scrollX, int scrollY)
     notifyViewChanged();
 }
 
+// —— 缩放 ——
+
 void CanvasView::setZoom(qreal zoom)
 {
     const QPointF anchorWidget(width() * 0.5, height() * 0.5);
     const QPointF anchorImage = widgetToImage(anchorWidget);
     m_zoom = qBound(0.05, zoom, 32.0);
     m_offset = anchorWidget - anchorImage * m_zoom;
+    clampOffset();
+    update();
+    notifyViewChanged();
+}
+
+void CanvasView::zoomAt(const QPointF &widgetPos, qreal factor)
+{
+    if (!m_document)
+        return;
+
+    // 锚点缩放：让 widgetPos 下的图像点缩放前后保持在同一屏幕位置。
+    // 这段数学此前在 wheelEvent / 缩放工具里各写了一遍，现收敛于此。
+    const QPointF before = (widgetPos - m_offset) / m_zoom;
+    m_zoom = qBound(0.05, m_zoom * factor, 32.0);
+    m_offset = widgetPos - before * m_zoom;
+    clampOffset();
+    update();
+    notifyViewChanged();
+}
+
+void CanvasView::panBy(const QPointF &deltaWidget)
+{
+    if (!m_document)
+        return;
+    m_offset += deltaWidget;
     clampOffset();
     update();
     notifyViewChanged();
@@ -186,31 +229,67 @@ void CanvasView::centerOnImage()
     notifyViewChanged();
 }
 
+// —— 工具与参数 ——
+
+void CanvasView::refreshToolContext()
+{
+    m_toolContext.document = m_document;
+    m_toolContext.foreground = m_fg;
+    m_toolContext.background = m_bg;
+    m_toolContext.brushRadius = m_brushRadius;
+
+    if (m_toolManager)
+        m_toolManager->setContext(m_toolContext);
+}
+
 void CanvasView::setCurrentTool(Ps::ToolId id)
 {
-    if (m_tool == id)
+    if (!m_toolManager)
         return;
-    m_tool = id;
-    m_painting = false;
+    // 切换动作交给管理器：它会 deactivate 旧工具（清理拖拽态）再激活新工具
+    m_toolManager->setActiveTool(id, *this);
     updateToolCursor();
+}
+
+Ps::ToolId CanvasView::currentTool() const
+{
+    return m_toolManager ? m_toolManager->activeToolId() : Ps::ToolId::Move;
 }
 
 void CanvasView::setForegroundColor(const QColor &c)
 {
-    if (c.isValid())
-        m_fg = c;
+    if (!c.isValid())
+        return;
+    m_fg = c;
+    refreshToolContext();
 }
 
 void CanvasView::setBackgroundColor(const QColor &c)
 {
-    if (c.isValid())
-        m_bg = c;
+    if (!c.isValid())
+        return;
+    m_bg = c;
+    refreshToolContext();
 }
 
 void CanvasView::setBrushDiameter(int diameter)
 {
     m_brushRadius = qMax(0.5, diameter * 0.5);
+    refreshToolContext();
 }
+
+int CanvasView::brushDiameter() const
+{
+    return qRound(m_brushRadius * 2.0);
+}
+
+void CanvasView::updateToolCursor()
+{
+    if (m_toolManager)
+        setCursor(m_toolManager->activeCursorShape());
+}
+
+// —— 绘制 ——
 
 void CanvasView::paintEvent(QPaintEvent *)
 {
@@ -227,7 +306,16 @@ void CanvasView::paintEvent(QPaintEvent *)
     drawCheckerboard(painter, target.toAlignedRect());
     painter.setRenderHint(QPainter::SmoothPixmapTransform, m_zoom < 4.0);
     painter.drawImage(target, m_cache);
+
+    // 工具浮层最后画：位于图像之上（对应 GIMP display 的 tool_items / preview_items）
+    Ps::Tool *tool = m_toolManager ? m_toolManager->activeTool() : nullptr;
+    if (tool && tool->hasOverlay()) {
+        painter.setRenderHint(QPainter::SmoothPixmapTransform, false);
+        tool->drawOverlay(painter, m_toolContext);
+    }
 }
+
+// —— 事件 ——
 
 void CanvasView::wheelEvent(QWheelEvent *event)
 {
@@ -235,66 +323,46 @@ void CanvasView::wheelEvent(QWheelEvent *event)
         QWidget::wheelEvent(event);
         return;
     }
-
-    const QPointF mouse = event->position();
-    const QPointF before = (mouse - m_offset) / m_zoom;
-
     const qreal factor = event->angleDelta().y() > 0 ? 1.1 : (1.0 / 1.1);
-    m_zoom = qBound(0.05, m_zoom * factor, 32.0);
-    m_offset = mouse - before * m_zoom;
-    clampOffset();
-    update();
-    notifyViewChanged();
+    zoomAt(event->position(), factor);
     event->accept();
+}
+
+Ps::ToolEvent CanvasView::makeToolEvent(QMouseEvent *event) const
+{
+    Ps::ToolEvent e;
+    e.widgetPos = event->position();
+    e.imagePos = widgetToImage(e.widgetPos);
+    e.button = event->button();
+    e.buttons = event->buttons();
+    e.modifiers = event->modifiers();
+    return e;
 }
 
 void CanvasView::mousePressEvent(QMouseEvent *event)
 {
-    if (event->button() == Qt::MiddleButton
-        || (event->button() == Qt::LeftButton && (event->modifiers() & Qt::AltModifier))) {
-        m_panning = true;
-        m_lastMousePos = event->pos();
-        setCursor(Qt::ClosedHandCursor);
-        event->accept();
+    if (!m_document || !m_toolManager) {
+        QWidget::mousePressEvent(event);
         return;
     }
 
-    if (event->button() == Qt::LeftButton && m_document) {
-        if (m_tool == Ps::ToolId::Hand) {
-            m_panning = true;
-            m_lastMousePos = event->pos();
-            setCursor(Qt::ClosedHandCursor);
-            event->accept();
-            return;
-        }
+    const Ps::ToolEvent e = makeToolEvent(event);
 
-        if (m_tool == Ps::ToolId::Zoom) {
-            const QPointF mouse = event->position();
-            const QPointF before = (mouse - m_offset) / m_zoom;
-            m_zoom = qBound(0.05, m_zoom * 1.25, 32.0);
-            m_offset = mouse - before * m_zoom;
-            clampOffset();
-            update();
-            notifyViewChanged();
-            event->accept();
-            return;
-        }
-
-        if (isPaintTool()) {
-            beginPaintStroke(widgetToImage(event->position()));
-            event->accept();
-            return;
+    // 通用平移手势（中键 / Alt+左键）优先于当前工具：由抓手工具承担。
+    // 对齐 PS/GIMP：任何工具下都能临时平移。
+    if (Ps::HandTool::isPanGesture(e)) {
+        if (Ps::Tool *hand = m_toolManager->tool(Ps::ToolId::Hand)) {
+            hand->setContext(m_toolContext);
+            m_panning = hand->mousePress(e, m_toolContext, *this);
+            if (m_panning) {
+                event->accept();
+                return;
+            }
         }
     }
 
-    if (event->button() == Qt::RightButton && m_tool == Ps::ToolId::Zoom && m_document) {
-        const QPointF mouse = event->position();
-        const QPointF before = (mouse - m_offset) / m_zoom;
-        m_zoom = qBound(0.05, m_zoom / 1.25, 32.0);
-        m_offset = mouse - before * m_zoom;
-        clampOffset();
-        update();
-        notifyViewChanged();
+    // 其余事件交给活动工具；未消费则视为无操作（不再有工具专属 if 分支）
+    if (m_toolManager->dispatchPress(e, *this)) {
         event->accept();
         return;
     }
@@ -307,19 +375,23 @@ void CanvasView::mouseMoveEvent(QMouseEvent *event)
     if (m_document)
         emit cursorImagePosChanged(widgetToImage(event->position()), true);
 
-    if (m_panning) {
-        const QPoint delta = event->pos() - m_lastMousePos;
-        m_lastMousePos = event->pos();
-        m_offset += delta;
-        clampOffset();
-        update();
-        notifyViewChanged();
-        event->accept();
+    if (!m_document || !m_toolManager) {
+        QWidget::mouseMoveEvent(event);
         return;
     }
 
-    if (m_painting && (event->buttons() & Qt::LeftButton)) {
-        continuePaintStroke(widgetToImage(event->position()));
+    const Ps::ToolEvent e = makeToolEvent(event);
+
+    // 平移进行中：固定发给抓手工具，不因中途切工具而丢失 release
+    if (m_panning) {
+        if (Ps::Tool *hand = m_toolManager->tool(Ps::ToolId::Hand)) {
+            hand->mouseMove(e, m_toolContext, *this);
+            event->accept();
+            return;
+        }
+    }
+
+    if (m_toolManager->dispatchMove(e, *this)) {
         event->accept();
         return;
     }
@@ -329,15 +401,25 @@ void CanvasView::mouseMoveEvent(QMouseEvent *event)
 
 void CanvasView::mouseReleaseEvent(QMouseEvent *event)
 {
-    if (m_panning && (event->button() == Qt::MiddleButton || event->button() == Qt::LeftButton)) {
-        m_panning = false;
-        updateToolCursor();
-        event->accept();
+    if (!m_document || !m_toolManager) {
+        QWidget::mouseReleaseEvent(event);
         return;
     }
 
-    if (m_painting && event->button() == Qt::LeftButton) {
-        endPaintStroke();
+    const Ps::ToolEvent e = makeToolEvent(event);
+
+    if (m_panning) {
+        m_panning = false;
+        if (Ps::Tool *hand = m_toolManager->tool(Ps::ToolId::Hand)) {
+            hand->mouseRelease(e, m_toolContext, *this);
+            // 平移结束后恢复当前工具的光标
+            updateToolCursor();
+            event->accept();
+            return;
+        }
+    }
+
+    if (m_toolManager->dispatchRelease(e, *this)) {
         event->accept();
         return;
     }
@@ -363,12 +445,15 @@ void CanvasView::leaveEvent(QEvent *event)
     QWidget::leaveEvent(event);
 }
 
+// —— 内部工具 ——
+
 void CanvasView::rebuildCache()
 {
     if (!m_document) {
         m_cache = QImage();
         return;
     }
+    // 目前仍是全量重合成；脏区局部重算见 docs/architecture.md §8.1 主线 ②
     m_cache = Ps::Compositor::composite(*m_document);
 }
 
@@ -404,63 +489,4 @@ void CanvasView::drawCheckerboard(QPainter &painter, const QRect &rect) const
                              light ? QColor(255, 255, 255) : QColor(200, 200, 200));
         }
     }
-}
-
-void CanvasView::updateToolCursor()
-{
-    switch (m_tool) {
-    case Ps::ToolId::Hand:
-        setCursor(Qt::OpenHandCursor);
-        break;
-    case Ps::ToolId::Zoom:
-        setCursor(Qt::CrossCursor);
-        break;
-    case Ps::ToolId::Brush:
-    case Ps::ToolId::Eraser:
-        setCursor(Qt::CrossCursor);
-        break;
-    default:
-        unsetCursor();
-        break;
-    }
-}
-
-bool CanvasView::isPaintTool() const
-{
-    return m_tool == Ps::ToolId::Brush || m_tool == Ps::ToolId::Eraser;
-}
-
-void CanvasView::beginPaintStroke(const QPointF &imagePos)
-{
-    Ps::Layer *layer = m_document ? m_document->activeLayer() : nullptr;
-    if (!layer || !layer->isVisible())
-        return;
-
-    m_painting = true;
-    m_lastPaintPos = imagePos;
-
-    const auto mode = (m_tool == Ps::ToolId::Eraser)
-                          ? Ps::PaintEngine::Mode::Erase
-                          : Ps::PaintEngine::Mode::Paint;
-    Ps::PaintEngine::stampDab(layer->pixels(), imagePos, m_brushRadius, m_fg, mode);
-    m_document->markDirty();
-}
-
-void CanvasView::continuePaintStroke(const QPointF &imagePos)
-{
-    Ps::Layer *layer = m_document ? m_document->activeLayer() : nullptr;
-    if (!layer || !m_painting)
-        return;
-
-    const auto mode = (m_tool == Ps::ToolId::Eraser)
-                          ? Ps::PaintEngine::Mode::Erase
-                          : Ps::PaintEngine::Mode::Paint;
-    m_lastPaintPos = Ps::PaintEngine::strokeSegment(
-        layer->pixels(), m_lastPaintPos, imagePos, m_brushRadius, m_fg, mode);
-    m_document->markDirty();
-}
-
-void CanvasView::endPaintStroke()
-{
-    m_painting = false;
 }

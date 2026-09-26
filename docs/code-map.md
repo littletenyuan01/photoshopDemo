@@ -7,18 +7,49 @@
 | 文件 | 职责 | 状态 |
 |------|------|------|
 | `psDemo/main.cpp` | `QApplication` 入口 | 已实现 |
-| `psDemo/mainwindow.h/.cpp` | 持有文档、菜单动作、挂接画布 | 已实现 |
-| `psDemo/mainwindow.ui` | 主窗口布局；中央提升为 `CanvasView` | 已实现 |
-| `psDemo/psDemo.pro` | 源文件与 `INCLUDEPATH` | 已实现 |
+| `psDemo/mainwindow.h/.cpp` | 只做菜单接线 + 装配与广播（不再逐个 setDocument） | 已实现 |
+| `psDemo/mainwindow.ui` | 主窗口布局；中央提升为 `CanvasWorkspace`、右侧为 `DockPanel` | 已实现 |
+| `psDemo/psDemo.pro` | 源文件与 `INCLUDEPATH`（按 app/domain/engine/tools/ui 分层分组） | 已实现 |
+
+## app（会话与广播）
+
+| 文件 | 职责 |
+|------|------|
+| `app/appsession.h/.cpp` | **当前文档的唯一持有者与广播中心**；`documentChanged(doc)` 一发，所有面板自行订阅。对照 GIMP `GimpContext` 的 `image-changed` |
+
+**要点**：早先换文档要在 `MainWindow` 里逐个 `setDocument`（画布/工作区/面板/状态条），加一个面板就得加一行，漏一行即静默不刷新。现在只需 `m_session->setDocument(...)`。
+
+## tools（交互状态机）
+
+| 文件 | 职责 |
+|------|------|
+| `tools/toolid.h` | 工具枚举（对应 GIMP ToolInfo 思路） |
+| `tools/toolevent.h` | `ToolEvent`：**已换算成图像坐标**的规范化事件（含控件坐标供锚点缩放用） |
+| `tools/toolcontext.h` | `ToolContext`（文档/前景/背景/笔刷半径）+ `ViewPort` 接口 |
+| `tools/tool.h/.cpp` | Tool 基类：`mousePress/Move/Release`、`cursorShape`、`drawOverlay`、`deactivate` |
+| `tools/toolmanager.h/.cpp` | 注册表 + 活动工具 + 事件分发 + **信号转发**（活动工具会变，画布无法预先 connect） |
+| `tools/movetool.h/.cpp` | 占位；**中性兜底**：未接入逻辑的工具切过去不消费事件 |
+| `tools/handtool.h/.cpp` | 平移；`isPanGesture` 供画布判定中键 / Alt+左键通用手势 |
+| `tools/zoomtool.h/.cpp` | 锚点缩放（左键放大 / 右键缩小） |
+| `tools/painttool.h/.cpp` | 画笔 + 橡皮（同一类、两种 mode；只负责事件→dab，写像素在 PaintEngine） |
+
+**要点**：新增工具 = 加一个类 + 在 `ToolManager` 注册一行，**`CanvasView` 与 `MainWindow` 均无需改动**。
+视图变换由画布实现 `ViewPort` 提供，**锚点缩放数学只存在于 `CanvasView::zoomAt` 一处**。
 
 ## domain（文档真相）
 
 | 文件 | 职责 |
 |------|------|
 | `domain/blendmode.h` | 混合模式枚举（现仅 Normal） |
-| `domain/layer.h/.cpp` | 单层像素与属性 |
+| `domain/layer.h/.cpp` | 单层像素与属性；**持 owner 回指，setter 内部自动广播** |
 | `domain/layerstack.h/.cpp` | 图层列表（`std::vector<unique_ptr>`） |
-| `domain/imagedocument.h/.cpp` | 文档：尺寸、栈、活动层、信号 |
+| `domain/imagedocument.h/.cpp` | 文档：尺寸、栈、活动层、**分级信号 + 语义化 setter + 累计脏区** |
+
+**要点**：`ImageDocument` 的信号**刻意分级**，让订阅方增量更新而不是整表重建 ——
+`pixelsChanged(QRect)` / `layerPropertiesChanged(int)` / `structureChanged()` /
+`activeLayerChanged(int)` / `contentChanged()`（汇总）。
+UI 不得直接改 `Layer`，一律走 `setLayerVisible/Opacity/Name/BlendMode` 语义化 setter
+（这是 Phase 6 撤销的收口点）。
 
 ## engine
 
@@ -33,14 +64,18 @@
 
 | 文件 | 职责 |
 |------|------|
-| `ui/canvasview.h/.cpp` | 合成缓存显示；缩放/平移/居中；画笔等工具事件 |
-| `ui/canvasworkspace.ui/.h/.cpp` | 顶/左标尺 + 画布 + 底栏状态 + 水平/竖直滚动条 |
+| `ui/canvasview.h/.cpp` | **只管视图变换 / 绘制 / 事件归一化转发**；实现 `ViewPort` 供工具请求缩放平移 |
+| `ui/canvasworkspace.ui/.h/.cpp` | 顶/左标尺 + 画布 + 底栏状态 + 水平/竖直滚动条；订阅 session |
 | `ui/canvasdocstatusbar.ui/.h/.cpp` | 缩放% + 文档信息 + 显示菜单（PS 底栏左侧） |
 | `ui/rulerwidget.h/.cpp` | 像素标尺自绘（外层由 workspace.ui 排布） |
-| `ui/layerpanel.ui/.h/.cpp` | 图层面板：列表/显隐/透明度/增删排序 |
+| `ui/itemtreepanel.h/.cpp` | Item 树面板基类；提供 `applyToolbarIcon` 等共用能力 |
+| `ui/layertreepanel.ui/.h/.cpp` | 图层树：列表/显隐/透明度/增删排序；**增量更新 + 滑条两段提交** |
+| `ui/channeltreepanel.*` / `ui/pathtreepanel.*` | 通道 / 路径树；底栏接线，尚无 domain |
+| `ui/dockpanel.ui/.h/.cpp` | 右侧三 Tab 停靠壳（`.ui` 文件名为 `layerpanel.ui`）；订阅 session 后转发给三个树 |
 | `ui/toolbox.ui/.h/.cpp` | 左侧工具箱 + 前/背景色（对齐 GIMP Toolbox 结构） |
 | `ui/tooloptionsbar.ui/.h/.cpp` | 工具选项栏（名称 + 画笔直径） |
-| `tools/toolid.h` | 工具枚举（对应 GIMP ToolInfo 思路） |
+
+**要点**：`CanvasView` **不再包含任何工具分支**；工具逻辑全在 `tools/`。
 
 ## 计划中
 
@@ -48,8 +83,9 @@
 |----------|----------|
 | `Selection` | 文档级选区 mask |
 | `LayerMask` / `AdjustmentLayer` | 蒙版与调整层 |
-| `HistoryStack` | 撤销 / 重做 |
+| `HistoryStack` / `app/commands` | 撤销 / 重做（收口点已在 domain 语义化 setter） |
 | `RasterIO` / `ProjectIO` | 导出与工程文件 |
+| `ToolInfo` 注册表 | 统一工具元数据（现分散在 toolid/toolbox/tooloptionsbar 三处） |
 
 ## 摘录约定
 

@@ -12,6 +12,8 @@ build-*/
 **/build/
 **/Build/
 **/build-*/
+# 本地验证构建目录（与 build/ 同性质，但不匹配上面的 "build-" 前缀规则）
+.build-verify/
 debug/
 release/
 Debug/

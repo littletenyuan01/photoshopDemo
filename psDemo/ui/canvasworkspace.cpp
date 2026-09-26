@@ -1,11 +1,22 @@
 #include "canvasworkspace.h"
 #include "ui_canvasworkspace.h"
 
+#include "app/appsession.h"
 #include "canvasdocstatusbar.h"
 #include "canvasview.h"
+#include "domain/imagedocument.h"
 #include "rulerwidget.h"
 
+#include <QScrollBar>
+#include <QSignalBlocker>
+
 #include <limits>
+
+namespace {
+
+constexpr qreal kNaN = std::numeric_limits<qreal>::quiet_NaN();
+
+} // namespace
 
 CanvasWorkspace::CanvasWorkspace(QWidget *parent)
     : QWidget(parent)
@@ -47,9 +58,31 @@ CanvasView *CanvasWorkspace::canvasView() const
     return ui->canvasView;
 }
 
-void CanvasWorkspace::notifyDocumentChanged()
+void CanvasWorkspace::setSession(Ps::AppSession *session)
 {
-    ui->docStatusBar->setDocument(ui->canvasView->document());
+    if (!session)
+        return;
+
+    // 文档换了 → 画布换文档 + 状态条换文档
+    connect(session, &Ps::AppSession::documentChanged, this,
+            [this](Ps::ImageDocument *doc) {
+                ui->canvasView->setDocument(doc);
+                ui->docStatusBar->setDocument(doc);
+                syncDocStatus();
+                syncRulersAndScrollBars();
+            });
+
+    // 文档内容变了 → 底栏尺寸/分辨率文案刷新（早先靠 MainWindow 手工调 notifyDocumentChanged）
+    connect(session, &Ps::AppSession::documentChanged, this,
+            [this](Ps::ImageDocument *doc) {
+                if (!doc)
+                    return;
+                connect(doc, &Ps::ImageDocument::contentChanged, this,
+                        &CanvasWorkspace::syncDocStatus, Qt::UniqueConnection);
+            });
+
+    ui->canvasView->setDocument(session->document());
+    ui->docStatusBar->setDocument(session->document());
     syncDocStatus();
 }
 
@@ -65,6 +98,27 @@ void CanvasWorkspace::onStatusZoomCommitted(qreal zoom)
     syncDocStatus();
 }
 
+void CanvasWorkspace::syncScrollBar(QScrollBar *bar, int maxScroll, int pageSize, int value)
+{
+    // RAII 抑制回环：本函数内写 bar 不会反过来触发 onHScroll/onVScroll
+    const QSignalBlocker blocker(bar);
+
+    if (maxScroll <= 0) {
+        // Qt：min==max 会禁用滚动条；完整可见时用假行程保持 AlwaysOn 外观
+        bar->setRange(0, 1);
+        bar->setPageStep(1000);
+        bar->setSingleStep(1);
+        bar->setValue(0);
+    } else {
+        bar->setRange(0, maxScroll);
+        bar->setPageStep(pageSize);
+        bar->setSingleStep(qMax(1, pageSize / 20));
+        bar->setValue(qBound(0, value, maxScroll));
+    }
+    bar->setEnabled(true);
+    bar->show();
+}
+
 void CanvasWorkspace::syncRulersAndScrollBars()
 {
     CanvasView *canvas = ui->canvasView;
@@ -73,85 +127,49 @@ void CanvasWorkspace::syncRulersAndScrollBars()
         return;
 
     const QPointF offset = canvas->imageOffset();
-    const qreal hLower = -offset.x() / zoom;
-    const qreal hUpper = (canvas->width() - offset.x()) / zoom;
-    const qreal vLower = -offset.y() / zoom;
-    const qreal vUpper = (canvas->height() - offset.y()) / zoom;
-    ui->hRuler->setRange(hLower, hUpper);
-    ui->vRuler->setRange(vLower, vUpper);
+    // 标尺范围 = 视口两边在图像坐标中的值（对照 gimp_display_shell_rulers_update）
+    ui->hRuler->setRange(-offset.x() / zoom, (canvas->width() - offset.x()) / zoom);
+    ui->vRuler->setRange(-offset.y() / zoom, (canvas->height() - offset.y()) / zoom);
 
-    m_updatingScrollBars = true;
-
-    const int maxX = canvas->scrollMaxX();
-    const int maxY = canvas->scrollMaxY();
-    const int pageX = qMax(1, canvas->width());
-    const int pageY = qMax(1, canvas->height());
-
-    // Qt：min==max 会禁用滚动条；完整可见时用假行程保持 AlwaysOn
-    if (maxX <= 0) {
-        ui->hScrollBar->setRange(0, 1);
-        ui->hScrollBar->setPageStep(1000);
-        ui->hScrollBar->setSingleStep(1);
-        ui->hScrollBar->setValue(0);
-    } else {
-        ui->hScrollBar->setRange(0, maxX);
-        ui->hScrollBar->setPageStep(pageX);
-        ui->hScrollBar->setSingleStep(qMax(1, pageX / 20));
-        ui->hScrollBar->setValue(canvas->scrollX());
-    }
-    ui->hScrollBar->setEnabled(true);
-    ui->hScrollBar->show();
-
-    if (maxY <= 0) {
-        ui->vScrollBar->setRange(0, 1);
-        ui->vScrollBar->setPageStep(1000);
-        ui->vScrollBar->setSingleStep(1);
-        ui->vScrollBar->setValue(0);
-    } else {
-        ui->vScrollBar->setRange(0, maxY);
-        ui->vScrollBar->setPageStep(pageY);
-        ui->vScrollBar->setSingleStep(qMax(1, pageY / 20));
-        ui->vScrollBar->setValue(canvas->scrollY());
-    }
-    ui->vScrollBar->setEnabled(true);
-    ui->vScrollBar->show();
-
-    m_updatingScrollBars = false;
+    syncScrollBar(ui->hScrollBar, canvas->scrollMaxX(),
+                  qMax(1, canvas->width()), canvas->scrollX());
+    syncScrollBar(ui->vScrollBar, canvas->scrollMaxY(),
+                  qMax(1, canvas->height()), canvas->scrollY());
 }
 
 void CanvasWorkspace::onCanvasMouseMoved(const QPointF &imagePos, bool inside)
 {
     if (!inside) {
-        ui->hRuler->setCursorValue(std::numeric_limits<qreal>::quiet_NaN());
-        ui->vRuler->setCursorValue(std::numeric_limits<qreal>::quiet_NaN());
+        ui->hRuler->setCursorValue(kNaN);
+        ui->vRuler->setCursorValue(kNaN);
         return;
     }
     ui->hRuler->setCursorValue(imagePos.x());
     ui->vRuler->setCursorValue(imagePos.y());
 }
 
-void CanvasWorkspace::onHScroll(int value)
+void CanvasWorkspace::handleScroll(QScrollBar *bar, int maxScroll, int value, bool horizontal)
 {
-    if (m_updatingScrollBars)
-        return;
-    if (ui->canvasView->scrollMaxX() <= 0) {
-        m_updatingScrollBars = true;
-        ui->hScrollBar->setValue(0);
-        m_updatingScrollBars = false;
+    if (maxScroll <= 0) {
+        // 无行程：把滚动条归零（同样用 RAII 抑制回环）
+        const QSignalBlocker blocker(bar);
+        bar->setValue(0);
         return;
     }
-    ui->canvasView->setScrollOffset(value, ui->canvasView->scrollY());
+
+    CanvasView *canvas = ui->canvasView;
+    if (horizontal)
+        canvas->setScrollOffset(value, canvas->scrollY());
+    else
+        canvas->setScrollOffset(canvas->scrollX(), value);
+}
+
+void CanvasWorkspace::onHScroll(int value)
+{
+    handleScroll(ui->hScrollBar, ui->canvasView->scrollMaxX(), value, true);
 }
 
 void CanvasWorkspace::onVScroll(int value)
 {
-    if (m_updatingScrollBars)
-        return;
-    if (ui->canvasView->scrollMaxY() <= 0) {
-        m_updatingScrollBars = true;
-        ui->vScrollBar->setValue(0);
-        m_updatingScrollBars = false;
-        return;
-    }
-    ui->canvasView->setScrollOffset(ui->canvasView->scrollX(), value);
+    handleScroll(ui->vScrollBar, ui->canvasView->scrollMaxY(), value, false);
 }
