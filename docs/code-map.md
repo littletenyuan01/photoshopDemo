@@ -68,14 +68,25 @@ UI 不得直接改 `Layer`，一律走 `setLayerVisible/Opacity/Name/BlendMode` 
 | `ui/canvasworkspace.ui/.h/.cpp` | 顶/左标尺 + 画布 + 底栏状态 + 水平/竖直滚动条；订阅 session |
 | `ui/canvasdocstatusbar.ui/.h/.cpp` | 缩放% + 文档信息 + 显示菜单（PS 底栏左侧） |
 | `ui/rulerwidget.h/.cpp` | 像素标尺自绘（外层由 workspace.ui 排布） |
-| `ui/itemtreepanel.h/.cpp` | Item 树面板基类；提供 `applyToolbarIcon` 等共用能力 |
-| `ui/layertreepanel.ui/.h/.cpp` | 图层树：列表/显隐/透明度/增删排序；**增量更新 + 滑条两段提交** |
-| `ui/channeltreepanel.*` / `ui/pathtreepanel.*` | 通道 / 路径树；底栏接线，尚无 domain |
+| `ui/itemtreepanel.h/.cpp` | Item 树面板基类；提供 `applyToolbarIcon` 等共用能力，以及**缩略图生成**（`makeLayerThumbnail` / `makeChannelThumbnail`、`ThumbChannel`） |
+| `ui/layertreepanel.ui/.h/.cpp` | 图层树：列表/**缩略图**/显隐/透明度/增删排序；**增量更新 + 缩略图防抖 + 滑条两段提交** |
+| `ui/channeltreepanel.*` / `ui/pathtreepanel.*` | 通道树（**缩略图由合成图推算**，无 domain）/ 路径树（无 domain，无缩略图） |
 | `ui/dockpanel.h/.cpp` | 右侧三 Tab 停靠壳；**`.ui` 文件仍名为 `layerpanel.ui`**（类为 `DockPanel`）；订阅 session 后转发给三个树 |
-| `ui/toolbox.ui/.h/.cpp` | 左侧工具箱 + 前/背景色（对齐 GIMP Toolbox 结构） |
-| `ui/tooloptionsbar.ui/.h/.cpp` | 工具选项栏（名称 + 画笔直径） |
+| `ui/toolbox.ui/.h/.cpp` | 左侧工具箱：17 个占位槽 / 35 个工具，按 PS 分组，右键飞出菜单（对齐 GIMP Toolbox 结构） |
+| `ui/tooloptionsbar.ui/.h/.cpp` | 工具选项栏：`QStackedWidget` 11 个工具族参数页，随工具整块切换（对照 GIMP `gimp_tool_options_gui()`） |
 
 **要点**：`CanvasView` **不再包含任何工具分支**；工具逻辑全在 `tools/`。
+
+## 图标生成（不在编译产物里，但改图标必看）
+
+| 文件 | 职责 |
+|------|------|
+| `resources/icons/layers/_gen_svg_icons.py` | 24 个图标（图层 16 / 通道 3 / 路径 5）的 **SVG 矢量**定义与入口 |
+
+**约定**：24×24 viewBox、描边 2.2、round cap/join、主色 `#DCDCDC`、次级色 `#8C8C8C`。
+图标是 **SVG 矢量**，由 `ItemTreePanel::svgIcon()` 在显示尺寸上直接光栅化（1x/2x 双分辨率），
+任意尺寸、任意 DPI 都锐利 —— 不再用「48px PNG 缩到 22px」的位图方案。
+改完跑 `python _gen_svg_icons.py` 重新生成。来源与 iconfont 替换关键词见 `docs/iconfont-icons.md`。
 
 ## 计划中
 

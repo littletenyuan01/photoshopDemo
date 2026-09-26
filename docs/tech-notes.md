@@ -50,6 +50,167 @@
 
 ## 技术点日志
 
+### 2026-09 — 工具选项栏：按工具族切换参数页（对齐 GIMP）
+
+> 需求：PS 每个工具都有自己的参数条，demo 也要有。**只做 UI**。
+
+- 【对照 GIMP】先查了 `gimp-master/app/tools` 的真实做法：
+  - `GimpToolOptions` 基类 + 每工具族实现 `gimp_tool_options_gui()` 虚函数
+  - `gimptooloptions-gui.c` 提供 `gimp_prop_check_button_new` / `gimp_prop_spin_scale_new` /
+    `gimp_prop_enum_combo_box_new` / `gimp_prop_expanding_frame_new` 等**按属性生成控件**的构造器
+  - `gimp-tool-options-manager.c` 的 `gimp_tools_get_tool_options_gui()` 在工具切换时按需创建/替换整块 GUI
+  - 具体参数名直接抄自源码：选区 `operation`/`antialias`/`feather`/`feather-radius`；
+    绘画 `paint-mode`/`opacity`/`hard`/dynamics；图章 `clone-type`/`sample-merged`/`align-mode`；
+    渐变 `gradient-type`/`distance-metric`/`gradient-repeat`/`offset`/`dither`；
+    路径 `path-edit-mode`/`path-polygonal`/`enable-fill`/`enable-stroke`
+- 【本项目落地】取同样的**"按工具族整块切换"**形状，但用 Qt 的方式：
+  **一个 `.ui` 内放 `QStackedWidget` + 11 个页面**，切换工具即 `setCurrentWidget()`。
+  这样满足 `qt-ui-forms.mdc`（界面必须落在 `.ui`，纯代码堆控件是该规则列出的反例），
+  Designer 里能直接看到全部页面。
+- 覆盖 **35 个工具 → 11 个页面**；同页内的专有控件按工具显隐
+  （选区页的魔棒项、绘画页的图章项）。
+- ⚠️ **只有「大小」接线**（画笔/橡皮直径）。其余全是 UI 占位，提示语写明「尚未接入」。
+
+**踩坑（两个，都是实测出来的）**：
+
+1. **不要用 `QSizePolicy::Ignored` 去"压缩"选项页**。本意是窄窗口时压缩而非撑宽窗口，
+   实际后果是：stack 的自然宽度被忽略，**末尾那个 Expanding 的 spacer 吃掉全部空间**，
+   控件被压扁到只剩一位数字（用户截图：`硬度 3` / `不透明度 1`）。
+   正确做法是**让页面保持自然宽度**，外面套 `QScrollArea` 横向滚动。
+2. **`QScrollArea` 的 sizeHint 是 font-based 的**（`QAbstractScrollArea::sizeHint` 按字号推算，
+   实测约 70px），直接把 30px 高的选项条撑高。解法：给滚动区设
+   `sizePolicy = Expanding×Fixed` + `minimumSize.height / maximumSize.height`
+   把它压回「内容高度 + 横向滚动条」。
+
+**实测数据**（各选项页最小宽度，用临时程序量出）：绘画 **1038** · 文字 700 · 渐变 654 ·
+油漆桶 636 · 选区 609 · 路径 607 · 裁剪 559 · 形状 551 · 视图 457 · 吸管 396 · 移动 252。
+加了滚动区后整条 `minimumSizeHint` 只有 **218×28**（不会撑宽主窗口），`sizeHint 596×38`。
+
+**另一个坑：勾选框在暗色主题下看不见**。`dark.qss` 里完全没有 `QCheckBox` 样式，
+而全局有 `QWidget { background-color: transparent; }`，原生指示器就被"透明"掉了。
+解法：在选项栏样式里显式写 `QCheckBox::indicator`（描边 + 选中态对勾图），
+抄 `colorpickerdialog.ui` 里已有的画法保持一致。
+
+**第三个坑：宽窗口下控件被拉得东一个西一个**。`QScrollArea` 的 `widgetResizable`
+会让页面拿到整个视口宽度，而 Qt 布局会把多余空间**平均分给所有"可增长"的控件**
+（`QComboBox` / `QSpinBox` 默认 sizePolicy 都算可增长）。用户窗口 2878px 时尤其明显。
+解法：在 `.ui` 里给 stack 的 `<item>` 加
+`alignment="Qt::AlignLeft|Qt::AlignVCenter"` —— 布局按 sizeHint 给宽、左对齐，
+多余空间留白。实测超宽窗口下：视口 2256px、内容 656px、**无多余滚动条**。
+
+**提示语挪到状态栏**：原先选项条末尾有个 `hintLabel`（"参数为 UI 占位…"），
+被 Expanding 的选项区挤到最右边、离参数很远，而且 PS 的选项条本来就只有参数。
+已删除该标签，改由 `ToolOptionsBar::currentHint()` 暴露、`MainWindow::onToolChanged()`
+显示在状态栏。
+
+### 2026-09 — 修工具箱图标发虚（第二代 DPR 坑）
+
+> 现象：工具箱图标"糊糊的、带灰晕"，而右侧面板图标是清晰的。
+
+**根因**（`ui/toolbox.cpp`）：
+
+```cpp
+QPixmap pm(20, 20);
+p.drawPixmap(0, 0, base.pixmap(QSize(20, 20)));  // 先缩到 20×20
+return QIcon(pm);                                 // 这个 QIcon 只有一张 20×20、DPR=1 的位图
+```
+
+屏幕是缩放显示（150%/300%）时 Qt 需要 30/60 像素的图，QIcon 里没有 →
+**只能放大那张 20×20 的低分位图 → 发虚带灰晕**。
+
+**改法**：`toolIcon()` 对每档 DPR 都从**源图直接缩放到设备像素尺寸**
+（200×200 源图 → 24/48/72，全是降采样所以锐利），再 `setDevicePixelRatio` 后
+`addPixmap` 进同一个 QIcon；小三角标记也随 DPR 放大。
+同时把按钮图标从 20px 提到 **24px**（与面板底栏一致）。
+
+对比图：`docs/images/toolbox-icon-fix.png`（成对出现，**左旧右新**）。
+
+> **这是同一类坑的第二次出现**（第一次是 SVG 图标的 `render(painter)` + DPR 双重缩放）。
+> 教训：**任何"生成位图塞进 QIcon/QPixmap"的代码都必须考虑 devicePixelRatio**——
+> 要么多档 DPR，要么让 Qt 从足够大的源图缩。低分位图 + 屏幕缩放 = 必然发虚。
+
+### 2026-09 — 工具箱补齐到 PS 分组（UI 占位）
+
+- 原先只有 12 个占位槽 / 18 个工具，而 `resources/icons/tools/` 里有 38 个图标：
+  **图有、没接线**。用户指出工具箱比 PS 少太多。
+- 现扩到 **17 槽 / 35 工具**，分组与顺序对齐 PS 默认工具箱
+  （移动/选框/套索/快速选择/裁剪/吸管/画笔/图章/橡皮擦/填充/聚焦/色调/钢笔/文字/形状/抓手/缩放）。
+- `resources.qrc` 登记的工具图标从 18 → **35**；`toolid.h` 枚举同步扩到 35 项；
+  `tooloptionsbar.cpp::toolDisplayName` 必须**逐个补 case**（该 switch 没有 `default`，漏写会触发 `-Wswitch` 警告）。
+- 工具箱外层本就有 `QScrollArea`（`toolsScroll`），按钮变多可滚动，未挤爆布局。
+- ⚠️ **只有 5 个工具有逻辑**（移动/抓手/缩放/画笔/橡皮）。其余 30 个是 UI 占位：
+  选中后 `ToolManager::setActiveTool` 找不到注册项 → 回退到中性 `MoveTool`（不消费事件），
+  选项栏显示「该工具逻辑尚未接入」。**这是刻意设计：界面完整可演示，但不假装有功能。**
+- 未接线图标剩 3 个：`logo-icon`（应用图标）、`edit`、`smudge-alt`。
+- 【已知债】工具元数据仍分散在 `toolbox.cpp` / `tooloptionsbar.cpp` / `toolid.h` 三处，
+  加一个工具要改三个文件；计划收敛成 `ToolInfo` 注册表（见 `docs/code-map.md`「计划中」）。
+
+### 2026-09 — 面板图标换 SVG 矢量（解决"缩小就糊"）
+
+> 起因：自绘 PNG 被两次指出"大小不一致、不够清晰"。根因是**位图缩图**。
+
+**根因**：图标文件是 48×48 PNG，底栏按钮显示 22×22，缩小 2.18 倍后描边只剩 ~1.65px，
+再经平滑缩放就发软发糊。这是位图方案的硬伤，逐像素重画、加抗锯齿都只是缓解。
+
+**最终方案**：换成 **SVG 矢量**（`resources/icons/layers/_gen_svg_icons.py` 生成 24 个 `.svg`）：
+
+| 项 | 说明 |
+|----|------|
+| 格式 | SVG，24×24 viewBox（Feather 风格），描边 2.2，round cap/join |
+| 渲染 | `ItemTreePanel::svgIcon()` 用 Qt6Svg 在**显示尺寸**上直接光栅化（1x/2x 双分辨率） |
+| 效果 | 任意尺寸、任意 DPI 都锐利；`psDemo.pro` 增加 `QT += svg` |
+
+**踩坑记录（真实发生过，肉眼一眼可见）**：
+
+- **不要「先设 `devicePixelRatio` 再 `render(painter)`」**。`QSvgRenderer::render(QPainter*)`
+  会按绘制设备的尺寸缩放，而 painter 又叠加一次 DPR 变换 → 图标被画成 2 倍大，
+  屏幕上**只看到左上角一小块**（本轮实际出现的 bug）。
+  正确做法：在 **1:1 设备像素** 的 `QImage` 上 `render(&painter, QRectF(0,0,px,px))`
+  显式指定目标矩形，渲染完再 `QPixmap::setDevicePixelRatio()`。
+- **预览工具必须复刻真实渲染路径**：早先预览用 `render(painter)` 且不设 DPR，
+  结果预览正常、真机只露一角，白验一轮。`docs/images/icons-preview.png` 的生成程序
+  已改为与 `svgIcon()` 同逻辑。
+- **SVG 根元素的 `width`/`height` 应与 `viewBox` 一致**（本套 24×24），
+  否则其它按固有尺寸渲染的消费者会画错大小。
+
+**走过的弯路**（都已被本方案取代）：早先的 `_iconkit.py`/`_gen_layer_icons.py` 是
+48×48 超采样像素方案，已删除。教训：**图标应该用矢量源，而不是在更低位图里堆细节**。
+
+> 【对照 GIMP】GIMP 用矢量 `GimpViewRenderer` 渲染图标。
+> 【来源约定】优先 iconfont.cn；本套为自绘占位，搜索关键词见 `docs/iconfont-icons.md`，
+> 可同名替换 `.svg`（`resources.qrc` 无需改）。
+
+### 2026-09 — 图层 / 通道面板缩略图
+
+> 纯 UI 阶段（尚未接撤销）。目标是让面板有 PS 那样的缩略图列。
+
+- **生成位置**：统一放在基类 `ItemTreePanel`，避免三个面板各写一份
+  （与 `applyToolbarIcon` 同样的去重理由）。
+  - `makeLayerThumbnail(layerPixels)`：等比缩放该层像素 + **透明棋盘格衬底**。
+    全透明层也能看出「这里有一层」，所以「新建空层」在列表里可见。
+  - `makeChannelThumbnail(composite, kind)`：RGB 行给彩色合成图；
+    红/绿/蓝/Alpha 行取该分量做灰度图（Alpha 按 PS 习惯反转，白 = 不透明）。
+- **两段式缩放**：直接对整张大图做 `SmoothTransformation` 在缩略图频率下太慢，
+  改为「先 `FastTransformation` 粗降到 2 倍附近，再平滑收尾」，视觉等价但快得多。
+- **预乘格式坑**：分量灰度图必须写成 `qRgba(level, level, level, 255)`。
+  若漏掉 alpha，Qt 会按**预乘**规则解释颜色，灰度会整体偏暗。
+- **缩略图防抖**：`contentChanged` 在画笔拖动时每帧都发，同步重建缩略图会明显拖慢绘制。
+  故延迟 **250ms**（`QTimer` 单次触发，连发只算一次），到期后**只重算活动层那一行**
+  （画笔只动活动层）。对齐 PS「停笔后缩略图才更新」的观感。
+- **不重建列表**：刷新缩略图只调 `QListWidgetItem::setIcon`，
+  不碰文字/勾选/选中态，否则会打断用户正在进行的改名或选择。
+- **通道面板的诚实标注**：**尚无 Channel domain**，那 5 行（RGB/红/绿/蓝/Alpha）
+  与其缩略图全部由 `engine/Compositor` 从合成图**推算**，属展示层推算值。
+  源码与 `docs/features.md` 均已显式标注，等通道 domain 开建后必须换掉。
+- **验证方式**：用最小 Qt 程序（`QGuiApplication` + `QT_QPA_PLATFORM=offscreen`）
+  把 8 种缩略图渲染成 PNG 拼图肉眼核对，覆盖「白底层 / 透明层 / 空透明层 / 合成 / 四个分量」。
+  验证程序为临时件，未入库。
+- **路径面板刻意不做像素缩略图**：路径是矢量、没有像素可缩；PS 的路径面板本身也不显示缩略图。
+  为统一三 Tab 行高，只在行内给一个路径标记图标（`:/icons/paths/new-path.png`），
+  **不画编造的贝塞尔曲线**。真轮廓预览待 path domain 后按路径数据描边。
+- 【对照 GIMP】`gimp_viewable_get_preview` → `GimpViewRenderer`（`app/widgets/`）。
+  本项目不做异步渲染器与多档尺寸，直接同步生成 40×40。
+
 ### 2026-09 — UI 结构收口（工具层 / 会话广播 / 信号分级）
 
 > 完整审查记录见 `docs/ui-review.md`（含审查方法、依赖实测、仍欠清单、自测清单）。
