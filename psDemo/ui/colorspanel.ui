@@ -1,0 +1,330 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>ColorsPanel</class>
+ <!-- 根控件名必须与类名一致：dark.qss 用 QWidget#ColorsPanel 选择本面板
+      （layerpanel.ui 的根也叫 LayerPanel，三者共用同一套面板外观规则） -->
+ <widget class="QWidget" name="ColorsPanel">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>280</width>
+    <height>340</height>
+   </rect>
+  </property>
+  <property name="minimumSize">
+   <size>
+    <width>240</width>
+    <height>150</height>
+   </size>
+  </property>
+  <property name="windowTitle">
+   <string>颜色</string>
+  </property>
+  <!-- 外观在 resources/styles/dark.qss 的「右侧停靠面板外观」一节 -->
+  <layout class="QVBoxLayout" name="rootLayout">
+   <property name="spacing">
+    <number>0</number>
+   </property>
+   <property name="leftMargin">
+    <number>0</number>
+   </property>
+   <property name="topMargin">
+    <number>0</number>
+   </property>
+   <property name="rightMargin">
+    <number>0</number>
+   </property>
+   <property name="bottomMargin">
+    <number>0</number>
+   </property>
+   <item>
+    <widget class="QTabWidget" name="panelTabs">
+     <property name="currentIndex">
+      <number>1</number>
+     </property>
+     <property name="documentMode">
+      <bool>true</bool>
+     </property>
+
+     <!-- ===== 颜色：前景/背景 + 色域 + 色相 + RGB/十六进制 ===== -->
+     <widget class="QWidget" name="tabColor">
+      <attribute name="title">
+       <string>颜色</string>
+      </attribute>
+      <!-- 本页内容是固定高度的一串控件，面板被拖矮时必须能滚（否则底下的
+           十六进制输入框会被裁掉、够不着）。PS 的面板也是这么处理的。 -->
+      <layout class="QVBoxLayout" name="colorTabLayout">
+       <property name="spacing"><number>0</number></property>
+       <property name="leftMargin"><number>0</number></property>
+       <property name="topMargin"><number>0</number></property>
+       <property name="rightMargin"><number>0</number></property>
+       <property name="bottomMargin"><number>0</number></property>
+       <item>
+        <widget class="QScrollArea" name="colorScroll">
+         <property name="widgetResizable"><bool>true</bool></property>
+         <property name="frameShape"><enum>QFrame::Shape::NoFrame</enum></property>
+         <property name="horizontalScrollBarPolicy"><enum>Qt::ScrollBarPolicy::ScrollBarAlwaysOff</enum></property>
+         <widget class="QWidget" name="colorScrollBody">
+          <layout class="QVBoxLayout" name="colorBodyLayout">
+           <property name="spacing"><number>6</number></property>
+           <property name="leftMargin"><number>6</number></property>
+           <property name="topMargin"><number>6</number></property>
+           <property name="rightMargin"><number>6</number></property>
+           <property name="bottomMargin"><number>6</number></property>
+           <item>
+            <layout class="QHBoxLayout" name="colorSwatchRow">
+             <property name="spacing"><number>4</number></property>
+             <item>
+              <widget class="QFrame" name="fgSwatch">
+               <property name="minimumSize"><size><width>44</width><height>30</height></size></property>
+               <property name="toolTip"><string>前景色</string></property>
+               <property name="styleSheet"><string notr="true">background-color: #000000; border: 1px solid #202020;</string></property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QFrame" name="bgSwatch">
+               <property name="minimumSize"><size><width>44</width><height>30</height></size></property>
+               <property name="toolTip"><string>背景色</string></property>
+               <property name="styleSheet"><string notr="true">background-color: #ffffff; border: 1px solid #202020;</string></property>
+              </widget>
+             </item>
+             <item>
+              <spacer name="colorSwatchSpacer">
+               <property name="orientation"><enum>Qt::Orientation::Horizontal</enum></property>
+               <property name="sizeHint" stdset="0"><size><width>10</width><height>10</height></size></property>
+              </spacer>
+             </item>
+            </layout>
+           </item>
+           <item>
+            <!-- 【占位】PS 的色域是 HSV 双渐变方块；样式表做不出二维渐变，
+                 此处用竖直渐变近似。真接功能时需自绘（可参照 ui/colorpickerdialog.cpp 的色域实现）。 -->
+            <widget class="QFrame" name="colorField">
+             <property name="minimumSize"><size><width>0</width><height>90</height></size></property>
+             <property name="toolTip"><string>色域（UI 占位）</string></property>
+             <property name="styleSheet"><string notr="true">background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #ff0000, stop:1 #ffffff); border: 1px solid #202020;</string></property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QSlider" name="hueSlider">
+             <property name="minimumSize"><size><width>0</width><height>16</height></size></property>
+             <property name="maximum"><number>359</number></property>
+             <property name="orientation"><enum>Qt::Orientation::Horizontal</enum></property>
+             <property name="toolTip"><string>色相（UI 占位：只驱动上方色域与 RGB 的显示，不改文档）</string></property>
+            </widget>
+           </item>
+           <item>
+            <layout class="QHBoxLayout" name="rgbRow">
+             <property name="spacing"><number>4</number></property>
+             <item><widget class="QLabel" name="labelR"><property name="text"><string>R</string></property></widget></item>
+             <item><widget class="QSpinBox" name="spinR"><property name="maximum"><number>255</number></property><property name="value"><number>0</number></property></widget></item>
+             <item><widget class="QLabel" name="labelG"><property name="text"><string>G</string></property></widget></item>
+             <item><widget class="QSpinBox" name="spinG"><property name="maximum"><number>255</number></property><property name="value"><number>0</number></property></widget></item>
+             <item><widget class="QLabel" name="labelB"><property name="text"><string>B</string></property></widget></item>
+             <item><widget class="QSpinBox" name="spinB"><property name="maximum"><number>255</number></property><property name="value"><number>0</number></property></widget></item>
+            </layout>
+           </item>
+           <item>
+            <layout class="QHBoxLayout" name="hexRow">
+             <property name="spacing"><number>4</number></property>
+             <item><widget class="QLabel" name="labelHex"><property name="text"><string>十六进制</string></property></widget></item>
+             <item><widget class="QLineEdit" name="hexEdit"><property name="text"><string>#000000</string></property></widget></item>
+            </layout>
+           </item>
+           <item>
+            <spacer name="colorTabSpacer">
+             <property name="orientation"><enum>Qt::Orientation::Vertical</enum></property>
+             <property name="sizeHint" stdset="0"><size><width>10</width><height>10</height></size></property>
+            </spacer>
+           </item>
+          </layout>
+         </widget>
+        </widget>
+       </item>
+      </layout>
+     </widget>
+
+     <!-- ===== 色板：按 PS 截图做细 ===== -->
+     <widget class="QWidget" name="tabSwatches">
+      <attribute name="title">
+       <string>色板</string>
+      </attribute>
+      <layout class="QVBoxLayout" name="swatchTabLayout">
+       <property name="spacing"><number>6</number></property>
+       <property name="leftMargin"><number>6</number></property>
+       <property name="topMargin"><number>6</number></property>
+       <property name="rightMargin"><number>6</number></property>
+       <property name="bottomMargin"><number>6</number></property>
+       <item>
+        <widget class="QLineEdit" name="swatchSearch">
+         <property name="placeholderText"><string>搜索色板</string></property>
+         <property name="clearButtonEnabled"><bool>true</bool></property>
+        </widget>
+       </item>
+       <item>
+        <!-- 最近使用/当前色板的前几个色块（PS 顶部的色块条） -->
+        <layout class="QHBoxLayout" name="swatchStripRow">
+         <property name="spacing"><number>0</number></property>
+         <item>
+          <widget class="QFrame" name="strip1">
+           <property name="minimumSize"><size><width>34</width><height>22</height></size></property>
+           <property name="styleSheet"><string notr="true">background-color: #000000; border: 1px solid #202020;</string></property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QFrame" name="strip2">
+           <property name="minimumSize"><size><width>34</width><height>22</height></size></property>
+           <property name="styleSheet"><string notr="true">background-color: #ffffff; border: 1px solid #202020;</string></property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QFrame" name="strip3">
+           <property name="minimumSize"><size><width>34</width><height>22</height></size></property>
+           <property name="styleSheet"><string notr="true">background-color: #6b0f0f; border: 1px solid #202020;</string></property>
+          </widget>
+         </item>
+         <item>
+          <spacer name="swatchStripSpacer">
+           <property name="orientation"><enum>Qt::Orientation::Horizontal</enum></property>
+           <property name="sizeHint" stdset="0"><size><width>10</width><height>10</height></size></property>
+          </spacer>
+         </item>
+        </layout>
+       </item>
+       <item>
+        <widget class="QTreeWidget" name="swatchTree">
+         <property name="headerHidden"><bool>true</bool></property>
+         <property name="rootIsDecorated"><bool>true</bool></property>
+         <property name="toolTip"><string>色板组（UI 占位；GIMP 对应 Palette Editor 的资源列表）</string></property>
+         <column>
+          <property name="text"><string>色板</string></property>
+         </column>
+         <item>
+          <property name="text"><string>RGB</string></property>
+          <item><property name="text"><string>纯红</string></property></item>
+          <item><property name="text"><string>纯绿</string></property></item>
+          <item><property name="text"><string>纯蓝</string></property></item>
+         </item>
+         <item>
+          <property name="text"><string>CMYK</string></property>
+          <item><property name="text"><string>青</string></property></item>
+          <item><property name="text"><string>洋红</string></property></item>
+          <item><property name="text"><string>黄</string></property></item>
+         </item>
+         <item>
+          <property name="text"><string>灰度</string></property>
+          <item><property name="text"><string>10% 灰</string></property></item>
+          <item><property name="text"><string>50% 灰</string></property></item>
+         </item>
+         <item>
+          <property name="text"><string>蜡笔</string></property>
+          <item><property name="text"><string>蜡笔黄</string></property></item>
+          <item><property name="text"><string>蜡笔蓝</string></property></item>
+         </item>
+         <item>
+          <property name="text"><string>浅色</string></property>
+          <item><property name="text"><string>浅粉</string></property></item>
+          <item><property name="text"><string>浅青</string></property></item>
+         </item>
+        </widget>
+       </item>
+       <item>
+        <!-- 底栏动作：新建色板组 / 添加当前色 / 删除（与 PS 一致，均为 UI 占位） -->
+        <layout class="QHBoxLayout" name="swatchBarLayout">
+         <property name="spacing"><number>2</number></property>
+         <item>
+          <spacer name="swatchBarSpacer">
+           <property name="orientation"><enum>Qt::Orientation::Horizontal</enum></property>
+           <property name="sizeHint" stdset="0"><size><width>10</width><height>10</height></size></property>
+          </spacer>
+         </item>
+         <item>
+          <widget class="QToolButton" name="btnSwatchGroup">
+           <property name="toolTip"><string>新建色板组（UI 占位）</string></property>
+           <property name="iconSize"><size><width>18</width><height>18</height></size></property>
+           <property name="autoRaise"><bool>true</bool></property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QToolButton" name="btnSwatchAdd">
+           <property name="toolTip"><string>添加当前颜色到色板（UI 占位）</string></property>
+           <property name="iconSize"><size><width>18</width><height>18</height></size></property>
+           <property name="autoRaise"><bool>true</bool></property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QToolButton" name="btnSwatchDelete">
+           <property name="toolTip"><string>删除色板（UI 占位）</string></property>
+           <property name="iconSize"><size><width>18</width><height>18</height></size></property>
+           <property name="autoRaise"><bool>true</bool></property>
+          </widget>
+         </item>
+        </layout>
+       </item>
+      </layout>
+     </widget>
+
+     <!-- ===== 渐变（截图未展示内容，做简洁版预设列表）===== -->
+     <widget class="QWidget" name="tabGradients">
+      <attribute name="title">
+       <string>渐变</string>
+      </attribute>
+      <layout class="QVBoxLayout" name="gradientTabLayout">
+       <property name="spacing"><number>6</number></property>
+       <property name="leftMargin"><number>6</number></property>
+       <property name="topMargin"><number>6</number></property>
+       <property name="rightMargin"><number>6</number></property>
+       <property name="bottomMargin"><number>6</number></property>
+       <item>
+        <widget class="QListWidget" name="gradientList">
+         <property name="toolTip"><string>渐变预设（缩略图由代码绘制；对照 GIMP Gradient Editor）</string></property>
+         <item><property name="text"><string>前景色到背景色</string></property></item>
+         <item><property name="text"><string>前景色到透明</string></property></item>
+         <item><property name="text"><string>黑色到白色</string></property></item>
+         <item><property name="text"><string>彩虹</string></property></item>
+         <item><property name="text"><string>紫到橙</string></property></item>
+         <item><property name="text"><string>铜色</string></property></item>
+        </widget>
+       </item>
+      </layout>
+     </widget>
+
+     <!-- ===== 图案（截图未展示内容，做网格视图）===== -->
+     <widget class="QWidget" name="tabPatterns">
+      <attribute name="title">
+       <string>图案</string>
+      </attribute>
+      <layout class="QVBoxLayout" name="patternTabLayout">
+       <property name="spacing"><number>6</number></property>
+       <property name="leftMargin"><number>6</number></property>
+       <property name="topMargin"><number>6</number></property>
+       <property name="rightMargin"><number>6</number></property>
+       <property name="bottomMargin"><number>6</number></property>
+       <item>
+        <widget class="QListWidget" name="patternList">
+         <property name="viewMode"><enum>QListView::ViewMode::IconMode</enum></property>
+         <property name="resizeMode"><enum>QListView::ResizeMode::Adjust</enum></property>
+         <property name="movement"><enum>QListView::Movement::Static</enum></property>
+         <property name="iconSize"><size><width>40</width><height>40</height></size></property>
+         <property name="gridSize"><size><width>56</width><height>62</height></size></property>
+         <property name="wordWrap"><bool>true</bool></property>
+         <property name="toolTip"><string>图案预设（缩略图由代码绘制；对照 GIMP 的图案工厂视图）</string></property>
+         <item><property name="text"><string>网格</string></property></item>
+         <item><property name="text"><string>斜纹</string></property></item>
+         <item><property name="text"><string>圆点</string></property></item>
+         <item><property name="text"><string>棋盘</string></property></item>
+         <item><property name="text"><string>横条</string></property></item>
+         <item><property name="text"><string>竖条</string></property></item>
+        </widget>
+       </item>
+      </layout>
+     </widget>
+
+    </widget>
+   </item>
+  </layout>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>

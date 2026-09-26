@@ -51,7 +51,13 @@
        <widget class="CanvasWorkspace" name="canvasWorkspace" native="true"/>
       </item>
       <item>
-       <widget class="DockPanel" name="dockPanel" native="true">
+       <!-- PS 式右侧栏：颜色/色板/渐变/图案 → 属性/调整/库 → 图层/通道/路径。
+            用 QSplitter 而不是固定布局：三段高度**可拖动调节**（PS 的面板组之间
+            也是这种拖动条），否则下面图层区会被上面两块按各自 sizeHint 挤扁。
+            不折叠(childrenCollapsible=false) + 每段的 minimumHeight 兜底，
+            拖到底也不会把某一块拖没（要隐藏请用「窗口」菜单）。
+            窄栏宽度约束放在 splitter 上，三段共用，不必写三份。 -->
+       <widget class="QSplitter" name="rightSplitter">
         <property name="minimumSize">
          <size>
           <width>240</width>
@@ -64,6 +70,42 @@
           <height>16777215</height>
          </size>
         </property>
+        <property name="orientation">
+         <enum>Qt::Orientation::Vertical</enum>
+        </property>
+        <property name="handleWidth">
+         <number>4</number>
+        </property>
+        <property name="childrenCollapsible">
+         <bool>false</bool>
+        </property>
+        <property name="opaqueResize">
+         <bool>true</bool>
+        </property>
+        <widget class="ColorsPanel" name="colorsPanel" native="true">
+         <property name="minimumSize">
+          <size>
+           <width>0</width>
+           <height>120</height>
+          </size>
+         </property>
+        </widget>
+        <widget class="PropertiesPanel" name="propertiesPanel" native="true">
+         <property name="minimumSize">
+          <size>
+           <width>0</width>
+           <height>120</height>
+          </size>
+         </property>
+        </widget>
+        <widget class="DockPanel" name="dockPanel" native="true">
+         <property name="minimumSize">
+          <size>
+           <width>0</width>
+           <height>160</height>
+          </size>
+         </property>
+        </widget>
        </widget>
       </item>
      </layout>
@@ -201,6 +243,7 @@
     <addaction name="actionWindowChannels"/>
     <addaction name="actionWindowPaths"/>
     <addaction name="actionWindowColor"/>
+    <addaction name="actionWindowProperties"/>
     <addaction name="actionWindowHistogram"/>
     <addaction name="separator"/>
     <addaction name="actionWindowWorkspace"/>
@@ -747,8 +790,22 @@
    <property name="text">
     <string>颜色</string>
    </property>
-   <property name="enabled">
-    <bool>false</bool>
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="checked">
+    <bool>true</bool>
+   </property>
+  </action>
+  <action name="actionWindowProperties">
+   <property name="text">
+    <string>属性</string>
+   </property>
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="checked">
+    <bool>true</bool>
    </property>
   </action>
   <action name="actionWindowHistogram">
@@ -785,6 +842,18 @@
    <class>DockPanel</class>
    <extends>QWidget</extends>
    <header>ui/dockpanel.h</header>
+   <container>1</container>
+  </customwidget>
+  <customwidget>
+   <class>ColorsPanel</class>
+   <extends>QWidget</extends>
+   <header>ui/colorspanel.h</header>
+   <container>1</container>
+  </customwidget>
+  <customwidget>
+   <class>PropertiesPanel</class>
+   <extends>QWidget</extends>
+   <header>ui/propertiespanel.h</header>
    <container>1</container>
   </customwidget>
   <customwidget>

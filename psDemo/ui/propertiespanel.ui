@@ -1,0 +1,310 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>PropertiesPanel</class>
+ <widget class="QWidget" name="PropertiesPanel">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>280</width>
+    <height>300</height>
+   </rect>
+  </property>
+  <property name="minimumSize">
+   <size>
+    <width>240</width>
+    <height>150</height>
+   </size>
+  </property>
+  <property name="windowTitle">
+   <string>属性</string>
+  </property>
+  <!-- 外观在 resources/styles/dark.qss 的「右侧停靠面板外观」一节。
+       PS 的「属性」是按内容类型变化的上下文面板（照片/文字/形状/像素各不相同），
+       本 Demo 暂无这些实体，故只固定展示「变换 + 对齐」两个分区（UI 占位）。 -->
+  <layout class="QVBoxLayout" name="rootLayout">
+   <property name="spacing">
+    <number>0</number>
+   </property>
+   <property name="leftMargin">
+    <number>0</number>
+   </property>
+   <property name="topMargin">
+    <number>0</number>
+   </property>
+   <property name="rightMargin">
+    <number>0</number>
+   </property>
+   <property name="bottomMargin">
+    <number>0</number>
+   </property>
+   <item>
+    <widget class="QTabWidget" name="panelTabs">
+     <property name="currentIndex">
+      <number>0</number>
+     </property>
+     <property name="documentMode">
+      <bool>true</bool>
+     </property>
+
+     <!-- ===== 属性 ===== -->
+     <widget class="QWidget" name="tabProperties">
+      <attribute name="title">
+       <string>属性</string>
+      </attribute>
+      <!-- 本页内容是固定高度的一串控件，面板被拖矮时必须能滚（否则「对齐」那一排
+           会被裁掉、够不着）。PS 的面板也是这么处理的。 -->
+      <layout class="QVBoxLayout" name="propertiesTabLayout">
+       <property name="spacing"><number>0</number></property>
+       <property name="leftMargin"><number>0</number></property>
+       <property name="topMargin"><number>0</number></property>
+       <property name="rightMargin"><number>0</number></property>
+       <property name="bottomMargin"><number>0</number></property>
+       <item>
+        <widget class="QScrollArea" name="propertiesScroll">
+         <property name="widgetResizable"><bool>true</bool></property>
+         <property name="frameShape"><enum>QFrame::Shape::NoFrame</enum></property>
+         <property name="horizontalScrollBarPolicy"><enum>Qt::ScrollBarPolicy::ScrollBarAlwaysOff</enum></property>
+         <widget class="QWidget" name="propertiesScrollBody">
+          <layout class="QVBoxLayout" name="propertiesBodyLayout">
+           <property name="spacing"><number>2</number></property>
+           <property name="leftMargin"><number>6</number></property>
+           <property name="topMargin"><number>4</number></property>
+           <property name="rightMargin"><number>6</number></property>
+           <property name="bottomMargin"><number>4</number></property>
+           <item>
+            <!-- 真实数据摘要：文档尺寸 + 活动图层名（来自 ImageDocument / Layer） -->
+            <widget class="QLabel" name="labelTarget">
+             <property name="text"><string>未打开文档</string></property>
+             <property name="wordWrap"><bool>true</bool></property>
+             <property name="toolTip"><string>当前文档与活动图层（真实数据）</string></property>
+            </widget>
+           </item>
+           <item>
+            <!-- 分区折叠标题（对应 GIMP gimp_prop_expanding_frame_new 的展开器外观） -->
+            <widget class="QToolButton" name="toggleTransform">
+             <property name="text"><string>变换</string></property>
+             <property name="checkable"><bool>true</bool></property>
+             <property name="checked"><bool>true</bool></property>
+             <property name="autoRaise"><bool>true</bool></property>
+             <property name="toolButtonStyle"><enum>Qt::ToolButtonStyle::ToolButtonTextOnly</enum></property>
+             <property name="toolTip"><string>展开/收起变换分区</string></property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QWidget" name="transformBody" native="true">
+             <layout class="QGridLayout" name="transformGrid">
+              <property name="horizontalSpacing"><number>4</number></property>
+              <property name="verticalSpacing"><number>3</number></property>
+              <property name="leftMargin"><number>0</number></property>
+              <property name="topMargin"><number>0</number></property>
+              <property name="rightMargin"><number>0</number></property>
+              <property name="bottomMargin"><number>0</number></property>
+              <item row="0" column="0">
+               <widget class="QLabel" name="labelW"><property name="text"><string>宽</string></property></widget>
+              </item>
+              <item row="0" column="1">
+               <widget class="QSpinBox" name="spinW">
+                <property name="maximum"><number>100000</number></property>
+                <property name="suffix"><string> px</string></property>
+                <property name="readOnly"><bool>true</bool></property>
+                <property name="toolTip"><string>活动图层的像素宽度（只读，来自 Layer::width）</string></property>
+               </widget>
+              </item>
+              <item row="0" column="2">
+               <widget class="QLabel" name="labelH"><property name="text"><string>高</string></property></widget>
+              </item>
+              <item row="0" column="3">
+               <widget class="QSpinBox" name="spinH">
+                <property name="maximum"><number>100000</number></property>
+                <property name="suffix"><string> px</string></property>
+                <property name="readOnly"><bool>true</bool></property>
+                <property name="toolTip"><string>活动图层的像素高度（只读，来自 Layer::height）</string></property>
+               </widget>
+              </item>
+              <item row="1" column="0">
+               <widget class="QLabel" name="labelX"><property name="text"><string>X</string></property></widget>
+              </item>
+              <item row="1" column="1">
+               <widget class="QSpinBox" name="spinX">
+                <property name="minimum"><number>-100000</number></property>
+                <property name="maximum"><number>100000</number></property>
+                <property name="suffix"><string> px</string></property>
+                <property name="toolTip"><string>UI 占位：domain 的 Layer 尚无 offset 属性，接功能时接上</string></property>
+               </widget>
+              </item>
+              <item row="1" column="2">
+               <widget class="QLabel" name="labelY"><property name="text"><string>Y</string></property></widget>
+              </item>
+              <item row="1" column="3">
+               <widget class="QSpinBox" name="spinY">
+                <property name="minimum"><number>-100000</number></property>
+                <property name="maximum"><number>100000</number></property>
+                <property name="suffix"><string> px</string></property>
+                <property name="toolTip"><string>UI 占位：domain 的 Layer 尚无 offset 属性，接功能时接上</string></property>
+               </widget>
+              </item>
+              <item row="2" column="0">
+               <widget class="QLabel" name="labelAngle"><property name="text"><string>旋转</string></property></widget>
+              </item>
+              <item row="2" column="1" colspan="3">
+               <widget class="QDoubleSpinBox" name="spinAngle">
+                <property name="minimum"><number>-360</number></property>
+                <property name="maximum"><number>360</number></property>
+                <property name="decimals"><number>1</number></property>
+                <property name="suffix"><string>°</string></property>
+                <property name="toolTip"><string>UI 占位：暂无图层变换矩阵，恒为 0</string></property>
+               </widget>
+              </item>
+             </layout>
+            </widget>
+           </item>
+           <item>
+            <widget class="QToolButton" name="toggleAlign">
+             <property name="text"><string>对齐</string></property>
+             <property name="checkable"><bool>true</bool></property>
+             <property name="checked"><bool>true</bool></property>
+             <property name="autoRaise"><bool>true</bool></property>
+             <property name="toolButtonStyle"><enum>Qt::ToolButtonStyle::ToolButtonTextOnly</enum></property>
+             <property name="toolTip"><string>展开/收起对齐分区</string></property>
+            </widget>
+           </item>
+           <item>
+            <!-- PS 的「对齐」是一排图标按钮；图标由代码用 SVG 按 DPR 渲染（见 ItemTreePanel::svgIcon） -->
+            <widget class="QWidget" name="alignBody" native="true">
+             <layout class="QHBoxLayout" name="alignRow">
+              <property name="spacing"><number>2</number></property>
+              <property name="leftMargin"><number>0</number></property>
+              <property name="topMargin"><number>0</number></property>
+              <property name="rightMargin"><number>0</number></property>
+              <property name="bottomMargin"><number>0</number></property>
+              <item>
+               <widget class="QToolButton" name="btnAlignLeft">
+                <property name="toolTip"><string>水平左对齐（UI 占位）</string></property>
+                <property name="iconSize"><size><width>18</width><height>18</height></size></property>
+                <property name="autoRaise"><bool>true</bool></property>
+               </widget>
+              </item>
+              <item>
+               <widget class="QToolButton" name="btnAlignHCenter">
+                <property name="toolTip"><string>水平居中对齐（UI 占位）</string></property>
+                <property name="iconSize"><size><width>18</width><height>18</height></size></property>
+                <property name="autoRaise"><bool>true</bool></property>
+               </widget>
+              </item>
+              <item>
+               <widget class="QToolButton" name="btnAlignRight">
+                <property name="toolTip"><string>水平右对齐（UI 占位）</string></property>
+                <property name="iconSize"><size><width>18</width><height>18</height></size></property>
+                <property name="autoRaise"><bool>true</bool></property>
+               </widget>
+              </item>
+              <item>
+               <widget class="QToolButton" name="btnAlignTop">
+                <property name="toolTip"><string>垂直顶对齐（UI 占位）</string></property>
+                <property name="iconSize"><size><width>18</width><height>18</height></size></property>
+                <property name="autoRaise"><bool>true</bool></property>
+               </widget>
+              </item>
+              <item>
+               <widget class="QToolButton" name="btnAlignVCenter">
+                <property name="toolTip"><string>垂直居中对齐（UI 占位）</string></property>
+                <property name="iconSize"><size><width>18</width><height>18</height></size></property>
+                <property name="autoRaise"><bool>true</bool></property>
+               </widget>
+              </item>
+              <item>
+               <widget class="QToolButton" name="btnAlignBottom">
+                <property name="toolTip"><string>垂直底对齐（UI 占位）</string></property>
+                <property name="iconSize"><size><width>18</width><height>18</height></size></property>
+                <property name="autoRaise"><bool>true</bool></property>
+               </widget>
+              </item>
+              <item>
+               <spacer name="alignSpacer">
+                <property name="orientation"><enum>Qt::Orientation::Horizontal</enum></property>
+                <property name="sizeHint" stdset="0"><size><width>10</width><height>10</height></size></property>
+               </spacer>
+              </item>
+             </layout>
+            </widget>
+           </item>
+           <item>
+            <spacer name="propertiesTabSpacer">
+             <property name="orientation"><enum>Qt::Orientation::Vertical</enum></property>
+             <property name="sizeHint" stdset="0"><size><width>10</width><height>10</height></size></property>
+            </spacer>
+           </item>
+          </layout>
+         </widget>
+        </widget>
+       </item>
+      </layout>
+     </widget>
+
+     <!-- ===== 调整（截图未展示内容，做简洁版类型列表）===== -->
+     <widget class="QWidget" name="tabAdjust">
+      <attribute name="title">
+       <string>调整</string>
+      </attribute>
+      <layout class="QVBoxLayout" name="adjustTabLayout">
+       <property name="spacing"><number>6</number></property>
+       <property name="leftMargin"><number>6</number></property>
+       <property name="topMargin"><number>6</number></property>
+       <property name="rightMargin"><number>6</number></property>
+       <property name="bottomMargin"><number>6</number></property>
+       <item>
+        <widget class="QListWidget" name="adjustList">
+         <property name="toolTip"><string>调整类型（UI 占位；对照 GIMP 的调整类 GEGL operation 列表）</string></property>
+         <item><property name="text"><string>亮度/对比度</string></property></item>
+         <item><property name="text"><string>色阶</string></property></item>
+         <item><property name="text"><string>曲线</string></property></item>
+         <item><property name="text"><string>曝光度</string></property></item>
+         <item><property name="text"><string>自然饱和度</string></property></item>
+         <item><property name="text"><string>色相/饱和度</string></property></item>
+         <item><property name="text"><string>色彩平衡</string></property></item>
+         <item><property name="text"><string>黑白</string></property></item>
+         <item><property name="text"><string>照片滤镜</string></property></item>
+         <item><property name="text"><string>通道混合器</string></property></item>
+         <item><property name="text"><string>反相</string></property></item>
+         <item><property name="text"><string>阈值</string></property></item>
+         <item><property name="text"><string>渐变映射</string></property></item>
+        </widget>
+       </item>
+      </layout>
+     </widget>
+
+     <!-- ===== 库（截图未展示内容，做简洁版资源网格）===== -->
+     <widget class="QWidget" name="tabLibraries">
+      <attribute name="title">
+       <string>库</string>
+      </attribute>
+      <layout class="QVBoxLayout" name="libraryTabLayout">
+       <property name="spacing"><number>6</number></property>
+       <property name="leftMargin"><number>6</number></property>
+       <property name="topMargin"><number>6</number></property>
+       <property name="rightMargin"><number>6</number></property>
+       <property name="bottomMargin"><number>6</number></property>
+       <item>
+        <!-- PS 的「库」是云端/团队共享资源面板；本 Demo 无云端资源，
+             故只列资源类别，全部为 UI 占位。 -->
+        <widget class="QListWidget" name="libraryList">
+         <property name="toolTip"><string>库资源类别（UI 占位；对照 GIMP 的 pattern / gradient / brush 资源工厂视图）</string></property>
+         <item><property name="text"><string>文档</string></property></item>
+         <item><property name="text"><string>渐变</string></property></item>
+         <item><property name="text"><string>图案</string></property></item>
+         <item><property name="text"><string>形状</string></property></item>
+         <item><property name="text"><string>样式</string></property></item>
+         <item><property name="text"><string>画笔</string></property></item>
+        </widget>
+       </item>
+      </layout>
+     </widget>
+
+    </widget>
+   </item>
+  </layout>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>

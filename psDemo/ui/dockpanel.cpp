@@ -3,8 +3,7 @@
 
 #include "app/appsession.h"
 #include "domain/imagedocument.h"
-
-#include <QToolButton>
+#include "panelchrome.h"
 
 DockPanel::DockPanel(QWidget *parent)
     : QWidget(parent)
@@ -12,13 +11,8 @@ DockPanel::DockPanel(QWidget *parent)
 {
     ui->setupUi(this);
 
-    // PS 面板右上角 ≡；GIMP 各 dock 自有菜单，此处合一面板共用一个入口
-    auto *menuBtn = new QToolButton(this);
-    menuBtn->setObjectName(QStringLiteral("btnPanelMenu"));
-    menuBtn->setText(QStringLiteral("≡"));
-    menuBtn->setToolTip(QStringLiteral("面板选项"));
-    menuBtn->setAutoRaise(true);
-    ui->panelTabs->setCornerWidget(menuBtn, Qt::TopRightCorner);
+    // PS 面板右上角 ≡；三个面板共用 PanelChrome，样式见 dark.qss
+    PanelChrome::addMenuButton(ui->panelTabs);
 }
 
 DockPanel::~DockPanel()

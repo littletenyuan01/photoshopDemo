@@ -100,14 +100,16 @@ QToolButton *ItemTreePanel::addToolbarButton(const QString &objectName,
     return btn;
 }
 
-void ItemTreePanel::applyToolbarIcon(QToolButton *button, const QString &resourcePath)
+void ItemTreePanel::applyToolbarIcon(QToolButton *button,
+                                    const QString &resourcePath,
+                                    int logicalSize)
 {
     if (!button)
         return;
     // SVG 矢量：按目标尺寸直接光栅化，锐利；不再用 48px PNG 缩图。
-    // 图标取 24px（按钮 30×30，留 3px 边距）—— 比 22px 更易辨认。
-    button->setIcon(svgIcon(resourcePath, kToolbarIconSize));
-    button->setIconSize(QSize(kToolbarIconSize, kToolbarIconSize));
+    // 默认 24px（按钮 30×30，留 3px 边距）—— 比 22px 更易辨认。
+    button->setIcon(svgIcon(resourcePath, logicalSize));
+    button->setIconSize(QSize(logicalSize, logicalSize));
     button->setText(QString());
     button->setToolButtonStyle(Qt::ToolButtonIconOnly);
     button->setAutoRaise(true);

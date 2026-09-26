@@ -8,12 +8,14 @@
 #include "ui/canvasview.h"
 #include "ui/canvasworkspace.h"
 #include "ui/dockpanel.h"
+#include "ui/propertiespanel.h"
 #include "ui/toolbox.h"
 #include "ui/tooloptionsbar.h"
 
 #include <QFileDialog>
 #include <QImageReader>
 #include <QMessageBox>
+#include <QSplitter>
 
 #include <memory>
 
@@ -23,6 +25,15 @@ MainWindow::MainWindow(QWidget *parent)
     , m_session(new Ps::AppSession(this))
 {
     ui->setupUi(this); // 菜单与布局均来自 mainwindow.ui
+
+    // 右侧栏三段可拖动调节高度（QSplitter）；拖不到折叠，靠每段的 minimumHeight 兜底
+    for (int i = 0; i < ui->rightSplitter->count(); ++i) {
+        ui->rightSplitter->setCollapsible(i, false);
+        ui->rightSplitter->setStretchFactor(i, i == ui->rightSplitter->count() - 1 ? 1 : 0);
+    }
+    // 用户一旦自己拖过，就再也不覆盖他的高度
+    connect(ui->rightSplitter, &QSplitter::splitterMoved,
+            this, [this]() { m_rightColumnUserSized = true; });
 
     setupMenus();
     setupSession();
@@ -50,6 +61,9 @@ void MainWindow::setupMenus()
 
     // —— 窗口：显隐右侧面板 ——
     connect(ui->actionWindowLayers, &QAction::toggled, this, &MainWindow::onToggleDockPanel);
+    // 颜色/属性各自是一块独立面板，直接切显隐，不需要额外的槽
+    connect(ui->actionWindowColor, &QAction::toggled, ui->colorsPanel, &QWidget::setVisible);
+    connect(ui->actionWindowProperties, &QAction::toggled, ui->propertiesPanel, &QWidget::setVisible);
 
     // —— 帮助 ——
     connect(ui->actionHelpAbout, &QAction::triggered, this, &MainWindow::onAbout);
@@ -60,6 +74,7 @@ void MainWindow::setupSession()
     // 一次性交付：此后文档变化全部由 AppSession 广播，无需在此逐个转发
     ui->canvasWorkspace->setSession(m_session);
     ui->dockPanel->setSession(m_session);
+    ui->propertiesPanel->setSession(m_session); // 「属性」页展示真实文档/图层数据
 
     // 标题跟着 session 走
     connect(m_session, &Ps::AppSession::documentChanged,
@@ -182,6 +197,24 @@ void MainWindow::onZoomOut()
 void MainWindow::onToggleDockPanel(bool visible)
 {
     ui->dockPanel->setVisible(visible);
+}
+
+void MainWindow::resizeEvent(QResizeEvent *event)
+{
+    QMainWindow::resizeEvent(event);
+    // 真实高度要等 resize 之后才知道，所以这里按比例分配，直到用户自己拖过为止
+    if (!m_rightColumnUserSized)
+        applyDefaultRightColumnSizes();
+}
+
+void MainWindow::applyDefaultRightColumnSizes()
+{
+    QSplitter *splitter = ui->rightSplitter;
+    const int usable = splitter->height() - splitter->handleWidth() * (splitter->count() - 1);
+    if (usable <= 0)
+        return; // 还没拿到真实高度，下一次 resize 再说
+    // 图层区最长（PS 也是），上面两块够用即可
+    splitter->setSizes({usable * 26 / 100, usable * 24 / 100, usable * 50 / 100});
 }
 
 void MainWindow::onAbout()

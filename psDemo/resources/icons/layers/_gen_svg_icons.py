@@ -176,6 +176,36 @@ ICONS = {
         '<path d="M15 10L13.6 3.5 2.5 2.5 4 13.5 10.5 15z"/>',
         '<circle cx="8.5" cy="8.5" r="1.7"/>',
         _plus())),
+
+    # ---------- 面板通用（属性 / 色板面板底栏与「对齐并分布」用） ----------
+    "plus": ("ui", "plus", svg(
+        '<path d="M12 5v14"/>',
+        '<path d="M5 12h14"/>')),
+    # 「对齐并分布」：一条参考线 + 两个待对齐方块（GIMP 用 gimpalignoptions，图标自绘）
+    "align-left": ("ui", "align-left", svg(
+        '<path d="M4 3v18"/>',
+        '<rect x="8" y="6" width="12" height="5" rx="0.6"/>',
+        '<rect x="8" y="13" width="7" height="5" rx="0.6"/>')),
+    "align-hcenter": ("ui", "align-hcenter", svg(
+        '<path d="M12 3v18"/>',
+        '<rect x="5" y="6" width="14" height="5" rx="0.6"/>',
+        '<rect x="8" y="13" width="8" height="5" rx="0.6"/>')),
+    "align-right": ("ui", "align-right", svg(
+        '<path d="M20 3v18"/>',
+        '<rect x="4" y="6" width="12" height="5" rx="0.6"/>',
+        '<rect x="9" y="13" width="7" height="5" rx="0.6"/>')),
+    "align-top": ("ui", "align-top", svg(
+        '<path d="M3 4h18"/>',
+        '<rect x="6" y="8" width="5" height="12" rx="0.6"/>',
+        '<rect x="13" y="8" width="5" height="7" rx="0.6"/>')),
+    "align-vcenter": ("ui", "align-vcenter", svg(
+        '<path d="M3 12h18"/>',
+        '<rect x="6" y="5" width="5" height="14" rx="0.6"/>',
+        '<rect x="13" y="8" width="5" height="8" rx="0.6"/>')),
+    "align-bottom": ("ui", "align-bottom", svg(
+        '<path d="M3 20h18"/>',
+        '<rect x="6" y="4" width="5" height="12" rx="0.6"/>',
+        '<rect x="13" y="9" width="5" height="7" rx="0.6"/>')),
 }
 
 

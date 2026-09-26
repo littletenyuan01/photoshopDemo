@@ -149,6 +149,8 @@ MainWindow ──setDocument()──> AppSession ──documentChanged(doc)─�
 | `bool m_updatingScrollBars` 手写守卫 | 改为 `QSignalBlocker`（RAII），提前 return 也不会卡住守卫 |
 | `syncRulersAndScrollBars` 里 h/v 各写 15 行 | 抽出 `syncScrollBar()` 与 `handleScroll()`，两轴共用 |
 | `LayerPanel` vs `LayerTreePanel` 命名歧义 | 前者改名 **`DockPanel`**（它是三 Tab 停靠壳，不含图层逻辑）；`.ui` 文件名保留 `layerpanel.ui` 以免与 Designer 反复来回 |
+| 三个面板各抄一遍「Tab 栏右上角 ≡ 按钮」 | 提为 `PanelChrome::addMenuButton`（`ui/panelchrome.h`），三处共用 |
+| `applyToolbarIcon` 图标尺寸写死 24px | 加 `logicalSize` 默认参数：列表底栏仍 24px，更矮的颜色/属性面板底栏用 18px |
 
 ---
 
@@ -164,6 +166,8 @@ MainWindow ──setDocument()──> AppSession ──documentChanged(doc)─�
 | 6 | **`ItemTreePanel::addToolbarButton` 未被使用** | 三个面板都在 `.ui` 里静态声明按钮，此方法目前是死代码 | 要么用起来，要么删 |
 | 7 | **`Tool::statusMessageRequested` 未被消费** | 管理器有转发信号，但无订阅方 | 接入状态栏时用 |
 | 8 | **`uic` 会覆盖 `.ui` 里的 `objectName`** | 本仓库的 `.ui` 存在被 Qt Designer 规范化重写的痕迹 | 见 §5 |
+| 9 | **颜色/属性面板的内容是 UI 占位** | 色板分组与色值、渐变/图案预设、调整类型、库类别全是写死的（应从 `.gpl` / `.ggr` 等资源文件读）；底栏动作按钮、对齐按钮无功能 | 接功能时按 §3 的资源载入方式做 |
+| 10 | **前景/背景色未进 domain** | 目前只在 `ToolBox → MainWindow::onForegroundColorChanged → CanvasView` 内部串一条线；**没有**进 `AppSession`，新颜色面板与它不通、工具选项栏也看不到它 | 需 `AppSession` 级的前景色字段 + 广播 |
 
 ---
 
@@ -179,6 +183,16 @@ MainWindow ──setDocument()──> AppSession ──documentChanged(doc)─�
    **不得**在 `MainWindow` 里手工 `setDocument`。
 5. **改像素后必须 `markDirty(rect)`**：`Layer::pixels()` 返回可写引用，不写脏区画布不刷新。
 6. **滑条类控件一律两段语义**（拖动预览 / 松手提交），见 `.cursor/rules/percent-sliders.mdc`。
+7. **面板样式一律写进 `resources/styles/dark.qss`**，`.ui` 里不写死静态外观
+   （只有「值随状态变」的内联样式，如前景色块，才留在代码里）。
+   选择器**用类名做祖先**（`ColorsPanel QToolButton`），**不要**用提升实例名
+   （`QWidget#colorsPanel …`）—— 实测匹配不上；每个 Tab **页容器要显式写底色**
+   （全局 `QWidget` 是透明的，不写就露黑底）。详见 `docs/tech-notes.md` 同名条目。
+8. **右侧栏高度必须可拖**：三段放在 `QSplitter` 里，默认比例由
+   `MainWindow::applyDefaultRightColumnSizes()` 按真实高度分配（构造期算不准）。
+   **新增面板**：给它设 `minimumHeight` 并让 `QSplitter` 收录；
+   **页内容高度固定时**（一串控件，不是树/列表）必须套 `QScrollArea`，
+   否则面板拖矮后控件会被裁掉、够不着。
 
 ---
 
@@ -211,6 +225,14 @@ MainWindow ──setDocument()──> AppSession ──documentChanged(doc)─�
 - [ ] 不透明度滑条：拖动中数字跟随；松手后画布才变化；拖回原点无变化
 - [ ] 显隐勾选、双击改名、新建、删除、上下移均即时反映到画布
 - [ ] 窗口 → 图层 菜单可显隐右侧面板
+- [ ] 窗口 → 颜色 / 属性 可分别显隐两块新面板
+- [ ] 颜色面板：改 RGB → 十六进制与前景色块跟着变；拖色相滑杆 → 色域与 RGB 跟着变
+- [ ] 色板页：默认展开、每个色名左侧有对应颜色的小色块；搜索框能过滤、清空能恢复
+- [ ] 渐变/图案页：每行都有缩略图，且**不同预设的缩略图不一样**
+- [ ] 属性页：显示真实的「文档 W×H｜活动图层名」；折叠/展开两个分区（箭头跟着变）
+- [ ] 右侧三块面板底色一致（#3a3a3a），**没有露黑底的行/页**
+- [ ] 右侧栏**两条拖动条可拖**：拖完高度真的变；把颜色面板压到最矮时该页出现滚动条（控件够得着）
+- [ ] 启动时右侧栏默认「图层区最长」，不是被上面两块挤成一条
 - [ ] 视图缩放四项（适应窗口 / 100% / 放大 / 缩小）正确
 - [ ] 画布外松开鼠标后，绘制不会继续（`buttons` 校验回归点）
 
@@ -226,5 +248,8 @@ MainWindow ──setDocument()──> AppSession ──documentChanged(doc)─�
 | `tools/ViewPort` | `GimpDisplayShell` 的 scale/scroll 接口 | 旋转/翻转、参考线、网格 |
 | `ui/ItemTreePanel` | `app/widgets/gimpitemtreeview.c` | actions 名字绑定、拖放、多选 |
 | `ui/DockPanel` | `dialogs-constructors.c` 的三个独立 dockable | 用户自定义 dock 布局 |
+| `ui/ColorsPanel` | `gimpcoloreditor.c` / `gimppaletteeditor.c` / `gimpgradienteditor.c` / 资源工厂视图（**四个** dockable） | 色域自绘、调色板/渐变编辑、`GimpData` 载入 |
+| `ui/PropertiesPanel` | **无对应**：变换≈`GimpTransformTool` 选项 + `GimpItem` 尺寸；折叠分区≈`gimp_prop_expanding_frame_new`；调整≈各 GEGL operation；库≈`GimpDataFactoryView` | PS 式的上下文参数、调整/库的实际资源 |
+| `ui/PanelChrome` | `gimp_dockbook.c` 的 dock 菜单 | 每个 dock 独立菜单、可拖拽 |
 | `ui/CanvasView` | `app/display/gimpdisplayshell.c` | `GimpCanvasItem` 图元体系、旋转 |
 | `Layer` owner 回指 | `gimplayer.c` 的 notify 虚函数 | GObject 属性系统 |

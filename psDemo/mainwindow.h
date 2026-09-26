@@ -5,6 +5,8 @@
 
 #include <QMainWindow>
 
+class QResizeEvent;
+
 namespace Ps {
 class AppSession;
 class ImageDocument;
@@ -43,6 +45,15 @@ public:
     explicit MainWindow(QWidget *parent = nullptr);
     ~MainWindow() override;
 
+protected:
+    /**
+     * 首次拿到真实窗口高度后，给右侧栏三段分配默认高度比例。
+     * 【为什么不能只在构造里 setSizes】构造期 splitter 高度还没定，
+     * 传进去的比例会被「最后一段吃掉差额」的规则压扁（实测 250/240/460 → 250/240/245，
+     * 结果图层面板反而最小）。真实高度只有 resize 之后才知道。
+     * 因此每次 resize 都按比例重算，**直到用户自己拖过分隔条**为止。
+     */
+    void resizeEvent(QResizeEvent *event) override;
 private slots:
     void onNewDocument();
     void onOpenDocument();
@@ -66,10 +77,13 @@ private:
     void setupToolbox();
     /** 载入一篇默认文档，避免启动即空白壳。 */
     void createInitialDocument();
+    /** 按当前高度给右侧栏三段分配默认比例（颜色 26% / 属性 24% / 图层 50%）。 */
+    void applyDefaultRightColumnSizes();
     void updateWindowTitle(Ps::ImageDocument *document);
 
     Ui::MainWindow *ui;
     Ps::AppSession *m_session = nullptr;
+    bool m_rightColumnUserSized = false; ///< 用户拖过分隔条后，不再套用默认比例
 };
 
 #endif // MAINWINDOW_H

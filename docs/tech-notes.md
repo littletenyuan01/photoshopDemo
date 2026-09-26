@@ -50,6 +50,74 @@
 
 ## 技术点日志
 
+### 2026-09 — 颜色 / 属性面板：三个「不报错就是不生效」的坑
+
+> 需求：照 PS 补出右侧的「颜色/色板/渐变/图案」与「属性/调整/库」两块面板。仍是**只做 UI**。
+
+**先说对照**：GIMP 里这七样**没有**一一对应的 dockable —— 颜色/色板/渐变/图案是四个独立
+dockable（`gimpcoloreditor.c` / `gimppaletteeditor.c` / `gimpgradienteditor.c` / 资源工厂视图），
+属性≈`GimpTransformTool` 的选项 + `GimpItem` 的位置尺寸，折叠分区≈`gimp_prop_expanding_frame_new`，
+调整≈「颜色」菜单里的各 GEGL operation，库≈`GimpDataFactoryView`。
+故这里按 **PS 截图**实现，只在真能对上的地方标注 GIMP 出处（诚实标注见 `docs/features.md`）。
+
+**坑 1：QSS 祖先选择器写实例名 / 属性，一条都不命中。**
+`dark.qss` 里我把面板样式写成 `QWidget#colorsPanel QToolButton { … }`，
+运行时 `objectName` 打印确实是 `colorsPanel`、类名也确实是 `ColorsPanel`，**但整段规则全部失效**：
+面板底是露出来的黑、分区标题套着全局 `QToolButton:checked` 的蓝底、色板树没有底色。
+实测三种写法（`QWidget#colorsPanel …`、`#colorsPanel …`、`*[psPanel="true"] …`）**都不匹配**，
+只有**类名**（`ColorsPanel QToolButton { … }`）命中。
+判断依据不是猜的：写了屏幕实拍逐控件取色的小程序（见下），改一次量一次。
+
+**坑 2：全局 `QWidget { background-color: transparent; }` 会露出黑底。**
+面板根控件命中规则、给了 `#3a3a3a` 也没用 —— `QTabWidget` 的每个 **Tab 页**是独立 QWidget，
+透明背景在深色窗口里显示为**黑**。所以**每个页面容器都要显式写底色**，不能指望父级透上来。
+
+**坑 3：`QLatin1String("中文")` 永远比不中。**
+占位数据表用 `const char *`（源码是 UTF-8 字节），比较时写成 `item->text(0) != QLatin1String(entry.name)`，
+Qt 按 **Latin-1** 解码这些字节 → 一个名字都匹配不上：
+**12 个色块图标、6 个渐变缩略图、6 个图案花纹全部静默消失**（图案还全画成同一个默认方块）。
+改用 `QString::fromUtf8()` 后正常。
+
+**验证方式**（`no-latent-bugs.mdc` §3/§6/§9 要求的行为验证）：
+一次性程序 `QApplication` + 真实 `MainWindow` + 真实 `dark.qss`，等窗口映射后
+① 断言行为：RGB↔十六进制联动、非法输入不清色、搜索过滤、分区折叠与箭头、
+属性页真实数据；② **屏幕实拍**（`QScreen::grabWindow`）逐控件取色，断言面板底 `#3a3a3a`、
+搜索框 `#2e2e2e`、色板树 `#333`、分区标题不是蓝底；③ 断言**图标真的画出来了**
+（`icon().isNull()` 全否、且不同预设画出的图**互不相同**）。
+共 **32 条断言全过**，构建 0 error / 0 warning。截图见 `docs/images/right-panels.png`。
+
+> **教训（已写进规则 §9）**：光断言「12 行数据都在」是**假验证** —— 图标一个没画也照样通过。
+> 样式/图标/资源这类绑定，必须断言**画出来的东西**。
+
+**附带事故**：用 `Get-Content` + `Select-String` + `Set-Content` 从 `dark.qss` 里删临时探针块，
+把 210 行样式表**截成 8 行**且首行乱码（下标算成 −1），只能 `git checkout` 后重做。
+非 ASCII 文件只能走编辑工具（规则 §7 已加严）。
+
+**补：三段高度必须可拖（用户反馈「最下面的图层面板被挤扁」）**
+
+原来右侧栏是固定的 `QVBoxLayout`：上面两块按自己的 `sizeHint` 把空间占掉，图层区只剩零头。
+改成 **`QSplitter`（竖直）**，并踩到两个坑：
+
+1. **`setSizes()` 在构造期算不对**。构造里 `setSizes({250, 240, 460})`，实测出来是
+   **250 / 240 / 245** —— 请求总量超过可用高度时，差额被**最后一段**吃掉了，结果图层面板反而最小。
+   解法：在 `MainWindow::resizeEvent()` 里按**真实高度**算比例（26% / 24% / 50%），
+   并且**只在用户没拖过之前**算（订阅 `QSplitter::splitterMoved` 置位），
+   否则用户拖完一改窗口大小就又被覆盖。
+2. **给大 `minimumHeight` 不能替代滚动**。既想拖得动、又想控件够得着，就必须让内容能滚：
+   颜色页与属性页是**固定高度**的一串控件（面板压到 120px 时内容要 234px），
+   故这两页各套一层 `QScrollArea`（`widgetResizable`，无边框、按需出纵向条）。
+   **不要**靠调大 `minimumHeight` 来解决 —— 那等于把「谁能变大」的权力从用户手里收回来，
+   正是用户提的那个问题的另一面。
+
+**验证方式**（都是行为验证，不是看代码）：
+
+- 直接给**分隔条**发鼠标事件（`QSplitterHandle` 的真实实现路径就是鼠标事件）：
+  按住第一条分隔条往下拖 60px → 断言「颜色变高、属性变矮」（实测 192→253 / 177→120，
+  属性到底后停在最小高度 120）。
+- 断言默认比例：颜色 192 / 属性 177 / 图层 362，**图层区最大**。
+- 把颜色面板压到最矮（120）→ 断言颜色页**出现纵向滚动条**（`scrollArea->verticalScrollBar()->isVisible()`），
+  即「控件不会够不着」。
+
 ### 2026-09 — 性能修复：通道面板刷新（实测 3.7× 提升）
 
 > 起因：代码复查时用微基准量了一次，发现问题比我预想的严重。

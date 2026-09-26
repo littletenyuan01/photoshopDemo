@@ -81,6 +81,18 @@ public:
      */
     static QIcon svgIcon(const QString &resourcePath, int logicalSize);
 
+    /**
+     * 把按钮改成「线框图标 + 中文 tip」的统一外观。
+     * 图层/通道/路径三个子面板本是一致的规则，早先在各自 .cpp 里逐字重复了三遍；
+     * 颜色面板、属性面板也要用同一套外观，故与本面板是否为子类无关，对外公开。
+     * 【对照 GIMP】gimp_editor_add_icon_box + gimp_editor_set_action_sensitive 的按钮外观约定。
+     * @param logicalSize 图标边长（逻辑像素）；默认取列表底栏的 24px，
+     *                    更矮的面板底栏（如颜色/属性面板）可传小一号的尺寸。
+     */
+    static void applyToolbarIcon(QToolButton *button,
+                                 const QString &resourcePath,
+                                 int logicalSize = kToolbarIconSize);
+
 protected:
     explicit ItemTreePanel(QWidget *parent = nullptr);
     ~ItemTreePanel() override;
@@ -99,13 +111,6 @@ protected:
     QToolButton *addToolbarButton(const QString &objectName,
                                   const QString &text,
                                   const QString &toolTip);
-
-    /**
-     * 把底栏按钮改成「线框图标 + 中文 tip」的统一外观。
-     * 三个子面板（图层/通道/路径）本是一致的规则，早先在各自 .cpp 里逐字重复了三遍。
-     * 【对照 GIMP】gimp_editor_add_icon_box + gimp_editor_set_action_sensitive 的按钮外观约定。
-     */
-    static void applyToolbarIcon(QToolButton *button, const QString &resourcePath);
 
     /**
      * 文档指针已更新、旧信号已断开；子类重绑业务信号并 refresh。

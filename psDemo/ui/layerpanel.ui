@@ -19,44 +19,8 @@
   <property name="windowTitle">
    <string>图层</string>
   </property>
-  <property name="styleSheet">
-   <string notr="true">QWidget#LayerPanel {
-  background-color: #3a3a3a;
-  border-left: 1px solid #222;
-}
-QTabWidget#panelTabs::pane {
-  border: none;
-  background-color: #3a3a3a;
-  top: -1px;
-}
-QTabWidget#panelTabs QTabBar::tab {
-  background-color: #2e2e2e;
-  color: #b8b8b8;
-  border: none;
-  padding: 6px 12px;
-  margin-right: 1px;
-  min-width: 48px;
-}
-QTabWidget#panelTabs QTabBar::tab:selected {
-  background-color: #3a3a3a;
-  color: #f0f0f0;
-}
-QTabWidget#panelTabs QTabBar::tab:hover:!selected {
-  background-color: #353535;
-  color: #ddd;
-}
-QToolButton#btnPanelMenu {
-  font-size: 14px;
-  font-weight: bold;
-  color: #ddd;
-  background: transparent;
-  border: none;
-  padding: 4px 8px;
-}
-QToolButton#btnPanelMenu:hover {
-  background-color: #4e4e4e;
-}</string>
-  </property>
+  <!-- 外观（面板背景 / Tab 栏 / 底栏按钮）已抽到 resources/styles/dark.qss，
+       三个停靠面板共用一套规则，见该文件「右侧停靠面板外观」一节 -->
   <layout class="QVBoxLayout" name="rootLayout">
    <property name="spacing">
     <number>0</number>

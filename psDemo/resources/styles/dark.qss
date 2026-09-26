@@ -89,3 +89,148 @@ QLabel {
   color: #e0e0e0;
   background: transparent;
 }
+
+/* ===========================================================================
+   右侧停靠面板外观 —— 三个面板共用同一套规则，集中在此避免每个 .ui 各抄一份：
+     DockPanel       图层 / 通道 / 路径
+     ColorsPanel     颜色 / 色板 / 渐变 / 图案
+     PropertiesPanel 属性 / 调整 / 库
+
+   【选择器为什么写类名】面板是 .ui 里「提升(promote)」出来的自定义控件。
+   用实例名（QWidget#colorsPanel …）或属性选择器（*[psPanel] …）做**祖先**都匹配不上：
+   这些信息是 setupUi 阶段才设上去的，而样式规则表在控件构造期就已定型。
+   实测只有类名（ColorsPanel / PropertiesPanel / DockPanel）能稳定命中，
+   且与实例名无关、改名不会静默失效。
+   【第二坑】全局 QWidget 是 background: transparent，而透明区域在深色窗口里
+   会露出**黑底**。所以面板根和每个 Tab 页都要显式给底色，不能指望它自己透出来。
+   =========================================================================== */
+DockPanel, ColorsPanel, PropertiesPanel {
+  background-color: #3a3a3a;
+  border-left: 1px solid #222;
+}
+/* 每个 Tab 页的容器（全局透明 → 必须显式上色，否则页面空白处是黑的） */
+ColorsPanel QWidget#tabColor,
+ColorsPanel QWidget#tabSwatches,
+ColorsPanel QWidget#tabGradients,
+ColorsPanel QWidget#tabPatterns,
+PropertiesPanel QWidget#tabProperties,
+PropertiesPanel QWidget#tabAdjust,
+PropertiesPanel QWidget#tabLibraries {
+  background-color: #3a3a3a;
+}
+QTabWidget#panelTabs::pane {
+  border: none;
+  background-color: #3a3a3a;
+  top: -1px;
+}
+QTabWidget#panelTabs QTabBar::tab {
+  background-color: #2e2e2e;
+  color: #b8b8b8;
+  border: none;
+  padding: 6px 9px;
+  margin-right: 1px;
+  min-width: 42px;
+}
+QTabWidget#panelTabs QTabBar::tab:selected {
+  background-color: #3a3a3a;
+  color: #f0f0f0;
+}
+QTabWidget#panelTabs QTabBar::tab:hover:!selected {
+  background-color: #353535;
+  color: #ddd;
+}
+QToolButton#btnPanelMenu {
+  font-size: 14px;
+  font-weight: bold;
+  color: #ddd;
+  background: transparent;
+  border: none;
+  padding: 4px 8px;
+}
+QToolButton#btnPanelMenu:hover {
+  background-color: #4e4e4e;
+}
+/* 右侧栏三段的拖动条（拖动调各段高度；太细会看不见，故给一条可悬停高亮的槽） */
+QSplitter#rightSplitter::handle:vertical {
+  height: 4px;
+  background-color: #2b2b2b;
+  border-top: 1px solid #222;
+  border-bottom: 1px solid #444;
+}
+QSplitter#rightSplitter::handle:vertical:hover {
+  background-color: #4e7ba8;
+}
+/* 面板内的输入控件（色板搜索、属性数值） */
+ColorsPanel QLineEdit,
+PropertiesPanel QLineEdit,
+ColorsPanel QSpinBox,
+PropertiesPanel QSpinBox,
+PropertiesPanel QDoubleSpinBox {
+  background-color: #2e2e2e;
+  color: #eee;
+  border: 1px solid #222;
+  padding: 2px 4px;
+  min-height: 20px;
+}
+ColorsPanel QTreeWidget,
+ColorsPanel QListWidget,
+PropertiesPanel QListWidget {
+  background-color: #333;
+  border: 1px solid #222;
+  outline: none;
+}
+ColorsPanel QTreeWidget::item,
+ColorsPanel QListWidget::item,
+PropertiesPanel QListWidget::item {
+  padding: 2px;
+}
+ColorsPanel QTreeWidget::item:selected,
+ColorsPanel QListWidget::item:selected,
+PropertiesPanel QListWidget::item:selected {
+  background-color: #2d5a8a;
+}
+/* 面板内的小工具按钮（底栏动作、折叠分区标题）——
+   全局 QToolButton 是「有底有框」的按钮样，面板里要的是扁平线框图标 */
+ColorsPanel QToolButton,
+PropertiesPanel QToolButton {
+  background: transparent;
+  border: none;
+  color: #ddd;
+  padding: 2px 4px;
+}
+ColorsPanel QToolButton:hover,
+PropertiesPanel QToolButton:hover {
+  background-color: #4e4e4e;
+}
+/* 分区标题是 checkable 的 QToolButton，必须显式压掉全局的 :checked 蓝底 */
+PropertiesPanel QToolButton#toggleTransform,
+PropertiesPanel QToolButton#toggleAlign,
+PropertiesPanel QToolButton#toggleTransform:checked,
+PropertiesPanel QToolButton#toggleAlign:checked {
+  background: transparent;
+  border: none;
+  color: #f0f0f0;
+  font-weight: bold;
+  padding: 4px 2px;
+  text-align: left;
+}
+/* 属性页顶部的真实数据摘要（文档尺寸 / 活动图层名），弱化一档不抢焦点 */
+PropertiesPanel QLabel#labelTarget {
+  color: #9a9a9a;
+  padding: 2px 0;
+}
+/* 颜色页的色相滑杆：彩虹轨 + 浅色滑块（整段样式放这里，.ui 里不再各写一份） */
+ColorsPanel QSlider#hueSlider::groove:horizontal {
+  height: 10px;
+  border: 1px solid #202020;
+  background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+              stop:0 #ff0000, stop:0.17 #ffff00, stop:0.33 #00ff00,
+              stop:0.5 #00ffff, stop:0.67 #0000ff, stop:0.83 #ff00ff, stop:1 #ff0000);
+}
+ColorsPanel QSlider#hueSlider::handle:horizontal {
+  width: 8px;
+  margin: -4px 0;
+  background-color: #e8e8e8;
+  border: 1px solid #111;
+  border-radius: 2px;
+}

@@ -8,7 +8,7 @@
 |------|------|------|
 | `psDemo/main.cpp` | `QApplication` 入口 | 已实现 |
 | `psDemo/mainwindow.h/.cpp` | 只做菜单接线 + 装配与广播（不再逐个 setDocument） | 已实现 |
-| `psDemo/mainwindow.ui` | 主窗口布局；中央提升为 `CanvasWorkspace`、右侧为 `DockPanel` | 已实现 |
+| `psDemo/mainwindow.ui` | 主窗口布局；中央提升为 `CanvasWorkspace`，右侧栏（`rightColumn`）自上而下为 `ColorsPanel` / `PropertiesPanel` / `DockPanel` | 已实现 |
 | `psDemo/psDemo.pro` | 源文件与 `INCLUDEPATH`（按 app/domain/engine/tools/ui 分层分组） | 已实现 |
 
 ## app（会话与广播）
@@ -71,7 +71,10 @@ UI 不得直接改 `Layer`，一律走 `setLayerVisible/Opacity/Name/BlendMode` 
 | `ui/itemtreepanel.h/.cpp` | Item 树面板基类；提供 `applyToolbarIcon` 等共用能力，以及**缩略图生成**（`makeLayerThumbnail` / `makeChannelThumbnail`、`ThumbChannel`） |
 | `ui/layertreepanel.ui/.h/.cpp` | 图层树：列表/**缩略图**/显隐/透明度/增删排序；**增量更新 + 缩略图防抖 + 滑条两段提交** |
 | `ui/channeltreepanel.*` / `ui/pathtreepanel.*` | 通道树（**缩略图由合成图推算**，无 domain）/ 路径树（无 domain，无缩略图） |
-| `ui/dockpanel.h/.cpp` | 右侧三 Tab 停靠壳；**`.ui` 文件仍名为 `layerpanel.ui`**（类为 `DockPanel`）；订阅 session 后转发给三个树 |
+| `ui/dockpanel.h/.cpp` | 右侧三 Tab 停靠壳（图层/通道/路径）；**`.ui` 文件仍名为 `layerpanel.ui`**（类为 `DockPanel`）；订阅 session 后转发给三个树 |
+| `ui/colorspanel.ui/.h/.cpp` | 颜色/色板/渐变/图案停靠面板；色板树色块、渐变条、图案格**由代码现画**（非图片资源） |
+| `ui/propertiespanel.ui/.h/.cpp` | 属性/调整/库停靠面板；「属性」页显示**真实**文档尺寸与活动图层名，可折叠分区 |
+| `ui/panelchrome.h` | 停靠面板公共外观件（Tab 栏右上角 ≡ 按钮），三个面板共用 |
 | `ui/toolbox.ui/.h/.cpp` | 左侧工具箱：17 个占位槽 / 35 个工具，按 PS 分组，右键飞出菜单（对齐 GIMP Toolbox 结构） |
 | `ui/tooloptionsbar.ui/.h/.cpp` | 工具选项栏：`QStackedWidget` 11 个工具族参数页，随工具整块切换（对照 GIMP `gimp_tool_options_gui()`） |
 

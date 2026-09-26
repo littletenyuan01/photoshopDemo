@@ -6,10 +6,14 @@
 
 ### 主窗口壳
 
-- **说明**：菜单栏按 Photoshop 中文版顶层顺序；其下为工具选项栏；左侧工具箱 + 画布 + 右侧图层。
+- **说明**：菜单栏按 Photoshop 中文版顶层顺序；其下为工具选项栏；左侧工具箱 + 画布 + 右侧**三段面板**
+  （颜色/色板/渐变/图案 → 属性/调整/库 → 图层/通道/路径，对齐 PS 右侧栏的堆叠顺序）。
+- **右侧栏三段高度可拖动**（`QSplitter`，两条拖动条）：默认比例 26% / 24% / 50%，
+  即**图层区最长**；三段都拖不到折叠（各有 `minimumHeight` 兜底，要隐藏请用「窗口」菜单）。
+  颜色页与属性页内容高度固定，面板被拖矮时会**出现纵向滚动条**，控件不会被裁掉够不着。
 - **窗口尺寸**：启动时**最大化**（对齐 Photoshop Windows 常见行为）；`.ui` 设计几何约 1440×900，最小 1024×640。Photoshop 本身无固定客户区像素。
-- **布局文件**：`mainwindow.ui`、`ui/toolbox.ui`、`ui/tooloptionsbar.ui`、`ui/layerpanel.ui`（右侧 `DockPanel` 壳）、`ui/canvasworkspace.ui`
-- **已可点**：新建、打开、退出；视图缩放；窗口→图层；工具切换；画笔/橡皮绘制活动层；抓手平移；缩放工具；前景/背景色；关于。
+- **布局文件**：`mainwindow.ui`、`ui/toolbox.ui`、`ui/tooloptionsbar.ui`、`ui/colorspanel.ui`、`ui/propertiespanel.ui`、`ui/layerpanel.ui`（右侧 `DockPanel` 壳）、`ui/canvasworkspace.ui`
+- **已可点**：新建、打开、退出；视图缩放；窗口→图层 / 颜色 / 属性；工具切换；画笔/橡皮绘制活动层；抓手平移；缩放工具；前景/背景色；关于。
 - **灰色菜单项**：尚未实现功能占位。
 - **如何用**：Qt Creator 打开 `psDemo/psDemo.pro` 运行。选画笔后在画布左键拖拽即可绘制。
 
@@ -112,6 +116,45 @@
 - `Compositor`：自底向顶 Normal + opacity，预乘 Alpha 混合；**支持按矩形脏区合成**。
 - `CanvasView`：棋盘格透明底、滚轮缩放、中键/Alt+左键平移、适应窗口 / 100%。
 - **限制**：画布目前仍是**全量重合成**（`pixelsChanged` 已带脏区但尚未被消费），见 `wiki/Roadmap.md` Phase 7。
+
+### 颜色 / 色板 / 渐变 / 图案面板（纯 UI 占位）
+
+> 外观见 `docs/images/right-panels.png`（右侧栏从上到下三块面板的实拍）。
+
+- **说明**：`ColorsPanel`（`colorspanel.ui`），右侧栏**最上面一段**，四页 Tab。
+  【对照 GIMP】这四样在 GIMP 是**四个独立 dockable**（`app/widgets/gimpcoloreditor.c` /
+  `gimppaletteeditor.c` / `gimpgradienteditor.c` / 图案工厂视图），本项目按 PS 外观收进同一停靠区。
+- **颜色页**：前景/背景色块 + 色域 + 色相滑杆 + RGB/十六进制。
+  ⚠️ 色域是**竖直渐变近似**（样式表做不出 PS 的二维 HSV 方块，真要一致得自绘 QWidget）。
+  RGB ↔ 十六进制 ↔ 色相滑杆之间**自洽联动**（改了会互相同步），但**不驱动任何文档状态**
+  —— 工程里还没有前景色/背景色的 domain 模型。
+- **色板页**（按 PS 截图做细）：搜索框（**真的会按色名过滤**）、顶部最近色块条、色板组树
+  （RGB / CMYK / 灰度 / 蜡笔 / 浅色）、底栏三按钮（新建色板组 / 添加当前色 / 删除）。
+- **渐变页 / 图案页**：预设列表 + 缩略图；PS 截图未展示这两页内容，故做的是简洁版。
+- **缩略图全部由代码现画**（色块 / 渐变条 / 图案格），**不是图片资源**；
+  按 2x 设备像素光栅化后打 DPR，HiDPI 下不发糊（同 `ItemTreePanel::svgIcon` 的思路）。
+- **限制**：色名与色值、渐变与图案预设都是**写死的占位数据**（真做应从 `.gpl` / `.ggr` 等资源文件读，
+  GIMP 走 `GimpData` 载入机制）；底栏三按钮**尚无功能**；
+  前景/背景色**没有**进 `AppSession`：工具箱那份颜色只在
+  `ToolBox → CanvasView` 内部串（`MainWindow::onForegroundColorChanged`），
+  颜色面板与它不通、工具选项栏也看不到它。
+
+### 属性 / 调整 / 库面板（属性页是真实数据）
+
+- **说明**：`PropertiesPanel`（`propertiespanel.ui`），右侧栏**中间一段**，三页 Tab，订阅 `AppSession`。
+  ⚠️ **GIMP 没有与这三页一一对应的 dockable**：属性 ≈ `GimpTransformTool` 的选项 + `GimpItem` 的位置尺寸；
+  折叠分区 ≈ `app/widgets/gimppropwidgets.c` 的 `gimp_prop_expanding_frame_new`；
+  调整 ≈ GIMP「颜色」菜单里的各 GEGL operation；库 ≈ `GimpDataFactoryView` 资源工厂视图。
+  故这里按 PS 截图实现，**不硬套 GIMP 结构**（仅在对得上的地方标注出处）。
+- **属性页**：顶部一行**真实数据**摘要（`文档 W × H px｜图层 <活动图层名>`，来自 `ImageDocument` / `Layer`）；
+  下面「变换」「对齐」两个**可折叠分区**（折叠真的生效：箭头文字与内容体显隐共用同一个开关，
+  见 `PropertiesPanel::bindCollapsible`，不会出现「箭头说收起、内容还在」）。
+  宽/高 = **活动图层的真实像素尺寸**（只读）；
+  ⚠️ **X / Y / 旋转是 UI 占位**：domain 的 `Layer` 既无 offset 也无变换矩阵，tooltip 已注明，**不伪造数值**。
+- **调整页**：调整类型列表（亮度/对比度、色阶、曲线…）。
+  ⚠️ **尚未接入任何调整算法**，条目的 tooltip 已注明「UI 占位」。
+- **库页**：资源类别列表；⚠️ PS 的「库」是云端/团队共享资源面板，本 Demo 无云端资源，仅列类别占位。
+- **限制**：属性页**不随内容类型切换**（PS 会按照片/文字/形状换一整套参数），因为工程里还没有这些实体。
 
 ### 图层面板
 

@@ -32,6 +32,8 @@ SOURCES += \
     ui/channeltreepanel.cpp \
     ui/pathtreepanel.cpp \
     ui/dockpanel.cpp \
+    ui/colorspanel.cpp \
+    ui/propertiespanel.cpp \
     ui/toolbox.cpp \
     ui/tooloptionsbar.cpp \
     ui/colorpickerdialog.cpp
@@ -63,6 +65,9 @@ HEADERS += \
     ui/channeltreepanel.h \
     ui/pathtreepanel.h \
     ui/dockpanel.h \
+    ui/panelchrome.h \
+    ui/colorspanel.h \
+    ui/propertiespanel.h \
     ui/toolbox.h \
     ui/tooloptionsbar.h \
     ui/colorpickerdialog.h
@@ -75,6 +80,8 @@ FORMS += \
     ui/channeltreepanel.ui \
     ui/pathtreepanel.ui \
     ui/layerpanel.ui \
+    ui/colorspanel.ui \
+    ui/propertiespanel.ui \
     ui/toolbox.ui \
     ui/tooloptionsbar.ui \
     ui/colorpickerdialog.ui
