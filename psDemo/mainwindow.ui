@@ -121,23 +121,59 @@
      <height>22</height>
     </rect>
    </property>
-   <!-- 顶栏顺序对齐 Photoshop（中文）：文件 编辑 图像 图层 文字 选择 滤镜 3D 视图 窗口 帮助 -->
+   <!-- 顶栏与下拉项对齐 Photoshop 中文版；未接线项 enabled=false（UI 占位） -->
    <widget class="QMenu" name="menuFile">
     <property name="title">
      <string>文件(&amp;F)</string>
     </property>
     <addaction name="actionNew"/>
+    <addaction name="actionNewFromTemplate"/>
     <addaction name="actionOpen"/>
+    <addaction name="actionBrowseInBridge"/>
     <addaction name="actionOpenAs"/>
+    <addaction name="actionOpenAsSmartObject"/>
+    <widget class="QMenu" name="menuOpenRecent">
+     <property name="title">
+      <string>打开最近的文件(&amp;T)</string>
+     </property>
+        <addaction name="actionRecentPlaceholder"/>
+    </widget>
+    <addaction name="menuOpenRecent"/>
     <addaction name="separator"/>
     <addaction name="actionClose"/>
     <addaction name="actionCloseAll"/>
+    <addaction name="actionCloseAndGoToBridge"/>
     <addaction name="separator"/>
     <addaction name="actionSave"/>
     <addaction name="actionSaveAs"/>
-    <addaction name="actionExport"/>
+    <addaction name="actionSaveACopy"/>
+    <addaction name="actionRevert"/>
+    <widget class="QMenu" name="menuFileExport">
+     <property name="title">
+      <string>导出</string>
+     </property>
+        <addaction name="actionExportAs"/>
+        <addaction name="actionExportForScreens"/>
+        <addaction name="actionSaveForWeb"/>
+        <addaction name="actionExport"/>
+    </widget>
+    <addaction name="menuFileExport"/>
+    <widget class="QMenu" name="menuFileGenerate">
+     <property name="title">
+      <string>生成</string>
+     </property>
+        <addaction name="actionGenerateImageAssets"/>
+        <addaction name="actionGenerateCopyCSS"/>
+    </widget>
+    <addaction name="menuFileGenerate"/>
     <addaction name="separator"/>
+    <addaction name="actionPlaceEmbedded"/>
+    <addaction name="actionPlaceLinked"/>
+    <addaction name="actionPackage"/>
+    <addaction name="separator"/>
+    <addaction name="actionFileInfo"/>
     <addaction name="actionPrint"/>
+    <addaction name="actionPrintOneCopy"/>
     <addaction name="separator"/>
     <addaction name="actionExit"/>
    </widget>
@@ -146,42 +182,347 @@
      <string>编辑(&amp;E)</string>
     </property>
     <addaction name="actionUndo"/>
-    <addaction name="actionRedo"/>
+    <addaction name="actionStepForward"/>
+    <addaction name="actionStepBackward"/>
+    <addaction name="actionFade"/>
     <addaction name="separator"/>
     <addaction name="actionCut"/>
     <addaction name="actionCopy"/>
+    <addaction name="actionCopyMerged"/>
     <addaction name="actionPaste"/>
+    <widget class="QMenu" name="menuPasteSpecial">
+     <property name="title">
+      <string>选择性粘贴</string>
+     </property>
+        <addaction name="actionPasteInPlace"/>
+        <addaction name="actionPasteInto"/>
+        <addaction name="actionPasteOutside"/>
+    </widget>
+    <addaction name="menuPasteSpecial"/>
+    <addaction name="actionClear"/>
+    <addaction name="separator"/>
+    <addaction name="actionSearch"/>
+    <addaction name="actionFindAndReplaceText"/>
     <addaction name="separator"/>
     <addaction name="actionFill"/>
     <addaction name="actionStroke"/>
+    <addaction name="actionContentAwareFill"/>
+    <addaction name="actionContentAwareScale"/>
+    <addaction name="actionPuppetWarp"/>
+    <addaction name="actionPerspectiveWarp"/>
     <addaction name="actionFreeTransform"/>
+    <widget class="QMenu" name="menuTransform">
+     <property name="title">
+      <string>变换</string>
+     </property>
+        <addaction name="actionTransformAgain"/>
+        <addaction name="actionTransformScale"/>
+        <addaction name="actionTransformRotate"/>
+        <addaction name="actionTransformSkew"/>
+        <addaction name="actionTransformDistort"/>
+        <addaction name="actionTransformPerspective"/>
+        <addaction name="actionTransformWarp"/>
+        <addaction name="actionRotate180"/>
+        <addaction name="actionRotate90CW"/>
+        <addaction name="actionRotate90CCW"/>
+        <addaction name="actionFlipHorizontal"/>
+        <addaction name="actionFlipVertical"/>
+    </widget>
+    <addaction name="menuTransform"/>
+    <addaction name="actionAutoAlignLayers"/>
+    <addaction name="actionAutoBlendLayers"/>
+    <addaction name="separator"/>
+    <addaction name="actionDefineBrushPreset"/>
+    <addaction name="actionDefinePattern"/>
+    <addaction name="actionDefineCustomShape"/>
+    <widget class="QMenu" name="menuPurge">
+     <property name="title">
+      <string>清理</string>
+     </property>
+        <addaction name="actionPurgeUndo"/>
+        <addaction name="actionPurgeClipboard"/>
+        <addaction name="actionPurgeHistories"/>
+        <addaction name="actionPurgeAll"/>
+        <addaction name="actionPurgeVideoCache"/>
+    </widget>
+    <addaction name="menuPurge"/>
+    <addaction name="separator"/>
+    <addaction name="actionAdobePDFPresets"/>
+    <addaction name="actionPresets"/>
+    <addaction name="actionRemoteConnections"/>
+    <addaction name="actionColorSettings"/>
+    <addaction name="actionAssignProfile"/>
+    <addaction name="actionConvertToProfile"/>
+    <addaction name="actionKeyboardShortcuts"/>
+    <addaction name="actionMenus"/>
+    <widget class="QMenu" name="menuPreferences">
+     <property name="title">
+      <string>首选项</string>
+     </property>
+        <addaction name="actionPrefsGeneral"/>
+        <addaction name="actionPrefsInterface"/>
+        <addaction name="actionPrefsTools"/>
+        <addaction name="actionPrefsFileHandling"/>
+        <addaction name="actionPrefsPerformance"/>
+        <addaction name="actionPrefsCursors"/>
+        <addaction name="actionPrefsTransparency"/>
+        <addaction name="actionPrefsUnits"/>
+        <addaction name="actionPrefsGuides"/>
+        <addaction name="actionPrefsPlugins"/>
+        <addaction name="actionPrefsType"/>
+    </widget>
+    <addaction name="menuPreferences"/>
    </widget>
    <widget class="QMenu" name="menuImage">
     <property name="title">
      <string>图像(&amp;I)</string>
     </property>
-    <addaction name="actionMode"/>
-    <addaction name="actionAdjustments"/>
+    <widget class="QMenu" name="menuMode">
+     <property name="title">
+      <string>模式</string>
+     </property>
+        <addaction name="actionModeBitmap"/>
+        <addaction name="actionModeGrayscale"/>
+        <addaction name="actionModeDuotone"/>
+        <addaction name="actionModeIndexed"/>
+        <addaction name="actionModeRGB"/>
+        <addaction name="actionModeCMYK"/>
+        <addaction name="actionModeLab"/>
+        <addaction name="actionModeMultichannel"/>
+        <addaction name="actionMode8Bits"/>
+        <addaction name="actionMode16Bits"/>
+        <addaction name="actionMode32Bits"/>
+        <addaction name="actionModeColorTable"/>
+    </widget>
+    <addaction name="menuMode"/>
+    <widget class="QMenu" name="menuAdjustments">
+     <property name="title">
+      <string>调整</string>
+     </property>
+        <addaction name="actionAdjBrightness"/>
+        <addaction name="actionAdjLevels"/>
+        <addaction name="actionAdjCurves"/>
+        <addaction name="actionAdjExposure"/>
+        <addaction name="actionAdjVibrance"/>
+        <addaction name="actionAdjHueSat"/>
+        <addaction name="actionAdjColorBalance"/>
+        <addaction name="actionAdjBlackWhite"/>
+        <addaction name="actionAdjPhotoFilter"/>
+        <addaction name="actionAdjChannelMixer"/>
+        <addaction name="actionAdjColorLookup"/>
+        <addaction name="actionAdjInvert"/>
+        <addaction name="actionAdjPosterize"/>
+        <addaction name="actionAdjThreshold"/>
+        <addaction name="actionAdjGradientMap"/>
+        <addaction name="actionAdjSelectiveColor"/>
+        <addaction name="actionAdjShadowsHighlights"/>
+        <addaction name="actionAdjHDRToning"/>
+        <addaction name="actionAdjDesaturate"/>
+        <addaction name="actionAdjMatchColor"/>
+        <addaction name="actionAdjReplaceColor"/>
+        <addaction name="actionAdjEqualize"/>
+    </widget>
+    <addaction name="menuAdjustments"/>
+    <addaction name="actionAutoTone"/>
+    <addaction name="actionAutoContrast"/>
+    <addaction name="actionAutoColor"/>
     <addaction name="separator"/>
     <addaction name="actionImageSize"/>
     <addaction name="actionCanvasSize"/>
-    <addaction name="actionImageRotation"/>
+    <widget class="QMenu" name="menuImageRotation">
+     <property name="title">
+      <string>图像旋转</string>
+     </property>
+        <addaction name="actionImageRot180"/>
+        <addaction name="actionImageRot90CW"/>
+        <addaction name="actionImageRot90CCW"/>
+        <addaction name="actionImageFlipH"/>
+        <addaction name="actionImageFlipV"/>
+        <addaction name="actionImageArbitrary"/>
+    </widget>
+    <addaction name="menuImageRotation"/>
     <addaction name="actionCrop"/>
+    <addaction name="actionTrim"/>
+    <addaction name="actionRevealAll"/>
+    <addaction name="separator"/>
+    <addaction name="actionDuplicateImage"/>
+    <addaction name="actionApplyImage"/>
+    <addaction name="actionCalculations"/>
+    <addaction name="actionVariables"/>
+    <addaction name="actionApplyDataSet"/>
    </widget>
    <widget class="QMenu" name="menuLayer">
     <property name="title">
      <string>图层(&amp;L)</string>
     </property>
-    <addaction name="actionLayerNew"/>
+    <widget class="QMenu" name="menuLayerNew">
+     <property name="title">
+      <string>新建</string>
+     </property>
+        <addaction name="actionLayerNew"/>
+        <addaction name="actionLayerNewBackground"/>
+        <addaction name="actionLayerNewGroup"/>
+        <addaction name="actionLayerNewGroupFromLayers"/>
+        <addaction name="actionLayerNewArtboard"/>
+        <addaction name="actionLayerViaCopy"/>
+        <addaction name="actionLayerViaCut"/>
+    </widget>
+    <addaction name="menuLayerNew"/>
     <addaction name="actionLayerDuplicate"/>
-    <addaction name="actionLayerDelete"/>
+    <widget class="QMenu" name="menuLayerDelete">
+     <property name="title">
+      <string>删除</string>
+     </property>
+        <addaction name="actionLayerDelete"/>
+        <addaction name="actionLayerDeleteHidden"/>
+    </widget>
+    <addaction name="menuLayerDelete"/>
     <addaction name="separator"/>
     <addaction name="actionLayerRename"/>
     <addaction name="actionLayerProperties"/>
+    <widget class="QMenu" name="menuLayerStyle">
+     <property name="title">
+      <string>图层样式</string>
+     </property>
+        <addaction name="actionLayerStyleBlending"/>
+        <addaction name="actionLSBevelEmboss"/>
+        <addaction name="actionLSStroke"/>
+        <addaction name="actionLSInnerShadow"/>
+        <addaction name="actionLSInnerGlow"/>
+        <addaction name="actionLSSatin"/>
+        <addaction name="actionLSColorOverlay"/>
+        <addaction name="actionLSGradientOverlay"/>
+        <addaction name="actionLSPatternOverlay"/>
+        <addaction name="actionLSOuterGlow"/>
+        <addaction name="actionLSDropShadow"/>
+        <addaction name="actionLSCopy"/>
+        <addaction name="actionLSPaste"/>
+        <addaction name="actionLSClear"/>
+        <addaction name="actionLSGlobalLight"/>
+        <addaction name="actionLSCreateLayers"/>
+        <addaction name="actionLSHideAll"/>
+        <addaction name="actionLSScaleEffects"/>
+    </widget>
+    <addaction name="menuLayerStyle"/>
+    <widget class="QMenu" name="menuNewFillLayer">
+     <property name="title">
+      <string>新建填充图层</string>
+     </property>
+        <addaction name="actionFillSolid"/>
+        <addaction name="actionFillGradient"/>
+        <addaction name="actionFillPattern"/>
+    </widget>
+    <addaction name="menuNewFillLayer"/>
+    <widget class="QMenu" name="menuNewAdjustmentLayer">
+     <property name="title">
+      <string>新建调整图层</string>
+     </property>
+        <addaction name="actionNewAdjBrightness"/>
+        <addaction name="actionNewAdjLevels"/>
+        <addaction name="actionNewAdjCurves"/>
+        <addaction name="actionNewAdjExposure"/>
+        <addaction name="actionNewAdjVibrance"/>
+        <addaction name="actionNewAdjHueSat"/>
+        <addaction name="actionNewAdjColorBalance"/>
+        <addaction name="actionNewAdjBlackWhite"/>
+        <addaction name="actionNewAdjPhotoFilter"/>
+        <addaction name="actionNewAdjChannelMixer"/>
+        <addaction name="actionNewAdjColorLookup"/>
+        <addaction name="actionNewAdjInvert"/>
+        <addaction name="actionNewAdjPosterize"/>
+        <addaction name="actionNewAdjThreshold"/>
+        <addaction name="actionNewAdjGradientMap"/>
+        <addaction name="actionNewAdjSelectiveColor"/>
+    </widget>
+    <addaction name="menuNewAdjustmentLayer"/>
+    <widget class="QMenu" name="menuLayerMask">
+     <property name="title">
+      <string>图层蒙版</string>
+     </property>
+        <addaction name="actionMaskRevealAll"/>
+        <addaction name="actionMaskHideAll"/>
+        <addaction name="actionMaskRevealSelection"/>
+        <addaction name="actionMaskHideSelection"/>
+        <addaction name="actionMaskFromTransparency"/>
+        <addaction name="actionMaskDelete"/>
+        <addaction name="actionMaskApply"/>
+        <addaction name="actionMaskDisable"/>
+        <addaction name="actionMaskLinkUnlink"/>
+    </widget>
+    <addaction name="menuLayerMask"/>
+    <addaction name="actionCreateClippingMask"/>
+    <addaction name="actionSmartObjects"/>
+    <addaction name="actionVideoLayers"/>
+    <widget class="QMenu" name="menuRasterize">
+     <property name="title">
+      <string>栅格化</string>
+     </property>
+        <addaction name="actionRasterizeType"/>
+        <addaction name="actionRasterizeShape"/>
+        <addaction name="actionRasterizeFillContent"/>
+        <addaction name="actionRasterizeVectorMask"/>
+        <addaction name="actionRasterizeSmartObject"/>
+        <addaction name="actionRasterizeVideo"/>
+        <addaction name="actionRasterize3D"/>
+        <addaction name="actionRasterizeLayer"/>
+        <addaction name="actionRasterizeAllLayers"/>
+    </widget>
+    <addaction name="menuRasterize"/>
     <addaction name="separator"/>
-    <addaction name="actionNewAdjustmentLayer"/>
-    <addaction name="actionLayerMask"/>
-    <addaction name="actionLayerStyle"/>
+    <addaction name="actionGroupLayers"/>
+    <addaction name="actionUngroupLayers"/>
+    <addaction name="actionHideLayers"/>
+    <widget class="QMenu" name="menuArrange">
+     <property name="title">
+      <string>排列</string>
+     </property>
+        <addaction name="actionBringToFront"/>
+        <addaction name="actionBringForward"/>
+        <addaction name="actionSendBackward"/>
+        <addaction name="actionSendToBack"/>
+        <addaction name="actionReverse"/>
+    </widget>
+    <addaction name="menuArrange"/>
+    <widget class="QMenu" name="menuAlign">
+     <property name="title">
+      <string>对齐</string>
+     </property>
+        <addaction name="actionAlignTop"/>
+        <addaction name="actionAlignVCenter"/>
+        <addaction name="actionAlignBottom"/>
+        <addaction name="actionAlignLeft"/>
+        <addaction name="actionAlignHCenter"/>
+        <addaction name="actionAlignRight"/>
+    </widget>
+    <addaction name="menuAlign"/>
+    <widget class="QMenu" name="menuDistribute">
+     <property name="title">
+      <string>分布</string>
+     </property>
+        <addaction name="actionDistTop"/>
+        <addaction name="actionDistVCenter"/>
+        <addaction name="actionDistBottom"/>
+        <addaction name="actionDistLeft"/>
+        <addaction name="actionDistHCenter"/>
+        <addaction name="actionDistRight"/>
+    </widget>
+    <addaction name="menuDistribute"/>
+    <addaction name="actionLockLayers"/>
+    <addaction name="actionLinkLayers"/>
+    <addaction name="actionSelectLinkedLayers"/>
+    <addaction name="actionMergeDown"/>
+    <addaction name="actionMergeVisible"/>
+    <addaction name="actionFlattenImage"/>
+    <widget class="QMenu" name="menuMatting">
+     <property name="title">
+      <string>修边</string>
+     </property>
+        <addaction name="actionMattingColorDecontaminate"/>
+        <addaction name="actionMattingDefringe"/>
+        <addaction name="actionMattingRemoveBlack"/>
+        <addaction name="actionMattingRemoveWhite"/>
+    </widget>
+    <addaction name="menuMatting"/>
    </widget>
    <widget class="QMenu" name="menuType">
     <property name="title">
@@ -189,8 +530,21 @@
     </property>
     <addaction name="actionTypeHorizontal"/>
     <addaction name="actionTypeVertical"/>
+    <addaction name="actionTypeExtraVertical"/>
+    <addaction name="actionTypeExtraHorizontal"/>
     <addaction name="separator"/>
     <addaction name="actionTypePanels"/>
+    <addaction name="actionTypeAntiAliasNone"/>
+    <addaction name="actionTypeAntiAliasSharp"/>
+    <addaction name="actionTypeAntiAliasCrisp"/>
+    <addaction name="actionTypeAntiAliasStrong"/>
+    <addaction name="actionTypeAntiAliasSmooth"/>
+    <addaction name="actionTypeConvertToShape"/>
+    <addaction name="actionTypeCreateWorkPath"/>
+    <addaction name="actionTypeConvertToParagraph"/>
+    <addaction name="actionTypeWarpText"/>
+    <addaction name="actionTypeUpdateAll"/>
+    <addaction name="actionTypeReplaceFonts"/>
    </widget>
    <widget class="QMenu" name="menuSelect">
     <property name="title">
@@ -200,59 +554,270 @@
     <addaction name="actionSelectDeselect"/>
     <addaction name="actionSelectReselect"/>
     <addaction name="actionSelectInverse"/>
+    <addaction name="actionSelectAllLayers"/>
+    <addaction name="actionSelectDeselectLayers"/>
+    <addaction name="actionSelectSimilarLayers"/>
     <addaction name="separator"/>
     <addaction name="actionSelectColorRange"/>
-    <addaction name="actionSelectModify"/>
+    <addaction name="actionSelectFocusArea"/>
+    <addaction name="actionSelectSubject"/>
+    <addaction name="actionSelectSky"/>
+    <widget class="QMenu" name="menuSelectModify">
+     <property name="title">
+      <string>修改</string>
+     </property>
+        <addaction name="actionSelectBorder"/>
+        <addaction name="actionSelectSmooth"/>
+        <addaction name="actionSelectExpand"/>
+        <addaction name="actionSelectContract"/>
+        <addaction name="actionSelectFeather"/>
+    </widget>
+    <addaction name="menuSelectModify"/>
+    <addaction name="actionGrow"/>
+    <addaction name="actionSimilar"/>
+    <addaction name="actionTransformSelection"/>
+    <addaction name="actionEditInQuickMask"/>
+    <addaction name="actionLoadSelection"/>
+    <addaction name="actionSaveSelection"/>
+    <addaction name="actionNewGuideLayout"/>
+    <addaction name="actionNewGuideFromShape"/>
    </widget>
    <widget class="QMenu" name="menuFilter">
     <property name="title">
      <string>滤镜(&amp;R)</string>
     </property>
+    <addaction name="actionLastFilter"/>
+    <addaction name="actionConvertForSmartFilters"/>
     <addaction name="actionFilterGallery"/>
+    <addaction name="actionAdaptiveWideAngle"/>
+    <addaction name="actionCameraRawFilter"/>
+    <addaction name="actionLensCorrection"/>
+    <addaction name="actionLiquify"/>
+    <addaction name="actionVanishingPoint"/>
     <addaction name="separator"/>
-    <addaction name="actionFilterBlur"/>
-    <addaction name="actionFilterSharpen"/>
-    <addaction name="actionFilterNoise"/>
-    <addaction name="actionFilterDistort"/>
+    <widget class="QMenu" name="menuFilterBlur">
+     <property name="title">
+      <string>模糊</string>
+     </property>
+        <addaction name="actionFilterBlur"/>
+        <addaction name="actionBlurMore"/>
+        <addaction name="actionGaussianBlur"/>
+        <addaction name="actionMotionBlur"/>
+        <addaction name="actionRadialBlur"/>
+        <addaction name="actionSurfaceBlur"/>
+        <addaction name="actionBoxBlur"/>
+        <addaction name="actionShapeBlur"/>
+        <addaction name="actionSmartBlur"/>
+        <addaction name="actionLensBlur"/>
+        <addaction name="actionBlurGallery"/>
+    </widget>
+    <addaction name="menuFilterBlur"/>
+    <widget class="QMenu" name="menuFilterDistort">
+     <property name="title">
+      <string>扭曲</string>
+     </property>
+        <addaction name="actionFilterDistort"/>
+        <addaction name="actionDisplace"/>
+        <addaction name="actionPinch"/>
+        <addaction name="actionPolarCoordinates"/>
+        <addaction name="actionRipple"/>
+        <addaction name="actionShear"/>
+        <addaction name="actionSpherize"/>
+        <addaction name="actionTwirl"/>
+        <addaction name="actionWave"/>
+        <addaction name="actionZigZag"/>
+    </widget>
+    <addaction name="menuFilterDistort"/>
+    <widget class="QMenu" name="menuFilterNoise">
+     <property name="title">
+      <string>杂色</string>
+     </property>
+        <addaction name="actionFilterNoise"/>
+        <addaction name="actionAddNoise"/>
+        <addaction name="actionDespeckle"/>
+        <addaction name="actionDustAndScratches"/>
+        <addaction name="actionMedian"/>
+        <addaction name="actionReduceNoise"/>
+    </widget>
+    <addaction name="menuFilterNoise"/>
+    <widget class="QMenu" name="menuFilterPixelate">
+     <property name="title">
+      <string>像素化</string>
+     </property>
+        <addaction name="actionColorHalftone"/>
+        <addaction name="actionCrystalize"/>
+        <addaction name="actionFacet"/>
+        <addaction name="actionFragment"/>
+        <addaction name="actionMezzotint"/>
+        <addaction name="actionMosaic"/>
+        <addaction name="actionPointillize"/>
+    </widget>
+    <addaction name="menuFilterPixelate"/>
+    <widget class="QMenu" name="menuFilterRender">
+     <property name="title">
+      <string>渲染</string>
+     </property>
+        <addaction name="actionClouds"/>
+        <addaction name="actionDifferenceClouds"/>
+        <addaction name="actionFibers"/>
+        <addaction name="actionLensFlare"/>
+        <addaction name="actionLightingEffects"/>
+    </widget>
+    <addaction name="menuFilterRender"/>
+    <widget class="QMenu" name="menuFilterSharpen">
+     <property name="title">
+      <string>锐化</string>
+     </property>
+        <addaction name="actionFilterSharpen"/>
+        <addaction name="actionSharpenMore"/>
+        <addaction name="actionSharpenEdges"/>
+        <addaction name="actionUnsharpMask"/>
+        <addaction name="actionSmartSharpen"/>
+        <addaction name="actionShakeReduction"/>
+    </widget>
+    <addaction name="menuFilterSharpen"/>
+    <widget class="QMenu" name="menuFilterStylize">
+     <property name="title">
+      <string>风格化</string>
+     </property>
+        <addaction name="actionDiffuse"/>
+        <addaction name="actionEmboss"/>
+        <addaction name="actionExtrude"/>
+        <addaction name="actionFindEdges"/>
+        <addaction name="actionOilPaint"/>
+        <addaction name="actionSolarize"/>
+        <addaction name="actionTiles"/>
+        <addaction name="actionTraceContour"/>
+        <addaction name="actionWind"/>
+    </widget>
+    <addaction name="menuFilterStylize"/>
+    <widget class="QMenu" name="menuFilterOther">
+     <property name="title">
+      <string>其它</string>
+     </property>
+        <addaction name="actionCustomFilter"/>
+        <addaction name="actionHighPass"/>
+        <addaction name="actionMaximum"/>
+        <addaction name="actionMinimum"/>
+        <addaction name="actionOffset"/>
+    </widget>
+    <addaction name="menuFilterOther"/>
+    <addaction name="separator"/>
+    <addaction name="actionBrowseFilters"/>
    </widget>
    <widget class="QMenu" name="menu3D">
     <property name="title">
      <string>3D</string>
     </property>
     <addaction name="action3DNew"/>
+    <addaction name="action3DNewMeshFromLayer"/>
+    <addaction name="action3DNewSphereFromLayer"/>
     <addaction name="action3DRender"/>
+    <addaction name="action3DSplit"/>
+    <addaction name="action3DPaint"/>
+    <addaction name="action3DSketch"/>
+    <addaction name="action3DExport"/>
    </widget>
    <widget class="QMenu" name="menuView">
     <property name="title">
      <string>视图(&amp;V)</string>
     </property>
+    <addaction name="actionProofSetup"/>
+    <addaction name="actionProofColors"/>
+    <addaction name="actionGamutWarning"/>
+    <addaction name="actionPixelAspectRatio"/>
+    <addaction name="actionPixelAspectCorrection"/>
+    <addaction name="separator"/>
     <addaction name="actionZoomIn"/>
     <addaction name="actionZoomOut"/>
     <addaction name="actionZoomFit"/>
     <addaction name="actionZoomActual"/>
+    <addaction name="actionPrintSize"/>
     <addaction name="separator"/>
     <addaction name="actionShowRulers"/>
     <addaction name="actionShowGuides"/>
     <addaction name="actionShowGrid"/>
+    <addaction name="actionShowSlices"/>
+    <addaction name="actionShowTargetPath"/>
+    <addaction name="actionShowSelectionEdges"/>
+    <addaction name="actionShowLayerEdges"/>
+    <addaction name="actionExtras"/>
+    <addaction name="separator"/>
+    <addaction name="actionSnap"/>
+    <addaction name="actionSnapTo"/>
+    <addaction name="actionLockGuides"/>
+    <addaction name="actionClearGuides"/>
+    <addaction name="actionNewGuide"/>
+    <addaction name="actionLockSlices"/>
+    <addaction name="actionClearSlices"/>
+    <addaction name="separator"/>
+    <addaction name="actionScreenModeStandard"/>
+    <addaction name="actionScreenModeFullWithMenu"/>
+    <addaction name="actionScreenModeFull"/>
    </widget>
    <widget class="QMenu" name="menuWindow">
     <property name="title">
      <string>窗口(&amp;W)</string>
     </property>
-    <addaction name="actionWindowLayers"/>
-    <addaction name="actionWindowChannels"/>
-    <addaction name="actionWindowPaths"/>
-    <addaction name="actionWindowColor"/>
-    <addaction name="actionWindowProperties"/>
-    <addaction name="actionWindowHistogram"/>
+    <addaction name="actionWindowArrange"/>
+    <widget class="QMenu" name="menuWindowWorkspace">
+     <property name="title">
+      <string>工作区</string>
+     </property>
+        <addaction name="actionWorkspaceEssentials"/>
+        <addaction name="actionWorkspacePhotography"/>
+        <addaction name="actionWorkspacePainting"/>
+        <addaction name="actionWorkspaceGraphic"/>
+        <addaction name="actionWorkspaceMotion"/>
+        <addaction name="actionWorkspace3D"/>
+        <addaction name="actionWorkspaceReset"/>
+        <addaction name="actionWorkspaceNew"/>
+        <addaction name="actionWorkspaceDelete"/>
+        <addaction name="actionWorkspaceKeyboard"/>
+    </widget>
+    <addaction name="menuWindowWorkspace"/>
     <addaction name="separator"/>
-    <addaction name="actionWindowWorkspace"/>
+    <addaction name="actionWindowActions"/>
+    <addaction name="actionWindowAdjustments"/>
+    <addaction name="actionWindowBrush"/>
+    <addaction name="actionWindowBrushPresets"/>
+    <addaction name="actionWindowChannels"/>
+    <addaction name="actionWindowCharacter"/>
+    <addaction name="actionWindowCharacterStyles"/>
+    <addaction name="actionWindowColor"/>
+    <addaction name="actionWindowGlyphs"/>
+    <addaction name="actionWindowGradients"/>
+    <addaction name="actionWindowHistogram"/>
+    <addaction name="actionWindowHistory"/>
+    <addaction name="actionWindowInfo"/>
+    <addaction name="actionWindowLayerComps"/>
+    <addaction name="actionWindowLayers"/>
+    <addaction name="actionWindowLibraries"/>
+    <addaction name="actionWindowNavigator"/>
+    <addaction name="actionWindowNotes"/>
+    <addaction name="actionWindowOptions"/>
+    <addaction name="actionWindowParagraph"/>
+    <addaction name="actionWindowParagraphStyles"/>
+    <addaction name="actionWindowPaths"/>
+    <addaction name="actionWindowPatterns"/>
+    <addaction name="actionWindowProperties"/>
+    <addaction name="actionWindowStyles"/>
+    <addaction name="actionWindowSwatches"/>
+    <addaction name="actionWindowTimeline"/>
+    <addaction name="actionWindowToolPresets"/>
+    <addaction name="separator"/>
+    <addaction name="actionWindowTools"/>
+    <addaction name="actionWindowApplicationFrame"/>
+    <addaction name="actionWindowApplicationBar"/>
    </widget>
    <widget class="QMenu" name="menuHelp">
     <property name="title">
      <string>帮助(&amp;H)</string>
     </property>
+    <addaction name="actionHelpPhotoshopHelp"/>
     <addaction name="actionHelpAbout"/>
+    <addaction name="actionHelpSystemInfo"/>
+    <addaction name="actionHelpManagePlugins"/>
    </widget>
    <addaction name="menuFile"/>
    <addaction name="menuEdit"/>
@@ -267,13 +832,24 @@
    <addaction name="menuHelp"/>
   </widget>
   <widget class="QStatusBar" name="statusbar"/>
-  <!-- ===== 文件（已实现部分可点） ===== -->
+  <!-- ===== 菜单动作定义（LIVE 项可点，其余灰显占位） ===== -->
   <action name="actionNew">
    <property name="text">
     <string>新建(&amp;N)...</string>
    </property>
    <property name="shortcut">
     <string>Ctrl+N</string>
+   </property>
+  </action>
+  <action name="actionNewFromTemplate">
+   <property name="text">
+    <string>从模板新建...</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
    </property>
   </action>
   <action name="actionOpen">
@@ -284,12 +860,54 @@
     <string>Ctrl+O</string>
    </property>
   </action>
+  <action name="actionBrowseInBridge">
+   <property name="text">
+    <string>在 Bridge 中浏览...</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+Alt+O</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
   <action name="actionOpenAs">
    <property name="text">
     <string>打开为...</string>
    </property>
+   <property name="shortcut">
+    <string>Ctrl+Alt+Shift+O</string>
+   </property>
    <property name="enabled">
     <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionOpenAsSmartObject">
+   <property name="text">
+    <string>打开为智能对象...</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionRecentPlaceholder">
+   <property name="text">
+    <string>（无最近文件）</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
    </property>
   </action>
   <action name="actionClose">
@@ -302,13 +920,33 @@
    <property name="enabled">
     <bool>false</bool>
    </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
   </action>
   <action name="actionCloseAll">
    <property name="text">
     <string>关闭全部</string>
    </property>
+   <property name="shortcut">
+    <string>Ctrl+Alt+W</string>
+   </property>
    <property name="enabled">
     <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionCloseAndGoToBridge">
+   <property name="text">
+    <string>关闭并转到 Bridge...</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
    </property>
   </action>
   <action name="actionSave">
@@ -321,6 +959,9 @@
    <property name="enabled">
     <bool>false</bool>
    </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
   </action>
   <action name="actionSaveAs">
    <property name="text">
@@ -332,29 +973,181 @@
    <property name="enabled">
     <bool>false</bool>
    </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
   </action>
-  <action name="actionExport">
+  <action name="actionSaveACopy">
    <property name="text">
-    <string>导出(&amp;E)...</string>
+    <string>存储为副本...</string>
    </property>
    <property name="enabled">
     <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionRevert">
+   <property name="text">
+    <string>恢复</string>
+   </property>
+   <property name="shortcut">
+    <string>F12</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionExportAs">
+   <property name="text">
+    <string>导出为...</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionExportForScreens">
+   <property name="text">
+    <string>导出为屏幕所用格式...</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionSaveForWeb">
+   <property name="text">
+    <string>存储为 Web 所用格式 (旧版)...</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionExport">
+   <property name="text">
+    <string>快速导出为 PNG</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionGenerateImageAssets">
+   <property name="text">
+    <string>图像资源</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionGenerateCopyCSS">
+   <property name="text">
+    <string>拷贝 CSS</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionPlaceEmbedded">
+   <property name="text">
+    <string>置入嵌入的对象...</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionPlaceLinked">
+   <property name="text">
+    <string>置入链接的对象...</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionPackage">
+   <property name="text">
+    <string>打包...</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionFileInfo">
+   <property name="text">
+    <string>文件简介...</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+Alt+Shift+I</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
    </property>
   </action>
   <action name="actionPrint">
    <property name="text">
     <string>打印(&amp;P)...</string>
    </property>
+   <property name="shortcut">
+    <string>Ctrl+P</string>
+   </property>
    <property name="enabled">
     <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionPrintOneCopy">
+   <property name="text">
+    <string>打印一份</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
    </property>
   </action>
   <action name="actionExit">
    <property name="text">
     <string>退出(&amp;X)</string>
    </property>
+   <property name="shortcut">
+    <string>Ctrl+Q</string>
+   </property>
   </action>
-  <!-- ===== 编辑 ===== -->
   <action name="actionUndo">
    <property name="text">
     <string>还原(&amp;U)</string>
@@ -365,16 +1158,50 @@
    <property name="enabled">
     <bool>false</bool>
    </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
   </action>
-  <action name="actionRedo">
+  <action name="actionStepForward">
    <property name="text">
-    <string>重做</string>
+    <string>向前一步</string>
    </property>
    <property name="shortcut">
     <string>Ctrl+Shift+Z</string>
    </property>
    <property name="enabled">
     <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionStepBackward">
+   <property name="text">
+    <string>返回一步</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+Alt+Z</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionFade">
+   <property name="text">
+    <string>消退...</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+Shift+F</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
    </property>
   </action>
   <action name="actionCut">
@@ -387,6 +1214,9 @@
    <property name="enabled">
     <bool>false</bool>
    </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
   </action>
   <action name="actionCopy">
    <property name="text">
@@ -397,6 +1227,23 @@
    </property>
    <property name="enabled">
     <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionCopyMerged">
+   <property name="text">
+    <string>合并拷贝</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+Shift+C</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
    </property>
   </action>
   <action name="actionPaste">
@@ -409,13 +1256,97 @@
    <property name="enabled">
     <bool>false</bool>
    </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionPasteInPlace">
+   <property name="text">
+    <string>原位粘贴</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+Shift+V</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionPasteInto">
+   <property name="text">
+    <string>粘贴入</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+Alt+Shift+V</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionPasteOutside">
+   <property name="text">
+    <string>粘贴在外部</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionClear">
+   <property name="text">
+    <string>清除</string>
+   </property>
+   <property name="shortcut">
+    <string>Delete</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionSearch">
+   <property name="text">
+    <string>搜索...</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionFindAndReplaceText">
+   <property name="text">
+    <string>查找和替换文本...</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
   </action>
   <action name="actionFill">
    <property name="text">
     <string>填充...</string>
    </property>
+   <property name="shortcut">
+    <string>Shift+F5</string>
+   </property>
    <property name="enabled">
     <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
    </property>
   </action>
   <action name="actionStroke">
@@ -424,6 +1355,56 @@
    </property>
    <property name="enabled">
     <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionContentAwareFill">
+   <property name="text">
+    <string>内容识别填充...</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionContentAwareScale">
+   <property name="text">
+    <string>内容识别比例</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+Alt+Shift+C</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionPuppetWarp">
+   <property name="text">
+    <string>操控变形</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionPerspectiveWarp">
+   <property name="text">
+    <string>透视变形...</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
    </property>
   </action>
   <action name="actionFreeTransform">
@@ -436,46 +1417,1020 @@
    <property name="enabled">
     <bool>false</bool>
    </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
   </action>
-  <!-- ===== 图像 ===== -->
-  <action name="actionMode">
+  <action name="actionTransformAgain">
    <property name="text">
-    <string>模式</string>
+    <string>再次</string>
    </property>
    <property name="enabled">
     <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionTransformScale">
+   <property name="text">
+    <string>缩放</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionTransformRotate">
+   <property name="text">
+    <string>旋转</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionTransformSkew">
+   <property name="text">
+    <string>斜切</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionTransformDistort">
+   <property name="text">
+    <string>扭曲</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionTransformPerspective">
+   <property name="text">
+    <string>透视</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionTransformWarp">
+   <property name="text">
+    <string>变形</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionRotate180">
+   <property name="text">
+    <string>旋转 180 度</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionRotate90CW">
+   <property name="text">
+    <string>旋转 90 度（顺时针）</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionRotate90CCW">
+   <property name="text">
+    <string>旋转 90 度（逆时针）</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionFlipHorizontal">
+   <property name="text">
+    <string>水平翻转</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionFlipVertical">
+   <property name="text">
+    <string>垂直翻转</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionAutoAlignLayers">
+   <property name="text">
+    <string>自动对齐图层...</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionAutoBlendLayers">
+   <property name="text">
+    <string>自动混合图层...</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionDefineBrushPreset">
+   <property name="text">
+    <string>定义画笔预设...</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionDefinePattern">
+   <property name="text">
+    <string>定义图案...</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionDefineCustomShape">
+   <property name="text">
+    <string>定义自定义形状...</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionPurgeUndo">
+   <property name="text">
+    <string>还原</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionPurgeClipboard">
+   <property name="text">
+    <string>剪贴板</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionPurgeHistories">
+   <property name="text">
+    <string>历史记录</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionPurgeAll">
+   <property name="text">
+    <string>全部</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionPurgeVideoCache">
+   <property name="text">
+    <string>视频高速缓存</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionAdobePDFPresets">
+   <property name="text">
+    <string>Adobe PDF 预设...</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionPresets">
+   <property name="text">
+    <string>预设</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionRemoteConnections">
+   <property name="text">
+    <string>远程连接...</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionColorSettings">
+   <property name="text">
+    <string>颜色设置...</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+Shift+K</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionAssignProfile">
+   <property name="text">
+    <string>指定配置文件...</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionConvertToProfile">
+   <property name="text">
+    <string>转换为配置文件...</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionKeyboardShortcuts">
+   <property name="text">
+    <string>键盘快捷键...</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+Alt+Shift+K</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionMenus">
+   <property name="text">
+    <string>菜单...</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionPrefsGeneral">
+   <property name="text">
+    <string>常规...</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionPrefsInterface">
+   <property name="text">
+    <string>界面...</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionPrefsTools">
+   <property name="text">
+    <string>工具...</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionPrefsFileHandling">
+   <property name="text">
+    <string>文件处理...</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionPrefsPerformance">
+   <property name="text">
+    <string>性能...</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionPrefsCursors">
+   <property name="text">
+    <string>光标...</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionPrefsTransparency">
+   <property name="text">
+    <string>透明度与色域...</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionPrefsUnits">
+   <property name="text">
+    <string>单位与标尺...</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionPrefsGuides">
+   <property name="text">
+    <string>参考线、网格和切片...</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionPrefsPlugins">
+   <property name="text">
+    <string>增效工具...</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionPrefsType">
+   <property name="text">
+    <string>文字...</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionModeBitmap">
+   <property name="text">
+    <string>位图</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionModeGrayscale">
+   <property name="text">
+    <string>灰度</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionModeDuotone">
+   <property name="text">
+    <string>双色调</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionModeIndexed">
+   <property name="text">
+    <string>索引颜色</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionModeRGB">
+   <property name="text">
+    <string>RGB 颜色</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionModeCMYK">
+   <property name="text">
+    <string>CMYK 颜色</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionModeLab">
+   <property name="text">
+    <string>Lab 颜色</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionModeMultichannel">
+   <property name="text">
+    <string>多通道</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionMode8Bits">
+   <property name="text">
+    <string>8 位/通道</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionMode16Bits">
+   <property name="text">
+    <string>16 位/通道</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionMode32Bits">
+   <property name="text">
+    <string>32 位/通道</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionModeColorTable">
+   <property name="text">
+    <string>颜色表...</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionMode">
+   <property name="text">
+    <string>模式（总览）...</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionAdjBrightness">
+   <property name="text">
+    <string>亮度/对比度...</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionAdjLevels">
+   <property name="text">
+    <string>色阶...</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+L</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionAdjCurves">
+   <property name="text">
+    <string>曲线...</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+M</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionAdjExposure">
+   <property name="text">
+    <string>曝光度...</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionAdjVibrance">
+   <property name="text">
+    <string>自然饱和度...</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionAdjHueSat">
+   <property name="text">
+    <string>色相/饱和度...</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+U</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionAdjColorBalance">
+   <property name="text">
+    <string>色彩平衡...</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+B</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionAdjBlackWhite">
+   <property name="text">
+    <string>黑白...</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+Alt+Shift+B</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionAdjPhotoFilter">
+   <property name="text">
+    <string>照片滤镜...</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionAdjChannelMixer">
+   <property name="text">
+    <string>通道混合器...</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionAdjColorLookup">
+   <property name="text">
+    <string>颜色查找...</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionAdjInvert">
+   <property name="text">
+    <string>反相</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+I</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionAdjPosterize">
+   <property name="text">
+    <string>色调分离...</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionAdjThreshold">
+   <property name="text">
+    <string>阈值...</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionAdjGradientMap">
+   <property name="text">
+    <string>渐变映射...</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionAdjSelectiveColor">
+   <property name="text">
+    <string>可选颜色...</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionAdjShadowsHighlights">
+   <property name="text">
+    <string>阴影/高光...</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionAdjHDRToning">
+   <property name="text">
+    <string>HDR 色调...</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionAdjDesaturate">
+   <property name="text">
+    <string>去色</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+Shift+U</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionAdjMatchColor">
+   <property name="text">
+    <string>匹配颜色...</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionAdjReplaceColor">
+   <property name="text">
+    <string>替换颜色...</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionAdjEqualize">
+   <property name="text">
+    <string>色调均化</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
    </property>
   </action>
   <action name="actionAdjustments">
    <property name="text">
-    <string>调整</string>
+    <string>调整（总览）...</string>
    </property>
    <property name="enabled">
     <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionAutoTone">
+   <property name="text">
+    <string>自动色调</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionAutoContrast">
+   <property name="text">
+    <string>自动对比度</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionAutoColor">
+   <property name="text">
+    <string>自动颜色</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
    </property>
   </action>
   <action name="actionImageSize">
    <property name="text">
     <string>图像大小...</string>
    </property>
+   <property name="shortcut">
+    <string>Ctrl+Alt+I</string>
+   </property>
    <property name="enabled">
     <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
    </property>
   </action>
   <action name="actionCanvasSize">
    <property name="text">
     <string>画布大小...</string>
    </property>
+   <property name="shortcut">
+    <string>Ctrl+Alt+C</string>
+   </property>
    <property name="enabled">
     <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionImageRot180">
+   <property name="text">
+    <string>180 度</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionImageRot90CW">
+   <property name="text">
+    <string>90 度（顺时针）</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionImageRot90CCW">
+   <property name="text">
+    <string>90 度（逆时针）</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionImageFlipH">
+   <property name="text">
+    <string>水平翻转画布</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionImageFlipV">
+   <property name="text">
+    <string>垂直翻转画布</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionImageArbitrary">
+   <property name="text">
+    <string>任意角度...</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
    </property>
   </action>
   <action name="actionImageRotation">
    <property name="text">
-    <string>图像旋转</string>
+    <string>图像旋转（总览）</string>
    </property>
    <property name="enabled">
     <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
    </property>
   </action>
   <action name="actionCrop">
@@ -485,30 +2440,207 @@
    <property name="enabled">
     <bool>false</bool>
    </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
   </action>
-  <!-- ===== 图层（面板已有新建/删除，菜单先占位，后续接线） ===== -->
-  <action name="actionLayerNew">
+  <action name="actionTrim">
    <property name="text">
-    <string>新建</string>
+    <string>裁切...</string>
    </property>
    <property name="enabled">
     <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionRevealAll">
+   <property name="text">
+    <string>显示全部</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionDuplicateImage">
+   <property name="text">
+    <string>复制...</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionApplyImage">
+   <property name="text">
+    <string>应用图像...</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionCalculations">
+   <property name="text">
+    <string>计算...</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionVariables">
+   <property name="text">
+    <string>变量</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionApplyDataSet">
+   <property name="text">
+    <string>应用数据组...</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionLayerNew">
+   <property name="text">
+    <string>图层...</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+Shift+N</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionLayerNewBackground">
+   <property name="text">
+    <string>图层背景</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionLayerNewGroup">
+   <property name="text">
+    <string>组...</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+G</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionLayerNewGroupFromLayers">
+   <property name="text">
+    <string>从图层建立组...</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionLayerNewArtboard">
+   <property name="text">
+    <string>画板...</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionLayerViaCopy">
+   <property name="text">
+    <string>通过拷贝的图层</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+J</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionLayerViaCut">
+   <property name="text">
+    <string>通过剪切的图层</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+Shift+J</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
    </property>
   </action>
   <action name="actionLayerDuplicate">
    <property name="text">
-    <string>复制图层</string>
+    <string>复制图层...</string>
    </property>
    <property name="enabled">
     <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
    </property>
   </action>
   <action name="actionLayerDelete">
    <property name="text">
-    <string>删除</string>
+    <string>图层</string>
    </property>
    <property name="enabled">
     <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionLayerDeleteHidden">
+   <property name="text">
+    <string>隐藏图层</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
    </property>
   </action>
   <action name="actionLayerRename">
@@ -518,6 +2650,9 @@
    <property name="enabled">
     <bool>false</bool>
    </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
   </action>
   <action name="actionLayerProperties">
    <property name="text">
@@ -526,21 +2661,206 @@
    <property name="enabled">
     <bool>false</bool>
    </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
   </action>
-  <action name="actionNewAdjustmentLayer">
+  <action name="actionLayerStyleBlending">
    <property name="text">
-    <string>新建调整图层</string>
+    <string>混合选项...</string>
    </property>
    <property name="enabled">
     <bool>false</bool>
    </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
   </action>
-  <action name="actionLayerMask">
+  <action name="actionLSBevelEmboss">
    <property name="text">
-    <string>图层蒙版</string>
+    <string>斜面和浮雕...</string>
    </property>
    <property name="enabled">
     <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionLSStroke">
+   <property name="text">
+    <string>描边...</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionLSInnerShadow">
+   <property name="text">
+    <string>内阴影...</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionLSInnerGlow">
+   <property name="text">
+    <string>内发光...</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionLSSatin">
+   <property name="text">
+    <string>光泽...</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionLSColorOverlay">
+   <property name="text">
+    <string>颜色叠加...</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionLSGradientOverlay">
+   <property name="text">
+    <string>渐变叠加...</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionLSPatternOverlay">
+   <property name="text">
+    <string>图案叠加...</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionLSOuterGlow">
+   <property name="text">
+    <string>外发光...</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionLSDropShadow">
+   <property name="text">
+    <string>投影...</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionLSCopy">
+   <property name="text">
+    <string>拷贝图层样式</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionLSPaste">
+   <property name="text">
+    <string>粘贴图层样式</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionLSClear">
+   <property name="text">
+    <string>清除图层样式</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionLSGlobalLight">
+   <property name="text">
+    <string>全局光...</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionLSCreateLayers">
+   <property name="text">
+    <string>创建图层</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionLSHideAll">
+   <property name="text">
+    <string>隐藏所有效果</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionLSScaleEffects">
+   <property name="text">
+    <string>缩放效果...</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
    </property>
   </action>
   <action name="actionLayerStyle">
@@ -550,22 +2870,868 @@
    <property name="enabled">
     <bool>false</bool>
    </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
   </action>
-  <!-- ===== 文字 ===== -->
+  <action name="actionFillSolid">
+   <property name="text">
+    <string>纯色...</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionFillGradient">
+   <property name="text">
+    <string>渐变...</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionFillPattern">
+   <property name="text">
+    <string>图案...</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionNewAdjBrightness">
+   <property name="text">
+    <string>亮度/对比度...</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionNewAdjLevels">
+   <property name="text">
+    <string>色阶...</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionNewAdjCurves">
+   <property name="text">
+    <string>曲线...</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionNewAdjExposure">
+   <property name="text">
+    <string>曝光度...</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionNewAdjVibrance">
+   <property name="text">
+    <string>自然饱和度...</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionNewAdjHueSat">
+   <property name="text">
+    <string>色相/饱和度...</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionNewAdjColorBalance">
+   <property name="text">
+    <string>色彩平衡...</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionNewAdjBlackWhite">
+   <property name="text">
+    <string>黑白...</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionNewAdjPhotoFilter">
+   <property name="text">
+    <string>照片滤镜...</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionNewAdjChannelMixer">
+   <property name="text">
+    <string>通道混合器...</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionNewAdjColorLookup">
+   <property name="text">
+    <string>颜色查找...</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionNewAdjInvert">
+   <property name="text">
+    <string>反相</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionNewAdjPosterize">
+   <property name="text">
+    <string>色调分离...</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionNewAdjThreshold">
+   <property name="text">
+    <string>阈值...</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionNewAdjGradientMap">
+   <property name="text">
+    <string>渐变映射...</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionNewAdjSelectiveColor">
+   <property name="text">
+    <string>可选颜色...</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionNewAdjustmentLayer">
+   <property name="text">
+    <string>新建调整图层</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionMaskRevealAll">
+   <property name="text">
+    <string>显示全部</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionMaskHideAll">
+   <property name="text">
+    <string>隐藏全部</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionMaskRevealSelection">
+   <property name="text">
+    <string>显示选区</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionMaskHideSelection">
+   <property name="text">
+    <string>隐藏选区</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionMaskFromTransparency">
+   <property name="text">
+    <string>从透明度生成</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionMaskDelete">
+   <property name="text">
+    <string>删除</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionMaskApply">
+   <property name="text">
+    <string>应用</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionMaskDisable">
+   <property name="text">
+    <string>停用</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionMaskLinkUnlink">
+   <property name="text">
+    <string>链接取消链接</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionLayerMask">
+   <property name="text">
+    <string>图层蒙版</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionCreateClippingMask">
+   <property name="text">
+    <string>创建剪贴蒙版</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionSmartObjects">
+   <property name="text">
+    <string>智能对象</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionVideoLayers">
+   <property name="text">
+    <string>视频图层</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionRasterizeType">
+   <property name="text">
+    <string>文字</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionRasterizeShape">
+   <property name="text">
+    <string>形状</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionRasterizeFillContent">
+   <property name="text">
+    <string>填充内容</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionRasterizeVectorMask">
+   <property name="text">
+    <string>矢量蒙版</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionRasterizeSmartObject">
+   <property name="text">
+    <string>智能对象</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionRasterizeVideo">
+   <property name="text">
+    <string>视频</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionRasterize3D">
+   <property name="text">
+    <string>3D</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionRasterizeLayer">
+   <property name="text">
+    <string>图层</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionRasterizeAllLayers">
+   <property name="text">
+    <string>所有图层</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionGroupLayers">
+   <property name="text">
+    <string>图层编组</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+G</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionUngroupLayers">
+   <property name="text">
+    <string>取消图层编组</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+Shift+G</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionHideLayers">
+   <property name="text">
+    <string>隐藏图层</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionBringToFront">
+   <property name="text">
+    <string>置为顶层</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+Shift+]</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionBringForward">
+   <property name="text">
+    <string>前移一层</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+]</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionSendBackward">
+   <property name="text">
+    <string>后移一层</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+[</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionSendToBack">
+   <property name="text">
+    <string>置为底层</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+Shift+[</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionReverse">
+   <property name="text">
+    <string>反向</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionAlignTop">
+   <property name="text">
+    <string>顶边</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionAlignVCenter">
+   <property name="text">
+    <string>垂直居中</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionAlignBottom">
+   <property name="text">
+    <string>底边</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionAlignLeft">
+   <property name="text">
+    <string>左边</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionAlignHCenter">
+   <property name="text">
+    <string>水平居中</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionAlignRight">
+   <property name="text">
+    <string>右边</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionDistTop">
+   <property name="text">
+    <string>顶边</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionDistVCenter">
+   <property name="text">
+    <string>垂直居中</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionDistBottom">
+   <property name="text">
+    <string>底边</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionDistLeft">
+   <property name="text">
+    <string>左边</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionDistHCenter">
+   <property name="text">
+    <string>水平居中</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionDistRight">
+   <property name="text">
+    <string>右边</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionLockLayers">
+   <property name="text">
+    <string>锁定图层...</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionLinkLayers">
+   <property name="text">
+    <string>链接图层</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionSelectLinkedLayers">
+   <property name="text">
+    <string>选择链接图层</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionMergeDown">
+   <property name="text">
+    <string>向下合并</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+E</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionMergeVisible">
+   <property name="text">
+    <string>合并可见图层</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+Shift+E</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionFlattenImage">
+   <property name="text">
+    <string>拼合图像</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionMattingColorDecontaminate">
+   <property name="text">
+    <string>颜色去除...</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionMattingDefringe">
+   <property name="text">
+    <string>去边...</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionMattingRemoveBlack">
+   <property name="text">
+    <string>移去黑色杂边</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionMattingRemoveWhite">
+   <property name="text">
+    <string>移去白色杂边</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
   <action name="actionTypeHorizontal">
+   <property name="text">
+    <string>横排文字工具面板</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionTypeVertical">
+   <property name="text">
+    <string>直排文字工具面板</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionTypeExtraVertical">
+   <property name="text">
+    <string>直排文字</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionTypeExtraHorizontal">
    <property name="text">
     <string>横排文字</string>
    </property>
    <property name="enabled">
     <bool>false</bool>
    </property>
-  </action>
-  <action name="actionTypeVertical">
-   <property name="text">
-    <string>直排文字</string>
-   </property>
-   <property name="enabled">
-    <bool>false</bool>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
    </property>
   </action>
   <action name="actionTypePanels">
@@ -575,8 +3741,131 @@
    <property name="enabled">
     <bool>false</bool>
    </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
   </action>
-  <!-- ===== 选择 ===== -->
+  <action name="actionTypeAntiAliasNone">
+   <property name="text">
+    <string>消除锯齿 无</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionTypeAntiAliasSharp">
+   <property name="text">
+    <string>消除锯齿 锐利</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionTypeAntiAliasCrisp">
+   <property name="text">
+    <string>消除锯齿 明晰</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionTypeAntiAliasStrong">
+   <property name="text">
+    <string>消除锯齿 强</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionTypeAntiAliasSmooth">
+   <property name="text">
+    <string>消除锯齿 平滑</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionTypeConvertToShape">
+   <property name="text">
+    <string>转换为形状</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionTypeCreateWorkPath">
+   <property name="text">
+    <string>创建工作路径</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionTypeConvertToParagraph">
+   <property name="text">
+    <string>转换为段落文本</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionTypeWarpText">
+   <property name="text">
+    <string>文字变形...</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionTypeUpdateAll">
+   <property name="text">
+    <string>更新所有文本图层</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionTypeReplaceFonts">
+   <property name="text">
+    <string>替换所有缺少的字体</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
   <action name="actionSelectAll">
    <property name="text">
     <string>全部(&amp;A)</string>
@@ -586,6 +3875,9 @@
    </property>
    <property name="enabled">
     <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
    </property>
   </action>
   <action name="actionSelectDeselect">
@@ -598,13 +3890,22 @@
    <property name="enabled">
     <bool>false</bool>
    </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
   </action>
   <action name="actionSelectReselect">
    <property name="text">
     <string>重新选择</string>
    </property>
+   <property name="shortcut">
+    <string>Ctrl+Shift+D</string>
+   </property>
    <property name="enabled">
     <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
    </property>
   </action>
   <action name="actionSelectInverse">
@@ -617,6 +3918,45 @@
    <property name="enabled">
     <bool>false</bool>
    </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionSelectAllLayers">
+   <property name="text">
+    <string>所有图层</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+Alt+A</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionSelectDeselectLayers">
+   <property name="text">
+    <string>取消选择图层</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionSelectSimilarLayers">
+   <property name="text">
+    <string>相似图层</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
   </action>
   <action name="actionSelectColorRange">
    <property name="text">
@@ -624,6 +3964,97 @@
    </property>
    <property name="enabled">
     <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionSelectFocusArea">
+   <property name="text">
+    <string>焦点区域...</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionSelectSubject">
+   <property name="text">
+    <string>主体</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionSelectSky">
+   <property name="text">
+    <string>天空</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionSelectBorder">
+   <property name="text">
+    <string>边界...</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionSelectSmooth">
+   <property name="text">
+    <string>平滑...</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionSelectExpand">
+   <property name="text">
+    <string>扩展...</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionSelectContract">
+   <property name="text">
+    <string>收缩...</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionSelectFeather">
+   <property name="text">
+    <string>羽化...</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
    </property>
   </action>
   <action name="actionSelectModify">
@@ -633,14 +4064,199 @@
    <property name="enabled">
     <bool>false</bool>
    </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
   </action>
-  <!-- ===== 滤镜 ===== -->
+  <action name="actionGrow">
+   <property name="text">
+    <string>扩大选取</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionSimilar">
+   <property name="text">
+    <string>选取相似</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionTransformSelection">
+   <property name="text">
+    <string>变换选区</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionEditInQuickMask">
+   <property name="text">
+    <string>在快速蒙版模式下编辑</string>
+   </property>
+   <property name="shortcut">
+    <string>Q</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionLoadSelection">
+   <property name="text">
+    <string>载入选区...</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionSaveSelection">
+   <property name="text">
+    <string>存储选区...</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionNewGuideLayout">
+   <property name="text">
+    <string>新建参考线版面...</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionNewGuideFromShape">
+   <property name="text">
+    <string>从形状新建参考线</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionLastFilter">
+   <property name="text">
+    <string>上次滤镜操作</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+F</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionConvertForSmartFilters">
+   <property name="text">
+    <string>转换为智能滤镜</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
   <action name="actionFilterGallery">
    <property name="text">
     <string>滤镜库...</string>
    </property>
    <property name="enabled">
     <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionAdaptiveWideAngle">
+   <property name="text">
+    <string>自适应广角...</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionCameraRawFilter">
+   <property name="text">
+    <string>Camera Raw 滤镜...</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+Shift+A</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionLensCorrection">
+   <property name="text">
+    <string>镜头校正...</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionLiquify">
+   <property name="text">
+    <string>液化...</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+Shift+X</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionVanishingPoint">
+   <property name="text">
+    <string>消失点...</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+Alt+V</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
    </property>
   </action>
   <action name="actionFilterBlur">
@@ -650,21 +4266,118 @@
    <property name="enabled">
     <bool>false</bool>
    </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
   </action>
-  <action name="actionFilterSharpen">
+  <action name="actionBlurMore">
    <property name="text">
-    <string>锐化</string>
+    <string>进一步模糊</string>
    </property>
    <property name="enabled">
     <bool>false</bool>
    </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
   </action>
-  <action name="actionFilterNoise">
+  <action name="actionGaussianBlur">
    <property name="text">
-    <string>杂色</string>
+    <string>高斯模糊...</string>
    </property>
    <property name="enabled">
     <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionMotionBlur">
+   <property name="text">
+    <string>动感模糊...</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionRadialBlur">
+   <property name="text">
+    <string>径向模糊...</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionSurfaceBlur">
+   <property name="text">
+    <string>表面模糊...</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionBoxBlur">
+   <property name="text">
+    <string>方框模糊...</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionShapeBlur">
+   <property name="text">
+    <string>形状模糊...</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionSmartBlur">
+   <property name="text">
+    <string>智能模糊...</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionLensBlur">
+   <property name="text">
+    <string>镜头模糊...</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionBlurGallery">
+   <property name="text">
+    <string>模糊画廊...</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
    </property>
   </action>
   <action name="actionFilterDistort">
@@ -674,25 +4387,687 @@
    <property name="enabled">
     <bool>false</bool>
    </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
   </action>
-  <!-- ===== 3D ===== -->
-  <action name="action3DNew">
+  <action name="actionDisplace">
    <property name="text">
-    <string>新建 3D 图层</string>
+    <string>置换...</string>
    </property>
    <property name="enabled">
     <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionPinch">
+   <property name="text">
+    <string>挤压...</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionPolarCoordinates">
+   <property name="text">
+    <string>极坐标...</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionRipple">
+   <property name="text">
+    <string>波纹...</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionShear">
+   <property name="text">
+    <string>剪切...</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionSpherize">
+   <property name="text">
+    <string>球面化...</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionTwirl">
+   <property name="text">
+    <string>旋转扭曲...</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionWave">
+   <property name="text">
+    <string>波浪...</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionZigZag">
+   <property name="text">
+    <string>ZigZag...</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionFilterNoise">
+   <property name="text">
+    <string>杂色</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionAddNoise">
+   <property name="text">
+    <string>添加杂色...</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionDespeckle">
+   <property name="text">
+    <string>去斑</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionDustAndScratches">
+   <property name="text">
+    <string>蒙尘与划痕...</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionMedian">
+   <property name="text">
+    <string>中间值...</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionReduceNoise">
+   <property name="text">
+    <string>减少杂色...</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionColorHalftone">
+   <property name="text">
+    <string>彩色半调...</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionCrystalize">
+   <property name="text">
+    <string>晶格化...</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionFacet">
+   <property name="text">
+    <string>彩块化</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionFragment">
+   <property name="text">
+    <string>碎片</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionMezzotint">
+   <property name="text">
+    <string>铜版雕刻...</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionMosaic">
+   <property name="text">
+    <string>马赛克...</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionPointillize">
+   <property name="text">
+    <string>点状化...</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionClouds">
+   <property name="text">
+    <string>云彩</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionDifferenceClouds">
+   <property name="text">
+    <string>分层云彩</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionFibers">
+   <property name="text">
+    <string>纤维...</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionLensFlare">
+   <property name="text">
+    <string>镜头光晕...</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionLightingEffects">
+   <property name="text">
+    <string>光照效果...</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionFilterSharpen">
+   <property name="text">
+    <string>锐化</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionSharpenMore">
+   <property name="text">
+    <string>进一步锐化</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionSharpenEdges">
+   <property name="text">
+    <string>锐化边缘</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionUnsharpMask">
+   <property name="text">
+    <string>USM 锐化...</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionSmartSharpen">
+   <property name="text">
+    <string>智能锐化...</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionShakeReduction">
+   <property name="text">
+    <string>防抖...</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionDiffuse">
+   <property name="text">
+    <string>扩散...</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionEmboss">
+   <property name="text">
+    <string>浮雕效果...</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionExtrude">
+   <property name="text">
+    <string>凸出...</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionFindEdges">
+   <property name="text">
+    <string>查找边缘</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionOilPaint">
+   <property name="text">
+    <string>油画...</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionSolarize">
+   <property name="text">
+    <string>曝光过度</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionTiles">
+   <property name="text">
+    <string>拼贴...</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionTraceContour">
+   <property name="text">
+    <string>等高线...</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionWind">
+   <property name="text">
+    <string>风...</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionCustomFilter">
+   <property name="text">
+    <string>自定...</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionHighPass">
+   <property name="text">
+    <string>高反差保留...</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionMaximum">
+   <property name="text">
+    <string>最大值...</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionMinimum">
+   <property name="text">
+    <string>最小值...</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionOffset">
+   <property name="text">
+    <string>位移...</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionBrowseFilters">
+   <property name="text">
+    <string>浏览滤镜和增效工具...</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="action3DNew">
+   <property name="text">
+    <string>从文件新建 3D 图层...</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="action3DNewMeshFromLayer">
+   <property name="text">
+    <string>从图层新建网格</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="action3DNewSphereFromLayer">
+   <property name="text">
+    <string>从图层新建球面全景</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
    </property>
   </action>
   <action name="action3DRender">
    <property name="text">
-    <string>渲染</string>
+    <string>渲染 3D 图层</string>
    </property>
    <property name="enabled">
     <bool>false</bool>
    </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
   </action>
-  <!-- ===== 视图（缩放已实现） ===== -->
+  <action name="action3DSplit">
+   <property name="text">
+    <string>分割场景中的挤压</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="action3DPaint">
+   <property name="text">
+    <string>绘画</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="action3DSketch">
+   <property name="text">
+    <string>草图</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="action3DExport">
+   <property name="text">
+    <string>导出 3D 图层...</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionProofSetup">
+   <property name="text">
+    <string>校样设置</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionProofColors">
+   <property name="text">
+    <string>校样颜色</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+Y</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionGamutWarning">
+   <property name="text">
+    <string>色域警告</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+Shift+Y</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionPixelAspectRatio">
+   <property name="text">
+    <string>像素长宽比</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionPixelAspectCorrection">
+   <property name="text">
+    <string>像素长宽比校正</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
   <action name="actionZoomIn">
    <property name="text">
     <string>放大</string>
@@ -725,15 +5100,32 @@
     <string>Ctrl+1</string>
    </property>
   </action>
+  <action name="actionPrintSize">
+   <property name="text">
+    <string>打印尺寸</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
   <action name="actionShowRulers">
    <property name="text">
     <string>标尺</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+R</string>
    </property>
    <property name="checkable">
     <bool>true</bool>
    </property>
    <property name="enabled">
     <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
    </property>
   </action>
   <action name="actionShowGuides">
@@ -746,10 +5138,16 @@
    <property name="enabled">
     <bool>false</bool>
    </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
   </action>
   <action name="actionShowGrid">
    <property name="text">
     <string>网格</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+'</string>
    </property>
    <property name="checkable">
     <bool>true</bool>
@@ -757,33 +5155,424 @@
    <property name="enabled">
     <bool>false</bool>
    </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
   </action>
-  <!-- ===== 窗口 ===== -->
-  <action name="actionWindowLayers">
+  <action name="actionShowSlices">
    <property name="text">
-    <string>图层</string>
+    <string>切片</string>
    </property>
    <property name="checkable">
     <bool>true</bool>
    </property>
-   <property name="checked">
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionShowTargetPath">
+   <property name="text">
+    <string>目标路径</string>
+   </property>
+   <property name="checkable">
     <bool>true</bool>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionShowSelectionEdges">
+   <property name="text">
+    <string>选区边缘</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+H</string>
+   </property>
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionShowLayerEdges">
+   <property name="text">
+    <string>图层边缘</string>
+   </property>
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionExtras">
+   <property name="text">
+    <string>显示额外内容</string>
+   </property>
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionSnap">
+   <property name="text">
+    <string>对齐</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+;</string>
+   </property>
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionSnapTo">
+   <property name="text">
+    <string>对齐到</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionLockGuides">
+   <property name="text">
+    <string>锁定参考线</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+Alt+;</string>
+   </property>
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionClearGuides">
+   <property name="text">
+    <string>清除参考线</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionNewGuide">
+   <property name="text">
+    <string>新建参考线...</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionLockSlices">
+   <property name="text">
+    <string>锁定切片</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionClearSlices">
+   <property name="text">
+    <string>清除切片</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionScreenModeStandard">
+   <property name="text">
+    <string>标准屏幕模式</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionScreenModeFullWithMenu">
+   <property name="text">
+    <string>带有菜单栏的全屏模式</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionScreenModeFull">
+   <property name="text">
+    <string>全屏模式</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionWindowArrange">
+   <property name="text">
+    <string>排列</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionWorkspaceEssentials">
+   <property name="text">
+    <string>基本功能（默认）</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionWorkspacePhotography">
+   <property name="text">
+    <string>摄影</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionWorkspacePainting">
+   <property name="text">
+    <string>绘画</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionWorkspaceGraphic">
+   <property name="text">
+    <string>图形和 Web</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionWorkspaceMotion">
+   <property name="text">
+    <string>动感</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionWorkspace3D">
+   <property name="text">
+    <string>3D</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionWorkspaceReset">
+   <property name="text">
+    <string>复位基本功能</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionWorkspaceNew">
+   <property name="text">
+    <string>新建工作区...</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionWorkspaceDelete">
+   <property name="text">
+    <string>删除工作区...</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionWorkspaceKeyboard">
+   <property name="text">
+    <string>键盘快捷键与菜单...</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionWindowWorkspace">
+   <property name="text">
+    <string>工作区</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionWindowActions">
+   <property name="text">
+    <string>动作</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionWindowAdjustments">
+   <property name="text">
+    <string>调整</string>
+   </property>
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionWindowBrush">
+   <property name="text">
+    <string>画笔设置</string>
+   </property>
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionWindowBrushPresets">
+   <property name="text">
+    <string>画笔预设</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
    </property>
   </action>
   <action name="actionWindowChannels">
    <property name="text">
     <string>通道</string>
    </property>
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
    <property name="enabled">
     <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
    </property>
   </action>
-  <action name="actionWindowPaths">
+  <action name="actionWindowCharacter">
    <property name="text">
-    <string>路径</string>
+    <string>字符</string>
+   </property>
+   <property name="checkable">
+    <bool>true</bool>
    </property>
    <property name="enabled">
     <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionWindowCharacterStyles">
+   <property name="text">
+    <string>字符样式</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
    </property>
   </action>
   <action name="actionWindowColor">
@@ -797,6 +5586,201 @@
     <bool>true</bool>
    </property>
   </action>
+  <action name="actionWindowGlyphs">
+   <property name="text">
+    <string>字形</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionWindowGradients">
+   <property name="text">
+    <string>渐变</string>
+   </property>
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionWindowHistogram">
+   <property name="text">
+    <string>直方图</string>
+   </property>
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionWindowHistory">
+   <property name="text">
+    <string>历史记录</string>
+   </property>
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionWindowInfo">
+   <property name="text">
+    <string>信息</string>
+   </property>
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionWindowLayerComps">
+   <property name="text">
+    <string>图层复合</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionWindowLayers">
+   <property name="text">
+    <string>图层</string>
+   </property>
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="checked">
+    <bool>true</bool>
+   </property>
+  </action>
+  <action name="actionWindowLibraries">
+   <property name="text">
+    <string>库</string>
+   </property>
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionWindowNavigator">
+   <property name="text">
+    <string>导航器</string>
+   </property>
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionWindowNotes">
+   <property name="text">
+    <string>注释</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionWindowOptions">
+   <property name="text">
+    <string>选项</string>
+   </property>
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionWindowParagraph">
+   <property name="text">
+    <string>段落</string>
+   </property>
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionWindowParagraphStyles">
+   <property name="text">
+    <string>段落样式</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionWindowPaths">
+   <property name="text">
+    <string>路径</string>
+   </property>
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionWindowPatterns">
+   <property name="text">
+    <string>图案</string>
+   </property>
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
   <action name="actionWindowProperties">
    <property name="text">
     <string>属性</string>
@@ -808,26 +5792,128 @@
     <bool>true</bool>
    </property>
   </action>
-  <action name="actionWindowHistogram">
+  <action name="actionWindowStyles">
    <property name="text">
-    <string>直方图</string>
+    <string>样式</string>
    </property>
    <property name="enabled">
     <bool>false</bool>
    </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
   </action>
-  <action name="actionWindowWorkspace">
+  <action name="actionWindowSwatches">
    <property name="text">
-    <string>工作区</string>
+    <string>色板</string>
+   </property>
+   <property name="checkable">
+    <bool>true</bool>
    </property>
    <property name="enabled">
     <bool>false</bool>
    </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
   </action>
-  <!-- ===== 帮助 ===== -->
+  <action name="actionWindowTimeline">
+   <property name="text">
+    <string>时间轴</string>
+   </property>
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionWindowToolPresets">
+   <property name="text">
+    <string>工具预设</string>
+   </property>
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionWindowTools">
+   <property name="text">
+    <string>工具</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionWindowApplicationFrame">
+   <property name="text">
+    <string>应用程序框架</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionWindowApplicationBar">
+   <property name="text">
+    <string>应用程序栏</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionHelpPhotoshopHelp">
+   <property name="text">
+    <string>PhotoshopLite 帮助...</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
   <action name="actionHelpAbout">
    <property name="text">
     <string>关于 PhotoshopLite</string>
+   </property>
+  </action>
+  <action name="actionHelpSystemInfo">
+   <property name="text">
+    <string>系统信息...</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
+   </property>
+  </action>
+  <action name="actionHelpManagePlugins">
+   <property name="text">
+    <string>管理增效工具...</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>UI 占位，功能尚未接入</string>
    </property>
   </action>
  </widget>
