@@ -7,30 +7,59 @@
 #include <QIcon>
 #include <QMenu>
 #include <QPainter>
+#include <QPolygonF>
 #include <QToolButton>
 #include <QVBoxLayout>
 
 namespace {
 
-/** 在图标右下角画小三角，提示该占位有多个子工具（对齐 PS）。 */
-QIcon withGroupMark(const QIcon &base, const QSize &size)
+/** 工具箱按钮的图标边长（逻辑像素）。 */
+constexpr int kToolIconSize = 24;
+
+/**
+ * 由源图生成「多档 DPR、按设备像素 1:1 渲染」的 QIcon；可选右下角小三角（同组标记）。
+ *
+ * 【坑 · 实测过】早先写法是：
+ *     QPixmap pm(20,20);
+ *     p.drawPixmap(0, 0, base.pixmap(QSize(20,20)));   // 先缩到 20×20
+ *     return QIcon(pm);                                 // 只含一张 20×20、DPR=1 的位图
+ * 屏幕缩放（如 150%/300%）时 Qt 需要 30/60 像素的图，而 QIcon 里只有 20×20，
+ * **只能放大小位图 → 图标发虚、带灰晕**（用户截图看到的"糊糊的"）。
+ *
+ * 正确做法：对每档 DPR 都从**源图直接缩放到设备像素尺寸**（都是降采样，因此锐利），
+ * 再 `setDevicePixelRatio` 后加入同一个 QIcon，由 Qt 按屏幕 DPR 取用最合适的那张。
+ */
+QIcon toolIcon(const QIcon &base, const QSize &logicalSize, bool groupMark)
 {
-    QPixmap pm(size);
-    pm.fill(Qt::transparent);
-    QPainter p(&pm);
-    p.setRenderHint(QPainter::Antialiasing, true);
-    const QPixmap src = base.pixmap(size);
-    p.drawPixmap(0, 0, src);
-    p.setPen(Qt::NoPen);
-    p.setBrush(QColor(230, 230, 230));
-    const int s = 5;
-    QPolygon tri;
-    tri << QPoint(size.width() - 1, size.height() - s - 1)
-        << QPoint(size.width() - 1, size.height() - 1)
-        << QPoint(size.width() - s - 1, size.height() - 1);
-    p.drawPolygon(tri);
-    p.end();
-    return QIcon(pm);
+    QIcon out;
+    const int scales[] = {1, 2, 3};
+    for (int s : scales) {
+        const QSize device(logicalSize.width() * s, logicalSize.height() * s);
+        QPixmap pm(device);
+        pm.fill(Qt::transparent);
+
+        QPainter p(&pm);
+        p.setRenderHint(QPainter::Antialiasing, true);
+        p.setRenderHint(QPainter::SmoothPixmapTransform, true);
+        p.drawPixmap(0, 0, base.pixmap(device));   // 源图 → 设备尺寸，只缩一次
+
+        if (groupMark) {
+            // 小三角也随 DPR 一起放大，否则在高分屏上会细到看不见
+            const qreal side = 5.0 * s;
+            QPolygonF tri;
+            tri << QPointF(device.width() - 1, device.height() - side - 1)
+                << QPointF(device.width() - 1, device.height() - 1)
+                << QPointF(device.width() - side - 1, device.height() - 1);
+            p.setPen(Qt::NoPen);
+            p.setBrush(QColor(230, 230, 230));
+            p.drawPolygon(tri);
+        }
+        p.end();
+
+        pm.setDevicePixelRatio(s);
+        out.addPixmap(pm);
+    }
+    return out;
 }
 
 } // namespace
@@ -186,10 +215,9 @@ void ToolBox::refreshSlotButton(int slotIndex)
         return;
 
     const ToolItem &item = slot.items[slot.activeIndex];
-    QIcon icon = loadIcon(item.iconPath);
-    const QSize sz(20, 20);
-    if (slot.items.size() > 1)
-        icon = withGroupMark(icon, sz);
+    const QSize sz(kToolIconSize, kToolIconSize);
+    // 关键：所有图标都走多档 DPR 生成（不论是否同组），否则屏幕缩放时会发虚
+    QIcon icon = toolIcon(loadIcon(item.iconPath), sz, slot.items.size() > 1);
 
     slot.button->setIcon(icon);
     slot.button->setIconSize(sz);
@@ -282,57 +310,79 @@ void ToolBox::addSlot(const QVector<ToolItem> &items)
 void ToolBox::buildToolSlots()
 {
     // 图标：resources/icons/tools/*.png（iconfont，英文文件名）
+    // 分组与顺序对齐 Photoshop 默认工具箱：同组共用一个占位，右键展开子菜单。
+    // ⚠️ 只有 Move / Hand / Zoom / Brush / Eraser 有实际逻辑，其余是 UI 占位
+    //    （选中后 ToolManager 回退到中性工具，不消费事件）。
     const QString dir = QStringLiteral(":/icons/tools/");
+    const auto icon = [&dir](const char *name) {
+        return dir + QString::fromLatin1(name) + QStringLiteral(".png");
+    };
 
-    addSlot({{Ps::ToolId::Move, dir + QStringLiteral("move.png"),
-              tr("移动工具"), QStringLiteral("V")}});
+    // 移动（V）
+    addSlot({{Ps::ToolId::Move, icon("move"), tr("移动工具"), QStringLiteral("V")}});
 
-    // 选框组
-    addSlot({{Ps::ToolId::RectSelect, dir + QStringLiteral("rect-select.png"),
-              tr("矩形选框工具"), QStringLiteral("M")},
-             {Ps::ToolId::EllipseSelect, dir + QStringLiteral("ellipse-select.png"),
-              tr("椭圆选框工具"), QStringLiteral("M")}});
+    // 选框（M）
+    addSlot({{Ps::ToolId::RectSelect, icon("rect-select"), tr("矩形选框工具"), QStringLiteral("M")},
+             {Ps::ToolId::EllipseSelect, icon("ellipse-select"), tr("椭圆选框工具"), QStringLiteral("M")}});
 
-    addSlot({{Ps::ToolId::Lasso, dir + QStringLiteral("lasso.png"),
-              tr("套索工具"), QStringLiteral("L")}});
+    // 套索（L）
+    addSlot({{Ps::ToolId::Lasso, icon("lasso"), tr("套索工具"), QStringLiteral("L")},
+             {Ps::ToolId::PolygonalLasso, icon("lasso-alt"), tr("多边形套索工具"), QStringLiteral("L")},
+             {Ps::ToolId::MagneticLasso, icon("magnetic-lasso"), tr("磁性套索工具"), QStringLiteral("L")}});
 
-    addSlot({{Ps::ToolId::MagicWand, dir + QStringLiteral("magic-wand.png"),
-              tr("魔棒工具"), QStringLiteral("W")}});
+    // 快速选择（W）
+    addSlot({{Ps::ToolId::QuickSelect, icon("quick-select"), tr("快速选择工具"), QStringLiteral("W")},
+             {Ps::ToolId::MagicWand, icon("magic-wand"), tr("魔棒工具"), QStringLiteral("W")}});
 
-    addSlot({{Ps::ToolId::Crop, dir + QStringLiteral("crop.png"),
-              tr("裁剪工具"), QStringLiteral("C")}});
+    // 裁剪（C）
+    addSlot({{Ps::ToolId::Crop, icon("crop"), tr("裁剪工具"), QStringLiteral("C")},
+             {Ps::ToolId::PerspectiveCrop, icon("perspective"), tr("透视裁剪工具"), QStringLiteral("C")}});
 
-    addSlot({{Ps::ToolId::Eyedropper, dir + QStringLiteral("eyedropper.png"),
-              tr("吸管工具"), QStringLiteral("I")}});
+    // 吸管（I）
+    addSlot({{Ps::ToolId::Eyedropper, icon("eyedropper"), tr("吸管工具"), QStringLiteral("I")}});
 
-    addSlot({{Ps::ToolId::Brush, dir + QStringLiteral("brush.png"),
-              tr("画笔工具"), QStringLiteral("B")}});
+    // 画笔（B）
+    addSlot({{Ps::ToolId::Brush, icon("brush"), tr("画笔工具"), QStringLiteral("B")},
+             {Ps::ToolId::Pencil, icon("pencil"), tr("铅笔工具"), QStringLiteral("B")},
+             {Ps::ToolId::MixerBrush, icon("brush-pencil"), tr("混合器画笔工具"), QStringLiteral("B")}});
 
-    addSlot({{Ps::ToolId::Eraser, dir + QStringLiteral("eraser.png"),
-              tr("橡皮擦工具"), QStringLiteral("E")}});
+    // 图章（S）
+    addSlot({{Ps::ToolId::CloneStamp, icon("stamp"), tr("仿制图章工具"), QStringLiteral("S")}});
 
-    // 填充组：油漆桶 + 渐变
-    addSlot({{Ps::ToolId::PaintBucket, dir + QStringLiteral("bucket.png"),
-              tr("油漆桶工具"), QStringLiteral("G")},
-             {Ps::ToolId::Gradient, dir + QStringLiteral("gradient.png"),
-              tr("渐变工具"), QStringLiteral("G")}});
+    // 橡皮擦（E）
+    addSlot({{Ps::ToolId::Eraser, icon("eraser"), tr("橡皮擦工具"), QStringLiteral("E")},
+             {Ps::ToolId::BackgroundEraser, icon("eraser-alt"),
+              tr("背景橡皮擦工具"), QStringLiteral("E")}});
 
-    addSlot({{Ps::ToolId::Type, dir + QStringLiteral("type-horizontal.png"),
-              tr("横排文字工具"), QStringLiteral("T")}});
+    // 填充（G）
+    addSlot({{Ps::ToolId::PaintBucket, icon("bucket"), tr("油漆桶工具"), QStringLiteral("G")},
+             {Ps::ToolId::Gradient, icon("gradient"), tr("渐变工具"), QStringLiteral("G")}});
 
-    // 形状组：矩形 / 椭圆 / 三角 / 直线 — 同一占位，右键展开（对齐用户 PS 截图）
-    addSlot({{Ps::ToolId::ShapeRect, dir + QStringLiteral("rectangle.png"),
-              tr("矩形工具"), QStringLiteral("U")},
-             {Ps::ToolId::ShapeEllipse, dir + QStringLiteral("ellipse.png"),
-              tr("椭圆工具"), QStringLiteral("U")},
-             {Ps::ToolId::ShapeTriangle, dir + QStringLiteral("triangle.png"),
-              tr("三角形工具"), QStringLiteral("U")},
-             {Ps::ToolId::ShapeLine, dir + QStringLiteral("line.png"),
-              tr("直线工具"), QStringLiteral("U")}});
+    // 聚焦：模糊 / 锐化 / 涂抹
+    addSlot({{Ps::ToolId::Blur, icon("blur"), tr("模糊工具"), QString()},
+             {Ps::ToolId::Sharpen, icon("sharpen"), tr("锐化工具"), QString()},
+             {Ps::ToolId::Smudge, icon("smudge"), tr("涂抹工具"), QString()}});
 
-    addSlot({{Ps::ToolId::Hand, dir + QStringLiteral("hand.png"),
-              tr("抓手工具"), QStringLiteral("H")}});
+    // 色调：减淡 / 海绵
+    addSlot({{Ps::ToolId::Dodge, icon("adjust-add"), tr("减淡工具"), QString()},
+             {Ps::ToolId::Sponge, icon("sponge"), tr("海绵工具"), QString()}});
 
-    addSlot({{Ps::ToolId::Zoom, dir + QStringLiteral("zoom.png"),
-              tr("缩放工具"), QStringLiteral("Z")}});
+    // 钢笔（P）
+    addSlot({{Ps::ToolId::Pen, icon("pen"), tr("钢笔工具"), QStringLiteral("P")},
+             {Ps::ToolId::FreeformPen, icon("pen-alt"), tr("自由钢笔工具"), QStringLiteral("P")},
+             {Ps::ToolId::AddAnchorPoint, icon("pen-add"), tr("添加锚点工具"), QStringLiteral("P")}});
+
+    // 文字（T）
+    addSlot({{Ps::ToolId::Type, icon("type-horizontal"), tr("横排文字工具"), QStringLiteral("T")},
+             {Ps::ToolId::TypeVertical, icon("type-vertical"), tr("直排文字工具"), QStringLiteral("T")}});
+
+    // 形状（U）
+    addSlot({{Ps::ToolId::ShapeRect, icon("rectangle"), tr("矩形工具"), QStringLiteral("U")},
+             {Ps::ToolId::ShapeEllipse, icon("ellipse"), tr("椭圆工具"), QStringLiteral("U")},
+             {Ps::ToolId::ShapeTriangle, icon("triangle"), tr("三角形工具"), QStringLiteral("U")},
+             {Ps::ToolId::ShapeLine, icon("line"), tr("直线工具"), QStringLiteral("U")}});
+
+    // 视图
+    addSlot({{Ps::ToolId::Hand, icon("hand"), tr("抓手工具"), QStringLiteral("H")}});
+    addSlot({{Ps::ToolId::Zoom, icon("zoom"), tr("缩放工具"), QStringLiteral("Z")}});
 }

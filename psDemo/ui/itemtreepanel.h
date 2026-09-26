@@ -1,15 +1,30 @@
 #ifndef ITEMTREEPANEL_H
 #define ITEMTREEPANEL_H
 
+#include <QSize>
 #include <QWidget>
 
 class QFrame;
+class QIcon;
+class QImage;
 class QListWidget;
 class QToolButton;
 
 namespace Ps {
 class ImageDocument;
 }
+
+/**
+ * 通道缩略图的派生方式（仅 UI 内部用）。
+ * 尚无 Channel domain，通道行的缩略图由**合成图实时派生**，属展示层推算。
+ */
+enum class ThumbChannel {
+    Composite, ///< RGB 行：彩色合成缩略图
+    Red,       ///< 红分量灰度
+    Green,     ///< 绿分量灰度
+    Blue,      ///< 蓝分量灰度
+    Alpha,     ///< Alpha 灰度（按 PS 习惯反转，白=不透明）
+};
 
 /**
  * Item 树面板基类（ui）。
@@ -21,7 +36,9 @@ class ImageDocument;
  * 本项目瘦身：
  * - 不用 Gtk / UIManager；底栏先直接 connect 槽，后续可再抽 actions 层
  * - Layers / Channels / Paths 在 GIMP 是三个独立 dockable；此处各自为
- *   ItemTreePanel 子类，由 LayerPanel（PS 式 Tab 壳）嵌入同一停靠区
+ *   ItemTreePanel 子类，由 DockPanel（PS 式 Tab 壳）嵌入同一停靠区
+ *
+ * 【缩略图】三个面板统一在此生成，见 §缩略图 一节。
  *
  * 子类须在 setupUi 后调用 bindSkeleton()，再实现 refreshFromDocument()。
  */
@@ -33,6 +50,36 @@ public:
     /** 不取得所有权；nullptr 清空。对应 gimp_item_tree_view_set_image。 */
     void setDocument(Ps::ImageDocument *document);
     Ps::ImageDocument *document() const { return m_document; }
+
+    // —— 缩略图 ——
+
+    /** 缩略图边长（逻辑像素，正方形）。 */
+    static constexpr int kThumbSize = 40;
+
+    /** 底栏功能按钮的图标边长（逻辑像素）。 */
+    static constexpr int kToolbarIconSize = 24;
+
+    /**
+     * 图层缩略图：等比缩放该层像素 + 透明棋盘格衬底。
+     * 【对照 GIMP】gimp_viewable_get_preview → GimpViewRenderer 的图层预览。
+     */
+    static QImage makeLayerThumbnail(const QImage &layerPixels);
+
+    /**
+     * 通道缩略图：从**合成图**派生。
+     * @param composite 合成结果（Format_ARGB32_Premultiplied）
+     *
+     * 【诚实标注】当前无 Channel domain，红/绿/蓝/Alpha 都是由合成图算出来的
+     * 展示层推算值，不是真实通道数据。等 Phase 后续开建通道 domain 后应换掉。
+     */
+    static QImage makeChannelThumbnail(const QImage &composite, ThumbChannel channel);
+
+    /**
+     * 从 SVG 资源渲染图标，按 1x/2x 双分辨率产出，任意显示尺寸都锐利。
+     * 【对照 GIMP】图标是矢量资源；本项目用 Qt6Svg 在目标尺寸上光栅化，
+     * 避免「48px PNG 缩到 22px 发糊」的位图问题。
+     */
+    static QIcon svgIcon(const QString &resourcePath, int logicalSize);
 
 protected:
     explicit ItemTreePanel(QWidget *parent = nullptr);

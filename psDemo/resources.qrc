@@ -1,19 +1,36 @@
 <!DOCTYPE RCC>
 <RCC version="1.0">
   <qresource prefix="/icons">
-    <!-- iconfont PNG（英文文件名）；工具箱用 :/icons/tools/ -->
+    <!-- 工具箱（iconfont PNG，英文文件名）；按 PS 工具组顺序排列 -->
     <file alias="tools/move.png">resources/icons/tools/move.png</file>
     <file alias="tools/rect-select.png">resources/icons/tools/rect-select.png</file>
     <file alias="tools/ellipse-select.png">resources/icons/tools/ellipse-select.png</file>
     <file alias="tools/lasso.png">resources/icons/tools/lasso.png</file>
+    <file alias="tools/lasso-alt.png">resources/icons/tools/lasso-alt.png</file>
+    <file alias="tools/magnetic-lasso.png">resources/icons/tools/magnetic-lasso.png</file>
+    <file alias="tools/quick-select.png">resources/icons/tools/quick-select.png</file>
     <file alias="tools/magic-wand.png">resources/icons/tools/magic-wand.png</file>
     <file alias="tools/crop.png">resources/icons/tools/crop.png</file>
+    <file alias="tools/perspective.png">resources/icons/tools/perspective.png</file>
     <file alias="tools/eyedropper.png">resources/icons/tools/eyedropper.png</file>
     <file alias="tools/brush.png">resources/icons/tools/brush.png</file>
+    <file alias="tools/pencil.png">resources/icons/tools/pencil.png</file>
+    <file alias="tools/brush-pencil.png">resources/icons/tools/brush-pencil.png</file>
+    <file alias="tools/stamp.png">resources/icons/tools/stamp.png</file>
     <file alias="tools/eraser.png">resources/icons/tools/eraser.png</file>
+    <file alias="tools/eraser-alt.png">resources/icons/tools/eraser-alt.png</file>
     <file alias="tools/bucket.png">resources/icons/tools/bucket.png</file>
     <file alias="tools/gradient.png">resources/icons/tools/gradient.png</file>
+    <file alias="tools/blur.png">resources/icons/tools/blur.png</file>
+    <file alias="tools/sharpen.png">resources/icons/tools/sharpen.png</file>
+    <file alias="tools/smudge.png">resources/icons/tools/smudge.png</file>
+    <file alias="tools/sponge.png">resources/icons/tools/sponge.png</file>
+    <file alias="tools/adjust-add.png">resources/icons/tools/adjust-add.png</file>
+    <file alias="tools/pen.png">resources/icons/tools/pen.png</file>
+    <file alias="tools/pen-alt.png">resources/icons/tools/pen-alt.png</file>
+    <file alias="tools/pen-add.png">resources/icons/tools/pen-add.png</file>
     <file alias="tools/type-horizontal.png">resources/icons/tools/type-horizontal.png</file>
+    <file alias="tools/type-vertical.png">resources/icons/tools/type-vertical.png</file>
     <file alias="tools/rectangle.png">resources/icons/tools/rectangle.png</file>
     <file alias="tools/ellipse.png">resources/icons/tools/ellipse.png</file>
     <file alias="tools/triangle.png">resources/icons/tools/triangle.png</file>
@@ -22,24 +39,35 @@
     <file alias="tools/zoom.png">resources/icons/tools/zoom.png</file>
     <file alias="ui/check-white.png">resources/icons/ui/check-white.png</file>
     <file alias="ui/radio-dot-white.png">resources/icons/ui/radio-dot-white.png</file>
-    <!-- 图层面板底栏（自绘线框 PNG，英文文件名） -->
-    <file alias="layers/link.png">resources/icons/layers/link.png</file>
-    <file alias="layers/fx.png">resources/icons/layers/fx.png</file>
-    <file alias="layers/mask.png">resources/icons/layers/mask.png</file>
-    <file alias="layers/adjustment.png">resources/icons/layers/adjustment.png</file>
-    <file alias="layers/group.png">resources/icons/layers/group.png</file>
-    <file alias="layers/new-layer.png">resources/icons/layers/new-layer.png</file>
-    <file alias="layers/delete.png">resources/icons/layers/delete.png</file>
+    <!-- 图层面板（SVG 矢量，运行时按显示尺寸光栅化，任意尺寸锐利） -->
+    <file alias="layers/link.svg">resources/icons/layers/link.svg</file>
+    <file alias="layers/fx.svg">resources/icons/layers/fx.svg</file>
+    <file alias="layers/mask.svg">resources/icons/layers/mask.svg</file>
+    <file alias="layers/adjustment.svg">resources/icons/layers/adjustment.svg</file>
+    <file alias="layers/group.svg">resources/icons/layers/group.svg</file>
+    <file alias="layers/new-layer.svg">resources/icons/layers/new-layer.svg</file>
+    <file alias="layers/delete.svg">resources/icons/layers/delete.svg</file>
+    <!-- 类型筛选行（顺序对齐 PS） -->
+    <file alias="layers/filter-pixel.svg">resources/icons/layers/filter-pixel.svg</file>
+    <file alias="layers/filter-adjust.svg">resources/icons/layers/filter-adjust.svg</file>
+    <file alias="layers/filter-type.svg">resources/icons/layers/filter-type.svg</file>
+    <file alias="layers/filter-shape.svg">resources/icons/layers/filter-shape.svg</file>
+    <file alias="layers/filter-smart.svg">resources/icons/layers/filter-smart.svg</file>
+    <!-- 锁定行（PS 四种锁） -->
+    <file alias="layers/lock-transparent.svg">resources/icons/layers/lock-transparent.svg</file>
+    <file alias="layers/lock-image.svg">resources/icons/layers/lock-image.svg</file>
+    <file alias="layers/lock-position.svg">resources/icons/layers/lock-position.svg</file>
+    <file alias="layers/lock-all.svg">resources/icons/layers/lock-all.svg</file>
     <!-- 通道面板底栏 -->
-    <file alias="channels/load-selection.png">resources/icons/channels/load-selection.png</file>
-    <file alias="channels/save-selection.png">resources/icons/channels/save-selection.png</file>
-    <file alias="channels/new-channel.png">resources/icons/channels/new-channel.png</file>
+    <file alias="channels/load-selection.svg">resources/icons/channels/load-selection.svg</file>
+    <file alias="channels/save-selection.svg">resources/icons/channels/save-selection.svg</file>
+    <file alias="channels/new-channel.svg">resources/icons/channels/new-channel.svg</file>
     <!-- 路径面板底栏 -->
-    <file alias="paths/fill.png">resources/icons/paths/fill.png</file>
-    <file alias="paths/stroke.png">resources/icons/paths/stroke.png</file>
-    <file alias="paths/to-selection.png">resources/icons/paths/to-selection.png</file>
-    <file alias="paths/from-selection.png">resources/icons/paths/from-selection.png</file>
-    <file alias="paths/new-path.png">resources/icons/paths/new-path.png</file>
+    <file alias="paths/fill.svg">resources/icons/paths/fill.svg</file>
+    <file alias="paths/stroke.svg">resources/icons/paths/stroke.svg</file>
+    <file alias="paths/to-selection.svg">resources/icons/paths/to-selection.svg</file>
+    <file alias="paths/from-selection.svg">resources/icons/paths/from-selection.svg</file>
+    <file alias="paths/new-path.svg">resources/icons/paths/new-path.svg</file>
   </qresource>
   <qresource prefix="/styles">
     <file alias="dark.qss">resources/styles/dark.qss</file>

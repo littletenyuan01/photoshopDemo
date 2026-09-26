@@ -6,20 +6,20 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>800</width>
-    <height>32</height>
+    <width>1100</width>
+    <height>34</height>
    </rect>
   </property>
   <property name="minimumSize">
    <size>
     <width>0</width>
-    <height>28</height>
+    <height>30</height>
    </size>
   </property>
   <property name="maximumSize">
    <size>
     <width>16777215</width>
-    <height>36</height>
+    <height>46</height>
    </size>
   </property>
   <property name="windowTitle">
@@ -30,13 +30,55 @@
   background-color: #4a4a4a;
   border-bottom: 1px solid #2a2a2a;
 }
-QLabel { color: #e8e8e8; }
-QSpinBox {
+QWidget#ToolOptionsBar QLabel { color: #e8e8e8; }
+QWidget#ToolOptionsBar QComboBox,
+QWidget#ToolOptionsBar QSpinBox,
+QWidget#ToolOptionsBar QFontComboBox {
   background-color: #3a3a3a;
   color: #eee;
   border: 1px solid #222;
-  min-width: 64px;
-}</string>
+  padding: 1px 4px;
+  min-height: 22px;
+}
+QWidget#ToolOptionsBar QComboBox::drop-down { border: none; width: 16px; }
+QWidget#ToolOptionsBar QCheckBox { color: #e8e8e8; spacing: 5px; }
+/* 勾选框必须显式描边：暗色主题下全局 QWidget 背景是透明的，原生指示器会看不见 */
+QWidget#ToolOptionsBar QCheckBox::indicator {
+  width: 13px;
+  height: 13px;
+  border: 1px solid #c8c8c8;
+  border-radius: 2px;
+  background-color: #2e2e2e;
+}
+QWidget#ToolOptionsBar QCheckBox::indicator:hover { border-color: #ffffff; }
+QWidget#ToolOptionsBar QCheckBox::indicator:checked {
+  border: 1px solid #ffffff;
+  background-color: #2e2e2e;
+  image: url(:/icons/ui/check-white.png);
+}
+QWidget#ToolOptionsBar QToolButton {
+  background-color: #3a3a3a;
+  color: #eee;
+  border: 1px solid #222;
+  padding: 1px 4px;
+}
+QWidget#ToolOptionsBar QToolButton:hover { background-color: #4f4f4f; }
+QWidget#ToolOptionsBar QToolButton:checked { background-color: #2d5a8a; }
+/* 选项页的滚动容器：透明、无边框、细滚动条，避免出现一块浅色底 */
+QWidget#ToolOptionsBar QScrollArea { background: transparent; border: none; }
+QWidget#ToolOptionsBar QScrollArea > QWidget > QWidget { background: transparent; }
+QWidget#ToolOptionsBar QScrollBar:horizontal {
+  background: #3a3a3a;
+  height: 8px;
+  margin: 0;
+}
+QWidget#ToolOptionsBar QScrollBar::handle:horizontal {
+  background: #6a6a6a;
+  border-radius: 4px;
+  min-width: 24px;
+}
+QWidget#ToolOptionsBar QScrollBar::add-line:horizontal,
+QWidget#ToolOptionsBar QScrollBar::sub-line:horizontal { width: 0; }</string>
   </property>
   <layout class="QHBoxLayout" name="horizontalLayout">
    <property name="spacing">
@@ -46,16 +88,22 @@ QSpinBox {
     <number>8</number>
    </property>
    <property name="topMargin">
-    <number>2</number>
+    <number>1</number>
    </property>
    <property name="rightMargin">
     <number>8</number>
    </property>
    <property name="bottomMargin">
-    <number>2</number>
+    <number>1</number>
    </property>
    <item>
     <widget class="QLabel" name="toolNameLabel">
+     <property name="minimumSize">
+      <size>
+       <width>120</width>
+       <height>0</height>
+      </size>
+     </property>
      <property name="text">
       <string>移动工具</string>
      </property>
@@ -64,52 +112,445 @@ QSpinBox {
      </property>
     </widget>
    </item>
+
+   <!-- 工具族选项页：切换工具时整页替换（对照 GIMP 的 gimp_tool_options_gui()）。
+        套 QScrollArea：各页最小宽度不同（实测绘画页需 1038px），
+        让它**保持自然宽度**、窗口不够宽时横向滚动 ——
+        不能压缩 stack（早先设 QSizePolicy::Ignored，末尾 Expanding spacer 会吃掉所有
+        空间，控件被压扁到只剩一位数字），也不能让 stack 撑大主窗口最小宽度。
+        高度是固定值：QScrollArea 的 sizeHint 按字号推算（font-based，约 70px），
+        故用 minimum/maximumSize 把它压回内容高度 + 滚动条。 -->
    <item>
-    <widget class="QLabel" name="sizeLabel">
-     <property name="text">
-      <string>大小</string>
+    <widget class="QScrollArea" name="optionsScroll">
+     <property name="sizePolicy">
+      <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
+       <horstretch>1</horstretch>
+       <verstretch>0</verstretch>
+      </sizepolicy>
      </property>
-    </widget>
-   </item>
-   <item>
-    <widget class="QSpinBox" name="brushSizeSpin">
-     <property name="toolTip">
-      <string>画笔/橡皮直径（像素）</string>
-     </property>
-     <property name="suffix">
-      <string> px</string>
-     </property>
-     <property name="minimum">
-      <number>1</number>
-     </property>
-     <property name="maximum">
-      <number>500</number>
-     </property>
-     <property name="value">
-      <number>20</number>
-     </property>
-    </widget>
-   </item>
-   <item>
-    <widget class="QLabel" name="hintLabel">
-     <property name="text">
-      <string></string>
-     </property>
-    </widget>
-   </item>
-   <item>
-    <spacer name="horizontalSpacer">
-     <property name="orientation">
-      <enum>Qt::Orientation::Horizontal</enum>
-     </property>
-     <property name="sizeHint" stdset="0">
+     <property name="minimumSize">
       <size>
-       <width>40</width>
-       <height>20</height>
+       <width>0</width>
+       <height>26</height>
       </size>
      </property>
-    </spacer>
+     <property name="maximumSize">
+      <size>
+       <width>16777215</width>
+       <height>40</height>
+      </size>
+     </property>
+     <property name="frameShape">
+      <enum>QFrame::Shape::NoFrame</enum>
+     </property>
+     <property name="widgetResizable">
+      <bool>true</bool>
+     </property>
+     <property name="horizontalScrollBarPolicy">
+      <enum>Qt::ScrollBarPolicy::ScrollBarAsNeeded</enum>
+     </property>
+     <property name="verticalScrollBarPolicy">
+      <enum>Qt::ScrollBarPolicy::ScrollBarAlwaysOff</enum>
+     </property>
+     <widget class="QWidget" name="optionsScrollHost">
+      <layout class="QHBoxLayout" name="optionsScrollLayout">
+       <property name="spacing">
+        <number>0</number>
+       </property>
+       <property name="leftMargin">
+        <number>0</number>
+       </property>
+       <property name="topMargin">
+        <number>0</number>
+       </property>
+       <property name="rightMargin">
+        <number>0</number>
+       </property>
+       <property name="bottomMargin">
+        <number>0</number>
+       </property>
+       <!-- 关键：stack 左对齐、按 sizeHint 取宽 —— 否则 widgetResizable 会让它拿到
+            整个视口宽度，Qt 布局再把多余空间平均分给各控件（下拉框/数字框默认可增长），
+            结果在宽窗口下控件被拉得东一个西一个。 -->
+       <item alignment="Qt::AlignmentFlag::AlignLeft|Qt::AlignmentFlag::AlignVCenter">
+        <widget class="QStackedWidget" name="optionsStack">
+
+     <!-- 移动 -->
+     <widget class="QWidget" name="pageMove">
+      <layout class="QHBoxLayout" name="pageMoveLayout">
+       <property name="spacing"><number>6</number></property>
+       <property name="leftMargin"><number>0</number></property>
+       <property name="topMargin"><number>0</number></property>
+       <property name="rightMargin"><number>0</number></property>
+       <property name="bottomMargin"><number>0</number></property>
+       <item><widget class="QLabel" name="moveAutoLabel"><property name="text"><string>自动选择</string></property></widget></item>
+       <item>
+        <widget class="QComboBox" name="moveAutoCombo">
+         <property name="toolTip"><string>拖拽时自动选择光标下的图层</string></property>
+         <item><property name="text"><string>图层</string></property></item>
+         <item><property name="text"><string>组</string></property></item>
+         <item><property name="text"><string>无</string></property></item>
+        </widget>
+       </item>
+       <item>
+        <widget class="QCheckBox" name="moveShowTransformCheck">
+         <property name="text"><string>显示变换控件</string></property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QCheckBox" name="moveAlignEdgeCheck">
+         <property name="text"><string>对齐边缘</string></property>
+        </widget>
+       </item>
+      </layout>
+     </widget>
+
+     <!-- 选区（选框 / 套索 / 魔棒 / 快速选择） -->
+     <widget class="QWidget" name="pageSelection">
+      <layout class="QHBoxLayout" name="pageSelectionLayout">
+       <property name="spacing"><number>6</number></property>
+       <property name="leftMargin"><number>0</number></property>
+       <property name="topMargin"><number>0</number></property>
+       <property name="rightMargin"><number>0</number></property>
+       <property name="bottomMargin"><number>0</number></property>
+       <item><widget class="QLabel" name="selModeLabel"><property name="text"><string>运算</string></property></widget></item>
+       <item>
+        <widget class="QComboBox" name="selModeCombo">
+         <property name="toolTip"><string>选区运算方式（对照 GIMP 的 operation 属性）</string></property>
+         <item><property name="text"><string>新选区</string></property></item>
+         <item><property name="text"><string>添加到选区</string></property></item>
+         <item><property name="text"><string>从选区减去</string></property></item>
+         <item><property name="text"><string>与选区交叉</string></property></item>
+        </widget>
+       </item>
+       <item><widget class="QLabel" name="selFeatherLabel"><property name="text"><string>羽化</string></property></widget></item>
+       <item>
+        <widget class="QSpinBox" name="selFeatherSpin">
+         <property name="suffix"><string> px</string></property>
+         <property name="maximum"><number>250</number></property>
+         <property name="value"><number>0</number></property>
+         <property name="toolTip"><string>羽化半径（对照 GIMP 的 feather-radius）</string></property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QCheckBox" name="selAntialiasCheck">
+         <property name="text"><string>消除锯齿</string></property>
+         <property name="checked"><bool>true</bool></property>
+        </widget>
+       </item>
+       <!-- 魔棒 / 快速选择 专有（其余选区工具时隐藏） -->
+       <item><widget class="QLabel" name="selToleranceLabel"><property name="text"><string>容差</string></property></widget></item>
+       <item>
+        <widget class="QSpinBox" name="selToleranceSpin">
+         <property name="maximum"><number>255</number></property>
+         <property name="value"><number>32</number></property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QCheckBox" name="selContiguousCheck">
+         <property name="text"><string>连续</string></property>
+         <property name="checked"><bool>true</bool></property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QCheckBox" name="selSampleMergedCheck">
+         <property name="text"><string>对所有图层取样</string></property>
+        </widget>
+       </item>
+      </layout>
+     </widget>
+
+     <!-- 裁剪 -->
+     <widget class="QWidget" name="pageCrop">
+      <layout class="QHBoxLayout" name="pageCropLayout">
+       <property name="spacing"><number>6</number></property>
+       <property name="leftMargin"><number>0</number></property>
+       <property name="topMargin"><number>0</number></property>
+       <property name="rightMargin"><number>0</number></property>
+       <property name="bottomMargin"><number>0</number></property>
+       <item><widget class="QLabel" name="cropAspectLabel"><property name="text"><string>比例</string></property></widget></item>
+       <item>
+        <widget class="QComboBox" name="cropAspectCombo">
+         <item><property name="text"><string>无限制</string></property></item>
+         <item><property name="text"><string>原始比例</string></property></item>
+         <item><property name="text"><string>1 : 1</string></property></item>
+         <item><property name="text"><string>4 : 3</string></property></item>
+         <item><property name="text"><string>16 : 9</string></property></item>
+        </widget>
+       </item>
+       <item><widget class="QLabel" name="cropWidthLabel"><property name="text"><string>宽</string></property></widget></item>
+       <item><widget class="QSpinBox" name="cropWidthSpin"><property name="suffix"><string> px</string></property><property name="maximum"><number>99999</number></property><property name="value"><number>800</number></property></widget></item>
+       <item><widget class="QLabel" name="cropHeightLabel"><property name="text"><string>高</string></property></widget></item>
+       <item><widget class="QSpinBox" name="cropHeightSpin"><property name="suffix"><string> px</string></property><property name="maximum"><number>99999</number></property><property name="value"><number>600</number></property></widget></item>
+       <item>
+        <widget class="QCheckBox" name="cropDeleteCheck">
+         <property name="text"><string>删除裁剪的像素</string></property>
+        </widget>
+       </item>
+      </layout>
+     </widget>
+
+     <!-- 吸管 -->
+     <widget class="QWidget" name="pageEyedropper">
+      <layout class="QHBoxLayout" name="pageEyedropperLayout">
+       <property name="spacing"><number>6</number></property>
+       <property name="leftMargin"><number>0</number></property>
+       <property name="topMargin"><number>0</number></property>
+       <property name="rightMargin"><number>0</number></property>
+       <property name="bottomMargin"><number>0</number></property>
+       <item><widget class="QLabel" name="pickSizeLabel"><property name="text"><string>取样大小</string></property></widget></item>
+       <item>
+        <widget class="QComboBox" name="pickSizeCombo">
+         <property name="toolTip"><string>对照 GIMP 的 sample-average 属性</string></property>
+         <item><property name="text"><string>取样点</string></property></item>
+         <item><property name="text"><string>3 × 3 平均</string></property></item>
+         <item><property name="text"><string>5 × 5 平均</string></property></item>
+         <item><property name="text"><string>11 × 11 平均</string></property></item>
+         <item><property name="text"><string>31 × 31 平均</string></property></item>
+        </widget>
+       </item>
+       <item><widget class="QCheckBox" name="pickMergedCheck"><property name="text"><string>对所有图层取样</string></property></widget></item>
+       <item><widget class="QCheckBox" name="pickRingCheck"><property name="text"><string>显示取样环</string></property></widget></item>
+      </layout>
+     </widget>
+
+     <!-- 绘画类（画笔 / 铅笔 / 橡皮 / 图章 / 模糊锐化涂抹 / 减淡海绵） -->
+     <widget class="QWidget" name="pagePaint">
+      <layout class="QHBoxLayout" name="pagePaintLayout">
+       <property name="spacing"><number>6</number></property>
+       <property name="leftMargin"><number>0</number></property>
+       <property name="topMargin"><number>0</number></property>
+       <property name="rightMargin"><number>0</number></property>
+       <property name="bottomMargin"><number>0</number></property>
+       <!-- 画笔预设（UI 占位：仅展示预览方块 + 下拉箭头） -->
+       <item><widget class="QToolButton" name="paintPresetButton"><property name="text"><string/></property><property name="toolTip"><string>画笔预设（UI 占位）</string></property><property name="minimumSize"><size><width>40</width><height>24</height></size></property></widget></item>
+       <item><widget class="QLabel" name="paintSizeLabel"><property name="text"><string>大小</string></property></widget></item>
+       <item><widget class="QSpinBox" name="brushSizeSpin"><property name="suffix"><string> px</string></property><property name="minimum"><number>1</number></property><property name="maximum"><number>500</number></property><property name="value"><number>20</number></property><property name="toolTip"><string>画笔/橡皮直径（像素）——本项已接入绘制</string></property></widget></item>
+       <item><widget class="QLabel" name="paintHardnessLabel"><property name="text"><string>硬度</string></property></widget></item>
+       <item><widget class="QSpinBox" name="paintHardnessSpin"><property name="suffix"><string> %</string></property><property name="maximum"><number>100</number></property><property name="value"><number>85</number></property></widget></item>
+       <item><widget class="QLabel" name="paintModeLabel"><property name="text"><string>模式</string></property></widget></item>
+       <item>
+        <widget class="QComboBox" name="paintModeCombo">
+         <item><property name="text"><string>正常</string></property></item>
+         <item><property name="text"><string>溶解</string></property></item>
+         <item><property name="text"><string>正片叠底</string></property></item>
+         <item><property name="text"><string>滤色</string></property></item>
+         <item><property name="text"><string>叠加</string></property></item>
+        </widget>
+       </item>
+       <item><widget class="QLabel" name="paintOpacityLabel"><property name="text"><string>不透明度</string></property></widget></item>
+       <item><widget class="QSpinBox" name="paintOpacitySpin"><property name="suffix"><string> %</string></property><property name="maximum"><number>100</number></property><property name="value"><number>100</number></property></widget></item>
+       <item><widget class="QLabel" name="paintFlowLabel"><property name="text"><string>流量</string></property></widget></item>
+       <item><widget class="QSpinBox" name="paintFlowSpin"><property name="suffix"><string> %</string></property><property name="maximum"><number>100</number></property><property name="value"><number>100</number></property></widget></item>
+       <item><widget class="QLabel" name="paintSpacingLabel"><property name="text"><string>间距</string></property></widget></item>
+       <item><widget class="QSpinBox" name="paintSpacingSpin"><property name="suffix"><string> %</string></property><property name="minimum"><number>1</number></property><property name="maximum"><number>1000</number></property><property name="value"><number>25</number></property></widget></item>
+       <!-- 仿制图章专有 -->
+       <item><widget class="QCheckBox" name="paintAlignCheck"><property name="text"><string>对齐</string></property><property name="checked"><bool>true</bool></property></widget></item>
+       <item><widget class="QCheckBox" name="paintSampleMergedCheck"><property name="text"><string>对所有图层取样</string></property></widget></item>
+      </layout>
+     </widget>
+
+     <!-- 油漆桶 -->
+     <widget class="QWidget" name="pageFill">
+      <layout class="QHBoxLayout" name="pageFillLayout">
+       <property name="spacing"><number>6</number></property>
+       <property name="leftMargin"><number>0</number></property>
+       <property name="topMargin"><number>0</number></property>
+       <property name="rightMargin"><number>0</number></property>
+       <property name="bottomMargin"><number>0</number></property>
+       <item><widget class="QLabel" name="fillTypeLabel"><property name="text"><string>填充</string></property></widget></item>
+       <item>
+        <widget class="QComboBox" name="fillTypeCombo">
+         <item><property name="text"><string>前景色</string></property></item>
+         <item><property name="text"><string>背景色</string></property></item>
+         <item><property name="text"><string>图案</string></property></item>
+        </widget>
+       </item>
+       <item><widget class="QLabel" name="fillModeLabel"><property name="text"><string>模式</string></property></widget></item>
+       <item>
+        <widget class="QComboBox" name="fillModeCombo">
+         <item><property name="text"><string>正常</string></property></item>
+         <item><property name="text"><string>正片叠底</string></property></item>
+         <item><property name="text"><string>滤色</string></property></item>
+         <item><property name="text"><string>叠加</string></property></item>
+        </widget>
+       </item>
+       <item><widget class="QLabel" name="fillOpacityLabel"><property name="text"><string>不透明度</string></property></widget></item>
+       <item><widget class="QSpinBox" name="fillOpacitySpin"><property name="suffix"><string> %</string></property><property name="maximum"><number>100</number></property><property name="value"><number>100</number></property></widget></item>
+       <item><widget class="QLabel" name="fillToleranceLabel"><property name="text"><string>容差</string></property></widget></item>
+       <item><widget class="QSpinBox" name="fillToleranceSpin"><property name="maximum"><number>255</number></property><property name="value"><number>32</number></property></widget></item>
+       <item><widget class="QCheckBox" name="fillContiguousCheck"><property name="text"><string>连续</string></property><property name="checked"><bool>true</bool></property></widget></item>
+       <item><widget class="QCheckBox" name="fillSampleMergedCheck"><property name="text"><string>对所有图层取样</string></property></widget></item>
+      </layout>
+     </widget>
+
+     <!-- 渐变 -->
+     <widget class="QWidget" name="pageGradient">
+      <layout class="QHBoxLayout" name="pageGradientLayout">
+       <property name="spacing"><number>6</number></property>
+       <property name="leftMargin"><number>0</number></property>
+       <property name="topMargin"><number>0</number></property>
+       <property name="rightMargin"><number>0</number></property>
+       <property name="bottomMargin"><number>0</number></property>
+       <item><widget class="QToolButton" name="gradientPreviewButton"><property name="text"><string/></property><property name="toolTip"><string>渐变预设（UI 占位）</string></property><property name="minimumSize"><size><width>48</width><height>24</height></size></property></widget></item>
+       <item><widget class="QLabel" name="gradTypeLabel"><property name="text"><string>类型</string></property></widget></item>
+       <item>
+        <widget class="QComboBox" name="gradTypeCombo">
+         <property name="toolTip"><string>对照 GIMP 的 gradient-type 属性</string></property>
+         <item><property name="text"><string>线性</string></property></item>
+         <item><property name="text"><string>径向</string></property></item>
+         <item><property name="text"><string>角度</string></property></item>
+         <item><property name="text"><string>对称</string></property></item>
+         <item><property name="text"><string>菱形</string></property></item>
+        </widget>
+       </item>
+       <item><widget class="QLabel" name="gradModeLabel"><property name="text"><string>模式</string></property></widget></item>
+       <item>
+        <widget class="QComboBox" name="gradModeCombo">
+         <item><property name="text"><string>正常</string></property></item>
+         <item><property name="text"><string>正片叠底</string></property></item>
+         <item><property name="text"><string>滤色</string></property></item>
+         <item><property name="text"><string>叠加</string></property></item>
+        </widget>
+       </item>
+       <item><widget class="QLabel" name="gradOpacityLabel"><property name="text"><string>不透明度</string></property></widget></item>
+       <item><widget class="QSpinBox" name="gradOpacitySpin"><property name="suffix"><string> %</string></property><property name="maximum"><number>100</number></property><property name="value"><number>100</number></property></widget></item>
+       <item><widget class="QLabel" name="gradOffsetLabel"><property name="text"><string>偏移</string></property></widget></item>
+       <item><widget class="QSpinBox" name="gradOffsetSpin"><property name="suffix"><string> %</string></property><property name="minimum"><number>-100</number></property><property name="maximum"><number>100</number></property><property name="value"><number>0</number></property></widget></item>
+       <item><widget class="QCheckBox" name="gradDitherCheck"><property name="text"><string>仿色</string></property><property name="checked"><bool>true</bool></property></widget></item>
+       <item><widget class="QCheckBox" name="gradReverseCheck"><property name="text"><string>反向</string></property></widget></item>
+      </layout>
+     </widget>
+
+     <!-- 钢笔 / 路径 -->
+     <widget class="QWidget" name="pagePath">
+      <layout class="QHBoxLayout" name="pagePathLayout">
+       <property name="spacing"><number>6</number></property>
+       <property name="leftMargin"><number>0</number></property>
+       <property name="topMargin"><number>0</number></property>
+       <property name="rightMargin"><number>0</number></property>
+       <property name="bottomMargin"><number>0</number></property>
+       <item><widget class="QLabel" name="pathModeLabel"><property name="text"><string>模式</string></property></widget></item>
+       <item>
+        <widget class="QComboBox" name="pathModeCombo">
+         <property name="toolTip"><string>对照 GIMP 的 path-polygonal 属性</string></property>
+         <item><property name="text"><string>路径</string></property></item>
+         <item><property name="text"><string>形状</string></property></item>
+        </widget>
+       </item>
+       <item><widget class="QCheckBox" name="pathPolygonalCheck"><property name="text"><string>多边形</string></property></widget></item>
+       <item><widget class="QCheckBox" name="pathAutoAddCheck"><property name="text"><string>自动添加/删除</string></property><property name="checked"><bool>true</bool></property></widget></item>
+       <item><widget class="QCheckBox" name="pathRubberBandCheck"><property name="text"><string>橡皮带</string></property><property name="checked"><bool>true</bool></property></widget></item>
+       <item><widget class="QCheckBox" name="pathFillCheck"><property name="text"><string>填充路径</string></property></widget></item>
+       <item><widget class="QCheckBox" name="pathStrokeCheck"><property name="text"><string>描边路径</string></property></widget></item>
+       <item><widget class="QLabel" name="pathStrokeWidthLabel"><property name="text"><string>线宽</string></property></widget></item>
+       <item><widget class="QSpinBox" name="pathStrokeWidthSpin"><property name="suffix"><string> px</string></property><property name="minimum"><number>1</number></property><property name="maximum"><number>100</number></property><property name="value"><number>2</number></property></widget></item>
+      </layout>
+     </widget>
+
+     <!-- 文字 -->
+     <widget class="QWidget" name="pageText">
+      <layout class="QHBoxLayout" name="pageTextLayout">
+       <property name="spacing"><number>6</number></property>
+       <property name="leftMargin"><number>0</number></property>
+       <property name="topMargin"><number>0</number></property>
+       <property name="rightMargin"><number>0</number></property>
+       <property name="bottomMargin"><number>0</number></property>
+       <item><widget class="QFontComboBox" name="textFontCombo"><property name="minimumSize"><size><width>150</width><height>0</height></size></property></widget></item>
+       <item>
+        <widget class="QComboBox" name="textStyleCombo">
+         <item><property name="text"><string>Regular</string></property></item>
+         <item><property name="text"><string>Bold</string></property></item>
+         <item><property name="text"><string>Italic</string></property></item>
+        </widget>
+       </item>
+       <item><widget class="QSpinBox" name="textSizeSpin"><property name="minimum"><number>1</number></property><property name="maximum"><number>999</number></property><property name="value"><number>24</number></property><property name="toolTip"><string>字号（pt）</string></property></widget></item>
+       <item>
+        <widget class="QComboBox" name="textAntiAliasCombo">
+         <item><property name="text"><string>锐利</string></property></item>
+         <item><property name="text"><string>犀利</string></property></item>
+         <item><property name="text"><string>浑厚</string></property></item>
+         <item><property name="text"><string>平滑</string></property></item>
+        </widget>
+       </item>
+       <item>
+        <widget class="QComboBox" name="textAlignCombo">
+         <item><property name="text"><string>左对齐</string></property></item>
+         <item><property name="text"><string>居中</string></property></item>
+         <item><property name="text"><string>右对齐</string></property></item>
+        </widget>
+       </item>
+       <item><widget class="QLabel" name="textColorLabel"><property name="text"><string>颜色</string></property></widget></item>
+       <item><widget class="QToolButton" name="textColorButton"><property name="text"><string/></property><property name="toolTip"><string>文字颜色（UI 占位）</string></property><property name="minimumSize"><size><width>26</width><height>22</height></size></property></widget></item>
+       <item><widget class="QLabel" name="textLineSpacingLabel"><property name="text"><string>行距</string></property></widget></item>
+       <item><widget class="QSpinBox" name="textLineSpacingSpin"><property name="suffix"><string> px</string></property><property name="minimum"><number>-200</number></property><property name="maximum"><number>500</number></property><property name="value"><number>0</number></property></widget></item>
+      </layout>
+     </widget>
+
+     <!-- 形状 -->
+     <widget class="QWidget" name="pageShape">
+      <layout class="QHBoxLayout" name="pageShapeLayout">
+       <property name="spacing"><number>6</number></property>
+       <property name="leftMargin"><number>0</number></property>
+       <property name="topMargin"><number>0</number></property>
+       <property name="rightMargin"><number>0</number></property>
+       <property name="bottomMargin"><number>0</number></property>
+       <item><widget class="QLabel" name="shapeFillLabel"><property name="text"><string>填充</string></property></widget></item>
+       <item>
+        <widget class="QComboBox" name="shapeFillCombo">
+         <item><property name="text"><string>无</string></property></item>
+         <item><property name="text"><string>前景色</string></property></item>
+         <item><property name="text"><string>图案</string></property></item>
+         <item><property name="text"><string>渐变</string></property></item>
+        </widget>
+       </item>
+       <item><widget class="QLabel" name="shapeStrokeLabel"><property name="text"><string>描边</string></property></widget></item>
+       <item>
+        <widget class="QComboBox" name="shapeStrokeCombo">
+         <item><property name="text"><string>无</string></property></item>
+         <item><property name="text"><string>实线</string></property></item>
+         <item><property name="text"><string>虚线</string></property></item>
+         <item><property name="text"><string>点线</string></property></item>
+        </widget>
+       </item>
+       <item><widget class="QLabel" name="shapeWidthLabel"><property name="text"><string>粗细</string></property></widget></item>
+       <item><widget class="QSpinBox" name="shapeWidthSpin"><property name="suffix"><string> px</string></property><property name="minimum"><number>1</number></property><property name="maximum"><number>200</number></property><property name="value"><number>2</number></property></widget></item>
+       <item><widget class="QLabel" name="shapeRadiusLabel"><property name="text"><string>圆角</string></property></widget></item>
+       <item><widget class="QSpinBox" name="shapeRadiusSpin"><property name="suffix"><string> px</string></property><property name="maximum"><number>500</number></property><property name="value"><number>0</number></property></widget></item>
+       <item><widget class="QCheckBox" name="shapeSmoothCheck"><property name="text"><string>消除锯齿</string></property><property name="checked"><bool>true</bool></property></widget></item>
+      </layout>
+     </widget>
+
+     <!-- 视图（抓手 / 缩放） -->
+     <widget class="QWidget" name="pageView">
+      <layout class="QHBoxLayout" name="pageViewLayout">
+       <property name="spacing"><number>6</number></property>
+       <property name="leftMargin"><number>0</number></property>
+       <property name="topMargin"><number>0</number></property>
+       <property name="rightMargin"><number>0</number></property>
+       <property name="bottomMargin"><number>0</number></property>
+       <item><widget class="QLabel" name="viewZoomLabel"><property name="text"><string>缩放级别</string></property></widget></item>
+       <item>
+        <widget class="QComboBox" name="viewZoomCombo">
+         <item><property name="text"><string>适应窗口</string></property></item>
+         <item><property name="text"><string>100%</string></property></item>
+         <item><property name="text"><string>200%</string></property></item>
+         <item><property name="text"><string>50%</string></property></item>
+        </widget>
+       </item>
+       <item><widget class="QCheckBox" name="viewResizeWindowCheck"><property name="text"><string>调整窗口大小以满屏显示</string></property></widget></item>
+       <item><widget class="QCheckBox" name="viewScrubbyCheck"><property name="text"><string>细微缩放</string></property><property name="checked"><bool>true</bool></property></widget></item>
+       <item><widget class="QCheckBox" name="viewScrollAllCheck"><property name="text"><string>滚动所有窗口</string></property></widget></item>
+      </layout>
+     </widget>
+
+        </widget>
+       </item>
+      </layout>
+     </widget>
+    </widget>
    </item>
+
   </layout>
  </widget>
  <resources/>

@@ -10,6 +10,7 @@
 #include <QSignalBlocker>
 #include <QSize>
 #include <QSlider>
+#include <QTimer>
 #include <QToolButton>
 
 #include <cmath>
@@ -31,6 +32,9 @@ int rowFromStackIndex(const Ps::ImageDocument *doc, int stackIndex)
     return doc->layers().count() - 1 - stackIndex;
 }
 
+/** 停笔多久之后重算缩略图（毫秒）。 */
+constexpr int kThumbnailDebounceMs = 250;
+
 } // namespace
 
 LayerTreePanel::LayerTreePanel(QWidget *parent)
@@ -41,15 +45,37 @@ LayerTreePanel::LayerTreePanel(QWidget *parent)
     // 骨架名与 GimpItemTreeView 的 options / tree / button_box 对应
     bindSkeleton(ui->optionsHost, ui->itemList, ui->toolbarHost);
 
+    // 缩略图列：图标尺寸与行高对齐（缩略图在 ItemTreePanel 内生成）
+    ui->itemList->setIconSize(QSize(ItemTreePanel::kThumbSize, ItemTreePanel::kThumbSize));
+    ui->itemList->setGridSize(QSize(0, 0)); // 0 = 交给样式自动算行高
+
     // 底栏图标：resources/icons/layers/（自绘线框，非 Adobe 资源）
     const QString iconDir = QStringLiteral(":/icons/layers/");
-    applyToolbarIcon(ui->btnLinkLayers, iconDir + QStringLiteral("link.png"));
-    applyToolbarIcon(ui->btnLayerStyle, iconDir + QStringLiteral("fx.png"));
-    applyToolbarIcon(ui->btnLayerMask, iconDir + QStringLiteral("mask.png"));
-    applyToolbarIcon(ui->btnAdjustment, iconDir + QStringLiteral("adjustment.png"));
-    applyToolbarIcon(ui->btnNewGroup, iconDir + QStringLiteral("group.png"));
-    applyToolbarIcon(ui->btnNew, iconDir + QStringLiteral("new-layer.png"));
-    applyToolbarIcon(ui->btnDelete, iconDir + QStringLiteral("delete.png"));
+    applyToolbarIcon(ui->btnLinkLayers, iconDir + QStringLiteral("link.svg"));
+    applyToolbarIcon(ui->btnLayerStyle, iconDir + QStringLiteral("fx.svg"));
+    applyToolbarIcon(ui->btnLayerMask, iconDir + QStringLiteral("mask.svg"));
+    applyToolbarIcon(ui->btnAdjustment, iconDir + QStringLiteral("adjustment.svg"));
+    applyToolbarIcon(ui->btnNewGroup, iconDir + QStringLiteral("group.svg"));
+    applyToolbarIcon(ui->btnNew, iconDir + QStringLiteral("new-layer.svg"));
+    applyToolbarIcon(ui->btnDelete, iconDir + QStringLiteral("delete.svg"));
+
+    // —— 类型筛选行 ——
+    // PS 用图标表示可筛选的图层类型，本工程原先是"像素/调整/T/形/智"文字按钮，
+    // 跨字体渲染不一致，改为图标。顺序与 PS 一致：像素 → 调整 → 文字 → 形状 → 智能对象。
+    // 【诚实标注】本项目目前只有像素层，其余四类都是筛选占位（见 toolTip 与 docs/features.md）。
+    applyToolbarIcon(ui->filterPixel, iconDir + QStringLiteral("filter-pixel.svg"));
+    applyToolbarIcon(ui->filterAdjust, iconDir + QStringLiteral("filter-adjust.svg"));
+    applyToolbarIcon(ui->filterType, iconDir + QStringLiteral("filter-type.svg"));
+    applyToolbarIcon(ui->filterShape, iconDir + QStringLiteral("filter-shape.svg"));
+    applyToolbarIcon(ui->filterSmart, iconDir + QStringLiteral("filter-smart.svg"));
+
+    // —— 锁定行 ——
+    // 原先误用"魔棒/画笔/移动/裁剪"等**工具**图标占位，语义完全不对；
+    // 改为 PS 的四把锁：锁定透明像素 / 图像像素 / 位置 / 全部。
+    applyToolbarIcon(ui->lockTransparent, iconDir + QStringLiteral("lock-transparent.svg"));
+    applyToolbarIcon(ui->lockImage, iconDir + QStringLiteral("lock-image.svg"));
+    applyToolbarIcon(ui->lockPosition, iconDir + QStringLiteral("lock-position.svg"));
+    applyToolbarIcon(ui->lockAll, iconDir + QStringLiteral("lock-all.svg"));
 
     // GIMP：new_action / delete_action → "layers-new" / "layers-delete"
     connect(ui->btnNew, &QToolButton::clicked, this, &LayerTreePanel::onNewItem);
@@ -58,6 +84,13 @@ LayerTreePanel::LayerTreePanel(QWidget *parent)
             this, &LayerTreePanel::onListSelectionChanged);
     connect(ui->itemList, &QListWidget::itemChanged,
             this, &LayerTreePanel::onItemChanged);
+
+    // —— 缩略图防抖 ——
+    // 单次触发：连发多次 contentChanged（画笔拖动）只会重算一次
+    m_thumbTimer = new QTimer(this);
+    m_thumbTimer->setSingleShot(true);
+    m_thumbTimer->setInterval(kThumbnailDebounceMs);
+    connect(m_thumbTimer, &QTimer::timeout, this, &LayerTreePanel::onThumbnailTimer);
 
     // —— 不透明度滑条的「拖动预览 / 松手提交」两段语义 ——
     // 拖动中只改右侧百分比文字（预览），松手才写入 domain。
@@ -91,6 +124,9 @@ void LayerTreePanel::onDocumentChanged()
                 this, &LayerTreePanel::onActiveLayerChanged);
         connect(doc, &Ps::ImageDocument::layerPropertiesChanged,
                 this, &LayerTreePanel::onLayerPropertiesChanged);
+        // 像素改动 → 只安排防抖刷新缩略图，绝不重建列表
+        connect(doc, &Ps::ImageDocument::contentChanged,
+                this, &LayerTreePanel::scheduleThumbnailRefresh);
     }
     refreshFromDocument();
 }
@@ -241,6 +277,8 @@ void LayerTreePanel::appendRowForLayer(int stackIndex, Ps::Layer &layer)
     item->setCheckState(layer.isVisible() ? Qt::Checked : Qt::Unchecked);
     // 行 ↔ 栈下标映射存在 UserRole：行序会变，不能用行号当身份
     item->setData(Qt::UserRole, stackIndex);
+    // 缩略图：该层像素 + 透明棋盘格（对齐 PS 图层面板最左列）
+    item->setIcon(QIcon(QPixmap::fromImage(makeLayerThumbnail(layer.pixels()))));
 }
 
 QListWidgetItem *LayerTreePanel::itemForStackIndex(int stackIndex) const
@@ -282,4 +320,41 @@ void LayerTreePanel::setOptionsEnabled(bool enabled)
     ui->opacitySlider->setEnabled(enabled);
     ui->fillSlider->setEnabled(enabled);
     ui->blendModeCombo->setEnabled(enabled);
+}
+
+// —— 缩略图刷新 ——
+
+void LayerTreePanel::refreshRowThumbnail(int stackIndex, const Ps::Layer *layer)
+{
+    Ps::ImageDocument *doc = document();
+    if (!doc)
+        return;
+    if (!layer)
+        layer = doc->layers().layerAt(stackIndex);
+    if (!layer)
+        return;
+
+    QListWidgetItem *item = itemForStackIndex(stackIndex);
+    if (!item)
+        return;
+
+    // 只换图标，不碰文字/勾选/选中态 —— 否则会打断用户正在进行的改名或选择
+    item->setIcon(QIcon(QPixmap::fromImage(makeLayerThumbnail(layer->pixels()))));
+}
+
+void LayerTreePanel::scheduleThumbnailRefresh()
+{
+    if (m_thumbTimer)
+        m_thumbTimer->start(); // 已在计时则重新计时，实现防抖
+}
+
+void LayerTreePanel::onThumbnailTimer()
+{
+    Ps::ImageDocument *doc = document();
+    if (!doc)
+        return;
+    // 画笔/橡皮只动活动层，故只重算那一行；其他层的缩略图仍然有效
+    const int active = doc->activeLayerIndex();
+    if (active >= 0)
+        refreshRowThumbnail(active);
 }

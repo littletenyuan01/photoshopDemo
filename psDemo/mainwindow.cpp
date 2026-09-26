@@ -97,7 +97,8 @@ void MainWindow::onToolChanged(Ps::ToolId id)
 {
     ui->toolOptionsBar->setCurrentTool(id);
     ui->canvasWorkspace->canvasView()->setCurrentTool(id);
-    statusBar()->showMessage(tr("当前工具已切换"), 1500);
+    // 工具提示语显示在状态栏（选项条里只放参数，对齐 PS）
+    statusBar()->showMessage(ui->toolOptionsBar->currentHint(), 4000);
 }
 
 void MainWindow::onBrushDiameterChanged(int diameter)

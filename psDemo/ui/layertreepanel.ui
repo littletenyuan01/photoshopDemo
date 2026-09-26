@@ -116,7 +116,7 @@ QToolButton:disabled { color: #666; }</string>
            <bool>true</bool>
           </property>
           <property name="text">
-           <string>像素</string>
+           <string/>
           </property>
           <property name="toolTip">
            <string>筛选像素图层</string>
@@ -129,7 +129,10 @@ QToolButton:disabled { color: #666; }</string>
            <bool>true</bool>
           </property>
           <property name="text">
-           <string>调整</string>
+           <string/>
+          </property>
+          <property name="toolTip">
+           <string>筛选调整图层（尚未实现）</string>
           </property>
          </widget>
         </item>
@@ -139,7 +142,10 @@ QToolButton:disabled { color: #666; }</string>
            <bool>true</bool>
           </property>
           <property name="text">
-           <string>T</string>
+           <string/>
+          </property>
+          <property name="toolTip">
+           <string>筛选文字图层（尚未实现）</string>
           </property>
          </widget>
         </item>
@@ -149,7 +155,10 @@ QToolButton:disabled { color: #666; }</string>
            <bool>true</bool>
           </property>
           <property name="text">
-           <string>形</string>
+           <string/>
+          </property>
+          <property name="toolTip">
+           <string>筛选形状图层（尚未实现）</string>
           </property>
          </widget>
         </item>
@@ -159,7 +168,10 @@ QToolButton:disabled { color: #666; }</string>
            <bool>true</bool>
           </property>
           <property name="text">
-           <string>智</string>
+           <string/>
+          </property>
+          <property name="toolTip">
+           <string>筛选智能对象（尚未实现）</string>
           </property>
          </widget>
         </item>
@@ -294,7 +306,7 @@ QToolButton:disabled { color: #666; }</string>
            <bool>true</bool>
           </property>
           <property name="text">
-           <string>□</string>
+           <string/>
           </property>
           <property name="toolTip">
            <string>锁定透明像素</string>
@@ -307,7 +319,7 @@ QToolButton:disabled { color: #666; }</string>
            <bool>true</bool>
           </property>
           <property name="text">
-           <string>画</string>
+           <string/>
           </property>
           <property name="toolTip">
            <string>锁定图像像素</string>
@@ -320,7 +332,7 @@ QToolButton:disabled { color: #666; }</string>
            <bool>true</bool>
           </property>
           <property name="text">
-           <string>十</string>
+           <string/>
           </property>
           <property name="toolTip">
            <string>锁定位置</string>
@@ -333,7 +345,7 @@ QToolButton:disabled { color: #666; }</string>
            <bool>true</bool>
           </property>
           <property name="text">
-           <string>锁</string>
+           <string/>
           </property>
           <property name="toolTip">
            <string>锁定全部</string>
@@ -456,8 +468,8 @@ QToolButton:disabled { color: #666; }</string>
         </property>
         <property name="iconSize">
          <size>
-          <width>22</width>
-          <height>22</height>
+          <width>24</width>
+          <height>24</height>
          </size>
         </property>
         <property name="autoRaise">
@@ -475,8 +487,8 @@ QToolButton:disabled { color: #666; }</string>
         </property>
         <property name="iconSize">
          <size>
-          <width>22</width>
-          <height>22</height>
+          <width>24</width>
+          <height>24</height>
          </size>
         </property>
         <property name="autoRaise">
@@ -494,8 +506,8 @@ QToolButton:disabled { color: #666; }</string>
         </property>
         <property name="iconSize">
          <size>
-          <width>22</width>
-          <height>22</height>
+          <width>24</width>
+          <height>24</height>
          </size>
         </property>
         <property name="autoRaise">
@@ -513,8 +525,8 @@ QToolButton:disabled { color: #666; }</string>
         </property>
         <property name="iconSize">
          <size>
-          <width>22</width>
-          <height>22</height>
+          <width>24</width>
+          <height>24</height>
          </size>
         </property>
         <property name="autoRaise">
@@ -532,8 +544,8 @@ QToolButton:disabled { color: #666; }</string>
         </property>
         <property name="iconSize">
          <size>
-          <width>22</width>
-          <height>22</height>
+          <width>24</width>
+          <height>24</height>
          </size>
         </property>
         <property name="autoRaise">
@@ -551,8 +563,8 @@ QToolButton:disabled { color: #666; }</string>
         </property>
         <property name="iconSize">
          <size>
-          <width>22</width>
-          <height>22</height>
+          <width>24</width>
+          <height>24</height>
          </size>
         </property>
         <property name="autoRaise">
@@ -570,8 +582,8 @@ QToolButton:disabled { color: #666; }</string>
         </property>
         <property name="iconSize">
          <size>
-          <width>22</width>
-          <height>22</height>
+          <width>24</width>
+          <height>24</height>
          </size>
         </property>
         <property name="autoRaise">
