@@ -129,6 +129,12 @@ QToolButton:disabled { color: #666; }</string>
    </item>
    <item>
     <widget class="QListWidget" name="itemList">
+        <property name="iconSize">
+         <size>
+          <width>40</width>
+          <height>40</height>
+         </size>
+        </property>
      <property name="selectionMode">
       <enum>QAbstractItemView::SelectionMode::ExtendedSelection</enum>
      </property>
@@ -169,6 +175,14 @@ QToolButton:disabled { color: #666; }</string>
       </property>
       <item>
        <widget class="QToolButton" name="btnLoadSelection">
+        <property name="icon">
+         <iconset resource="../resources.qrc">
+          <normaloff>:/icons/channels/load-selection.svg</normaloff>:/icons/channels/load-selection.svg</iconset>
+        </property>
+        <property name="toolButtonStyle">
+         <enum>Qt::ToolButtonStyle::ToolButtonIconOnly</enum>
+        </property>
+
         <property name="text">
          <string/>
         </property>
@@ -188,6 +202,14 @@ QToolButton:disabled { color: #666; }</string>
       </item>
       <item>
        <widget class="QToolButton" name="btnSaveSelection">
+        <property name="icon">
+         <iconset resource="../resources.qrc">
+          <normaloff>:/icons/channels/save-selection.svg</normaloff>:/icons/channels/save-selection.svg</iconset>
+        </property>
+        <property name="toolButtonStyle">
+         <enum>Qt::ToolButtonStyle::ToolButtonIconOnly</enum>
+        </property>
+
         <property name="text">
          <string/>
         </property>
@@ -207,6 +229,14 @@ QToolButton:disabled { color: #666; }</string>
       </item>
       <item>
        <widget class="QToolButton" name="btnNew">
+        <property name="icon">
+         <iconset resource="../resources.qrc">
+          <normaloff>:/icons/channels/new-channel.svg</normaloff>:/icons/channels/new-channel.svg</iconset>
+        </property>
+        <property name="toolButtonStyle">
+         <enum>Qt::ToolButtonStyle::ToolButtonIconOnly</enum>
+        </property>
+
         <property name="text">
          <string/>
         </property>
@@ -226,6 +256,14 @@ QToolButton:disabled { color: #666; }</string>
       </item>
       <item>
        <widget class="QToolButton" name="btnDelete">
+        <property name="icon">
+         <iconset resource="../resources.qrc">
+          <normaloff>:/icons/layers/delete.svg</normaloff>:/icons/layers/delete.svg</iconset>
+        </property>
+        <property name="toolButtonStyle">
+         <enum>Qt::ToolButtonStyle::ToolButtonIconOnly</enum>
+        </property>
+
         <property name="text">
          <string/>
         </property>
@@ -261,6 +299,8 @@ QToolButton:disabled { color: #666; }</string>
    </item>
   </layout>
  </widget>
- <resources/>
+ <resources>
+  <include location="../resources.qrc"/>
+ </resources>
  <connections/>
 </ui>

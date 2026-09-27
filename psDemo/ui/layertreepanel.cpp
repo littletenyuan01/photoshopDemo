@@ -42,38 +42,8 @@ LayerTreePanel::LayerTreePanel(QWidget *parent)
     , ui(new Ui::LayerTreePanel)
 {
     ui->setupUi(this);
-
-    // 缩略图列：图标尺寸与行高对齐（缩略图在 ItemTreePanel 内生成）
-    ui->itemList->setIconSize(QSize(ItemTreePanel::kThumbSize, ItemTreePanel::kThumbSize));
+    // 图标 / iconSize 见 layertreepanel.ui
     ui->itemList->setGridSize(QSize(0, 0)); // 0 = 交给样式自动算行高
-
-    // 底栏图标：resources/icons/layers/（自绘线框，非 Adobe 资源）
-    const QString iconDir = QStringLiteral(":/icons/layers/");
-    applyToolbarIcon(ui->btnLinkLayers, iconDir + QStringLiteral("link.svg"));
-    applyToolbarIcon(ui->btnLayerStyle, iconDir + QStringLiteral("fx.svg"));
-    applyToolbarIcon(ui->btnLayerMask, iconDir + QStringLiteral("mask.svg"));
-    applyToolbarIcon(ui->btnAdjustment, iconDir + QStringLiteral("adjustment.svg"));
-    applyToolbarIcon(ui->btnNewGroup, iconDir + QStringLiteral("group.svg"));
-    applyToolbarIcon(ui->btnNew, iconDir + QStringLiteral("new-layer.svg"));
-    applyToolbarIcon(ui->btnDelete, iconDir + QStringLiteral("delete.svg"));
-
-    // —— 类型筛选行 ——
-    // PS 用图标表示可筛选的图层类型，本工程原先是"像素/调整/T/形/智"文字按钮，
-    // 跨字体渲染不一致，改为图标。顺序与 PS 一致：像素 → 调整 → 文字 → 形状 → 智能对象。
-    // 【诚实标注】本项目目前只有像素层，其余四类都是筛选占位（见 toolTip 与 docs/features.md）。
-    applyToolbarIcon(ui->filterPixel, iconDir + QStringLiteral("filter-pixel.svg"));
-    applyToolbarIcon(ui->filterAdjust, iconDir + QStringLiteral("filter-adjust.svg"));
-    applyToolbarIcon(ui->filterType, iconDir + QStringLiteral("filter-type.svg"));
-    applyToolbarIcon(ui->filterShape, iconDir + QStringLiteral("filter-shape.svg"));
-    applyToolbarIcon(ui->filterSmart, iconDir + QStringLiteral("filter-smart.svg"));
-
-    // —— 锁定行 ——
-    // 原先误用"魔棒/画笔/移动/裁剪"等**工具**图标占位，语义完全不对；
-    // 改为 PS 的四把锁：锁定透明像素 / 图像像素 / 位置 / 全部。
-    applyToolbarIcon(ui->lockTransparent, iconDir + QStringLiteral("lock-transparent.svg"));
-    applyToolbarIcon(ui->lockImage, iconDir + QStringLiteral("lock-image.svg"));
-    applyToolbarIcon(ui->lockPosition, iconDir + QStringLiteral("lock-position.svg"));
-    applyToolbarIcon(ui->lockAll, iconDir + QStringLiteral("lock-all.svg"));
 
     // GIMP：new_action / delete_action → "layers-new" / "layers-delete"
     connect(ui->btnNew, &QToolButton::clicked, this, &LayerTreePanel::onNewItem);

@@ -71,7 +71,6 @@ HEADERS += \
     ui/channeltreepanel.h \
     ui/pathtreepanel.h \
     ui/dockpanel.h \
-    ui/panelchrome.h \
     ui/pixmaputils.h \
     ui/colorspanel.h \
     ui/hsvcolorwell.h \

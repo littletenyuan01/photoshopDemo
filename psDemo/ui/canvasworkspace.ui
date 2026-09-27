@@ -88,6 +88,9 @@ QScrollBar::add-page, QScrollBar::sub-page {
    </item>
    <item row="0" column="1">
     <widget class="RulerWidget" name="hRuler" native="true">
+     <property name="orientation">
+      <enum>Qt::Orientation::Horizontal</enum>
+     </property>
      <property name="minimumSize">
       <size>
        <width>0</width>
@@ -124,6 +127,9 @@ QScrollBar::add-page, QScrollBar::sub-page {
    <!-- 中行：竖标尺 | 画布 | 竖滚动条 -->
    <item row="1" column="0">
     <widget class="RulerWidget" name="vRuler" native="true">
+     <property name="orientation">
+      <enum>Qt::Orientation::Vertical</enum>
+     </property>
      <property name="minimumSize">
       <size>
        <width>20</width>
@@ -139,7 +145,14 @@ QScrollBar::add-page, QScrollBar::sub-page {
     </widget>
    </item>
    <item row="1" column="1">
-    <widget class="CanvasView" name="canvasView" native="true"/>
+    <widget class="CanvasView" name="canvasView" native="true">
+     <property name="minimumSize">
+      <size>
+       <width>200</width>
+       <height>150</height>
+      </size>
+     </property>
+    </widget>
    </item>
    <item row="1" column="2">
     <widget class="QScrollBar" name="vScrollBar">
@@ -197,7 +210,7 @@ QScrollBar::add-page, QScrollBar::sub-page {
      <property name="styleSheet">
       <string notr="true">QWidget#bottomBarHost { background-color: #4a4a4a; }</string>
      </property>
-     <layout class="QHBoxLayout" name="bottomBarLayout">
+     <layout class="QHBoxLayout" name="bottomBarLayout" stretch="0,1">
       <property name="spacing">
        <number>0</number>
       </property>

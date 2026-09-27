@@ -3,7 +3,6 @@
 
 #include "hsvcolorwell.h"
 #include "itemtreepanel.h"
-#include "panelchrome.h"
 #include "pixmaputils.h"
 
 #include <QColor>
@@ -16,13 +15,13 @@
 #include <QPainter>
 #include <QPixmap>
 #include <QSpinBox>
+#include <QTabWidget>
 #include <QToolButton>
 #include <QTreeWidget>
 #include <QTreeWidgetItem>
 
 namespace {
 
-constexpr int kPanelIconSize = 18;
 constexpr int kChip = 22;          // PS 色板色块逻辑边长
 constexpr int kPresetSquare = 40;  // 渐变/图案方缩略图
 constexpr int kDeviceScale = 2;    // 缩略图最高按 2x 光栅化
@@ -189,13 +188,6 @@ const PatternDef kWaterPatterns[] = {
     {"水珠", "水珠"}, {"网格波", "网格"},
 };
 
-void wireFooter(QToolButton *groupBtn, QToolButton *addBtn, QToolButton *delBtn)
-{
-    ItemTreePanel::applyToolbarIcon(groupBtn, QStringLiteral(":/icons/ui/folder.svg"), kPanelIconSize);
-    ItemTreePanel::applyToolbarIcon(addBtn, QStringLiteral(":/icons/ui/plus.svg"), kPanelIconSize);
-    ItemTreePanel::applyToolbarIcon(delBtn, QStringLiteral(":/icons/layers/delete.svg"), kPanelIconSize);
-}
-
 } // namespace
 
 ColorsPanel::ColorsPanel(QWidget *parent)
@@ -203,11 +195,8 @@ ColorsPanel::ColorsPanel(QWidget *parent)
     , ui(new Ui::ColorsPanel)
 {
     ui->setupUi(this);
-    PanelChrome::addMenuButton(ui->panelTabs);
-
-    wireFooter(ui->btnSwatchGroup, ui->btnSwatchAdd, ui->btnSwatchDelete);
-    wireFooter(ui->btnGradientGroup, ui->btnGradientAdd, ui->btnGradientDelete);
-    wireFooter(ui->btnPatternGroup, ui->btnPatternAdd, ui->btnPatternDelete);
+    // 底栏图标 / ≡ 在 colorspanel.ui
+    ui->panelTabs->setCornerWidget(ui->btnPanelMenu, Qt::TopRightCorner);
 
     buildSwatchGroups();
     buildGradientGroups();

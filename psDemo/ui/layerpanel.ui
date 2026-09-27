@@ -21,6 +21,26 @@
   </property>
   <!-- 外观（面板背景 / Tab 栏 / 底栏按钮）已抽到 resources/styles/dark.qss，
        三个停靠面板共用一套规则，见该文件「右侧停靠面板外观」一节 -->
+ <widget class="QToolButton" name="btnPanelMenu">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>22</width>
+    <height>22</height>
+   </rect>
+  </property>
+  <property name="text">
+   <string>≡</string>
+  </property>
+  <property name="toolTip">
+   <string>面板选项</string>
+  </property>
+  <property name="autoRaise">
+   <bool>true</bool>
+  </property>
+ </widget>
+
   <layout class="QVBoxLayout" name="rootLayout">
    <property name="spacing">
     <number>0</number>
@@ -84,6 +104,8 @@
    <container>1</container>
   </customwidget>
  </customwidgets>
- <resources/>
+ <resources>
+  <include location="../resources.qrc"/>
+ </resources>
  <connections/>
 </ui>

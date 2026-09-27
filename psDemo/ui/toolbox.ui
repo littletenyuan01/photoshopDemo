@@ -31,6 +31,7 @@ QWidget#ToolBox,
 QWidget#toolsHost,
 QScrollArea#toolsScroll {
   background-color: #5a5a5a;
+  border: none;
 }
 QScrollArea#toolsScroll > QWidget > QWidget {
   background-color: #5a5a5a;

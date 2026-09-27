@@ -19,8 +19,16 @@
   <property name="windowTitle">
    <string>PhotoshopLite</string>
   </property>
-  <widget class="QWidget" name="centralwidget">
-   <layout class="QVBoxLayout" name="rootVerticalLayout">
+  <property name="windowIcon">
+   <iconset resource="resources.qrc">
+    <normaloff>:/icons/ui/app-logo.png</normaloff>:/icons/ui/app-logo.png</iconset>
+  </property>
+  <widget class="QStackedWidget" name="mainStack">
+   <property name="currentIndex">
+    <number>0</number>
+   </property>
+   <widget class="QWidget" name="workspacePage">
+    <layout class="QVBoxLayout" name="rootVerticalLayout">
     <property name="spacing">
      <number>0</number>
     </property>
@@ -111,6 +119,8 @@
      </layout>
     </item>
    </layout>
+   </widget>
+   <widget class="HomeScreen" name="homeScreen" native="true"/>
   </widget>
   <widget class="QMenuBar" name="menubar">
    <property name="geometry">
@@ -5954,7 +5964,14 @@
    <header>ui/tooloptionsbar.h</header>
    <container>1</container>
   </customwidget>
+  <customwidget>
+   <class>HomeScreen</class>
+   <extends>QWidget</extends>
+   <header>ui/homescreen.h</header>
+   <container>1</container>
+  </customwidget>
  </customwidgets>
- <resources/>
- <connections/>
+ <resources>
+  <include location="resources.qrc"/>
+ </resources> <connections/>
 </ui>

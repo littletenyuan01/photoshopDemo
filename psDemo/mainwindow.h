@@ -7,8 +7,6 @@
 
 class QCloseEvent;
 class QResizeEvent;
-class QStackedWidget;
-class HomeScreen;
 
 namespace Ps {
 class AppSession;
@@ -90,8 +88,8 @@ private:
     /** 连接工具箱 ↔ 选项栏 ↔ 画布；以及「家」→ 主页。 */
     void setupToolbox();
     /**
-     * 用 QStackedWidget 包住原 central：工作区 / HomeScreen 互切。
-     * 【为什么不放进 .ui】setupUi 已建好整棵中央树；再包一层栈避免大改 mainwindow.ui。
+     * 用 setupUi 已建好的 mainStack（工作区 / HomeScreen）接线。
+     * 栈结构在 mainwindow.ui；此处只连信号。
      */
     void setupHomeStack();
     /** 载入一篇默认文档，避免启动即空白壳。 */
@@ -101,8 +99,6 @@ private:
 
     Ui::MainWindow *ui;
     Ps::AppSession *m_session = nullptr;
-    QStackedWidget *m_mainStack = nullptr;
-    HomeScreen *m_homeScreen = nullptr;
     bool m_rightColumnUserSized = false; ///< 用户拖过分隔条后，不再套用默认比例
     bool m_closeConfirming = false;      ///< 正在弹退出确认框（防重入）
 };

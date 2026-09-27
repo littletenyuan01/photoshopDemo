@@ -1,13 +1,7 @@
 #include "tooloptionsbar.h"
 #include "ui_tooloptionsbar.h"
 
-#include <QButtonGroup>
-#include <QFontComboBox>
-#include <QIcon>
-#include <QSize>
-#include <QSizePolicy>
 #include <QSpinBox>
-#include <QStackedWidget>
 #include <QToolButton>
 
 ToolOptionsBar::ToolOptionsBar(QWidget *parent)
@@ -15,10 +9,7 @@ ToolOptionsBar::ToolOptionsBar(QWidget *parent)
     , ui(new Ui::ToolOptionsBar)
 {
     ui->setupUi(this);
-
-    // 左侧「家」图标：resources/icons/ui/home.png（对齐 PS 选项条左端入口）
-    ui->homeButton->setIcon(QIcon(QStringLiteral(":/icons/ui/home.png")));
-    ui->homeButton->setIconSize(QSize(18, 18));
+    // 图标 / iconSize / 色块样式见 tooloptionsbar.ui
 
     // 唯一真正接线的选项：画笔/橡皮直径（其余全是 UI 占位，见头文件说明）
     connect(ui->brushSizeSpin, qOverload<int>(&QSpinBox::valueChanged),
@@ -26,17 +17,6 @@ ToolOptionsBar::ToolOptionsBar(QWidget *parent)
 
     // 「家」→ 主页（UI 阶段只发信号，由 MainWindow 切到 HomeScreen）
     connect(ui->homeButton, &QToolButton::clicked, this, &ToolOptionsBar::homeClicked);
-
-    // 画笔预设 / 渐变预设 / 文字颜色三个按钮：只做个色块样式，不接功能
-    ui->paintPresetButton->setIconSize(QSize(28, 18));
-    ui->gradientPreviewButton->setIconSize(QSize(36, 16));
-    ui->textColorButton->setStyleSheet(
-        QStringLiteral("background-color: #1a1a1a; border: 1px solid #222;"));
-
-    // 选项页套在 optionsScroll（QScrollArea）里：各页最小宽度不同（绘画页实测 1038px），
-    // 让它保持自然宽度、窗口不够宽时横向滚动。**不要压缩 stack**——早先设
-    // QSizePolicy::Ignored，末尾 Expanding spacer 会吃掉全部空间，控件被压扁到只剩一位数字。
-    // QScrollArea 的 sizeHint 按字号推算（font-based，约 70px），故用 min/maxSize 压回内容高度。
 
     setCurrentTool(Ps::ToolId::Move);
 }

@@ -153,6 +153,10 @@ QWidget#ToolOptionsBar QScrollBar::sub-line:horizontal { width: 0; }</string>
      <property name="text">
       <string/>
      </property>
+     <property name="icon">
+      <iconset resource="../resources.qrc">
+       <normaloff>:/icons/ui/home.png</normaloff>:/icons/ui/home.png</iconset>
+     </property>
      <property name="iconSize">
       <size>
        <width>18</width>
@@ -399,7 +403,7 @@ QToolButton#homeButton:hover { background-color: #5a5a5a; border-radius: 2px; }<
        <property name="rightMargin"><number>0</number></property>
        <property name="bottomMargin"><number>0</number></property>
        <!-- 画笔预设（UI 占位：仅展示预览方块 + 下拉箭头） -->
-       <item><widget class="QToolButton" name="paintPresetButton"><property name="text"><string/></property><property name="toolTip"><string>画笔预设（UI 占位）</string></property><property name="minimumSize"><size><width>40</width><height>24</height></size></property></widget></item>
+       <item><widget class="QToolButton" name="paintPresetButton"><property name="text"><string/></property><property name="toolTip"><string>画笔预设（UI 占位）</string></property><property name="iconSize"><size><width>28</width><height>18</height></size></property><property name="minimumSize"><size><width>40</width><height>24</height></size></property></widget></item>
        <item><widget class="QLabel" name="paintSizeLabel"><property name="text"><string>大小</string></property></widget></item>
        <item><widget class="QSpinBox" name="brushSizeSpin"><property name="suffix"><string> px</string></property><property name="minimum"><number>1</number></property><property name="maximum"><number>500</number></property><property name="value"><number>20</number></property><property name="toolTip"><string>画笔/橡皮直径（像素）——本项已接入绘制</string></property></widget></item>
        <item><widget class="QLabel" name="paintHardnessLabel"><property name="text"><string>硬度</string></property></widget></item>
@@ -468,7 +472,7 @@ QToolButton#homeButton:hover { background-color: #5a5a5a; border-radius: 2px; }<
        <property name="topMargin"><number>0</number></property>
        <property name="rightMargin"><number>0</number></property>
        <property name="bottomMargin"><number>0</number></property>
-       <item><widget class="QToolButton" name="gradientPreviewButton"><property name="text"><string/></property><property name="toolTip"><string>渐变预设（UI 占位）</string></property><property name="minimumSize"><size><width>48</width><height>24</height></size></property></widget></item>
+       <item><widget class="QToolButton" name="gradientPreviewButton"><property name="text"><string/></property><property name="toolTip"><string>渐变预设（UI 占位）</string></property><property name="iconSize"><size><width>36</width><height>16</height></size></property><property name="minimumSize"><size><width>48</width><height>24</height></size></property></widget></item>
        <item><widget class="QLabel" name="gradTypeLabel"><property name="text"><string>类型</string></property></widget></item>
        <item>
         <widget class="QComboBox" name="gradTypeCombo">
@@ -557,7 +561,7 @@ QToolButton#homeButton:hover { background-color: #5a5a5a; border-radius: 2px; }<
         </widget>
        </item>
        <item><widget class="QLabel" name="textColorLabel"><property name="text"><string>颜色</string></property></widget></item>
-       <item><widget class="QToolButton" name="textColorButton"><property name="text"><string/></property><property name="toolTip"><string>文字颜色（UI 占位）</string></property><property name="minimumSize"><size><width>26</width><height>22</height></size></property></widget></item>
+       <item><widget class="QToolButton" name="textColorButton"><property name="text"><string/></property><property name="toolTip"><string>文字颜色（UI 占位）</string></property><property name="minimumSize"><size><width>26</width><height>22</height></size></property><property name="styleSheet"><string notr="true">background-color: #1a1a1a; border: 1px solid #222;</string></property></widget></item>
        <item><widget class="QLabel" name="textLineSpacingLabel"><property name="text"><string>行距</string></property></widget></item>
        <item><widget class="QSpinBox" name="textLineSpacingSpin"><property name="suffix"><string> px</string></property><property name="minimum"><number>-200</number></property><property name="maximum"><number>500</number></property><property name="value"><number>0</number></property></widget></item>
       </layout>
@@ -629,6 +633,8 @@ QToolButton#homeButton:hover { background-color: #5a5a5a; border-radius: 2px; }<
 
   </layout>
  </widget>
- <resources/>
+ <resources>
+  <include location="../resources.qrc"/>
+ </resources>
  <connections/>
 </ui>

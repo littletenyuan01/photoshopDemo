@@ -20,7 +20,7 @@ CanvasView::CanvasView(QWidget *parent)
 {
     setMouseTracking(true);
     setFocusPolicy(Qt::StrongFocus);
-    setMinimumSize(200, 150);
+    // minimumSize 由 canvasworkspace.ui 声明
     setBackgroundRole(QPalette::Dark);
     setAutoFillBackground(true);
 

@@ -22,6 +22,26 @@
   <!-- 外观在 resources/styles/dark.qss 的「右侧停靠面板外观」一节。
        PS 的「属性」是按内容类型变化的上下文面板（照片/文字/形状/像素各不相同），
        本 Demo 暂无这些实体，故只固定展示「变换 + 对齐」两个分区（UI 占位）。 -->
+ <widget class="QToolButton" name="btnPanelMenu">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>22</width>
+    <height>22</height>
+   </rect>
+  </property>
+  <property name="text">
+   <string>≡</string>
+  </property>
+  <property name="toolTip">
+   <string>面板选项</string>
+  </property>
+  <property name="autoRaise">
+   <bool>true</bool>
+  </property>
+ </widget>
+
   <layout class="QVBoxLayout" name="rootLayout">
    <property name="spacing">
     <number>0</number>
@@ -170,7 +190,7 @@
             </widget>
            </item>
            <item>
-            <!-- PS 的「对齐」是一排图标按钮；图标由代码用 SVG 按 DPR 渲染（见 ItemTreePanel::svgIcon） -->
+            <!-- PS 的「对齐」是一排图标按钮；图标在本 .ui 的 iconset -->
             <widget class="QWidget" name="alignBody" native="true">
              <layout class="QHBoxLayout" name="alignRow">
               <property name="spacing"><number>2</number></property>
@@ -180,6 +200,14 @@
               <property name="bottomMargin"><number>0</number></property>
               <item>
                <widget class="QToolButton" name="btnAlignLeft">
+        <property name="icon">
+         <iconset resource="../resources.qrc">
+          <normaloff>:/icons/ui/align-left.svg</normaloff>:/icons/ui/align-left.svg</iconset>
+        </property>
+        <property name="toolButtonStyle">
+         <enum>Qt::ToolButtonStyle::ToolButtonIconOnly</enum>
+        </property>
+
                 <property name="toolTip"><string>水平左对齐（UI 占位）</string></property>
                 <property name="iconSize"><size><width>18</width><height>18</height></size></property>
                 <property name="autoRaise"><bool>true</bool></property>
@@ -187,6 +215,14 @@
               </item>
               <item>
                <widget class="QToolButton" name="btnAlignHCenter">
+        <property name="icon">
+         <iconset resource="../resources.qrc">
+          <normaloff>:/icons/ui/align-hcenter.svg</normaloff>:/icons/ui/align-hcenter.svg</iconset>
+        </property>
+        <property name="toolButtonStyle">
+         <enum>Qt::ToolButtonStyle::ToolButtonIconOnly</enum>
+        </property>
+
                 <property name="toolTip"><string>水平居中对齐（UI 占位）</string></property>
                 <property name="iconSize"><size><width>18</width><height>18</height></size></property>
                 <property name="autoRaise"><bool>true</bool></property>
@@ -194,6 +230,14 @@
               </item>
               <item>
                <widget class="QToolButton" name="btnAlignRight">
+        <property name="icon">
+         <iconset resource="../resources.qrc">
+          <normaloff>:/icons/ui/align-right.svg</normaloff>:/icons/ui/align-right.svg</iconset>
+        </property>
+        <property name="toolButtonStyle">
+         <enum>Qt::ToolButtonStyle::ToolButtonIconOnly</enum>
+        </property>
+
                 <property name="toolTip"><string>水平右对齐（UI 占位）</string></property>
                 <property name="iconSize"><size><width>18</width><height>18</height></size></property>
                 <property name="autoRaise"><bool>true</bool></property>
@@ -201,6 +245,14 @@
               </item>
               <item>
                <widget class="QToolButton" name="btnAlignTop">
+        <property name="icon">
+         <iconset resource="../resources.qrc">
+          <normaloff>:/icons/ui/align-top.svg</normaloff>:/icons/ui/align-top.svg</iconset>
+        </property>
+        <property name="toolButtonStyle">
+         <enum>Qt::ToolButtonStyle::ToolButtonIconOnly</enum>
+        </property>
+
                 <property name="toolTip"><string>垂直顶对齐（UI 占位）</string></property>
                 <property name="iconSize"><size><width>18</width><height>18</height></size></property>
                 <property name="autoRaise"><bool>true</bool></property>
@@ -208,6 +260,14 @@
               </item>
               <item>
                <widget class="QToolButton" name="btnAlignVCenter">
+        <property name="icon">
+         <iconset resource="../resources.qrc">
+          <normaloff>:/icons/ui/align-vcenter.svg</normaloff>:/icons/ui/align-vcenter.svg</iconset>
+        </property>
+        <property name="toolButtonStyle">
+         <enum>Qt::ToolButtonStyle::ToolButtonIconOnly</enum>
+        </property>
+
                 <property name="toolTip"><string>垂直居中对齐（UI 占位）</string></property>
                 <property name="iconSize"><size><width>18</width><height>18</height></size></property>
                 <property name="autoRaise"><bool>true</bool></property>
@@ -215,6 +275,14 @@
               </item>
               <item>
                <widget class="QToolButton" name="btnAlignBottom">
+        <property name="icon">
+         <iconset resource="../resources.qrc">
+          <normaloff>:/icons/ui/align-bottom.svg</normaloff>:/icons/ui/align-bottom.svg</iconset>
+        </property>
+        <property name="toolButtonStyle">
+         <enum>Qt::ToolButtonStyle::ToolButtonIconOnly</enum>
+        </property>
+
                 <property name="toolTip"><string>垂直底对齐（UI 占位）</string></property>
                 <property name="iconSize"><size><width>18</width><height>18</height></size></property>
                 <property name="autoRaise"><bool>true</bool></property>
@@ -256,19 +324,123 @@
        <item>
         <widget class="QListWidget" name="adjustList">
          <property name="toolTip"><string>调整类型（UI 占位；对照 GIMP 的调整类 GEGL operation 列表）</string></property>
-         <item><property name="text"><string>亮度/对比度</string></property></item>
-         <item><property name="text"><string>色阶</string></property></item>
-         <item><property name="text"><string>曲线</string></property></item>
-         <item><property name="text"><string>曝光度</string></property></item>
-         <item><property name="text"><string>自然饱和度</string></property></item>
-         <item><property name="text"><string>色相/饱和度</string></property></item>
-         <item><property name="text"><string>色彩平衡</string></property></item>
-         <item><property name="text"><string>黑白</string></property></item>
-         <item><property name="text"><string>照片滤镜</string></property></item>
-         <item><property name="text"><string>通道混合器</string></property></item>
-         <item><property name="text"><string>反相</string></property></item>
-         <item><property name="text"><string>阈值</string></property></item>
-         <item><property name="text"><string>渐变映射</string></property></item>
+         <item>
+         <property name="icon">
+          <iconset resource="../resources.qrc">
+           <normaloff>:/icons/layers/adjustment.svg</normaloff>:/icons/layers/adjustment.svg</iconset>
+         </property>
+         <property name="toolTip">
+          <string>UI 占位：尚未接入任何调整算法</string>
+         </property>
+         <property name="text"><string>亮度/对比度</string></property></item>
+         <item>
+         <property name="icon">
+          <iconset resource="../resources.qrc">
+           <normaloff>:/icons/layers/adjustment.svg</normaloff>:/icons/layers/adjustment.svg</iconset>
+         </property>
+         <property name="toolTip">
+          <string>UI 占位：尚未接入任何调整算法</string>
+         </property>
+         <property name="text"><string>色阶</string></property></item>
+         <item>
+         <property name="icon">
+          <iconset resource="../resources.qrc">
+           <normaloff>:/icons/layers/adjustment.svg</normaloff>:/icons/layers/adjustment.svg</iconset>
+         </property>
+         <property name="toolTip">
+          <string>UI 占位：尚未接入任何调整算法</string>
+         </property>
+         <property name="text"><string>曲线</string></property></item>
+         <item>
+         <property name="icon">
+          <iconset resource="../resources.qrc">
+           <normaloff>:/icons/layers/adjustment.svg</normaloff>:/icons/layers/adjustment.svg</iconset>
+         </property>
+         <property name="toolTip">
+          <string>UI 占位：尚未接入任何调整算法</string>
+         </property>
+         <property name="text"><string>曝光度</string></property></item>
+         <item>
+         <property name="icon">
+          <iconset resource="../resources.qrc">
+           <normaloff>:/icons/layers/adjustment.svg</normaloff>:/icons/layers/adjustment.svg</iconset>
+         </property>
+         <property name="toolTip">
+          <string>UI 占位：尚未接入任何调整算法</string>
+         </property>
+         <property name="text"><string>自然饱和度</string></property></item>
+         <item>
+         <property name="icon">
+          <iconset resource="../resources.qrc">
+           <normaloff>:/icons/layers/adjustment.svg</normaloff>:/icons/layers/adjustment.svg</iconset>
+         </property>
+         <property name="toolTip">
+          <string>UI 占位：尚未接入任何调整算法</string>
+         </property>
+         <property name="text"><string>色相/饱和度</string></property></item>
+         <item>
+         <property name="icon">
+          <iconset resource="../resources.qrc">
+           <normaloff>:/icons/layers/adjustment.svg</normaloff>:/icons/layers/adjustment.svg</iconset>
+         </property>
+         <property name="toolTip">
+          <string>UI 占位：尚未接入任何调整算法</string>
+         </property>
+         <property name="text"><string>色彩平衡</string></property></item>
+         <item>
+         <property name="icon">
+          <iconset resource="../resources.qrc">
+           <normaloff>:/icons/layers/adjustment.svg</normaloff>:/icons/layers/adjustment.svg</iconset>
+         </property>
+         <property name="toolTip">
+          <string>UI 占位：尚未接入任何调整算法</string>
+         </property>
+         <property name="text"><string>黑白</string></property></item>
+         <item>
+         <property name="icon">
+          <iconset resource="../resources.qrc">
+           <normaloff>:/icons/layers/adjustment.svg</normaloff>:/icons/layers/adjustment.svg</iconset>
+         </property>
+         <property name="toolTip">
+          <string>UI 占位：尚未接入任何调整算法</string>
+         </property>
+         <property name="text"><string>照片滤镜</string></property></item>
+         <item>
+         <property name="icon">
+          <iconset resource="../resources.qrc">
+           <normaloff>:/icons/layers/adjustment.svg</normaloff>:/icons/layers/adjustment.svg</iconset>
+         </property>
+         <property name="toolTip">
+          <string>UI 占位：尚未接入任何调整算法</string>
+         </property>
+         <property name="text"><string>通道混合器</string></property></item>
+         <item>
+         <property name="icon">
+          <iconset resource="../resources.qrc">
+           <normaloff>:/icons/layers/adjustment.svg</normaloff>:/icons/layers/adjustment.svg</iconset>
+         </property>
+         <property name="toolTip">
+          <string>UI 占位：尚未接入任何调整算法</string>
+         </property>
+         <property name="text"><string>反相</string></property></item>
+         <item>
+         <property name="icon">
+          <iconset resource="../resources.qrc">
+           <normaloff>:/icons/layers/adjustment.svg</normaloff>:/icons/layers/adjustment.svg</iconset>
+         </property>
+         <property name="toolTip">
+          <string>UI 占位：尚未接入任何调整算法</string>
+         </property>
+         <property name="text"><string>阈值</string></property></item>
+         <item>
+         <property name="icon">
+          <iconset resource="../resources.qrc">
+           <normaloff>:/icons/layers/adjustment.svg</normaloff>:/icons/layers/adjustment.svg</iconset>
+         </property>
+         <property name="toolTip">
+          <string>UI 占位：尚未接入任何调整算法</string>
+         </property>
+         <property name="text"><string>渐变映射</string></property></item>
         </widget>
        </item>
       </layout>
@@ -305,6 +477,8 @@
    </item>
   </layout>
  </widget>
- <resources/>
+ <resources>
+  <include location="../resources.qrc"/>
+ </resources>
  <connections/>
 </ui>

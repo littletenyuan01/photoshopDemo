@@ -21,7 +21,7 @@ public:
     explicit ColorPlaneWidget(QWidget *parent = nullptr)
         : QWidget(parent)
     {
-        setFixedSize(220, 220);
+        // 尺寸由 colorpickerdialog.ui 的 planeHost 固定
         setCursor(Qt::CrossCursor);
         setMouseTracking(true);
     }
@@ -92,7 +92,7 @@ public:
     explicit ColorStripWidget(QWidget *parent = nullptr)
         : QWidget(parent)
     {
-        setFixedSize(22, 220);
+        // 尺寸由 colorpickerdialog.ui 的 stripHost 固定
         setCursor(Qt::PointingHandCursor);
     }
 
@@ -171,7 +171,7 @@ public:
     explicit ColorPreviewWidget(QWidget *parent = nullptr)
         : QWidget(parent)
     {
-        setFixedSize(60, 72);
+        // 尺寸由 colorpickerdialog.ui 的 previewHost 固定
         setCursor(Qt::PointingHandCursor);
         setToolTip(QStringLiteral("点击「当前」可复位"));
     }
@@ -216,6 +216,11 @@ private:
 
 static void embedIntoHost(QWidget *host, QWidget *child)
 {
+    // 宿主布局已在 colorpickerdialog.ui 声明（零边距）
+    if (auto *lay = host->layout()) {
+        lay->addWidget(child);
+        return;
+    }
     auto *lay = new QVBoxLayout(host);
     lay->setContentsMargins(0, 0, 0, 0);
     lay->setSpacing(0);
@@ -367,6 +372,7 @@ void ColorPickerDialog::wireUi(Mode mode)
     setWindowTitle(mode == Mode::Foreground
                        ? tr("拾色器（前景色）")
                        : tr("拾色器（背景色）"));
+    // 窗口标题随前景/背景模式变化，无法写死在 .ui
 
     m_plane = new ColorPlaneWidget(ui->planeHost);
     m_plane->onChanged = [this](qreal x, qreal y) { onFieldChanged(x, y); };

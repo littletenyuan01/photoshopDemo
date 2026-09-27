@@ -12,17 +12,8 @@ PathTreePanel::PathTreePanel(QWidget *parent)
 {
     ui->setupUi(this);
 
-    // 与图层 / 通道两栏保持同样的行高（路径不做像素缩略图，只给标记图标）
-    ui->itemList->setIconSize(QSize(ItemTreePanel::kThumbSize, ItemTreePanel::kThumbSize));
+    // 图标 / iconSize 见 pathtreepanel.ui
 
-    // 底栏图标：paths/* + 共用 delete
-    const QString pathDir = QStringLiteral(":/icons/paths/");
-    applyToolbarIcon(ui->btnFillPath, pathDir + QStringLiteral("fill.svg"));
-    applyToolbarIcon(ui->btnStrokePath, pathDir + QStringLiteral("stroke.svg"));
-    applyToolbarIcon(ui->btnPathToSelection, pathDir + QStringLiteral("to-selection.svg"));
-    applyToolbarIcon(ui->btnSelectionToPath, pathDir + QStringLiteral("from-selection.svg"));
-    applyToolbarIcon(ui->btnNew, pathDir + QStringLiteral("new-path.svg"));
-    applyToolbarIcon(ui->btnDelete, QStringLiteral(":/icons/layers/delete.svg"));
 
     // GIMP：paths-new / paths-delete；另有 fill/stroke/to-selection（paths-actions）
     connect(ui->btnNew, &QToolButton::clicked, this, &PathTreePanel::onNewItem);

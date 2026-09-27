@@ -24,13 +24,6 @@ CanvasWorkspace::CanvasWorkspace(QWidget *parent)
 {
     ui->setupUi(this);
 
-    ui->hRuler->setOrientation(Qt::Horizontal);
-    ui->vRuler->setOrientation(Qt::Vertical);
-
-    // 水平滚动条在布局中应吃掉剩余宽度
-    if (auto *layout = ui->bottomBarLayout)
-        layout->setStretch(1, 1);
-
     connect(ui->canvasView, &CanvasView::viewChanged,
             this, &CanvasWorkspace::syncRulersAndScrollBars);
     connect(ui->canvasView, &CanvasView::viewChanged,

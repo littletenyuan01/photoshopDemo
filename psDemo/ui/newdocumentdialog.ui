@@ -50,12 +50,16 @@ QTabBar::tab:selected {
   color: #fff;
   border-bottom: 2px solid #fff;
 }
-QFrame#presetCard {
+QFrame#presetClipboard,
+QFrame#presetA4,
+QFrame#presetDefault {
   background-color: #3a3a3a;
   border: 1px solid #2a2a2a;
   border-radius: 4px;
 }
-QFrame#presetCard[selected="true"] {
+QFrame#presetClipboard[selected="true"],
+QFrame#presetA4[selected="true"],
+QFrame#presetDefault[selected="true"] {
   border: 2px solid #0d66d0;
 }
 QWidget#detailsPanel {
@@ -250,8 +254,8 @@ QGroupBox::title { subcontrol-origin: margin; left: 0; padding: 0 4px; }
               <property name="frameShape">
                <enum>QFrame::Shape::StyledPanel</enum>
               </property>
-              <property name="styleSheet">
-               <string notr="true">QFrame#presetClipboard { border: 2px solid #0d66d0; }</string>
+              <property name="selected" stdset="0">
+               <bool>true</bool>
               </property>
               <layout class="QVBoxLayout" name="clipboardCardLayout">
                <item>

@@ -19,8 +19,7 @@ constexpr int kBetween = 8;
 HsvColorWell::HsvColorWell(QWidget *parent)
     : QWidget(parent)
 {
-    // 尺寸下限统一由 minimumSizeHint() 给，不再另外 setMinimumHeight（两处会打架）
-    setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+    // sizePolicy / minimumSize 由 colorspanel.ui 声明；尺寸下限另由 minimumSizeHint()
     adoptColor(m_color);
 }
 

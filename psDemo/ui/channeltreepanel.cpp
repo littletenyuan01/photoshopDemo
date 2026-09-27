@@ -49,14 +49,7 @@ ChannelTreePanel::ChannelTreePanel(QWidget *parent)
     , ui(new Ui::ChannelTreePanel)
 {
     ui->setupUi(this);
-
-    ui->itemList->setIconSize(QSize(ItemTreePanel::kThumbSize, ItemTreePanel::kThumbSize));
-
-    // 底栏图标：channels/* + 共用 delete
-    applyToolbarIcon(ui->btnLoadSelection, QStringLiteral(":/icons/channels/load-selection.svg"));
-    applyToolbarIcon(ui->btnSaveSelection, QStringLiteral(":/icons/channels/save-selection.svg"));
-    applyToolbarIcon(ui->btnNew, QStringLiteral(":/icons/channels/new-channel.svg"));
-    applyToolbarIcon(ui->btnDelete, QStringLiteral(":/icons/layers/delete.svg"));
+    // 图标 / iconSize 见 channeltreepanel.ui
 
     // GIMP：channels-new / channels-delete；选区相关见 channels-selection-*
     connect(ui->btnNew, &QToolButton::clicked, this, &ChannelTreePanel::onNewItem);

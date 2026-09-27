@@ -69,9 +69,6 @@ ToolBox::ToolBox(QWidget *parent)
     , ui(new Ui::ToolBox)
 {
     ui->setupUi(this);
-    ui->toolsScroll->setStyleSheet(QStringLiteral("QScrollArea { background: #5a5a5a; border: none; }"));
-    ui->toolsHost->setStyleSheet(QStringLiteral("background-color: #5a5a5a;"));
-    ui->toolsScroll->viewport()->setStyleSheet(QStringLiteral("background-color: #5a5a5a;"));
 
     m_slotGroup = new QButtonGroup(this);
     m_slotGroup->setExclusive(true);
@@ -240,10 +237,6 @@ void ToolBox::showSlotMenu(int slotIndex, const QPoint &globalPos)
         return;
 
     QMenu menu(this);
-    menu.setStyleSheet(QStringLiteral(
-        "QMenu { background-color: #3c3c3c; color: #eee; border: 1px solid #222; }"
-        "QMenu::item:selected { background-color: #2d5a8a; }"
-        "QMenu::icon { padding-left: 4px; }"));
 
     for (int i = 0; i < slot.items.size(); ++i) {
         const ToolItem &item = slot.items[i];

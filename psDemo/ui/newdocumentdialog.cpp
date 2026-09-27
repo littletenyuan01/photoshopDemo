@@ -5,10 +5,12 @@
 #include <QComboBox>
 #include <QDoubleValidator>
 #include <QEvent>
+#include <QFrame>
 #include <QIntValidator>
 #include <QLineEdit>
 #include <QPushButton>
 #include <QSignalBlocker>
+#include <QStyle>
 #include <QToolButton>
 
 #include <QtMath>
@@ -209,17 +211,16 @@ void NewDocumentDialog::applyPreset(int widthPx, int heightPx, int ppi, DimUnit 
         ui->docNameEdit->setText(title);
     updateOrientationButtons();
 
-    const QString selected = QStringLiteral("border: 2px solid #0d66d0;");
-    const QString normal = QStringLiteral("border: 1px solid #2a2a2a;");
-    ui->presetClipboard->setStyleSheet(
-        QStringLiteral("QFrame#presetClipboard { %1 }")
-            .arg(widthPx == 1920 && ppi == 72 ? selected : normal));
-    ui->presetA4->setStyleSheet(
-        QStringLiteral("QFrame#presetA4 { %1 }")
-            .arg(widthPx == 2480 && ppi == 300 ? selected : normal));
-    ui->presetDefault->setStyleSheet(
-        QStringLiteral("QFrame#presetDefault { %1 }")
-            .arg(widthPx == 800 && ppi == 72 ? selected : normal));
+    // 选中态用动态属性，边框样式在 newdocumentdialog.ui 的 QSS 中
+    auto markSelected = [](QFrame *frame, bool on) {
+        frame->setProperty("selected", on);
+        frame->style()->unpolish(frame);
+        frame->style()->polish(frame);
+        frame->update();
+    };
+    markSelected(ui->presetClipboard, widthPx == 1920 && ppi == 72);
+    markSelected(ui->presetA4, widthPx == 2480 && ppi == 300);
+    markSelected(ui->presetDefault, widthPx == 800 && ppi == 72);
 }
 
 void NewDocumentDialog::updateOrientationButtons()

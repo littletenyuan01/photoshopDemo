@@ -19,6 +19,26 @@
   <property name="windowTitle">
    <string>颜色</string>
   </property>
+ <widget class="QToolButton" name="btnPanelMenu">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>22</width>
+    <height>22</height>
+   </rect>
+  </property>
+  <property name="text">
+   <string>≡</string>
+  </property>
+  <property name="toolTip">
+   <string>面板选项</string>
+  </property>
+  <property name="autoRaise">
+   <bool>true</bool>
+  </property>
+ </widget>
+
   <layout class="QVBoxLayout" name="rootLayout">
    <property name="spacing"><number>0</number></property>
    <property name="leftMargin"><number>0</number></property>
@@ -53,6 +73,12 @@
            <property name="bottomMargin"><number>4</number></property>
            <item>
             <widget class="HsvColorWell" name="hsvWell" native="true">
+             <property name="sizePolicy">
+              <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
+               <horstretch>0</horstretch>
+               <verstretch>0</verstretch>
+              </sizepolicy>
+             </property>
              <property name="minimumSize"><size><width>0</width><height>130</height></size></property>
              <property name="toolTip"><string>色域：拖动选饱和度/明度；右侧条选色相（对齐 PS 颜色面板）</string></property>
             </widget>
@@ -145,6 +171,14 @@
          </item>
          <item>
           <widget class="QToolButton" name="btnSwatchGroup">
+        <property name="icon">
+         <iconset resource="../resources.qrc">
+          <normaloff>:/icons/ui/folder.svg</normaloff>:/icons/ui/folder.svg</iconset>
+        </property>
+        <property name="toolButtonStyle">
+         <enum>Qt::ToolButtonStyle::ToolButtonIconOnly</enum>
+        </property>
+
            <property name="toolTip"><string>新建色板组（UI 占位）</string></property>
            <property name="iconSize"><size><width>18</width><height>18</height></size></property>
            <property name="autoRaise"><bool>true</bool></property>
@@ -152,6 +186,14 @@
          </item>
          <item>
           <widget class="QToolButton" name="btnSwatchAdd">
+        <property name="icon">
+         <iconset resource="../resources.qrc">
+          <normaloff>:/icons/ui/plus.svg</normaloff>:/icons/ui/plus.svg</iconset>
+        </property>
+        <property name="toolButtonStyle">
+         <enum>Qt::ToolButtonStyle::ToolButtonIconOnly</enum>
+        </property>
+
            <property name="toolTip"><string>添加当前颜色到色板（UI 占位）</string></property>
            <property name="iconSize"><size><width>18</width><height>18</height></size></property>
            <property name="autoRaise"><bool>true</bool></property>
@@ -159,6 +201,14 @@
          </item>
          <item>
           <widget class="QToolButton" name="btnSwatchDelete">
+        <property name="icon">
+         <iconset resource="../resources.qrc">
+          <normaloff>:/icons/layers/delete.svg</normaloff>:/icons/layers/delete.svg</iconset>
+        </property>
+        <property name="toolButtonStyle">
+         <enum>Qt::ToolButtonStyle::ToolButtonIconOnly</enum>
+        </property>
+
            <property name="toolTip"><string>删除色板（UI 占位）</string></property>
            <property name="iconSize"><size><width>18</width><height>18</height></size></property>
            <property name="autoRaise"><bool>true</bool></property>
@@ -204,6 +254,14 @@
          </item>
          <item>
           <widget class="QToolButton" name="btnGradientGroup">
+        <property name="icon">
+         <iconset resource="../resources.qrc">
+          <normaloff>:/icons/ui/folder.svg</normaloff>:/icons/ui/folder.svg</iconset>
+        </property>
+        <property name="toolButtonStyle">
+         <enum>Qt::ToolButtonStyle::ToolButtonIconOnly</enum>
+        </property>
+
            <property name="toolTip"><string>新建渐变组（UI 占位）</string></property>
            <property name="iconSize"><size><width>18</width><height>18</height></size></property>
            <property name="autoRaise"><bool>true</bool></property>
@@ -211,6 +269,14 @@
          </item>
          <item>
           <widget class="QToolButton" name="btnGradientAdd">
+        <property name="icon">
+         <iconset resource="../resources.qrc">
+          <normaloff>:/icons/ui/plus.svg</normaloff>:/icons/ui/plus.svg</iconset>
+        </property>
+        <property name="toolButtonStyle">
+         <enum>Qt::ToolButtonStyle::ToolButtonIconOnly</enum>
+        </property>
+
            <property name="toolTip"><string>新建渐变（UI 占位）</string></property>
            <property name="iconSize"><size><width>18</width><height>18</height></size></property>
            <property name="autoRaise"><bool>true</bool></property>
@@ -218,6 +284,14 @@
          </item>
          <item>
           <widget class="QToolButton" name="btnGradientDelete">
+        <property name="icon">
+         <iconset resource="../resources.qrc">
+          <normaloff>:/icons/layers/delete.svg</normaloff>:/icons/layers/delete.svg</iconset>
+        </property>
+        <property name="toolButtonStyle">
+         <enum>Qt::ToolButtonStyle::ToolButtonIconOnly</enum>
+        </property>
+
            <property name="toolTip"><string>删除渐变（UI 占位）</string></property>
            <property name="iconSize"><size><width>18</width><height>18</height></size></property>
            <property name="autoRaise"><bool>true</bool></property>
@@ -263,6 +337,14 @@
          </item>
          <item>
           <widget class="QToolButton" name="btnPatternGroup">
+        <property name="icon">
+         <iconset resource="../resources.qrc">
+          <normaloff>:/icons/ui/folder.svg</normaloff>:/icons/ui/folder.svg</iconset>
+        </property>
+        <property name="toolButtonStyle">
+         <enum>Qt::ToolButtonStyle::ToolButtonIconOnly</enum>
+        </property>
+
            <property name="toolTip"><string>新建图案组（UI 占位）</string></property>
            <property name="iconSize"><size><width>18</width><height>18</height></size></property>
            <property name="autoRaise"><bool>true</bool></property>
@@ -270,6 +352,14 @@
          </item>
          <item>
           <widget class="QToolButton" name="btnPatternAdd">
+        <property name="icon">
+         <iconset resource="../resources.qrc">
+          <normaloff>:/icons/ui/plus.svg</normaloff>:/icons/ui/plus.svg</iconset>
+        </property>
+        <property name="toolButtonStyle">
+         <enum>Qt::ToolButtonStyle::ToolButtonIconOnly</enum>
+        </property>
+
            <property name="toolTip"><string>新建图案（UI 占位）</string></property>
            <property name="iconSize"><size><width>18</width><height>18</height></size></property>
            <property name="autoRaise"><bool>true</bool></property>
@@ -277,6 +367,14 @@
          </item>
          <item>
           <widget class="QToolButton" name="btnPatternDelete">
+        <property name="icon">
+         <iconset resource="../resources.qrc">
+          <normaloff>:/icons/layers/delete.svg</normaloff>:/icons/layers/delete.svg</iconset>
+        </property>
+        <property name="toolButtonStyle">
+         <enum>Qt::ToolButtonStyle::ToolButtonIconOnly</enum>
+        </property>
+
            <property name="toolTip"><string>删除图案（UI 占位）</string></property>
            <property name="iconSize"><size><width>18</width><height>18</height></size></property>
            <property name="autoRaise"><bool>true</bool></property>
@@ -299,6 +397,8 @@
    <container>0</container>
   </customwidget>
  </customwidgets>
- <resources/>
+ <resources>
+  <include location="../resources.qrc"/>
+ </resources>
  <connections/>
 </ui>

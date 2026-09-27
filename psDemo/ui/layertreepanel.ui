@@ -112,6 +112,14 @@ QToolButton:disabled { color: #666; }</string>
         </item>
         <item>
          <widget class="QToolButton" name="filterPixel">
+        <property name="icon">
+         <iconset resource="../resources.qrc">
+          <normaloff>:/icons/layers/filter-pixel.svg</normaloff>:/icons/layers/filter-pixel.svg</iconset>
+        </property>
+        <property name="toolButtonStyle">
+         <enum>Qt::ToolButtonStyle::ToolButtonIconOnly</enum>
+        </property>
+
           <property name="checkable">
            <bool>true</bool>
           </property>
@@ -125,6 +133,14 @@ QToolButton:disabled { color: #666; }</string>
         </item>
         <item>
          <widget class="QToolButton" name="filterAdjust">
+        <property name="icon">
+         <iconset resource="../resources.qrc">
+          <normaloff>:/icons/layers/filter-adjust.svg</normaloff>:/icons/layers/filter-adjust.svg</iconset>
+        </property>
+        <property name="toolButtonStyle">
+         <enum>Qt::ToolButtonStyle::ToolButtonIconOnly</enum>
+        </property>
+
           <property name="checkable">
            <bool>true</bool>
           </property>
@@ -138,6 +154,14 @@ QToolButton:disabled { color: #666; }</string>
         </item>
         <item>
          <widget class="QToolButton" name="filterType">
+        <property name="icon">
+         <iconset resource="../resources.qrc">
+          <normaloff>:/icons/layers/filter-type.svg</normaloff>:/icons/layers/filter-type.svg</iconset>
+        </property>
+        <property name="toolButtonStyle">
+         <enum>Qt::ToolButtonStyle::ToolButtonIconOnly</enum>
+        </property>
+
           <property name="checkable">
            <bool>true</bool>
           </property>
@@ -151,6 +175,14 @@ QToolButton:disabled { color: #666; }</string>
         </item>
         <item>
          <widget class="QToolButton" name="filterShape">
+        <property name="icon">
+         <iconset resource="../resources.qrc">
+          <normaloff>:/icons/layers/filter-shape.svg</normaloff>:/icons/layers/filter-shape.svg</iconset>
+        </property>
+        <property name="toolButtonStyle">
+         <enum>Qt::ToolButtonStyle::ToolButtonIconOnly</enum>
+        </property>
+
           <property name="checkable">
            <bool>true</bool>
           </property>
@@ -164,6 +196,14 @@ QToolButton:disabled { color: #666; }</string>
         </item>
         <item>
          <widget class="QToolButton" name="filterSmart">
+        <property name="icon">
+         <iconset resource="../resources.qrc">
+          <normaloff>:/icons/layers/filter-smart.svg</normaloff>:/icons/layers/filter-smart.svg</iconset>
+        </property>
+        <property name="toolButtonStyle">
+         <enum>Qt::ToolButtonStyle::ToolButtonIconOnly</enum>
+        </property>
+
           <property name="checkable">
            <bool>true</bool>
           </property>
@@ -302,6 +342,14 @@ QToolButton:disabled { color: #666; }</string>
         </item>
         <item>
          <widget class="QToolButton" name="lockTransparent">
+        <property name="icon">
+         <iconset resource="../resources.qrc">
+          <normaloff>:/icons/layers/lock-transparent.svg</normaloff>:/icons/layers/lock-transparent.svg</iconset>
+        </property>
+        <property name="toolButtonStyle">
+         <enum>Qt::ToolButtonStyle::ToolButtonIconOnly</enum>
+        </property>
+
           <property name="checkable">
            <bool>true</bool>
           </property>
@@ -315,6 +363,14 @@ QToolButton:disabled { color: #666; }</string>
         </item>
         <item>
          <widget class="QToolButton" name="lockImage">
+        <property name="icon">
+         <iconset resource="../resources.qrc">
+          <normaloff>:/icons/layers/lock-image.svg</normaloff>:/icons/layers/lock-image.svg</iconset>
+        </property>
+        <property name="toolButtonStyle">
+         <enum>Qt::ToolButtonStyle::ToolButtonIconOnly</enum>
+        </property>
+
           <property name="checkable">
            <bool>true</bool>
           </property>
@@ -328,6 +384,14 @@ QToolButton:disabled { color: #666; }</string>
         </item>
         <item>
          <widget class="QToolButton" name="lockPosition">
+        <property name="icon">
+         <iconset resource="../resources.qrc">
+          <normaloff>:/icons/layers/lock-position.svg</normaloff>:/icons/layers/lock-position.svg</iconset>
+        </property>
+        <property name="toolButtonStyle">
+         <enum>Qt::ToolButtonStyle::ToolButtonIconOnly</enum>
+        </property>
+
           <property name="checkable">
            <bool>true</bool>
           </property>
@@ -341,6 +405,14 @@ QToolButton:disabled { color: #666; }</string>
         </item>
         <item>
          <widget class="QToolButton" name="lockAll">
+        <property name="icon">
+         <iconset resource="../resources.qrc">
+          <normaloff>:/icons/layers/lock-all.svg</normaloff>:/icons/layers/lock-all.svg</iconset>
+        </property>
+        <property name="toolButtonStyle">
+         <enum>Qt::ToolButtonStyle::ToolButtonIconOnly</enum>
+        </property>
+
           <property name="checkable">
            <bool>true</bool>
           </property>
@@ -417,6 +489,12 @@ QToolButton:disabled { color: #666; }</string>
    </item>
    <item>
     <widget class="QListWidget" name="itemList">
+        <property name="iconSize">
+         <size>
+          <width>40</width>
+          <height>40</height>
+         </size>
+        </property>
      <property name="selectionMode">
       <enum>QAbstractItemView::SelectionMode::SingleSelection</enum>
      </property>
@@ -457,6 +535,14 @@ QToolButton:disabled { color: #666; }</string>
       </property>
       <item>
        <widget class="QToolButton" name="btnLinkLayers">
+        <property name="icon">
+         <iconset resource="../resources.qrc">
+          <normaloff>:/icons/layers/link.svg</normaloff>:/icons/layers/link.svg</iconset>
+        </property>
+        <property name="toolButtonStyle">
+         <enum>Qt::ToolButtonStyle::ToolButtonIconOnly</enum>
+        </property>
+
         <property name="enabled">
          <bool>false</bool>
         </property>
@@ -479,6 +565,14 @@ QToolButton:disabled { color: #666; }</string>
       </item>
       <item>
        <widget class="QToolButton" name="btnLayerStyle">
+        <property name="icon">
+         <iconset resource="../resources.qrc">
+          <normaloff>:/icons/layers/fx.svg</normaloff>:/icons/layers/fx.svg</iconset>
+        </property>
+        <property name="toolButtonStyle">
+         <enum>Qt::ToolButtonStyle::ToolButtonIconOnly</enum>
+        </property>
+
         <property name="text">
          <string/>
         </property>
@@ -498,6 +592,14 @@ QToolButton:disabled { color: #666; }</string>
       </item>
       <item>
        <widget class="QToolButton" name="btnLayerMask">
+        <property name="icon">
+         <iconset resource="../resources.qrc">
+          <normaloff>:/icons/layers/mask.svg</normaloff>:/icons/layers/mask.svg</iconset>
+        </property>
+        <property name="toolButtonStyle">
+         <enum>Qt::ToolButtonStyle::ToolButtonIconOnly</enum>
+        </property>
+
         <property name="text">
          <string/>
         </property>
@@ -517,6 +619,14 @@ QToolButton:disabled { color: #666; }</string>
       </item>
       <item>
        <widget class="QToolButton" name="btnAdjustment">
+        <property name="icon">
+         <iconset resource="../resources.qrc">
+          <normaloff>:/icons/layers/adjustment.svg</normaloff>:/icons/layers/adjustment.svg</iconset>
+        </property>
+        <property name="toolButtonStyle">
+         <enum>Qt::ToolButtonStyle::ToolButtonIconOnly</enum>
+        </property>
+
         <property name="text">
          <string/>
         </property>
@@ -536,6 +646,14 @@ QToolButton:disabled { color: #666; }</string>
       </item>
       <item>
        <widget class="QToolButton" name="btnNewGroup">
+        <property name="icon">
+         <iconset resource="../resources.qrc">
+          <normaloff>:/icons/layers/group.svg</normaloff>:/icons/layers/group.svg</iconset>
+        </property>
+        <property name="toolButtonStyle">
+         <enum>Qt::ToolButtonStyle::ToolButtonIconOnly</enum>
+        </property>
+
         <property name="text">
          <string/>
         </property>
@@ -555,6 +673,14 @@ QToolButton:disabled { color: #666; }</string>
       </item>
       <item>
        <widget class="QToolButton" name="btnNew">
+        <property name="icon">
+         <iconset resource="../resources.qrc">
+          <normaloff>:/icons/layers/new-layer.svg</normaloff>:/icons/layers/new-layer.svg</iconset>
+        </property>
+        <property name="toolButtonStyle">
+         <enum>Qt::ToolButtonStyle::ToolButtonIconOnly</enum>
+        </property>
+
         <property name="text">
          <string/>
         </property>
@@ -574,6 +700,14 @@ QToolButton:disabled { color: #666; }</string>
       </item>
       <item>
        <widget class="QToolButton" name="btnDelete">
+        <property name="icon">
+         <iconset resource="../resources.qrc">
+          <normaloff>:/icons/layers/delete.svg</normaloff>:/icons/layers/delete.svg</iconset>
+        </property>
+        <property name="toolButtonStyle">
+         <enum>Qt::ToolButtonStyle::ToolButtonIconOnly</enum>
+        </property>
+
         <property name="text">
          <string/>
         </property>
@@ -609,6 +743,8 @@ QToolButton:disabled { color: #666; }</string>
    </item>
   </layout>
  </widget>
- <resources/>
+ <resources>
+  <include location="../resources.qrc"/>
+ </resources>
  <connections/>
 </ui>

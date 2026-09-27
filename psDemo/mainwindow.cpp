@@ -16,12 +16,10 @@
 
 #include <QCloseEvent>
 #include <QFileDialog>
-#include <QIcon>
 #include <QImageReader>
 #include <QMessageBox>
 #include <QPushButton>
 #include <QSplitter>
-#include <QStackedWidget>
 
 #include <memory>
 
@@ -30,11 +28,7 @@ MainWindow::MainWindow(QWidget *parent)
     , ui(new Ui::MainWindow)
     , m_session(new Ps::AppSession(this))
 {
-    ui->setupUi(this); // 菜单与布局均来自 mainwindow.ui
-
-    // 标题栏：产品名 PhotoshopLite；窗口图标（exe 名见 .pro 的 TARGET=PSLite）
-    setWindowTitle(QStringLiteral("PhotoshopLite"));
-    setWindowIcon(QIcon(QStringLiteral(":/icons/ui/app-logo.png")));
+    ui->setupUi(this); // 菜单、标题、图标与布局均来自 mainwindow.ui
 
     // 右侧栏三段可拖动调节高度（QSplitter）；拖不到折叠，靠每段的 minimumHeight 兜底
     for (int i = 0; i < ui->rightSplitter->count(); ++i) {
@@ -114,29 +108,20 @@ void MainWindow::setupToolbox()
 
 void MainWindow::setupHomeStack()
 {
-    // 把 setupUi 建好的 central 整棵树挪进栈页 0；页 1 是 PS 主页壳
-    QWidget *workspace = takeCentralWidget();
-    m_homeScreen = new HomeScreen(this);
-    m_mainStack = new QStackedWidget(this);
-    m_mainStack->addWidget(workspace);
-    m_mainStack->addWidget(m_homeScreen);
-    setCentralWidget(m_mainStack);
-
-    connect(m_homeScreen, &HomeScreen::newFileRequested, this, &MainWindow::onNewDocument);
-    connect(m_homeScreen, &HomeScreen::openFileRequested, this, &MainWindow::onOpenDocument);
-    connect(m_homeScreen, &HomeScreen::backToWorkspaceRequested, this, &MainWindow::onShowWorkspace);
+    // 栈页已在 mainwindow.ui：0=workspacePage，1=homeScreen
+    connect(ui->homeScreen, &HomeScreen::newFileRequested, this, &MainWindow::onNewDocument);
+    connect(ui->homeScreen, &HomeScreen::openFileRequested, this, &MainWindow::onOpenDocument);
+    connect(ui->homeScreen, &HomeScreen::backToWorkspaceRequested, this, &MainWindow::onShowWorkspace);
 }
 
 void MainWindow::onShowHomeScreen()
 {
-    if (m_mainStack)
-        m_mainStack->setCurrentWidget(m_homeScreen);
+    ui->mainStack->setCurrentWidget(ui->homeScreen);
 }
 
 void MainWindow::onShowWorkspace()
 {
-    if (m_mainStack)
-        m_mainStack->setCurrentIndex(0);
+    ui->mainStack->setCurrentIndex(0);
 }
 
 void MainWindow::createInitialDocument()

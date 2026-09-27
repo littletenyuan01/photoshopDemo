@@ -4,18 +4,12 @@
 #include "app/appsession.h"
 #include "domain/imagedocument.h"
 #include "domain/layer.h"
-#include "itemtreepanel.h"
-#include "panelchrome.h"
 
-#include <QIcon>
-#include <QListWidgetItem>
+#include <QTabWidget>
 #include <QSpinBox>
 #include <QToolButton>
 
 namespace {
-
-/** 面板内小按钮图标边长（逻辑像素，与颜色面板一致）。 */
-constexpr int kPanelIconSize = 18;
 
 /** 折叠分区的箭头；展开/收起各一个（对应 GIMP 展开器 GtkExpander 的三角）。 */
 constexpr char kArrowExpanded[] = "▾ ";
@@ -28,34 +22,11 @@ PropertiesPanel::PropertiesPanel(QWidget *parent)
     , ui(new Ui::PropertiesPanel)
 {
     ui->setupUi(this);
-
-    PanelChrome::addMenuButton(ui->panelTabs);
+    // 对齐图标 / ≡ 在 propertiespanel.ui
+    ui->panelTabs->setCornerWidget(ui->btnPanelMenu, Qt::TopRightCorner);
 
     bindCollapsible(ui->toggleTransform, ui->transformBody);
     bindCollapsible(ui->toggleAlign, ui->alignBody);
-
-    // 对齐按钮图标：改用已有的 align-*.svg（同 ItemTreePanel 的 SVG 光栅化）
-    ItemTreePanel::applyToolbarIcon(ui->btnAlignLeft,
-                                    QStringLiteral(":/icons/ui/align-left.svg"), kPanelIconSize);
-    ItemTreePanel::applyToolbarIcon(ui->btnAlignHCenter,
-                                    QStringLiteral(":/icons/ui/align-hcenter.svg"), kPanelIconSize);
-    ItemTreePanel::applyToolbarIcon(ui->btnAlignRight,
-                                    QStringLiteral(":/icons/ui/align-right.svg"), kPanelIconSize);
-    ItemTreePanel::applyToolbarIcon(ui->btnAlignTop,
-                                    QStringLiteral(":/icons/ui/align-top.svg"), kPanelIconSize);
-    ItemTreePanel::applyToolbarIcon(ui->btnAlignVCenter,
-                                    QStringLiteral(":/icons/ui/align-vcenter.svg"), kPanelIconSize);
-    ItemTreePanel::applyToolbarIcon(ui->btnAlignBottom,
-                                    QStringLiteral(":/icons/ui/align-bottom.svg"), kPanelIconSize);
-
-    // 调整类型列表：统一用「调整图层」图标（GIMP 侧对应各颜色 operation）
-    const QIcon adjustIcon = ItemTreePanel::svgIcon(QStringLiteral(":/icons/layers/adjustment.svg"),
-                                                    kPanelIconSize);
-    for (int i = 0; i < ui->adjustList->count(); ++i) {
-        QListWidgetItem *item = ui->adjustList->item(i);
-        item->setIcon(adjustIcon);
-        item->setToolTip(QStringLiteral("UI 占位：尚未接入任何调整算法"));
-    }
 
     refreshFromDocument();
 }

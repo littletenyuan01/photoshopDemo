@@ -8,7 +8,7 @@
 |------|------|------|
 | `psDemo/main.cpp` | `QApplication` 入口 | 已实现 |
 | `psDemo/mainwindow.h/.cpp` | 只做菜单接线 + 装配与广播（不再逐个 setDocument） | 已实现 |
-| `psDemo/mainwindow.ui` | 主窗口布局；中央提升为 `CanvasWorkspace`，右侧栏（`rightColumn`）自上而下为 `ColorsPanel` / `PropertiesPanel` / `DockPanel` | 已实现 |
+| `psDemo/mainwindow.ui` | 主窗口布局；中央 `mainStack`：工作区（选项栏/工具箱/`CanvasWorkspace`/右侧栏）↔ `HomeScreen` | 已实现 |
 | `psDemo/psDemo.pro` | 源文件与 `INCLUDEPATH`（按 app/domain/engine/tools/ui 分层分组） | 已实现 |
 
 ## app（会话与广播）
@@ -112,3 +112,9 @@ UI 不得直接改 `Layer`，一律走 `setLayerVisible/Opacity/Name/BlendMode` 
 3. 非显然逻辑可附 5–20 行关键片段  
 
 **代码注释**：关键类与算法须在源码中写中文注释，见 `.cursor/rules/code-comments.mdc`。
+
+## UI 分层约定
+
+- **静态外观**（布局、尺寸、图标、QSS、固定文案）→ 写在对应 `.ui` / `resources/styles/dark.qss`，不要在 `setupUi` 后再 `setStyleSheet` / `setIcon`。
+- **动态逻辑**（信号槽、校验器、数据驱动列表、按状态变色、工具槽工厂、高分屏缩略图光栅化）→ 留在 `.cpp`。
+- 面板 ≡ 菜单按钮在各面板 `.ui`（`btnPanelMenu`），ctor 里只需 `setCornerWidget`（Designer 无法直接设 Tab 角标）。

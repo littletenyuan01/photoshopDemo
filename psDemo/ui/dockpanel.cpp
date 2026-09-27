@@ -3,7 +3,9 @@
 
 #include "app/appsession.h"
 #include "domain/imagedocument.h"
-#include "panelchrome.h"
+
+#include <QTabWidget>
+#include <QToolButton>
 
 DockPanel::DockPanel(QWidget *parent)
     : QWidget(parent)
@@ -11,8 +13,8 @@ DockPanel::DockPanel(QWidget *parent)
 {
     ui->setupUi(this);
 
-    // PS 面板右上角 ≡；三个面板共用 PanelChrome，样式见 dark.qss
-    PanelChrome::addMenuButton(ui->panelTabs);
+    // ≡ 按钮在 layerpanel.ui；挂到 Tab 右上角（Designer 无法直接设 corner）
+    ui->panelTabs->setCornerWidget(ui->btnPanelMenu, Qt::TopRightCorner);
 }
 
 DockPanel::~DockPanel()

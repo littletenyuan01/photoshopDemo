@@ -166,6 +166,23 @@ QPushButton:pressed { background-color: #404040; }</string>
             <height>220</height>
            </size>
           </property>
+          <layout class="QVBoxLayout" name="planeHostLayout">
+           <property name="spacing">
+            <number>0</number>
+           </property>
+           <property name="leftMargin">
+            <number>0</number>
+           </property>
+           <property name="topMargin">
+            <number>0</number>
+           </property>
+           <property name="rightMargin">
+            <number>0</number>
+           </property>
+           <property name="bottomMargin">
+            <number>0</number>
+           </property>
+          </layout>
          </widget>
         </item>
         <item alignment="Qt::AlignmentFlag::AlignTop">
@@ -182,6 +199,23 @@ QPushButton:pressed { background-color: #404040; }</string>
             <height>220</height>
            </size>
           </property>
+          <layout class="QVBoxLayout" name="stripHostLayout">
+           <property name="spacing">
+            <number>0</number>
+           </property>
+           <property name="leftMargin">
+            <number>0</number>
+           </property>
+           <property name="topMargin">
+            <number>0</number>
+           </property>
+           <property name="rightMargin">
+            <number>0</number>
+           </property>
+           <property name="bottomMargin">
+            <number>0</number>
+           </property>
+          </layout>
          </widget>
         </item>
        </layout>
@@ -317,6 +351,23 @@ QPushButton:pressed { background-color: #404040; }</string>
               <height>72</height>
              </size>
             </property>
+            <layout class="QVBoxLayout" name="previewHostLayout">
+             <property name="spacing">
+              <number>0</number>
+             </property>
+             <property name="leftMargin">
+              <number>0</number>
+             </property>
+             <property name="topMargin">
+              <number>0</number>
+             </property>
+             <property name="rightMargin">
+              <number>0</number>
+             </property>
+             <property name="bottomMargin">
+              <number>0</number>
+             </property>
+            </layout>
            </widget>
           </item>
          </layout>

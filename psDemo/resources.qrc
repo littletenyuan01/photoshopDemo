@@ -48,6 +48,7 @@
     <!-- 菜单栏 / 工具选项条 chrome -->
     <file alias="ui/home.png">resources/icons/ui/home.png</file>
     <file alias="ui/app-logo.png">resources/icons/ui/app-logo.png</file>
+    <file alias="ui/home-card-thumb.png">resources/icons/ui/home-card-thumb.png</file>
     <!-- 面板通用小图标（属性 / 色板面板底栏与「对齐并分布」） -->
     <file alias="ui/plus.svg">resources/icons/ui/plus.svg</file>
     <file alias="ui/folder.svg">resources/icons/ui/folder.svg</file>
