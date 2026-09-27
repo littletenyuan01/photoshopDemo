@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>演示稿库 · PhotoshopLite</title>
+<!--
+  演示稿库的入口页：列出所有演示稿。
+  新增文稿时只需在这里加一张卡片（一个 a.card 元素，见 README.md 的目录约定）。
+-->
+<style>
+  :root {
+    --bg: #2b2b2b; --panel: #3a3a3a; --line: #222; --text: #e8e8e8;
+    --dim: #9a9a9a; --accent: #2d5a8a; --accent-2: #4a90d9;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font: 14px/1.65 "Microsoft YaHei", "Segoe UI", system-ui, sans-serif;
+  }
+  header {
+    display: flex; align-items: center; gap: 14px;
+    padding: 18px 26px; background: #3c3c3c; border-bottom: 1px solid #1f1f1f;
+  }
+  .logo {
+    width: 40px; height: 40px; border-radius: 8px; background: #111; border: 1px solid #000;
+    color: #9ad; font-weight: 700; font-size: 20px; display: grid; place-items: center;
+  }
+  h1 { margin: 0; font-size: 18px; }
+  header p { margin: 3px 0 0; color: var(--dim); font-size: 12.5px; }
+  main { padding: 22px 26px; max-width: 980px; }
+  h2 { font-size: 14px; color: var(--dim); font-weight: 500; margin: 4px 0 12px; }
+  .card {
+    display: block; text-decoration: none; color: inherit;
+    background: var(--panel); border: 1px solid var(--line); border-left: 3px solid var(--accent-2);
+    border-radius: 7px; padding: 14px 16px; margin-bottom: 12px;
+  }
+  .card:hover { background: #454545; }
+  .card .title { font-size: 15px; font-weight: 600; }
+  .card .no {
+    display: inline-block; min-width: 26px; margin-right: 8px; padding: 1px 6px;
+    background: var(--accent); border-radius: 4px; font-size: 12px; color: #fff;
+  }
+  .card .desc { margin: 6px 0 0; color: #d6d6d6; font-size: 13px; }
+  .card .tags { margin-top: 8px; }
+  .tag {
+    display: inline-block; margin-right: 6px; padding: 1px 7px; border-radius: 10px;
+    background: #2e2e2e; border: 1px solid #262626; color: var(--dim); font-size: 11.5px;
+  }
+  .planned {
+    background: #333; border-left-color: #5a5a5a; opacity: .78;
+  }
+  .planned .desc { color: var(--dim); }
+  footer {
+    padding: 14px 26px; border-top: 1px solid #1f1f1f; background: #333;
+    color: var(--dim); font-size: 12px;
+  }
+  code { background: #262626; border: 1px solid #1c1c1c; border-radius: 3px; padding: 0 4px; }
+  a { color: #8fb8e0; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">Ps</div>
+  <div>
+    <h1>演示稿库</h1>
+    <p>每一份都是离线自足的交互页面（双击即开）· 数字当场算 · 资料分级标注</p>
+  </div>
+</header>
+
+<main>
+  <h2>已完成</h2>
+
+  <a class="card" href="01-photoshop-image-engine/index.html">
+    <div class="title"><span class="no">01</span>Photoshop 图像引擎：从新建文档到你看到的画面</div>
+    <p class="desc">
+      新建文档到底分配了什么 · 瓦片（tile）是什么、为什么非要它 · 每个图层一套瓦片网格 ·
+      画一笔的内部链路 · 屏幕合成与"第三份数据" · 区域撤销 · 暂存盘换页 · 缓存级别金字塔。
+    </p>
+    <div class="tags">
+      <span class="tag">瓦片 / 稀疏分配</span>
+      <span class="tag">脏瓦片重算</span>
+      <span class="tag">区域撤销</span>
+      <span class="tag">LRU 换页</span>
+      <span class="tag">9 步交互</span>
+    </div>
+  </a>
+
+  <h2>计划中（按需再做）</h2>
+
+  <div class="card planned">
+    <div class="title"><span class="no">02</span>选区与蒙版</div>
+    <p class="desc">选区为什么是"8 位灰度图"？蒙版与选区什么关系？羽化/抗锯齿在哪一层算。</p>
+  </div>
+
+  <div class="card planned">
+    <div class="title"><span class="no">03</span>图层混合模式</div>
+    <p class="desc">Normal 之外的几十种模式怎么推导 —— 公式 + 逐像素演示。</p>
+  </div>
+
+  <div class="card planned">
+    <div class="title"><span class="no">04</span>撤销栈 / 历史记录</div>
+    <p class="desc">命令模式 vs 快照；一次操作 = 一次 push；分支历史怎么长出来。</p>
+  </div>
+
+  <div class="card planned">
+    <div class="title"><span class="no">05</span>非破坏编辑：调整层与智能对象</div>
+    <p class="desc">节点图 vs 像素栈；"写作与分离"到底分离了什么。</p>
+  </div>
+
+  <div class="card planned">
+    <div class="title"><span class="no">06</span>色彩管理</div>
+    <p class="desc">sRGB / Adobe RGB / 16 位管线；为什么"同一个数值看起来不一样"。</p>
+  </div>
+</main>
+
+<footer>
+  约定与自检方式见 <code>presentations/README.md</code> ·
+  资料分级：<code>[官方]</code> / <code>[共识]</code> / <code>[源码]</code> / <code>[模拟]</code>
+</footer>
+
+</body>
+</html>

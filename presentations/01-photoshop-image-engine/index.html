@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>Photoshop 图像引擎演示 · 新建文档 / 新建图层 / 瓦片 / 你看到的画面</title>
+<!--
+  这份演示稿讲的是 **Photoshop 的内部机制**（不是本仓库的 psDemo）。
+
+  资料分级（页面上也会逐条标注）：
+    [官方]   Adobe 官方文档/首选项里能查到的概念：暂存盘、缓存级别(Cache Levels)、
+             历史记录的内存占用、图层偏移、16 位/通道管线。
+    [共识]   长期被业界广泛引用、但 Adobe 未文档化的实现数字（最典型的就是 128×128 瓦片）。
+    [源码]   GIMP 是开源的，可以精确引用它的对应实现（用来落地"瓦片/投影/撤销"的细节）。
+    [模拟]   本页面用 JS 真实跑的简化模型——所有数字都是当场算出来的，
+             但它是"按上面的规则重现"，不是 PS 本体。
+
+  页面里跑的是**真实数组**：瓦片、稀疏分配、脏瓦片重算、区域撤销、金字塔缓存
+  全部真的在算，不是画示意图。
+-->
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">
+    <span class="logo">Ps</span>
+    <div>
+      <h1>Photoshop 是怎么做到的：文档 · 图层 · 瓦片 · 你看到的画面</h1>
+      <p class="sub">真实数组驱动的交互演示 · 资料分 [官方] / [共识] / [源码] / [模拟] 四级标注</p>
+    </div>
+  </div>
+  <div class="nav">
+    <button id="btnPrev">← 上一步</button>
+    <span id="stepBadge">1 / 9</span>
+    <button id="btnNext">下一步 →</button>
+  </div>
+</header>
+
+<main>
+  <!-- ================= 左：步骤 ================= -->
+  <aside class="steps" id="stepList"></aside>
+
+  <!-- ================= 中：画布与操作 ================= -->
+  <section class="stage">
+    <div class="card">
+      <div class="card-head">
+        <h2>① 文档窗口（整幅 + 瓦片网格）</h2>
+        <div class="hint">虚线格 = 未分配的瓦片；实色格 = 已分配；红框 = 脏瓦片</div>
+      </div>
+      <div class="canvas-wrap">
+        <canvas id="docCanvas" width="520" height="380"></canvas>
+        <div class="legend">
+          <span><i class="sw sw-alloc"></i>已分配</span>
+          <span><i class="sw sw-unalloc"></i>未分配（0 字节）</span>
+          <span><i class="sw sw-dirty"></i>脏瓦片</span>
+          <span><i class="sw sw-disk"></i>已换出到暂存盘</span>
+          <span><i class="sw sw-view"></i>视口</span>
+        </div>
+      </div>
+      <div class="note" id="docHint">在这里拖拽就是用画笔/橡皮在<b>活动图层</b>上作画；按住 Shift 拖 = 移动视口。</div>
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <h2>② 屏幕（用户实际看到的）</h2>
+        <div class="hint" id="cacheHint">缓存级别 L0（100%）</div>
+      </div>
+      <div class="canvas-wrap"><canvas id="screenCanvas" width="260" height="195"></canvas></div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h2>③ 操作与参数</h2></div>
+      <div class="controls">
+        <div class="ctl-group">
+          <label>工具（只作用于活动图层）</label>
+          <div class="btnrow" id="toolRow">
+            <button data-tool="brush" class="on">画笔</button>
+            <button data-tool="eraser">橡皮</button>
+            <button data-tool="picker">吸管</button>
+            <button data-tool="viewport">移动视口</button>
+          </div>
+        </div>
+        <div class="ctl-group">
+          <label>笔刷半径 <b id="brushLabel">14</b> px</label>
+          <input type="range" id="brushRange" min="4" max="60" value="14">
+        </div>
+        <div class="ctl-group">
+          <label>颜色</label><input type="color" id="colorPick" value="#e8c33a">
+        </div>
+        <div class="ctl-group">
+          <label>瓦片边长 [共识] 128 / [源码] GIMP 可配 64</label>
+          <div class="btnrow" id="tileRow">
+            <button data-tile="64">64</button>
+            <button data-tile="128" class="on">128</button>
+            <button data-tile="256">256</button>
+          </div>
+        </div>
+        <div class="ctl-group">
+          <label>位深 [官方] 8 位/通道 vs 16 位/通道管线</label>
+          <div class="btnrow" id="depthRow">
+            <button data-depth="8" class="on">8 位</button>
+            <button data-depth="16">16 位</button>
+          </div>
+        </div>
+        <div class="ctl-group">
+          <label>内存额度（超出就把瓦片换到暂存盘）</label>
+          <input type="range" id="memRange" min="8" max="400" value="120">
+          <div class="tiny" id="memLabel">120 MB</div>
+        </div>
+        <div class="ctl-group">
+          <label>重绘策略</label>
+          <div class="btnrow" id="modeRow">
+            <button data-mode="tiles" class="on">只重算脏瓦片（真实做法）</button>
+            <button data-mode="full">整幅重算（对照）</button>
+          </div>
+        </div>
+        <div class="ctl-group">
+          <label>缩放 / 缓存级别 [官方 Cache Levels]</label>
+          <div class="btnrow" id="zoomRow">
+            <button data-zoom="1" class="on">100% (L0)</button>
+            <button data-zoom="2">50% (L1)</button>
+            <button data-zoom="4">25% (L2)</button>
+          </div>
+        </div>
+        <div class="ctl-group">
+          <label>其他</label>
+          <div class="btnrow">
+            <button id="btnUndo">撤销一步</button>
+            <button id="btnRecompute">手动整幅重算</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= 右：图层 / 瓦片检查器 / 讲解 / 数字 ================= -->
+  <section class="side">
+    <div class="card">
+      <div class="card-head">
+        <h2>④ 图层（每层一套自己的瓦片网格）</h2>
+        <div class="btnrow small">
+          <button id="btnAddLayer">新建图层</button>
+          <button id="btnDelLayer">删除</button>
+          <button id="btnUp">上移</button>
+          <button id="btnDown">下移</button>
+        </div>
+      </div>
+      <div class="layers" id="layerList"></div>
+      <div class="note">
+        点某层 = 设为活动图层。眼睛 = 显隐（<b>隐藏不释放存储</b>）。
+        每行显示：瓦片数 / 占用字节 / 偏移。
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <h2>⑤ 瓦片检查器</h2>
+        <div class="hint">在画布上点一下任意瓦片</div>
+      </div>
+      <div class="inspector" id="tileInspector">
+        点画布上的某个瓦片，这里会显示它属于哪一层、是否已分配、在内存还是暂存盘、字节数。
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h2>⑥ 这一步在讲什么</h2></div>
+      <div class="explain" id="explain"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h2>⑦ 当场算出来的数字</h2></div>
+      <div class="stats" id="stats"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h2>⑧ 历史记录（按改动区域存，不是整幅）</h2></div>
+      <div class="history" id="history"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h2>⑨ 资料与出处</h2></div>
+      <div class="codemap" id="sources"></div>
+    </div>
+  </section>
+</main>
+
+<footer class="foot">
+  <span>[官方] 暂存盘 / 缓存级别 / 历史内存 / 16 位管线 —— Adobe 帮助文档与首选项里可查</span>
+  <span>[共识] 128×128 瓦片 —— 业界广泛引用，Adobe 未文档化</span>
+  <span>[源码] GIMP 对应实现：<code>app/gegl/gimptilehandlervalidate.c</code>、<code>app/core/gimpprojection.c</code>、<code>app/core/gimpdrawableundo.h</code></span>
+</footer>
+
+<script src="app.js"></script>
+</body>
+</html>

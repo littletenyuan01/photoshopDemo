@@ -25,6 +25,13 @@
 | [completeness.md](completeness.md) | 除编辑能力外，怎样才算完善 |
 | [cursor-role-prompt.md](cursor-role-prompt.md) | 可粘贴的 Cursor 角色 Prompt |
 
+## 相关目录
+
+| 目录 | 用途 |
+|------|------|
+| [`../presentations/`](../presentations/README.md) | **演示稿库**：每份一个子目录（离线交互页面），讲原理用，不参与编译 |
+| `images/` | 文档截图（由验证程序按真实渲染路径生成） |
+
 ## 维护约定
 
 1. 每完成一个小功能：更新相关文档 + 在对话中给出 commit 文案  
