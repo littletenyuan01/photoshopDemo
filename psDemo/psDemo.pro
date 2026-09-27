@@ -40,7 +40,9 @@ SOURCES += \
     ui/propertiespanel.cpp \
     ui/toolbox.cpp \
     ui/tooloptionsbar.cpp \
-    ui/colorpickerdialog.cpp
+    ui/colorpickerdialog.cpp \
+    ui/homescreen.cpp \
+    ui/newdocumentdialog.cpp
 
 HEADERS += \
     mainwindow.h \
@@ -76,7 +78,9 @@ HEADERS += \
     ui/propertiespanel.h \
     ui/toolbox.h \
     ui/tooloptionsbar.h \
-    ui/colorpickerdialog.h
+    ui/colorpickerdialog.h \
+    ui/homescreen.h \
+    ui/newdocumentdialog.h
 
 FORMS += \
     mainwindow.ui \
@@ -90,7 +94,9 @@ FORMS += \
     ui/propertiespanel.ui \
     ui/toolbox.ui \
     ui/tooloptionsbar.ui \
-    ui/colorpickerdialog.ui
+    ui/colorpickerdialog.ui \
+    ui/homescreen.ui \
+    ui/newdocumentdialog.ui
 
 RESOURCES += \
     resources.qrc

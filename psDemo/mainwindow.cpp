@@ -8,6 +8,8 @@
 #include "ui/canvasview.h"
 #include "ui/canvasworkspace.h"
 #include "ui/dockpanel.h"
+#include "ui/homescreen.h"
+#include "ui/newdocumentdialog.h"
 #include "ui/propertiespanel.h"
 #include "ui/toolbox.h"
 #include "ui/tooloptionsbar.h"
@@ -19,6 +21,7 @@
 #include <QMessageBox>
 #include <QPushButton>
 #include <QSplitter>
+#include <QStackedWidget>
 
 #include <memory>
 
@@ -42,6 +45,7 @@ MainWindow::MainWindow(QWidget *parent)
     connect(ui->rightSplitter, &QSplitter::splitterMoved,
             this, [this]() { m_rightColumnUserSized = true; });
 
+    setupHomeStack();
     setupMenus();
     setupSession();
     createInitialDocument(); // 启动即有可演示文档，避免空白壳
@@ -96,6 +100,8 @@ void MainWindow::setupToolbox()
             this, &MainWindow::onBackgroundColorChanged);
     connect(ui->toolOptionsBar, &ToolOptionsBar::brushDiameterChanged,
             this, &MainWindow::onBrushDiameterChanged);
+    connect(ui->toolOptionsBar, &ToolOptionsBar::homeClicked,
+            this, &MainWindow::onShowHomeScreen);
 
     // 用工具箱当前值对齐其余组件（这里同步不经过槽，避免半初始化状态）
     const Ps::ToolId tool = ui->toolBox->currentTool();
@@ -104,6 +110,33 @@ void MainWindow::setupToolbox()
     canvas->setForegroundColor(ui->toolBox->foregroundColor());
     canvas->setBackgroundColor(ui->toolBox->backgroundColor());
     canvas->setBrushDiameter(ui->toolOptionsBar->brushDiameter());
+}
+
+void MainWindow::setupHomeStack()
+{
+    // 把 setupUi 建好的 central 整棵树挪进栈页 0；页 1 是 PS 主页壳
+    QWidget *workspace = takeCentralWidget();
+    m_homeScreen = new HomeScreen(this);
+    m_mainStack = new QStackedWidget(this);
+    m_mainStack->addWidget(workspace);
+    m_mainStack->addWidget(m_homeScreen);
+    setCentralWidget(m_mainStack);
+
+    connect(m_homeScreen, &HomeScreen::newFileRequested, this, &MainWindow::onNewDocument);
+    connect(m_homeScreen, &HomeScreen::openFileRequested, this, &MainWindow::onOpenDocument);
+    connect(m_homeScreen, &HomeScreen::backToWorkspaceRequested, this, &MainWindow::onShowWorkspace);
+}
+
+void MainWindow::onShowHomeScreen()
+{
+    if (m_mainStack)
+        m_mainStack->setCurrentWidget(m_homeScreen);
+}
+
+void MainWindow::onShowWorkspace()
+{
+    if (m_mainStack)
+        m_mainStack->setCurrentIndex(0);
 }
 
 void MainWindow::createInitialDocument()
@@ -136,8 +169,16 @@ void MainWindow::onBackgroundColorChanged(const QColor &color)
 
 void MainWindow::onNewDocument()
 {
-    m_session->setDocument(Ps::ImageDocument::createBlank(800, 600, Qt::white));
-    statusBar()->showMessage(tr("已新建 800×600 文档"), 3000);
+    // UI 阶段：弹出 PS 式新建对话框；确认后按宽高建空白文档（对照 GIMP image-new-dialog）
+    NewDocumentDialog dialog(this);
+    if (dialog.exec() != QDialog::Accepted)
+        return;
+
+    const QSize size = dialog.documentSize();
+    m_session->setDocument(Ps::ImageDocument::createBlank(size.width(), size.height(), Qt::white));
+    onShowWorkspace();
+    statusBar()->showMessage(
+        tr("已新建 %1×%2 文档").arg(size.width()).arg(size.height()), 3000);
 }
 
 void MainWindow::onOpenDocument()

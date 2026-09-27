@@ -23,10 +23,15 @@
   ⚠️ 标题栏 logo 的**单击弹系统菜单、双击请求关闭**是 Windows/PS 的平台约定
   （用户实测 PS 同样如此），**不做拦截**；要改的只是「双击就直接没了」这件事。
 - **布局文件**：`mainwindow.ui`、`ui/toolbox.ui`、`ui/tooloptionsbar.ui`、`ui/colorspanel.ui`、`ui/propertiespanel.ui`、`ui/layerpanel.ui`（右侧 `DockPanel` 壳）、`ui/canvasworkspace.ui`
-- **已可点**：新建、打开、退出；视图缩放；窗口→图层 / 颜色 / 属性；工具切换；画笔/橡皮绘制活动层；抓手平移；缩放工具；前景/背景色；关于。
+- **已可点**：新建（弹「新建文档」对话框）、打开、退出；视图缩放；窗口→图层 / 颜色 / 属性；工具切换；画笔/橡皮绘制活动层；抓手平移；缩放工具；前景/背景色；关于；
+  选项条「家」→ 主页全页，主页「新文件」同新建对话框，「打开」同打开文件，顶栏 ← 返回工作区。
 - **菜单下拉**：顶层与 Photoshop 中文版对齐（文件 / 编辑 / 图像 / 图层 / 文字 / 选择 / 滤镜 / 3D / 视图 / 窗口 / 帮助），
   含子菜单（导出、调整、图层样式、滤镜分类、窗口面板列表等）。**除上列已接线项外全部灰显占位**，
   tooltip 写「UI 占位，功能尚未接入」——只补齐入口，不假装有功能。
+- **主页 / 新建文档（UI 壳）**：
+  - `ui/homescreen.ui`：对齐 PS Home；对照 GIMP `welcome-dialog.c` Create 页（本项目用栈页而非模态欢迎框）。
+  - `ui/newdocumentdialog.ui`：对齐 PS「新建文档」；对照 GIMP `image-new-dialog.c` + TemplateEditor。
+  - 最近文件列表、预设库持久化、颜色模式/分辨率进 domain 均尚未做。
 - **如何用**：Qt Creator 打开 `psDemo/psDemo.pro` 运行。选画笔后在画布左键拖拽即可绘制。
 
 ### 会话与广播（`app/AppSession`）

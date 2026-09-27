@@ -32,13 +32,49 @@
 }
 QWidget#ToolOptionsBar QLabel { color: #e8e8e8; }
 QWidget#ToolOptionsBar QComboBox,
-QWidget#ToolOptionsBar QSpinBox,
 QWidget#ToolOptionsBar QFontComboBox {
   background-color: #3a3a3a;
   color: #eee;
   border: 1px solid #222;
   padding: 1px 4px;
   min-height: 22px;
+}
+/* SpinBox：右侧上下键叠放（勿与 ComboBox 共用 padding） */
+QWidget#ToolOptionsBar QSpinBox {
+  background-color: #3a3a3a;
+  color: #eee;
+  border: 1px solid #222;
+  padding: 1px 16px 1px 4px;
+  min-height: 22px;
+}
+QWidget#ToolOptionsBar QSpinBox::up-button {
+  subcontrol-origin: border;
+  subcontrol-position: top right;
+  width: 14px;
+  border-left: 1px solid #222;
+  border-bottom: 1px solid #1a1a1a;
+  background-color: #454545;
+}
+QWidget#ToolOptionsBar QSpinBox::down-button {
+  subcontrol-origin: border;
+  subcontrol-position: bottom right;
+  width: 14px;
+  border-left: 1px solid #222;
+  background-color: #454545;
+}
+QWidget#ToolOptionsBar QSpinBox::up-button:hover,
+QWidget#ToolOptionsBar QSpinBox::down-button:hover {
+  background-color: #555;
+}
+QWidget#ToolOptionsBar QSpinBox::up-arrow {
+  image: url(:/icons/ui/spin-up.png);
+  width: 7px;
+  height: 5px;
+}
+QWidget#ToolOptionsBar QSpinBox::down-arrow {
+  image: url(:/icons/ui/spin-down.png);
+  width: 7px;
+  height: 5px;
 }
 QWidget#ToolOptionsBar QComboBox::drop-down { border: none; width: 16px; }
 QWidget#ToolOptionsBar QCheckBox { color: #e8e8e8; spacing: 5px; }

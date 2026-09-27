@@ -90,6 +90,63 @@ QLabel {
   background: transparent;
 }
 
+/* ---------------------------------------------------------------------------
+   QSpinBox / QDoubleSpinBox（工程统一用 Qt 自带控件）
+
+   只要给 SpinBox 写了 background/border/padding，Windows 样式表代理就会接管
+   按钮绘制；若不显式指定 ::up-button / ::down-button 的 subcontrol-position，
+   箭头会被排成左右两列，且左侧（加）经常点不到。
+
+   这里强制右上 / 右下叠放，与原生 UpDownArrows 一致。
+   --------------------------------------------------------------------------- */
+QSpinBox, QDoubleSpinBox {
+  background-color: #3c3c3c;
+  color: #eee;
+  border: 1px solid #222;
+  border-radius: 3px;
+  padding: 2px 18px 2px 6px; /* 右侧留给上下箭头列 */
+  min-height: 22px;
+}
+QSpinBox::up-button, QDoubleSpinBox::up-button {
+  subcontrol-origin: border;
+  subcontrol-position: top right;
+  width: 16px;
+  border-left: 1px solid #222;
+  border-bottom: 1px solid #1a1a1a;
+  background-color: #454545;
+}
+QSpinBox::down-button, QDoubleSpinBox::down-button {
+  subcontrol-origin: border;
+  subcontrol-position: bottom right;
+  width: 16px;
+  border-left: 1px solid #222;
+  background-color: #454545;
+}
+QSpinBox::up-button:hover, QDoubleSpinBox::up-button:hover,
+QSpinBox::down-button:hover, QDoubleSpinBox::down-button:hover {
+  background-color: #555;
+}
+QSpinBox::up-button:pressed, QDoubleSpinBox::up-button:pressed,
+QSpinBox::down-button:pressed, QDoubleSpinBox::down-button:pressed {
+  background-color: #3a3a3a;
+}
+QSpinBox::up-arrow, QDoubleSpinBox::up-arrow {
+  image: url(:/icons/ui/spin-up.png);
+  width: 9px;
+  height: 6px;
+}
+QSpinBox::down-arrow, QDoubleSpinBox::down-arrow {
+  image: url(:/icons/ui/spin-down.png);
+  width: 9px;
+  height: 6px;
+}
+QSpinBox::up-arrow:disabled, QDoubleSpinBox::up-arrow:disabled {
+  image: url(:/icons/ui/spin-up-disabled.png);
+}
+QSpinBox::down-arrow:disabled, QDoubleSpinBox::down-arrow:disabled {
+  image: url(:/icons/ui/spin-down-disabled.png);
+}
+
 /* ===========================================================================
    右侧停靠面板外观 —— 三个面板共用同一套规则，集中在此避免每个 .ui 各抄一份：
      DockPanel       图层 / 通道 / 路径
@@ -162,14 +219,19 @@ QSplitter#rightSplitter::handle:vertical:hover {
 }
 /* 面板内的输入控件（色板搜索、属性数值） */
 ColorsPanel QLineEdit,
-PropertiesPanel QLineEdit,
-ColorsPanel QSpinBox,
-PropertiesPanel QSpinBox,
-PropertiesPanel QDoubleSpinBox {
+PropertiesPanel QLineEdit {
   background-color: #2e2e2e;
   color: #eee;
   border: 1px solid #222;
   padding: 2px 4px;
+  min-height: 20px;
+}
+/* 面板 SpinBox 仅覆写底色；上下键叠放规则见上文全局块 */
+ColorsPanel QSpinBox,
+PropertiesPanel QSpinBox,
+PropertiesPanel QDoubleSpinBox {
+  background-color: #2e2e2e;
+  padding: 1px 16px 1px 4px;
   min-height: 20px;
 }
 ColorsPanel QTreeWidget,

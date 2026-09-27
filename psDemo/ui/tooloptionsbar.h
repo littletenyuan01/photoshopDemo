@@ -56,6 +56,8 @@ public slots:
 signals:
     /** 画笔/橡皮直径变化（图像像素）。唯一真正接线的选项。 */
     void brushDiameterChanged(int diameter);
+    /** 左端「家」按钮：请求显示主页（对齐 PS Home）。 */
+    void homeClicked();
 
 private:
     static QString toolDisplayName(Ps::ToolId id);

@@ -7,6 +7,8 @@
 
 class QCloseEvent;
 class QResizeEvent;
+class QStackedWidget;
+class HomeScreen;
 
 namespace Ps {
 class AppSession;
@@ -26,6 +28,7 @@ QT_END_NAMESPACE
  * 整体布局对齐 Photoshop：
  *   顶：菜单栏 → 工具选项栏
  *   中：左侧工具箱 | 标尺+画布工作区 | 右侧图层/通道/路径面板
+ *   另：选项条「家」→ HomeScreen 全页（对照 GIMP welcome-dialog Create 页，本项目做成栈页）
  *
  * 【职责收窄】本类只做两件事：
  * 1. **菜单/动作接线**（action → 槽）
@@ -66,6 +69,8 @@ protected:
 private slots:
     void onNewDocument();
     void onOpenDocument();
+    void onShowHomeScreen();
+    void onShowWorkspace();
     void onZoomFit();
     void onZoomActual();
     void onZoomIn();
@@ -82,8 +87,13 @@ private:
     void setupMenus();
     /** 把 session 交给画布工作区与右侧面板（一次性，之后靠广播）。 */
     void setupSession();
-    /** 连接工具箱 ↔ 选项栏 ↔ 画布。 */
+    /** 连接工具箱 ↔ 选项栏 ↔ 画布；以及「家」→ 主页。 */
     void setupToolbox();
+    /**
+     * 用 QStackedWidget 包住原 central：工作区 / HomeScreen 互切。
+     * 【为什么不放进 .ui】setupUi 已建好整棵中央树；再包一层栈避免大改 mainwindow.ui。
+     */
+    void setupHomeStack();
     /** 载入一篇默认文档，避免启动即空白壳。 */
     void createInitialDocument();
     /** 按当前高度给右侧栏三段分配默认比例（颜色 26% / 属性 24% / 图层 50%）。 */
@@ -91,6 +101,8 @@ private:
 
     Ui::MainWindow *ui;
     Ps::AppSession *m_session = nullptr;
+    QStackedWidget *m_mainStack = nullptr;
+    HomeScreen *m_homeScreen = nullptr;
     bool m_rightColumnUserSized = false; ///< 用户拖过分隔条后，不再套用默认比例
     bool m_closeConfirming = false;      ///< 正在弹退出确认框（防重入）
 };

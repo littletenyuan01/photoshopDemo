@@ -78,7 +78,9 @@ UI 不得直接改 `Layer`，一律走 `setLayerVisible/Opacity/Name/BlendMode` 
 | `ui/panelchrome.h` | 停靠面板公共外观件（Tab 栏右上角 ≡ 按钮），三个面板共用 |
 | `ui/pixmaputils.h` | 位图/图标公共工具：DPR 画布、多档图标光栅化、透明棋盘格（原先在 itemtreepanel / colorspanel / canvasview / toolbox 四处各写一份） |
 | `ui/toolbox.ui/.h/.cpp` | 左侧工具箱：17 个占位槽 / 35 个工具，按 PS 分组，右键飞出菜单（对齐 GIMP Toolbox 结构） |
-| `ui/tooloptionsbar.ui/.h/.cpp` | 工具选项栏：`QStackedWidget` 11 个工具族参数页，随工具整块切换（对照 GIMP `gimp_tool_options_gui()`） |
+| `ui/tooloptionsbar.ui/.h/.cpp` | 工具选项栏：`QStackedWidget` 11 个工具族参数页，随工具整块切换（对照 GIMP `gimp_tool_options_gui()`）；左端「家」发 `homeClicked` |
+| `ui/homescreen.ui/.h/.cpp` | PS 主页全页壳（新文件/打开/最近项）；对照 GIMP `welcome-dialog.c` Create 页，本项目用栈页 |
+| `ui/newdocumentdialog.ui/.h/.cpp` | PS「新建文档」对话框壳；对照 GIMP `image-new-dialog.c` + TemplateEditor |
 
 **要点**：`CanvasView` **不再包含任何工具分支**；工具逻辑全在 `tools/`。
 

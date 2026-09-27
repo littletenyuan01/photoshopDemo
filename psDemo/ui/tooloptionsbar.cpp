@@ -24,6 +24,9 @@ ToolOptionsBar::ToolOptionsBar(QWidget *parent)
     connect(ui->brushSizeSpin, qOverload<int>(&QSpinBox::valueChanged),
             this, &ToolOptionsBar::brushDiameterChanged);
 
+    // 「家」→ 主页（UI 阶段只发信号，由 MainWindow 切到 HomeScreen）
+    connect(ui->homeButton, &QToolButton::clicked, this, &ToolOptionsBar::homeClicked);
+
     // 画笔预设 / 渐变预设 / 文字颜色三个按钮：只做个色块样式，不接功能
     ui->paintPresetButton->setIconSize(QSize(28, 18));
     ui->gradientPreviewButton->setIconSize(QSize(36, 16));

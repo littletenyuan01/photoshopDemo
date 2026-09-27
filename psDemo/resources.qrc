@@ -39,6 +39,12 @@
     <file alias="tools/zoom.png">resources/icons/tools/zoom.png</file>
     <file alias="ui/check-white.png">resources/icons/ui/check-white.png</file>
     <file alias="ui/radio-dot-white.png">resources/icons/ui/radio-dot-white.png</file>
+    <file alias="ui/spin-up.png">resources/icons/ui/spin-up.png</file>
+    <file alias="ui/spin-down.png">resources/icons/ui/spin-down.png</file>
+    <file alias="ui/spin-up-disabled.png">resources/icons/ui/spin-up-disabled.png</file>
+    <file alias="ui/spin-down-disabled.png">resources/icons/ui/spin-down-disabled.png</file>
+    <file alias="ui/orient-portrait.png">resources/icons/ui/orient-portrait.png</file>
+    <file alias="ui/orient-landscape.png">resources/icons/ui/orient-landscape.png</file>
     <!-- 菜单栏 / 工具选项条 chrome -->
     <file alias="ui/home.png">resources/icons/ui/home.png</file>
     <file alias="ui/app-logo.png">resources/icons/ui/app-logo.png</file>
