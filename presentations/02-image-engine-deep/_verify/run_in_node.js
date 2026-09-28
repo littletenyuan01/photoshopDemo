@@ -85,14 +85,28 @@ console.log('-- 1) 9 个步骤全部执行（任何异常都会让本脚本崩�
 for (let i = 0; i < 9; i++) { goStep(i); }
 check(true, '9 个步骤的 run() + render 都跑通了');
 
-console.log('-- 2) 惰性分配：透明文档 0 瓦片，画一笔只分配几块');
+console.log('-- 2) 划分 ≠ 分配：地址空间有 12 个，数据块 0 个');
 resetDoc({ w: 512, h: 384, tile: 128, depth: 8 });
 addLayer('测试层');
-check(state.tiles.size === 0, '新建透明文档：已分配瓦片 = 0（像素内存 0 字节）');
+check(gridCols() * gridRows() === 12, '寻址空间 = ' + gridCols() + ' × ' + gridRows() + ' = 12 个地址（尺寸一确定就推导得出）');
+check(state.tiles.size === 0, '新建透明文档：已分配数据块 = 0（像素内存 0 字节）');
 let L = activeLayer();
 let r = paintSegment(L, 100, 100, 140, 120, 10, [1, 0, 0], false);
 check(r.touched.size > 0 && r.touched.size <= 4, '一笔只触碰 ' + r.touched.size + ' 块瓦片（≤4）');
 captured.lazyTiles = r.touched.size;
+
+console.log('-- 2b) 边缘瓦片：网格只覆盖画布；不满一格也占一整块');
+resetDoc({ w: 512, h: 384, tile: 128, depth: 8 }); addLayer('t');
+check(gridCols() === 4 && gridRows() === 3 && edgeWaste().waste === 0, '512×384 正好整格：4×3，边缘浪费 0');
+resetDoc({ w: 400, h: 300, tile: 128, depth: 8 }); addLayer('t');
+const e = edgeWaste();
+check(gridCols() === 4 && gridRows() === 3, '400×300 仍是 4×3 格（⌈400/128⌉=4, ⌈300/128⌉=3）');
+check(tileValidW(3) === 16 && tileValidH(2) === 44, '右列有效宽 16px、下行有效高 44px');
+check((gridCols() - 1) * tilePx() < 400 && (gridRows() - 1) * tilePx() < 300,
+  '最后一行/列的起点仍在画布内（画布外没有瓦片）');
+check(e.waste === 512 * 384 - 400 * 300,
+  '网格覆盖 ' + e.covered + ' px − 文档 ' + e.doc + ' px = ' + e.waste + ' px 在画布外用不到（' +
+  (e.waste / e.covered * 100).toFixed(0) + '%）');
 
 console.log('-- 3) 只重算脏瓦片 vs 整幅');
 state.mode = 'tiles';

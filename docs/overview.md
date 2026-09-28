@@ -19,6 +19,8 @@ photoshopDemo/
 │   ├── mainwindow.*        # 主窗口壳 + .ui
 │   └── ...
 ├── docs/                   # 技术文档（本目录，随代码更新）
+│   ├── ui/                 # 界面壳：审查、图标清单
+│   └── layers/             # 文档 / 图层 / 合成概念
 ├── wiki/                   # 项目 Wiki（目标、路线、构建）
 ├── .cursor/rules/          # Cursor 工程规则
 ├── README.md
@@ -41,7 +43,7 @@ photoshopDemo/
 | 打开位图 | 已实现 | PNG/JPEG/BMP/WebP → 单层文档 |
 | 缩放/平移 | 已实现 | 滚轮缩放；中键或 Alt+左键拖拽；适应窗口 |
 | 画笔 / 橡皮 | 已实现 | 圆形 dab + 线段插值，写活动层 |
-| 撤销 / 重做 | 计划中 | 收口点已就位（见 `docs/ui-review.md`） |
+| 撤销 / 重做 | 计划中 | 收口点已就位（见 `docs/ui/ui-review.md`） |
 | 导出 | 计划中 | — |
 
 ## 技术栈

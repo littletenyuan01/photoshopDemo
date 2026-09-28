@@ -69,47 +69,59 @@
 </header>
 
 <main>
-  <h2>已完成</h2>
+  <h2>已完成 · 建议先看简明版</h2>
 
-  <a class="card" href="01-photoshop-image-engine/index.html">
-    <div class="title"><span class="no">01</span>Photoshop 图像引擎：从新建文档到你看到的画面</div>
+  <a class="card" href="01-tiles-and-layers/index.html">
+    <div class="title"><span class="no">01</span>图像引擎简明版：格子 · 图层 · 合成 · 脏格子</div>
     <p class="desc">
-      新建文档到底分配了什么 · 瓦片（tile）是什么、为什么非要它 · 每个图层一套瓦片网格 ·
-      画一笔的内部链路 · 屏幕合成与"第三份数据" · 区域撤销 · 暂存盘换页 · 缓存级别金字塔。
+      一步只说一件事：① 一张图是切成格子的 ② 只画过的地方才有格子（稀疏）③ 每个图层各自一套格子
+      ④ 你看到的是"叠起来算出的第三份数据" ⑤ 改一小块只重算那一小块。
     </p>
     <div class="tags">
-      <span class="tag">瓦片 / 稀疏分配</span>
-      <span class="tag">脏瓦片重算</span>
-      <span class="tag">区域撤销</span>
-      <span class="tag">LRU 换页</span>
-      <span class="tag">9 步交互</span>
+      <span class="tag">5 步</span>
+      <span class="tag">3 组控件</span>
+      <span class="tag">每步一个示范按钮</span>
+      <span class="tag">可直接在画布上画</span>
+    </div>
+  </a>
+
+  <a class="card" href="02-image-engine-deep/index.html">
+    <div class="title"><span class="no">02</span>图像引擎深入版（想深挖时再看）</div>
+    <p class="desc">
+      在简明版的主干上加细节：划分≠分配 · 边缘瓦片 · 屏幕合成缓存 · 区域撤销 ·
+      暂存盘 LRU 换页 · 缓存级别 · 位深 · 瓦片检查器 · 资料分级面板。
+    </p>
+    <div class="tags">
+      <span class="tag">9 步</span>
+      <span class="tag">10 组控件</span>
+      <span class="tag">进阶参数都在这里</span>
     </div>
   </a>
 
   <h2>计划中（按需再做）</h2>
 
   <div class="card planned">
-    <div class="title"><span class="no">02</span>选区与蒙版</div>
+    <div class="title"><span class="no">03</span>选区与蒙版</div>
     <p class="desc">选区为什么是"8 位灰度图"？蒙版与选区什么关系？羽化/抗锯齿在哪一层算。</p>
   </div>
 
   <div class="card planned">
-    <div class="title"><span class="no">03</span>图层混合模式</div>
+    <div class="title"><span class="no">04</span>图层混合模式</div>
     <p class="desc">Normal 之外的几十种模式怎么推导 —— 公式 + 逐像素演示。</p>
   </div>
 
   <div class="card planned">
-    <div class="title"><span class="no">04</span>撤销栈 / 历史记录</div>
+    <div class="title"><span class="no">05</span>撤销栈 / 历史记录</div>
     <p class="desc">命令模式 vs 快照；一次操作 = 一次 push；分支历史怎么长出来。</p>
   </div>
 
   <div class="card planned">
-    <div class="title"><span class="no">05</span>非破坏编辑：调整层与智能对象</div>
+    <div class="title"><span class="no">06</span>非破坏编辑：调整层与智能对象</div>
     <p class="desc">节点图 vs 像素栈；"写作与分离"到底分离了什么。</p>
   </div>
 
   <div class="card planned">
-    <div class="title"><span class="no">06</span>色彩管理</div>
+    <div class="title"><span class="no">07</span>色彩管理</div>
     <p class="desc">sRGB / Adobe RGB / 16 位管线；为什么"同一个数值看起来不一样"。</p>
   </div>
 </main>

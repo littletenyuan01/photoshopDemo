@@ -23,7 +23,7 @@ alwaysApply: true
 
 - 下载图标放到 `psDemo/resources/icons/tools/`（PNG，英文文件名），并加入 `resources.qrc`
 - 命名建议：`tools/<name>.png`（如 `brush.png`）；暗色主题优先单色/线框
-- 在 `docs/iconfont-icons.md` / `tech-notes.md` 记录来源（iconfont 关键词即可）
+- 在 `docs/ui/iconfont-icons.md` / `tech-notes.md` 记录来源（iconfont 关键词即可）
 
 ## 自动化注意
 

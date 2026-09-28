@@ -34,7 +34,7 @@
 **问题**：`CanvasView::mousePressEvent` 里堆着「通用平移 / 抓手 / 缩放放大 / 画笔 / 缩放缩小」
 的 if-else 链，且缩放数学写了两遍。每新增一个工具都要改这个文件，工具数与画布体积线性相关。
 
-**修复**：新增 `tools/` 交互层（`architecture.md` §2 早已规划 `tools` + `ToolManager`，此前未实现）。
+**修复**：新增 `tools/` 交互层（[`architecture.md`](../architecture.md) §2 早已规划 `tools` + `ToolManager`，此前未实现）。
 
 ```text
 tools/
@@ -129,7 +129,7 @@ tools/
 四处 setDocument（外加 `notifyDocumentChanged`），加一个面板就得加一行，漏一行即静默不刷新。
 
 **修复**：新增 `app/appsession.h/.cpp` —— **文档的唯一持有者与广播中心**
-（`architecture.md` §2 早已规划 `AppSession`，此前未实现）。
+（[`architecture.md`](../architecture.md) §2 早已规划 `AppSession`，此前未实现）。
 
 ```text
 MainWindow ──setDocument()──> AppSession ──documentChanged(doc)──> CanvasWorkspace / DockPanel / 标题
@@ -189,7 +189,7 @@ MainWindow ──setDocument()──> AppSession ──documentChanged(doc)─�
    （只有「值随状态变」的内联样式，如前景色块，才留在代码里）。
    选择器**用类名做祖先**（`ColorsPanel QToolButton`），**不要**用提升实例名
    （`QWidget#colorsPanel …`）—— 实测匹配不上；每个 Tab **页容器要显式写底色**
-   （全局 `QWidget` 是透明的，不写就露黑底）。详见 `docs/tech-notes.md` 同名条目。
+   （全局 `QWidget` 是透明的，不写就露黑底）。详见 [`tech-notes.md`](../tech-notes.md) 同名条目。
 8. **右侧栏高度必须可拖**：三段放在 `QSplitter` 里，默认比例由
    `MainWindow::applyDefaultRightColumnSizes()` 按真实高度分配（构造期算不准）。
    **新增面板**：给它设 `minimumHeight` 并让 `QSplitter` 收录；

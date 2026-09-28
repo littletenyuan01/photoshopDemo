@@ -34,7 +34,7 @@ QT_END_NAMESPACE
  *    之后文档变化由 AppSession 广播，**本类不再手工逐个 setDocument**。
  *
  * 早先换文档要连续调用 canvasWorkspace/canvasView/layerPanel/docStatusBar
- * 四处 setDocument，加一个面板就得加一行，漏一行即静默不刷新（见 docs/ui-review.md）。
+ * 四处 setDocument，加一个面板就得加一行，漏一行即静默不刷新（见 docs/ui/ui-review.md）。
  *
  * 工具箱结构参考 GIMP GimpToolbox（按钮区 + 前/背景色）。
  * 标尺工作区参考 GIMP display shell（hrule/vrule + canvas）。

@@ -396,7 +396,7 @@ return QIcon(pm);                                 // 这个 QIcon 只有一张 2
 48×48 超采样像素方案，已删除。教训：**图标应该用矢量源，而不是在更低位图里堆细节**。
 
 > 【对照 GIMP】GIMP 用矢量 `GimpViewRenderer` 渲染图标。
-> 【来源约定】优先 iconfont.cn；本套为自绘占位，搜索关键词见 `docs/iconfont-icons.md`，
+> 【来源约定】优先 iconfont.cn；本套为自绘占位，搜索关键词见 `docs/ui/iconfont-icons.md`，
 > 可同名替换 `.svg`（`resources.qrc` 无需改）。
 
 ### 2026-09 — 图层 / 通道面板缩略图
@@ -432,7 +432,7 @@ return QIcon(pm);                                 // 这个 QIcon 只有一张 2
 
 ### 2026-09 — UI 结构收口（工具层 / 会话广播 / 信号分级）
 
-> 完整审查记录见 `docs/ui-review.md`（含审查方法、依赖实测、仍欠清单、自测清单）。
+> 完整审查记录见 `docs/ui/ui-review.md`（含审查方法、依赖实测、仍欠清单、自测清单）。
 
 - **新增 `tools/` 交互层**：`Tool` 基类 + `ToolManager` 注册表 + `Move`/`Hand`/`Zoom`/`Paint` 四个工具。
   `CanvasView::mousePressEvent` 里原先 5 条工具 if 分支全部移除；新增工具只需注册一行。
@@ -492,7 +492,7 @@ return QIcon(pm);                                 // 这个 QIcon 只有一张 2
 - 形状组：矩形 / 椭圆 / 三角 / 直线；选框组：矩形选框 / 椭圆选框；填充组：油漆桶 / 渐变。
 
 - 主窗口加载 `:/styles/dark.qss`。
-- 图标约定：**优先 [iconfont.cn](https://www.iconfont.cn/)**（见 `icon-sources.mdc` / `docs/iconfont-icons.md`）；禁止 Adobe 官方图标；资源文件名用英文。
+- 图标约定：**优先 [iconfont.cn](https://www.iconfont.cn/)**（见 `icon-sources.mdc` / `docs/ui/iconfont-icons.md`）；禁止 Adobe 官方图标；资源文件名用英文。
 - 工具箱路径：`:/icons/tools/*.png`。旧自绘 `tool-*.svg` 已移除。
 
 ### 2026-09 — 图层面板底栏加大与图标

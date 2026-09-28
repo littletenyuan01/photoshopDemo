@@ -90,6 +90,16 @@ function ensureTile(layerId, tx, ty) {
   return t;
 }
 
+/** 某块瓦片的**有效**尺寸：边缘瓦片会小于粒度（例如 400 宽、粒度 128 → 第 4 列只有 16px 有效）。 */
+const tileValidW = tx => Math.min(tilePx(), state.doc.w - tx * tilePx());
+const tileValidH = ty => Math.min(tilePx(), state.doc.h - ty * tilePx());
+/** 网格覆盖的总面积（每块按整格算）与文档面积之差 = 边缘用不到的部分。 */
+function edgeWaste() {
+  const covered = gridCols() * gridRows() * tilePx() * tilePx();
+  const doc = state.doc.w * state.doc.h;
+  return { covered, doc, waste: covered - doc };
+}
+
 /** 触碰 = 记 LRU 时间；若已换出则换入（真实产品这里会读磁盘）。 */
 function touch(t) {
   t.lastUse = ++state.useSeq;
@@ -409,6 +419,20 @@ function paintDocCanvas() {
   docCtx.strokeStyle = '#000';
   docCtx.lineWidth = 1;
   docCtx.strokeRect(t.ox - .5, t.oy - .5, d.w * t.scale + 1, d.h * t.scale + 1);
+
+  // 边缘瓦片：把"这块只有多少像素落在画布内"写在格子左上角
+  // （网格只覆盖画布范围 —— 画布外没有任何瓦片；不满一格的行/列照样占**一整块**）
+  docCtx.font = '10px Consolas, monospace';
+  docCtx.textBaseline = 'top';
+  for (let ty = 0; ty < gridRows(); ty++) {
+    for (let tx = 0; tx < gridCols(); tx++) {
+      const vw = tileValidW(tx), vh = tileValidH(ty);
+      if (vw === n && vh === n) continue;
+      const [cx, cy] = imgToCanvas(tx * n, ty * n);
+      docCtx.fillStyle = 'rgba(255,212,121,.92)';
+      docCtx.fillText(`有效 ${vw}×${vh}`, cx + 4, cy + 4);
+    }
+  }
 }
 
 /** 视口：图像坐标（闭区间）。缩放越大，看到的图像范围越小。 */
@@ -537,6 +561,21 @@ function renderInspector() {
 }
 
 // ------------------------------------------------------------------ 数字面板
+/** 边缘瓦片那一行：说清"右/下零头仍占一整块，只是有一部分用不到"。 */
+function edgeStatLine() {
+  const e = edgeWaste();
+  const lastW = tileValidW(gridCols() - 1), lastH = tileValidH(gridRows() - 1);
+  const partial = (lastW < tilePx() ? `右列每块只用 ${lastW}/${tilePx()} 宽` : '')
+    + (lastW < tilePx() && lastH < tilePx() ? '，' : '')
+    + (lastH < tilePx() ? `下行每块只用 ${lastH}/${tilePx()} 高` : '');
+  if (e.waste === 0) {
+    return `无（${state.doc.w}×${state.doc.h} 正好是 ${tilePx()} 的整数倍，网格完全贴合画布）`;
+  }
+  return `${partial}；网格覆盖 ${e.covered.toLocaleString()} px − 文档 ${e.doc.toLocaleString()} px `
+    + `= <b>${e.waste.toLocaleString()} px（占 ${(e.waste / e.covered * 100).toFixed(0)}%）</b>用不到，`
+    + `但每块仍按整格占内存`;
+}
+
 function renderStats() {
   const d = state.doc;
   const alloc = state.tiles.size;
@@ -547,8 +586,9 @@ function renderStats() {
   const histTotal = state.history.reduce((s, e) => s + e.bytes, 0);
 
   const lines = [
-    ['画布', `${d.w} × ${d.h} px · 瓦片 ${tilePx()}×${tilePx()} · 网格 ${gridCols()} × ${gridRows()} = ${totalTiles()} 块 · ${d.depth} 位/通道`],
-    ['已分配瓦片', `${alloc} / ${totalTiles()} 块（内存 ${ram}，暂存盘 ${disk}）`],
+    ['画布', `${d.w} × ${d.h} px · 粒度 ${tilePx()}×${tilePx()} · <b>寻址空间</b> ${gridCols()} × ${gridRows()} = ${totalTiles()} 个地址 · ${d.depth} 位/通道`],
+    ['已分配数据块', `${alloc} / ${totalTiles()} 个地址有数据（内存 ${ram}，暂存盘 ${disk}）`],
+    ['边缘瓦片（不满一格）', edgeStatLine()],
     ['已分配占用', `${(usedBytes / 1024).toFixed(0)} KB（整幅全分配要 ${(fullBytes / 1024).toFixed(0)} KB）`],
     ['上一笔触碰瓦片', `${state.lastStrokeTiles} 块 → 只分配/只重算这几块；改动 ${state.stats.lastPaintedPx.toLocaleString()} 像素，涉及图层 ${state.stats.lastTouchedLayers} 个`],
     ['上次屏幕重算', `${state.stats.lastRecompTiles} 块瓦片（整幅是 ${totalTiles()} 块）`],
@@ -576,25 +616,42 @@ function renderHistory() {
 // ------------------------------------------------------------------ 步骤讲解
 const STEPS = [
   {
-    t: '① 新建文档：建"瓦片网格"，不马上分配整幅像素',
+    t: '① 新建文档：先有元数据；瓦片是"写像素时"才出现的',
     run() {
       resetDoc({ w: DOC_W, h: DOC_H, transparentBg: true });
-      addLayer('图层 1');       // 透明底：一个瓦片都不分配
+      addLayer('图层 1');       // 透明底：一个瓦片数据块都不分配
       recompute(); renderAll();
     },
-    html: `<h3>PS 新建文档时到底分配了什么</h3>
-      <p>不是一次 malloc 出 <code>宽×高×4</code> 字节，而是先建立<b>元数据 + 一张空的瓦片网格</b>：</p>
-      <p class="mono">网格 = ⌈宽 / 瓦片边长⌉ × ⌈高 / 瓦片边长⌉ 块</p>
+    html: `<h3>先把三个词分清楚（这里最容易混）</h3>
+      <table>
+        <tr><th>词</th><th>是什么</th><th>什么时候出现</th></tr>
+        <tr><td>文档元数据</td><td>宽、高、分辨率、颜色模式、位深 + 一条空的图层记录</td>
+            <td><b>新建文档时</b>就有了</td></tr>
+        <tr><td>瓦片<b>划分</b>（寻址空间）</td>
+            <td>按粒度把画布算成 ⌈宽/边长⌉ × ⌈高/边长⌉ 个<b>地址</b></td>
+            <td>尺寸一确定就<b>推导得出</b>，不是被"建"出来的对象</td></tr>
+        <tr><td>瓦片<b>数据块</b>（分配）</td>
+            <td>真正装像素的那 边长×边长×4 字节</td>
+            <td><b>第一次往这块写像素</b>时才分配</td></tr>
+      </table>
+      <p>所以"新建文档时建立了一张空瓦片网格"这种说法<b>不准确</b>：
+      网格不是被创建出来的实体，它只是 <span class="mono">tx = ⌊x/边长⌋, ty = ⌊y/边长⌋</span>
+      这套<b>寻址</b>算出来的结果。新建时真正被建立的只有<b>元数据与图层记录</b>。</p>
       <ul>
-        <li>本页 512×384、瓦片 128 → <b>4 × 3 = 12 块</b>。虚线格 = "还没分配"。</li>
-        <li>当前是<b>透明底</b>文档：一个像素都没写 → <b>已分配 0 块</b>，像素内存 <b>0 字节</b>。</li>
-        <li>若在"新建"对话框选白底/背景色，PS 会真的写满整层 → 12 块全部被分配（数字面板可对比）。</li>
+        <li>本页 512×384、粒度 128 → 寻址空间 <b>4 × 3 = 12 个地址</b>（画布上那些虚线格）。</li>
+        <li>当前是<b>透明底</b>文档：一个像素都没写 → <b>已分配 0 / 12 块</b>，像素内存 <b>0 字节</b>。</li>
+        <li>若在"新建"对话框选白底/背景色，PS 会把整层像素写满 → 12 个地址才都拿到数据块。
+        <b>"分配"是被"写"触发的，不是被"建文档"触发的。</b></li>
       </ul>
-      <p>[共识] 瓦片边长通常引用 <b>128×128</b>（Adobe 未文档化）；[源码] GIMP 的瓦片边长是<b>可配属性</b>
-      （历史默认 64×64）。点第 ② 步的 64 / 128 / 256 按钮看差别。</p>`
+      <p>[共识] 瓦片边长常引用 <b>128×128</b>（Adobe 未文档化）；[源码] GIMP 的粒度是<b>可配属性</b>
+      （历史默认 64×64）。点第 ② 步的 64 / 128 / 256 按钮看差别。</p>
+      <p class="bad">诚实标注：PS 内部是否会预建一张"瓦片指针表/目录"没有官方文档；
+      能确定的是<b>像素内存按需分配</b>（这正是超大画布、超小图层能存在的原因）。
+      [源码] GIMP 侧可核对：GeglBuffer 只管外框，tile 由 tile handler
+      在被访问时才校验/渲染/取内存。</p>`
   },
   {
-    t: '② 瓦片是什么：坐标、稀疏、为什么非要它',
+    t: '② 瓦片是什么：先"划分"（寻址），再"分配"',
     run() {
       resetDoc({ w: DOC_W, h: DOC_H, transparentBg: true });
       addLayer('图层 1');
@@ -606,28 +663,43 @@ const STEPS = [
       endOp('演示笔画', L);
       renderAll();
     },
-    html: `<h3>瓦片 = 把画布切成固定边长的小方块</h3>
+    html: `<h3>瓦片 = 把画布按固定粒度切格子，作为<b>寻址与存储</b>的单位</h3>
+      <p><b>划分别等于分配</b>：划分是"给每个像素算一个格子地址"，尺寸一确定就能算；
+      分配是"为某个格子真的申请 边长×边长×4 字节"，只有写像素时才发生。
+      所以画布上虚线格 = 地址有了、数据还没有。</p>
       <p>坐标换算（记住这一条就够用）：</p>
       <p class="mono">tx = ⌊x / 边长⌋ &nbsp; ty = ⌊y / 边长⌋ &nbsp; 块内偏移 = (x mod 边长, y mod 边长)</p>
-      <p>同一笔（半径 40、横向一段）在不同边长下碰到的块数完全不同 —— 点上面的 64 / 128 / 256 试：</p>
+      <p>同一笔（半径 40、横向一段）在不同粒度下碰到的格子数完全不同 —— 点上面的 64 / 128 / 256 试：</p>
       <ul>
-        <li>边长越小：粒度细、笔迹边缘浪费少，但<b>块数暴涨</b>（索引与管理开销大）；</li>
-        <li>边长越大：管理简单，但一次要处理/换页/撤销的数据多，小笔画浪费大。</li>
+        <li>粒度越小：边缘浪费少，但<b>格子数暴涨</b>（索引与管理开销大）；</li>
+        <li>粒度越大：管理简单，但一次要处理/换页/撤销的数据多，小笔画浪费大。</li>
         <li>所以真实产品把它定在 64–128 这个量级，而不是 16 或 1024。</li>
+      </ul>
+      <h3>边缘瓦片：右/下"不满一格"怎么办</h3>
+      <p>划分只覆盖<b>文档范围</b>，所以行数是 <span class="mono">⌈高/粒度⌉</span>、列数是
+      <span class="mono">⌈宽/粒度⌉</span> —— <b>上取整，所以最后一行/列可能只用得到一部分</b>。
+      点上面的「400×300（有零头）」看：右列每块只有 16px 宽有效、下行每块只有 44px 高有效，
+      画布上会把「有效 w×h」写在格子角上，数字面板里给出用不到的像素比例。</p>
+      <ul>
+        <li><b>画布外没有任何瓦片</b>：网格 = ⌈宽/粒度⌉ × ⌈高/粒度⌉，最右边/最下边的格子也属于画布内。</li>
+        <li>不满一格的行/列，<b>照样按一整块占内存</b>（内存按整格申请）；
+        [诚实标注] 是否对边缘做特殊处理没有官方文档，[源码] GIMP 的 tile 就是整块缓冲。</li>
+        <li>这就是"粒度"的取舍另一面：粒度越大，边缘浪费越明显（400×300 用 128 粒度时，
+        网格覆盖 512×384 = 196,608 px，其中 <b>39%</b> 落在画布外用不到）。</li>
       </ul>
       <h3>为什么非要用瓦片（7 个理由）</h3>
       <ol>
-        <li><b>稀疏分配</b>：没画过的地方 0 字节 —— 超大画布、超小图层才敢开。</li>
-        <li><b>增量重算</b>：改一块只重算相关瓦片的合成结果，不必整幅。</li>
-        <li><b>撤销的天然单位</b>：历史按"被改动的瓦片"存旧内容（第 ⑥ 步）。</li>
-        <li><b>可换页</b>：内存不够就把瓦片写进暂存盘 [官方 Scratch Disks]。</li>
-        <li><b>显示金字塔</b>：缓存级别（Cache Levels）[官方] 缩小时用更粗的瓦片。</li>
-        <li><b>异步/并行</b>：只渲染可见瓦片、后台补算其余。[源码] GIMP 的 validate handler 就是按 tile 惰性渲染。</li>
+        <li><b>稀疏分配</b>：没写过的格子 0 字节 —— 超大画布、超小图层才敢开。</li>
+        <li><b>增量重算</b>：改一格只重算相关格子的合成结果，不必整幅。</li>
+        <li><b>撤销的天然单位</b>：历史按"被改动的格子"存旧内容（第 ⑥ 步）。</li>
+        <li><b>可换页</b>：内存不够就把格子写进暂存盘 [官方 Scratch Disks]。</li>
+        <li><b>显示金字塔</b>：缓存级别（Cache Levels）[官方] 缩小时用更粗的格子。</li>
+        <li><b>异步/并行</b>：只渲染可见格子、后台补算其余。[源码] GIMP 的 validate handler 就是按 tile 惰性渲染。</li>
         <li><b>缓存局部性</b>：一次只在 128×128 小块里遍历，CPU 缓存友好。</li>
       </ol>`
   },
   {
-    t: '③ 新建图层：又一套空瓦片网格（+ 偏移）',
+    t: '③ 新建图层：又一套空的寻址空间（+ 偏移）',
     run() {
       addLayer('图层 2');
       const L = activeLayer();
@@ -638,16 +710,18 @@ const STEPS = [
       endOp('图层 2 上画一笔', L);
       renderAll();
     },
-    html: `<h3>每个图层各有一套瓦片网格</h3>
+    html: `<h3>每个图层各有一套自己的格子</h3>
       <ul>
-        <li>图层不是"叠起来的数组"，而是<b>并排的若干套瓦片集合</b>；新建图层 = 一套全新的空网格（几乎 0 字节）。</li>
-        <li>[官方] 图层可以<b>比画布小</b>、可以带偏移（本页图层记录里的 <code>offset</code> 就对应 PS 的图层位置），
+        <li>新建图层只多了一条<b>图层记录</b>：它和画布共用同一套寻址公式，
+        但<b>数据块要从零开始</b>——空白层永远是 0 块（面板里"瓦片 0/12"）。</li>
+        <li>图层不是"叠起来的数组"，而是<b>并排的若干套稀疏格子集合</b>。</li>
+        <li>[官方] 图层可以<b>比画布小</b>、可以带偏移（本页图层记录里的 <code>offset</code> 对应 PS 的图层位置），
         这样"小贴图"图层不会白占整幅内存。</li>
         <li>隐藏图层（点眼睛）<b>照样占存储</b>，只是不参与合成 —— 与"删除图层"完全不同。</li>
         <li>图层顺序是<b>栈/顺序表</b>（本页 <code>layers[]</code>，index 0 = 最底），不是链表；
         只有<b>图层组</b>才是树形。[源码] GIMP：<code>GimpContainer</code> + <code>GimpGroupLayer</code>。</li>
       </ul>
-      <p>连点几次「新建图层」：空白层的瓦片数始终是 0 —— 这就是稀疏分配。</p>`
+      <p>连点几次「新建图层」：面板里新层的"瓦片 0/12"始终不变 —— 这就是稀疏分配。</p>`
   },
   {
     t: '④ 操作图层：写瓦片 → 标脏 → 合成失效',
@@ -887,6 +961,8 @@ function syncButtons() {
   document.querySelectorAll('#tileRow button').forEach(b => b.classList.toggle('on', +b.dataset.tile === state.doc.tile));
   document.querySelectorAll('#depthRow button').forEach(b => b.classList.toggle('on', +b.dataset.depth === state.doc.depth));
   document.querySelectorAll('#zoomRow button').forEach(b => b.classList.toggle('on', +b.dataset.zoom === state.zoom));
+  document.querySelectorAll('#sizeRow button').forEach(b =>
+    b.classList.toggle('on', b.dataset.size === `${state.doc.w}x${state.doc.h}`));
 }
 document.getElementById('toolRow').addEventListener('click', e => {
   const b = e.target.closest('button'); if (!b) return;
@@ -916,6 +992,19 @@ document.getElementById('depthRow').addEventListener('click', e => {
 document.getElementById('zoomRow').addEventListener('click', e => {
   const b = e.target.closest('button'); if (!b) return;
   state.zoom = +b.dataset.zoom; syncButtons(); paintScreenCanvas(); renderStats();
+});
+document.getElementById('sizeRow').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  const [w, h] = b.dataset.size.split('x').map(Number);
+  resetDoc({ w, h });
+  addLayer('图层 1');
+  const L = activeLayer();
+  beginOp();
+  paintSegment(L, w * 0.15, h * 0.2, w * 0.8, h * 0.75, Math.round(tilePx() / 5),
+               [0.30, 0.65, 1.0], false);
+  recompute();
+  endOp('换文档尺寸后画一笔', L);
+  syncButtons(); renderAll();
 });
 document.getElementById('brushRange').addEventListener('input', e => {
   state.radius = +e.target.value;

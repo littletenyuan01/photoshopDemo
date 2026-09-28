@@ -44,15 +44,15 @@
   <section class="stage">
     <div class="card">
       <div class="card-head">
-        <h2>① 文档窗口（整幅 + 瓦片网格）</h2>
-        <div class="hint">虚线格 = 未分配的瓦片；实色格 = 已分配；红框 = 脏瓦片</div>
+        <h2>① 文档窗口（整幅 + 格子地址空间）</h2>
+        <div class="hint">虚线格 = 地址在、数据还没分配；实色格 = 已分配数据块；红框 = 脏（待重算）</div>
       </div>
       <div class="canvas-wrap">
         <canvas id="docCanvas" width="520" height="380"></canvas>
         <div class="legend">
-          <span><i class="sw sw-alloc"></i>已分配</span>
-          <span><i class="sw sw-unalloc"></i>未分配（0 字节）</span>
-          <span><i class="sw sw-dirty"></i>脏瓦片</span>
+          <span><i class="sw sw-alloc"></i>已分配数据块（内存）</span>
+          <span><i class="sw sw-unalloc"></i>地址在、数据 0 字节</span>
+          <span><i class="sw sw-dirty"></i>脏（待重算）</span>
           <span><i class="sw sw-disk"></i>已换出到暂存盘</span>
           <span><i class="sw sw-view"></i>视口</span>
         </div>
@@ -100,6 +100,13 @@
           <div class="btnrow" id="depthRow">
             <button data-depth="8" class="on">8 位</button>
             <button data-depth="16">16 位</button>
+          </div>
+        </div>
+        <div class="ctl-group">
+          <label>文档尺寸（看右/下"不满一格"的边缘瓦片）</label>
+          <div class="btnrow" id="sizeRow">
+            <button data-size="512x384" class="on">512×384（正好整格）</button>
+            <button data-size="400x300">400×300（有零头）</button>
           </div>
         </div>
         <div class="ctl-group">

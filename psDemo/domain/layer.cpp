@@ -2,29 +2,25 @@
 
 #include "imagedocument.h"
 
-#include <QColor>
 #include <QtGlobal>
 
 namespace Ps {
 
 Layer::Layer(const QString &name, int width, int height)
     : m_name(name)
-    // 预乘格式：合成公式更简单，也与多数 GPU/加速路径习惯一致
-    , m_pixels(width, height, QImage::Format_ARGB32_Premultiplied)
+    , m_tiles(width, height)
 {
-    m_pixels.fill(Qt::transparent);
+    // 故意不 ensureTile / fill：透明层 0 块瓦片，对齐 GIMP 懒分配
 }
 
 Layer::Layer(const QString &name, const QImage &pixels)
     : m_name(name)
-    // 打开外部图时格式不一，这里统一，避免合成时直通/预乘混用
-    , m_pixels(pixels.convertToFormat(QImage::Format_ARGB32_Premultiplied))
 {
+    m_tiles.setFromImage(pixels);
 }
 
 void Layer::notifyPropertiesChanged()
 {
-    // owner 为空表示该层尚未入栈（构造中/游离层），静默即可
     if (m_owner)
         m_owner->notifyLayerPropertiesChanged(*this);
 }
@@ -64,7 +60,7 @@ void Layer::setBlendMode(BlendMode mode)
 
 void Layer::fill(const QColor &color)
 {
-    m_pixels.fill(color);
+    m_tiles.fill(color);
 }
 
 } // namespace Ps

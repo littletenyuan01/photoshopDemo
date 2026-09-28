@@ -71,7 +71,7 @@
   其余 30 个是 **UI 占位**。选中占位工具后 `ToolManager` 回退到中性工具（不消费事件），
   选项栏提示「该工具逻辑尚未接入」。**布局对齐 PS 只为界面完整可演示，不等于功能已实现。**
 - **图标**：`resources/icons/tools/`（iconfont 英文命名 PNG），经 `:/icons/tools/` 加载；
-  映射表见 `docs/iconfont-icons.md`。
+  映射表见 `docs/ui/iconfont-icons.md`。
 
 ### 工具选项栏（按工具族切换参数）
 
@@ -112,14 +112,18 @@
 
 ### 新建 / 打开文档
 
-- **新建**：默认 800×600 白底单层「背景」。
+- **新建**：弹出「新建文档」对话框；确认后按对话框换算得到的**像素宽高**建白底单层「背景」
+  （`ImageDocument::createBlank`）。启动时若无用户新建，主窗仍会先放一份默认空白文档便于演示。
+  对话框内 PPI / 单位主要用于物理尺寸↔像素；**尚未写入文档字段**。详见 [`layers/document-canvas.md`](layers/document-canvas.md)。
 - **打开**：常见位图读入为单层文档；合成后显示在画布上。
 - **限制**：尚无导出、无工程格式、无多标签文档。
 
 ### 图层模型（基础）
 
-- `Layer`：名称、显隐、透明度、混合模式枚举（目前仅 Normal）、`QImage` 像素；
-  **持 `owner` 回指**，属性 setter 内部自动广播 `layerPropertiesChanged`。
+> 概念与结构图见 [`docs/layers/`](layers/README.md)；信号/链路对照见 [`layers/data-flow.md`](layers/data-flow.md)。
+
+- `Layer`：名称、显隐、透明度、混合模式枚举（目前仅 Normal）、像素在 **`TileBuffer`（64×64 懒分配）**；
+  透明新建不分配瓦片；**持 `owner` 回指**，属性 setter 内部自动广播 `layerPropertiesChanged`。
 - `LayerStack`：自底向顶有序层列表。
 - `ImageDocument`：尺寸、活动层、**分级信号**（`pixelsChanged(QRect)` / `layerPropertiesChanged(int)` /
   `structureChanged()` / `activeLayerChanged(int)` / 汇总 `contentChanged()`）、
@@ -129,6 +133,8 @@
 - **限制**：无蒙版/调整层；面板已可操作图层。
 
 ### 合成预览
+
+> 混合公式与预乘说明见 [`layers/compositing.md`](layers/compositing.md)。
 
 - `Compositor`：自底向顶 Normal + opacity，预乘 Alpha 混合；**支持按矩形脏区合成**。
 - `CanvasView`：棋盘格透明底、滚轮缩放、中键/Alt+左键平移、适应窗口 / 100%。
@@ -186,7 +192,7 @@
 - **锁定行**：PS 四种锁的**图标**（锁定透明像素 / 图像像素 / 位置 / 全部）。
   ⚠️ 当前仅为 UI，尚未接入 domain（点选不会真的限制绘制）。
 - **底栏按钮**：加大可点区域（约 30×30）；线框图标见 `resources/icons/layers/`（链接 / fx / 蒙版 / 调整 / 组 / 新建 / 删除），悬停有中文 tip。
-- **图标来源**：整套由 `resources/icons/layers/_gen_svg_icons.py` 生成的 **SVG 矢量**，运行时按显示尺寸光栅化（任意尺寸锐利）。**自绘占位**，可按 `docs/iconfont-icons.md` 的关键词从 iconfont.cn 同名替换。
+- **图标来源**：整套由 `resources/icons/layers/_gen_svg_icons.py` 生成的 **SVG 矢量**，运行时按显示尺寸光栅化（任意尺寸锐利）。**自绘占位**，可按 `docs/ui/iconfont-icons.md` 的关键词从 iconfont.cn 同名替换。
 - **限制**：无缩略图尺寸选项；混合模式仍为占位；无撤销（改层后暂不可 Ctrl+Z）；
   底栏除图层新建/删除外多为 UI 占位（链接/样式/蒙版/调整层/图层组、填充滑条、
   图层筛选行都已加 `（UI 占位…）` tooltip，**点了不会有反应**）。

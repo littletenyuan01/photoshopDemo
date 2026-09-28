@@ -41,7 +41,8 @@
 | 文件 | 职责 |
 |------|------|
 | `domain/blendmode.h` | 混合模式枚举（现仅 Normal） |
-| `domain/layer.h/.cpp` | 单层像素与属性；**持 owner 回指，setter 内部自动广播** |
+| `domain/layer.h/.cpp` | 单层属性 + `TileBuffer`；**持 owner 回指，setter 内部自动广播** |
+| `domain/tilebuffer.h/.cpp` | 64×64 瓦片懒分配（透明新建 0 块；写时 `ensureTile`） |
 | `domain/layerstack.h/.cpp` | 图层列表（`std::vector<unique_ptr>`） |
 | `domain/imagedocument.h/.cpp` | 文档：尺寸、栈、活动层、**分级信号 + 语义化 setter + 累计脏区** |
 
@@ -93,7 +94,7 @@ UI 不得直接改 `Layer`，一律走 `setLayerVisible/Opacity/Name/BlendMode` 
 **约定**：24×24 viewBox、描边 2.2、round cap/join、主色 `#DCDCDC`、次级色 `#8C8C8C`。
 图标是 **SVG 矢量**，由 `ItemTreePanel::svgIcon()` 在显示尺寸上直接光栅化（1x/2x 双分辨率），
 任意尺寸、任意 DPI 都锐利 —— 不再用「48px PNG 缩到 22px」的位图方案。
-改完跑 `python _gen_svg_icons.py` 重新生成。来源与 iconfont 替换关键词见 `docs/iconfont-icons.md`。
+改完跑 `python _gen_svg_icons.py` 重新生成。来源与 iconfont 替换关键词见 `docs/ui/iconfont-icons.md`。
 
 ## 计划中
 
@@ -118,3 +119,4 @@ UI 不得直接改 `Layer`，一律走 `setLayerVisible/Opacity/Name/BlendMode` 
 - **静态外观**（布局、尺寸、图标、QSS、固定文案）→ 写在对应 `.ui` / `resources/styles/dark.qss`，不要在 `setupUi` 后再 `setStyleSheet` / `setIcon`。
 - **动态逻辑**（信号槽、校验器、数据驱动列表、按状态变色、工具槽工厂、高分屏缩略图光栅化）→ 留在 `.cpp`。
 - 面板 ≡ 菜单按钮在各面板 `.ui`（`btnPanelMenu`），ctor 里只需 `setCornerWidget`（Designer 无法直接设 Tab 角标）。
+- 审查与图标清单：[`docs/ui/`](ui/README.md)；文档/图层/合成概念：[`docs/layers/`](layers/README.md)。

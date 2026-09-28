@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>图像引擎简明版 · 格子 · 图层 · 合成 · 脏格子</title>
+<!--
+  简明版：一步只说一件事，5 步，3 组控件，大画布。
+  想深挖（暂存盘换页、缓存级别、位深、边缘瓦片、区域撤销）→ 去 ../02-image-engine-deep/
+
+  页面里跑的是真实像素数组：格子（瓦片）稀疏分配、图层各一套、合成缓存、脏格子重算。
+-->
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand"><span class="logo">Ps</span>
+    <div>
+      <h1>图像引擎简明版</h1>
+      <p class="sub">一张图怎么看、怎么存、怎么改 —— 5 步，每步一件事</p>
+    </div>
+  </div>
+  <nav class="steps" id="stepStrip"></nav>
+  <div class="nav">
+    <button id="btnPrev">←</button>
+    <button id="btnNext">下一步 →</button>
+  </div>
+</header>
+
+<main>
+  <!-- 左：画布（主体） -->
+  <section class="stage">
+    <div class="card">
+      <div class="card-head">
+        <h2 id="canvasTitle">文档（整幅）—— 格子锚在<b>图像坐标</b>上，与视口无关</h2>
+        <span class="legend">
+          <i class="sw sw-alloc"></i>已分配
+          <i class="sw sw-unalloc"></i>未分配（0 字节）
+          <i class="sw sw-dirty"></i>刚改过的格子
+          <i class="sw sw-view"></i>视口
+          <i class="sw sw-need"></i>视口要读的格子
+        </span>
+      </div>
+      <div class="canvas-wrap"><canvas id="docCanvas" width="560" height="420"></canvas></div>
+      <div class="hint" id="viewInfo">视口读数</div>
+      <div class="hint" id="docHint">直接在画布上拖动画笔；按住 Shift 拖 = 移动视口。</div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h2>屏幕上看到的（只有视口那一块）</h2></div>
+      <div class="canvas-wrap"><canvas id="screenCanvas" width="280" height="210"></canvas></div>
+    </div>
+  </section>
+
+  <!-- 右：讲解 / 图层 / 数字 -->
+  <aside class="side">
+    <div class="card">
+      <div class="card-head"><h2 id="stepTitle">第 1 步</h2></div>
+      <div class="explain" id="explain"></div>
+      <div class="btnrow step-actions" id="stepActions"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h2>图层（每层一套自己的格子）</h2>
+        <div class="btnrow small">
+          <button id="btnAddLayer">新建图层</button>
+          <button id="btnDelLayer">删除</button>
+        </div>
+      </div>
+      <div class="layers" id="layerList"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h2>数字（就这三行）</h2></div>
+      <div class="stats" id="stats"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h2>控件（就三组）</h2></div>
+      <div class="controls">
+        <div class="ctl">
+          <label>工具</label>
+          <div class="btnrow" id="toolRow">
+            <button data-tool="brush" class="on">画笔</button>
+            <button data-tool="eraser">橡皮</button>
+          </div>
+        </div>
+        <div class="ctl">
+          <label>格子粒度</label>
+          <div class="btnrow" id="tileRow">
+            <button data-tile="64">64</button>
+            <button data-tile="128" class="on">128</button>
+            <button data-tile="256">256</button>
+          </div>
+        </div>
+        <div class="ctl">
+          <label>改一块之后</label>
+          <div class="btnrow" id="modeRow">
+            <button data-mode="dirty" class="on">只重算脏格子</button>
+            <button data-mode="full">整幅重算（对照）</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </aside>
+</main>
+
+<footer class="foot">
+  <span>资料分级：<b>[官方]</b> 帮助文档可查 · <b>[共识]</b> 业界共识（如 128×128 格子）· <b>[源码]</b> GIMP 可核对</span>
+  <a href="../02-image-engine-deep/index.html">想深挖：02 深入版（暂存盘换页 · 缓存级别 · 位深 · 边缘瓦片 · 区域撤销）→</a>
+</footer>
+
+<script src="app.js"></script>
+</body>
+</html>

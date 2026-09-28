@@ -10,6 +10,13 @@
 | `wiki/` | 目标、路线、构建入口、简历话术 |
 | `docs/` | 实现级文档（随代码演进） |
 
+## 专题目录
+
+| 目录 | 内容 |
+|------|------|
+| [ui/](ui/README.md) | 界面壳：审查收口、图标清单 |
+| [layers/](layers/README.md) | 文档 / 画布 / 图层 / 合成 / 视图概念 |
+
 ## 文档列表
 
 | 文档 | 内容 |
@@ -19,8 +26,9 @@
 | [features.md](features.md) | 功能清单与使用说明 |
 | [code-map.md](code-map.md) | 重点代码与文件索引 |
 | [tech-notes.md](tech-notes.md) | 技术点与设计决策 |
-| [ui-review.md](ui-review.md) | UI 结构审查与收口（含仍欠清单、强制约定、自测清单） |
-| [iconfont-icons.md](iconfont-icons.md) | 从 iconfont 下载工具图标的清单 |
+| [ui/ui-review.md](ui/ui-review.md) | UI 结构审查与收口 |
+| [ui/iconfont-icons.md](ui/iconfont-icons.md) | iconfont 图标清单 |
+| [layers/](layers/README.md) | 图层与文档概念（新建、PPI、合成、瓦片内存、**实现对照**） |
 | [scope-estimate.md](scope-estimate.md) | 图层/选区/蒙版等功能评估与工作量 |
 | [completeness.md](completeness.md) | 除编辑能力外，怎样才算完善 |
 | [cursor-role-prompt.md](cursor-role-prompt.md) | 可粘贴的 Cursor 角色 Prompt |
@@ -37,3 +45,4 @@
 1. 每完成一个小功能：更新相关文档 + 在对话中给出 commit 文案  
 2. 新增模块时：补 `code-map.md`，必要时拆新文档并挂到本索引  
 3. 写文档时标明「已实现 / 计划中」，避免简历口径夸大  
+4. UI 类说明放 `docs/ui/`；文档/图层/合成概念放 `docs/layers/`  

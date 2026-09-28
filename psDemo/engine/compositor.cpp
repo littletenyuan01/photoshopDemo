@@ -2,6 +2,7 @@
 
 #include "domain/imagedocument.h"
 #include "domain/layer.h"
+#include "domain/tilebuffer.h"
 
 #include <QRect>
 #include <QtGlobal>
@@ -13,15 +14,20 @@ namespace {
 /**
  * 预乘 Alpha 的 Normal 混合（Porter-Duff over）：
  *   out = src + dst * (1 - src.a)
- * 其中 src 已先按图层 opacity 缩放。
- * 整数运算带 +127 做四舍五入，减少色带。
+ * src 位于文档坐标 (ox, oy)，尺寸为 tile 大小。
  */
-void blendNormalPremultiplied(QImage &dst, const QImage &src, qreal opacity, const QRect &rect)
+void blendNormalPremultipliedAt(QImage &dst,
+                                const QImage &src,
+                                int ox,
+                                int oy,
+                                qreal opacity,
+                                const QRect &dirty)
 {
-    if (opacity <= 0.0)
+    if (opacity <= 0.0 || src.isNull())
         return;
 
-    const QRect area = rect.intersected(dst.rect()).intersected(src.rect());
+    const QRect tileRect(ox, oy, src.width(), src.height());
+    const QRect area = dirty.intersected(dst.rect()).intersected(tileRect);
     if (area.isEmpty())
         return;
 
@@ -29,7 +35,8 @@ void blendNormalPremultiplied(QImage &dst, const QImage &src, qreal opacity, con
 
     for (int y = area.top(); y <= area.bottom(); ++y) {
         QRgb *d = reinterpret_cast<QRgb *>(dst.scanLine(y)) + area.left();
-        const QRgb *s = reinterpret_cast<const QRgb *>(src.constScanLine(y)) + area.left();
+        const QRgb *s = reinterpret_cast<const QRgb *>(src.constScanLine(y - oy))
+                        + (area.left() - ox);
         for (int x = 0; x < area.width(); ++x) {
             const QRgb sp = s[x];
             int sr = qRed(sp);
@@ -37,7 +44,6 @@ void blendNormalPremultiplied(QImage &dst, const QImage &src, qreal opacity, con
             int sb = qBlue(sp);
             int sa = qAlpha(sp);
 
-            // 图层不透明度：预乘空间下 RGB 与 A 同比例缩放
             if (opacityQ != 255) {
                 sr = (sr * opacityQ + 127) / 255;
                 sg = (sg * opacityQ + 127) / 255;
@@ -48,7 +54,6 @@ void blendNormalPremultiplied(QImage &dst, const QImage &src, qreal opacity, con
             if (sa == 0)
                 continue;
             if (sa == 255) {
-                // 完全盖住：无需读 dst
                 d[x] = qRgba(sr, sg, sb, 255);
                 continue;
             }
@@ -78,7 +83,6 @@ QImage Compositor::composite(const ImageDocument &doc)
 
 QImage Compositor::composite(const ImageDocument &doc, const QRect &rect)
 {
-    // 输出与文档同尺寸；未合成区域保持透明，画布用棋盘格衬底
     QImage result(doc.width(), doc.height(), QImage::Format_ARGB32_Premultiplied);
     result.fill(Qt::transparent);
 
@@ -87,14 +91,21 @@ QImage Compositor::composite(const ImageDocument &doc, const QRect &rect)
         return result;
 
     const LayerStack &stack = doc.layers();
-    // i=0 最底；后画的层在视觉上更靠上
     for (int i = 0; i < stack.count(); ++i) {
         const Layer *layer = stack.layerAt(i);
         if (!layer || !layer->isVisible() || layer->opacity() <= 0.0)
             continue;
+        // 无已分配瓦片 ≈ 全透明，跳过（对照 GIMP 跳过空 tile）
+        if (!layer->hasPixelData())
+            continue;
 
-        // v1 忽略 BlendMode，一律 Normal
-        blendNormalPremultiplied(result, layer->pixels(), layer->opacity(), area);
+        layer->tiles().forEachAllocatedTile(
+            [&](int, int, const QImage &tile, const QRect &bounds) {
+                if (!bounds.intersects(area))
+                    return;
+                blendNormalPremultipliedAt(result, tile, bounds.x(), bounds.y(),
+                                           layer->opacity(), area);
+            });
     }
 
     return result;

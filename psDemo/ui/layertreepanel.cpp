@@ -247,8 +247,14 @@ void LayerTreePanel::appendRowForLayer(int stackIndex, Ps::Layer &layer)
     item->setCheckState(layer.isVisible() ? Qt::Checked : Qt::Unchecked);
     // 行 ↔ 栈下标映射存在 UserRole：行序会变，不能用行号当身份
     item->setData(Qt::UserRole, stackIndex);
-    // 缩略图：该层像素 + 透明棋盘格（对齐 PS 图层面板最左列）
-    item->setIcon(QIcon(QPixmap::fromImage(makeLayerThumbnail(layer.pixels()))));
+    // 缩略图：有瓦片则物化；空透明层用小占位避免 materialize 整幅大图
+    const QImage thumbSrc = layer.hasPixelData()
+                                ? layer.materialize()
+                                : QImage(64, 64, QImage::Format_ARGB32_Premultiplied);
+    QImage forThumb = thumbSrc;
+    if (!layer.hasPixelData())
+        forThumb.fill(Qt::transparent);
+    item->setIcon(QIcon(QPixmap::fromImage(makeLayerThumbnail(forThumb))));
 }
 
 QListWidgetItem *LayerTreePanel::itemForStackIndex(int stackIndex) const
@@ -309,7 +315,13 @@ void LayerTreePanel::refreshRowThumbnail(int stackIndex, const Ps::Layer *layer)
         return;
 
     // 只换图标，不碰文字/勾选/选中态 —— 否则会打断用户正在进行的改名或选择
-    item->setIcon(QIcon(QPixmap::fromImage(makeLayerThumbnail(layer->pixels()))));
+    const QImage thumbSrc = layer->hasPixelData()
+                                ? layer->materialize()
+                                : QImage(64, 64, QImage::Format_ARGB32_Premultiplied);
+    QImage forThumb = thumbSrc;
+    if (!layer->hasPixelData())
+        forThumb.fill(Qt::transparent);
+    item->setIcon(QIcon(QPixmap::fromImage(makeLayerThumbnail(forThumb))));
 }
 
 void LayerTreePanel::scheduleThumbnailRefresh()

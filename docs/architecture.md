@@ -242,6 +242,8 @@ sequenceDiagram
 
 ### 5.2 图层合成（预览 / 导出共用）
 
+概念说明（文档/画布、Alpha、预乘、刷新策略、瓦片与内存）见 [`docs/layers/`](layers/README.md)。
+
 ```mermaid
 flowchart LR
   A[自底向顶遍历图层] --> B{类型?}
@@ -445,7 +447,7 @@ psDemo/
 11. ProjectIO + 变换 / 裁剪（完善度 P1）
 ```
 
-第 0 步的落地情况见 `docs/ui-review.md`：信号分级、`markDirty(rect)`、语义化 setter
+第 0 步的落地情况见 `docs/ui/ui-review.md`：信号分级、`markDirty(rect)`、语义化 setter
 均已就位，另附带抽出 `tools/` 工具层与 `app/AppSession`（后两者本不在「留缝」清单内，
 但它们同样属于「越晚做越贵」的结构债 —— 详见该文档 §2）。
 
@@ -461,7 +463,7 @@ psDemo/
 
 ## 9. 当前状态
 
-> UI 结构的一次完整审查与收口见 `docs/ui-review.md`。
+> UI 结构的一次完整审查与收口见 `docs/ui/ui-review.md`。
 
 | 模块 | 状态 |
 |------|------|

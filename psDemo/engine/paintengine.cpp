@@ -1,30 +1,37 @@
 #include "paintengine.h"
 
+#include "domain/tilebuffer.h"
+
 #include <QPainter>
 #include <QRadialGradient>
 #include <QtMath>
 
 namespace Ps {
 
-void PaintEngine::stampDab(QImage &target,
-                           const QPointF &center,
-                           qreal radius,
-                           const QColor &color,
-                           Mode mode,
-                           qreal hardness)
+namespace {
+
+QRect dabBounds(const QPointF &center, qreal radius)
+{
+    const int rCeil = qCeil(radius) + 1;
+    return QRect(qFloor(center.x()) - rCeil,
+                 qFloor(center.y()) - rCeil,
+                 rCeil * 2 + 1,
+                 rCeil * 2 + 1);
+}
+
+void stampDabOnImage(QImage &target,
+                     const QPointF &center,
+                     qreal radius,
+                     const QColor &color,
+                     PaintEngine::Mode mode,
+                     qreal hardness)
 {
     if (target.isNull() || radius <= 0.0)
         return;
 
     hardness = qBound(0.0, hardness, 1.0);
 
-    // dab 外接矩形，略扩 1px 避免抗锯齿裁切
-    const int rCeil = qCeil(radius) + 1;
-    const QRect dabRect(qFloor(center.x()) - rCeil,
-                        qFloor(center.y()) - rCeil,
-                        rCeil * 2 + 1,
-                        rCeil * 2 + 1);
-    const QRect clip = dabRect.intersected(target.rect());
+    const QRect clip = dabBounds(center, radius).intersected(target.rect());
     if (clip.isEmpty())
         return;
 
@@ -32,14 +39,12 @@ void PaintEngine::stampDab(QImage &target,
     painter.setRenderHint(QPainter::Antialiasing, true);
     painter.setClipRect(clip);
 
-    if (mode == Mode::Erase)
+    if (mode == PaintEngine::Mode::Erase)
         painter.setCompositionMode(QPainter::CompositionMode_DestinationOut);
     else
         painter.setCompositionMode(QPainter::CompositionMode_SourceOver);
 
-    // 径向渐变：硬核内 alpha=1，外缘按 hardness 衰减到 0
-    // DestinationOut 时用白色+alpha 表示「擦除强度」
-    QColor core = (mode == Mode::Erase) ? QColor(255, 255, 255) : color;
+    QColor core = (mode == PaintEngine::Mode::Erase) ? QColor(255, 255, 255) : color;
     QColor edge = core;
     core.setAlpha(255);
     edge.setAlpha(0);
@@ -55,6 +60,69 @@ void PaintEngine::stampDab(QImage &target,
     painter.drawEllipse(center, radius, radius);
 }
 
+template <typename Target>
+QPointF strokeSegmentImpl(Target &target,
+                          const QPointF &from,
+                          const QPointF &to,
+                          qreal radius,
+                          const QColor &color,
+                          PaintEngine::Mode mode,
+                          qreal hardness,
+                          qreal spacing)
+{
+    const QPointF delta = to - from;
+    const qreal len = qSqrt(delta.x() * delta.x() + delta.y() * delta.y());
+    const qreal step = qMax(0.5, radius * 2.0 * qBound(0.05, spacing, 1.0));
+
+    if (len < 1e-6) {
+        PaintEngine::stampDab(target, to, radius, color, mode, hardness);
+        return to;
+    }
+
+    qreal d = 0.0;
+    QPointF last = from;
+    while (d <= len) {
+        const qreal t = d / len;
+        last = from + delta * t;
+        PaintEngine::stampDab(target, last, radius, color, mode, hardness);
+        d += step;
+    }
+    if ((last - to).manhattanLength() > 0.5) {
+        PaintEngine::stampDab(target, to, radius, color, mode, hardness);
+        last = to;
+    }
+    return last;
+}
+
+} // namespace
+
+void PaintEngine::stampDab(QImage &target,
+                           const QPointF &center,
+                           qreal radius,
+                           const QColor &color,
+                           Mode mode,
+                           qreal hardness)
+{
+    stampDabOnImage(target, center, radius, color, mode, hardness);
+}
+
+void PaintEngine::stampDab(TileBuffer &tiles,
+                           const QPointF &center,
+                           qreal radius,
+                           const QColor &color,
+                           Mode mode,
+                           qreal hardness)
+{
+    if (tiles.width() <= 0 || tiles.height() <= 0 || radius <= 0.0)
+        return;
+
+    const QRect dabRect = dabBounds(center, radius);
+    tiles.forEachTileInRect(dabRect, true, [&](int, int, QImage &tile, const QRect &bounds) {
+        const QPointF local(center.x() - bounds.x(), center.y() - bounds.y());
+        stampDabOnImage(tile, local, radius, color, mode, hardness);
+    });
+}
+
 QPointF PaintEngine::strokeSegment(QImage &target,
                                    const QPointF &from,
                                    const QPointF &to,
@@ -64,29 +132,19 @@ QPointF PaintEngine::strokeSegment(QImage &target,
                                    qreal hardness,
                                    qreal spacing)
 {
-    const QPointF delta = to - from;
-    const qreal len = qSqrt(delta.x() * delta.x() + delta.y() * delta.y());
-    const qreal step = qMax(0.5, radius * 2.0 * qBound(0.05, spacing, 1.0));
+    return strokeSegmentImpl(target, from, to, radius, color, mode, hardness, spacing);
+}
 
-    if (len < 1e-6) {
-        stampDab(target, to, radius, color, mode, hardness);
-        return to;
-    }
-
-    // 沿线段等距盖 dab；终点再补一颗，避免快速拖动断笔
-    qreal d = 0.0;
-    QPointF last = from;
-    while (d <= len) {
-        const qreal t = d / len;
-        last = from + delta * t;
-        stampDab(target, last, radius, color, mode, hardness);
-        d += step;
-    }
-    if ((last - to).manhattanLength() > 0.5) {
-        stampDab(target, to, radius, color, mode, hardness);
-        last = to;
-    }
-    return last;
+QPointF PaintEngine::strokeSegment(TileBuffer &tiles,
+                                   const QPointF &from,
+                                   const QPointF &to,
+                                   qreal radius,
+                                   const QColor &color,
+                                   Mode mode,
+                                   qreal hardness,
+                                   qreal spacing)
+{
+    return strokeSegmentImpl(tiles, from, to, radius, color, mode, hardness, spacing);
 }
 
 } // namespace Ps

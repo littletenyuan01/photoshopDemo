@@ -49,7 +49,7 @@ bool PaintTool::mousePress(const ToolEvent &event, const ToolContext &ctx, ViewP
     m_painting = true;
     m_lastImagePos = event.imagePos;
 
-    PaintEngine::stampDab(layer->pixels(), event.imagePos, ctx.brushRadius, ctx.foreground, mode);
+    PaintEngine::stampDab(layer->tiles(), event.imagePos, ctx.brushRadius, ctx.foreground, mode);
     markDocumentDirty(ctx, dirtyRectForSegment(event.imagePos, event.imagePos, ctx.brushRadius));
     return true;
 }
@@ -70,7 +70,7 @@ bool PaintTool::mouseMove(const ToolEvent &event, const ToolContext &ctx, ViewPo
     const auto mode = m_erase ? PaintEngine::Mode::Erase : PaintEngine::Mode::Paint;
 
     // strokeSegment 返回最后一颗 dab 的中心，作为下一段的起点，保证连续
-    m_lastImagePos = PaintEngine::strokeSegment(layer->pixels(), m_lastImagePos, event.imagePos,
+    m_lastImagePos = PaintEngine::strokeSegment(layer->tiles(), m_lastImagePos, event.imagePos,
                                                 ctx.brushRadius, ctx.foreground, mode);
     markDocumentDirty(ctx, dirtyRectForSegment(m_lastImagePos, event.imagePos, ctx.brushRadius));
     return true;

@@ -18,7 +18,7 @@
 
 - [x] 画笔、橡皮（圆形 dab + 线段插值，写活动层）
 - [x] 活动层绘制
-- [x] **结构收口（留缝）**：信号分级 + 语义化 setter + 累计脏区（见 [docs/ui-review.md](../docs/ui-review.md)）
+- [x] **结构收口（留缝）**：信号分级 + 语义化 setter + 累计脏区（见 [docs/ui/ui-review.md](../docs/ui/ui-review.md)）
 - [x] **附带收口**：抽出 `tools/` 工具层与 `app/AppSession` 广播（越晚做越贵的结构债）
 - [ ] 撤销 / 重做 ← **下一步**（Phase 6，收口点已就位）
 
@@ -40,7 +40,7 @@
 
 > 【对照 GIMP】`app/core/gimpimage-undo-push.c`（46 KB）与 `gimpimage-undo-push.h` 的 **50+ 个 `gimp_image_undo_push_*` 入口**；每类对象一个 undo 子类（`gimpdrawableundo` / `gimplayerundo` / `gimpitemundo` / `gimpmaskundo` / `gimplayerpropundo` / `gimpundo.c`）。本项目取其**推入式 + 每对象一类**的语义，裁到最小集合；**不搬** GIMP 的 GObject undo 类层次规模。
 
-> 【前置已就位】`ImageDocument` 的语义化 setter（`setLayerVisible/Opacity/Name/BlendMode`）已是唯一的属性变更入口，push 只需加在这里；不透明度滑条已改为「松手才提交」，保证一次操作 = 一次状态变更。见 [docs/ui-review.md](../docs/ui-review.md)。
+> 【前置已就位】`ImageDocument` 的语义化 setter（`setLayerVisible/Opacity/Name/BlendMode`）已是唯一的属性变更入口，push 只需加在这里；不透明度滑条已改为「松手才提交」，保证一次操作 = 一次状态变更。见 [docs/ui/ui-review.md](../docs/ui/ui-review.md)。
 
 - [ ] `push` 入口最小集合（先做这 4 类即可闭环）：
   - [ ] `pushDrawablePixels` — 像素改动（画笔/橡皮/滤镜），按脏矩形存快照
