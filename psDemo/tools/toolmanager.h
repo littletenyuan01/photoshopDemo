@@ -5,6 +5,7 @@
 #include "toolevent.h"
 #include "toolid.h"
 
+#include <QCursor>
 #include <QHash>
 #include <QObject>
 #include <QString>
@@ -61,8 +62,8 @@ public:
     bool dispatchMove(const ToolEvent &event, const ToolContext &ctx, ViewPort &view);
     bool dispatchRelease(const ToolEvent &event, const ToolContext &ctx, ViewPort &view);
 
-    /** 当前活动工具的光标形状。 */
-    Qt::CursorShape activeCursorShape() const;
+    /** 当前活动工具的光标。 */
+    QCursor activeCursor() const;
 
 signals:
     /** 活动工具变了（选项栏/状态栏用）。 */
@@ -70,7 +71,7 @@ signals:
     /** 活动工具请求重绘（透传自 Tool::repaintRequested）。 */
     void repaintRequested();
     /** 活动工具请求改光标（透传）。 */
-    void cursorChangeRequested(Qt::CursorShape shape);
+    void cursorChangeRequested(const QCursor &cursor);
 
 private:
     /** 注册工具，key 取自 tool->id()。 */

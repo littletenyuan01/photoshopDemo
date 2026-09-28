@@ -33,7 +33,7 @@ CanvasView::CanvasView(QWidget *parent)
     connect(m_toolManager, &Ps::ToolManager::repaintRequested,
             this, qOverload<>(&QWidget::update));
     connect(m_toolManager, &Ps::ToolManager::cursorChangeRequested,
-            this, [this](Qt::CursorShape shape) { setCursor(shape); });
+            this, [this](const QCursor &cursor) { setCursor(cursor); });
 
     // 蚂蚁线相位（对照 gimp_display_shell_selection 的 marching-ants-speed）
     // 间隔略放慢，且只局部 update，减轻缩小时整窗闪烁
@@ -347,7 +347,7 @@ void CanvasView::setGradientOptions(int type, qreal opacity, int offsetPercent,
 void CanvasView::updateToolCursor()
 {
     if (m_toolManager)
-        setCursor(m_toolManager->activeCursorShape());
+        setCursor(m_toolManager->activeCursor());
 }
 
 // —— 绘制 ——

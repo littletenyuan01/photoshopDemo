@@ -27,7 +27,7 @@ class PaintBucketTool : public Tool
 public:
     explicit PaintBucketTool(QObject *parent = nullptr);
 
-    Qt::CursorShape cursorShape() const override;
+    QCursor cursor() const override;
 
     /** 左键在活动层种子点触发一次填充。 */
     bool mousePress(const ToolEvent &event, const ToolContext &ctx, ViewPort &view) override;

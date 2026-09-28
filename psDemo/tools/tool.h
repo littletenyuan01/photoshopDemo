@@ -41,8 +41,11 @@ public:
 
     Ps::ToolId id() const { return m_id; }
 
-    /** 鼠标光标形状（CanvasView 在切换工具后查询）。 */
+    /** 鼠标光标形状（默认；需要自定义 pixmap 时请重写 cursor()）。 */
     virtual Qt::CursorShape cursorShape() const { return Qt::ArrowCursor; }
+
+    /** 画布实际使用的光标（默认由 cursorShape() 构造）。 */
+    virtual QCursor cursor() const { return QCursor(cursorShape()); }
 
     /** 是否在画布上自绘（临时图形，如选框矩形）。 */
     virtual bool hasOverlay() const { return false; }
@@ -64,8 +67,8 @@ public:
 signals:
     /** 请求重绘画布。 */
     void repaintRequested();
-    /** 光标形状变了，请求画布更新光标。 */
-    void cursorChangeRequested(Qt::CursorShape shape);
+    /** 光标变了，请求画布更新光标。 */
+    void cursorChangeRequested(const QCursor &cursor);
 
 protected:
     /**

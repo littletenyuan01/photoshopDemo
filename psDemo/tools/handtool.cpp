@@ -26,7 +26,7 @@ bool HandTool::mousePress(const ToolEvent &event, const ToolContext &ctx, ViewPo
 
     m_panning = true;
     m_lastWidgetPos = event.widgetPos;
-    emit cursorChangeRequested(Qt::ClosedHandCursor);
+    emit cursorChangeRequested(QCursor(Qt::ClosedHandCursor));
     Q_UNUSED(view)
     return true;
 }
@@ -54,7 +54,7 @@ bool HandTool::mouseRelease(const ToolEvent &event, const ToolContext &ctx, View
         return false;
 
     m_panning = false;
-    emit cursorChangeRequested(Qt::OpenHandCursor);
+    emit cursorChangeRequested(QCursor(Qt::OpenHandCursor));
     // 中键/左键都可能是结束平移的那一次
     return event.isLeft() || event.isMiddle();
 }

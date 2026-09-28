@@ -165,6 +165,24 @@ void ToolBox::onDefaultColors()
     emit backgroundColorChanged(m_bg);
 }
 
+void ToolBox::setForegroundColor(const QColor &color)
+{
+    if (!color.isValid() || color == m_fg)
+        return;
+    m_fg = color.toRgb();
+    updateColorButtons();
+    emit foregroundColorChanged(m_fg);
+}
+
+void ToolBox::setBackgroundColor(const QColor &color)
+{
+    if (!color.isValid() || color == m_bg)
+        return;
+    m_bg = color.toRgb();
+    updateColorButtons();
+    emit backgroundColorChanged(m_bg);
+}
+
 void ToolBox::updateColorButtons()
 {
     // 前景始终画在上层、浅色粗边；背景在下层右下角 —— 交换只改 fill，不改前后位置

@@ -26,7 +26,8 @@
 | `tools/toolid.h` | 工具枚举（对应 GIMP ToolInfo 思路） |
 | `tools/toolevent.h` | `ToolEvent`：**已换算成图像坐标**的规范化事件（含控件坐标供锚点缩放用） |
 | `tools/toolcontext.h` | `ToolContext`（文档/前景/背景/笔刷半径）+ `ViewPort` 接口 |
-| `tools/tool.h/.cpp` | Tool 基类：`mousePress/Move/Release`、`cursorShape`、`drawOverlay`、`deactivate` |
+| `tools/tool.h/.cpp` | Tool 基类：`mousePress/Move/Release`、`cursor`/`cursorShape`、`drawOverlay`、`deactivate` |
+| `tools/toolcursor.h` | 工具图标光标 / 渐变风格光标辅助 |
 | `tools/toolmanager.h/.cpp` | 注册表 + 活动工具 + 事件分发 + **信号转发**（活动工具会变，画布无法预先 connect） |
 | `tools/movetool.h/.cpp` | 占位；**中性兜底**：未接入逻辑的工具切过去不消费事件 |
 | `tools/handtool.h/.cpp` | 平移；`isPanGesture` 供画布判定中键 / Alt+左键通用手势 |

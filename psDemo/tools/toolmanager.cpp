@@ -98,7 +98,7 @@ bool ToolManager::setActiveTool(Ps::ToolId id, ViewPort &view)
 
     rewriteConnections();
     emit activeToolChanged(activeToolId());
-    emit cursorChangeRequested(activeCursorShape());
+    emit cursorChangeRequested(activeCursor());
     return true;
 }
 
@@ -126,9 +126,9 @@ bool ToolManager::dispatchRelease(const ToolEvent &event, const ToolContext &ctx
     return m_activeTool->mouseRelease(event, ctx, view);
 }
 
-Qt::CursorShape ToolManager::activeCursorShape() const
+QCursor ToolManager::activeCursor() const
 {
-    return m_activeTool ? m_activeTool->cursorShape() : Qt::ArrowCursor;
+    return m_activeTool ? m_activeTool->cursor() : QCursor(Qt::ArrowCursor);
 }
 
 } // namespace Ps

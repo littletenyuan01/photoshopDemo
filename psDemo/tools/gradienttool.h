@@ -24,7 +24,7 @@ class GradientTool : public Tool
 public:
     explicit GradientTool(QObject *parent = nullptr);
 
-    Qt::CursorShape cursorShape() const override;
+    QCursor cursor() const override;
 
     bool hasOverlay() const override;
     void drawOverlay(QPainter &painter, const ToolContext &ctx) const override;

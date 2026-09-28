@@ -10,6 +10,7 @@
 #include "ui/dockpanel.h"
 #include "engine/compositor.h"
 #include "ui/canvassizedialog.h"
+#include "ui/colorspanel.h"
 #include "ui/homescreen.h"
 #include "ui/imagesizedialog.h"
 #include "ui/newdocumentdialog.h"
@@ -112,6 +113,16 @@ void MainWindow::setupToolbox()
             this, &MainWindow::onForegroundColorChanged);
     connect(ui->toolBox, &ToolBox::backgroundColorChanged,
             this, &MainWindow::onBackgroundColorChanged);
+
+    // 右侧颜色面板 ↔ 工具箱前/背景色（双向，避免回环靠相等短路）
+    connect(ui->colorsPanel, &ColorsPanel::foregroundColorChanged,
+            ui->toolBox, &ToolBox::setForegroundColor);
+    connect(ui->colorsPanel, &ColorsPanel::backgroundColorChanged,
+            ui->toolBox, &ToolBox::setBackgroundColor);
+    connect(ui->toolBox, &ToolBox::foregroundColorChanged,
+            ui->colorsPanel, &ColorsPanel::setForegroundColor);
+    connect(ui->toolBox, &ToolBox::backgroundColorChanged,
+            ui->colorsPanel, &ColorsPanel::setBackgroundColor);
     connect(ui->toolOptionsBar, &ToolOptionsBar::brushDiameterChanged,
             this, &MainWindow::onBrushDiameterChanged);
     connect(ui->toolOptionsBar, &ToolOptionsBar::fillOptionsChanged, this, [this]() {
@@ -138,6 +149,8 @@ void MainWindow::setupToolbox()
     canvas->setCurrentTool(tool);
     canvas->setForegroundColor(ui->toolBox->foregroundColor());
     canvas->setBackgroundColor(ui->toolBox->backgroundColor());
+    ui->colorsPanel->setForegroundColor(ui->toolBox->foregroundColor());
+    ui->colorsPanel->setBackgroundColor(ui->toolBox->backgroundColor());
     canvas->setBrushDiameter(ui->toolOptionsBar->brushDiameter());
     canvas->setFillOptions(ui->toolOptionsBar->fillTolerance(),
                            ui->toolOptionsBar->fillContiguous(),

@@ -3,6 +3,7 @@
 #include "domain/imagedocument.h"
 #include "domain/layer.h"
 #include "engine/paintengine.h"
+#include "toolcursor.h"
 
 #include <QPoint>
 #include <QtMath>
@@ -14,9 +15,11 @@ PaintBucketTool::PaintBucketTool(QObject *parent)
 {
 }
 
-Qt::CursorShape PaintBucketTool::cursorShape() const
+QCursor PaintBucketTool::cursor() const
 {
-    return Qt::PointingHandCursor;
+    // 热点落在倾倒口/水滴附近（对齐 PS 油漆桶光标）
+    return ToolCursor::fromToolIcon(QStringLiteral(":/icons/tools/bucket.png"),
+                                    0.88, 0.90, 28);
 }
 
 bool PaintBucketTool::mousePress(const ToolEvent &event, const ToolContext &ctx, ViewPort &view)

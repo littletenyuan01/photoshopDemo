@@ -42,6 +42,8 @@ public:
 
 public slots:
     void setCurrentTool(Ps::ToolId id);
+    void setForegroundColor(const QColor &color);
+    void setBackgroundColor(const QColor &color);
 
 signals:
     void toolChanged(Ps::ToolId id);

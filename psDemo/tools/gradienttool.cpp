@@ -3,6 +3,7 @@
 #include "domain/imagedocument.h"
 #include "domain/layer.h"
 #include "engine/paintengine.h"
+#include "toolcursor.h"
 
 #include <QLineF>
 #include <QPen>
@@ -14,9 +15,9 @@ GradientTool::GradientTool(QObject *parent)
 {
 }
 
-Qt::CursorShape GradientTool::cursorShape() const
+QCursor GradientTool::cursor() const
 {
-    return Qt::CrossCursor;
+    return ToolCursor::gradientStyle();
 }
 
 bool GradientTool::hasOverlay() const

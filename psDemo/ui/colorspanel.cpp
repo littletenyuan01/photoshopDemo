@@ -203,7 +203,7 @@ ColorsPanel::ColorsPanel(QWidget *parent)
     buildPatternGroups();
 
     connect(ui->hsvWell, &HsvColorWell::colorChanged, this, &ColorsPanel::onWellColorChanged);
-    connect(ui->hsvWell, &HsvColorWell::swatchesSwapped, this, &ColorsPanel::syncRecentStrip);
+    connect(ui->hsvWell, &HsvColorWell::swatchesSwapped, this, &ColorsPanel::onWellSwatchesSwapped);
     connect(ui->spinR, &QSpinBox::valueChanged, this, &ColorsPanel::onRgbChanged);
     connect(ui->spinG, &QSpinBox::valueChanged, this, &ColorsPanel::onRgbChanged);
     connect(ui->spinB, &QSpinBox::valueChanged, this, &ColorsPanel::onRgbChanged);
@@ -219,6 +219,44 @@ ColorsPanel::ColorsPanel(QWidget *parent)
 ColorsPanel::~ColorsPanel()
 {
     delete ui;
+}
+
+QColor ColorsPanel::foregroundColor() const
+{
+    return ui->hsvWell->color();
+}
+
+QColor ColorsPanel::backgroundColor() const
+{
+    return ui->hsvWell->backgroundColor();
+}
+
+void ColorsPanel::setForegroundColor(const QColor &color)
+{
+    if (!color.isValid() || color == ui->hsvWell->color())
+        return;
+    m_emitting = true;
+    ui->hsvWell->setColor(color);
+    m_emitting = false;
+}
+
+void ColorsPanel::setBackgroundColor(const QColor &color)
+{
+    if (!color.isValid() || color == ui->hsvWell->backgroundColor())
+        return;
+    m_emitting = true;
+    ui->hsvWell->setBackgroundColor(color);
+    syncRecentStrip();
+    m_emitting = false;
+}
+
+void ColorsPanel::onWellSwatchesSwapped()
+{
+    syncRecentStrip();
+    if (m_emitting)
+        return;
+    emit foregroundColorChanged(ui->hsvWell->color());
+    emit backgroundColorChanged(ui->hsvWell->backgroundColor());
 }
 
 QListWidget *ColorsPanel::attachChipGrid(QTreeWidget *tree, QTreeWidgetItem *group,
@@ -381,15 +419,17 @@ void ColorsPanel::onPatternSearchChanged(const QString &text)
 
 void ColorsPanel::onWellColorChanged(const QColor &color)
 {
-    if (m_syncing)
-        return;
-    m_syncing = true;
-    ui->spinR->setValue(color.red());
-    ui->spinG->setValue(color.green());
-    ui->spinB->setValue(color.blue());
-    ui->hexEdit->setText(color.name(QColor::HexRgb).toUpper());
-    m_syncing = false;
+    if (!m_syncing) {
+        m_syncing = true;
+        ui->spinR->setValue(color.red());
+        ui->spinG->setValue(color.green());
+        ui->spinB->setValue(color.blue());
+        ui->hexEdit->setText(color.name(QColor::HexRgb).toUpper());
+        m_syncing = false;
+    }
     syncRecentStrip();
+    if (!m_emitting)
+        emit foregroundColorChanged(color);
 }
 
 void ColorsPanel::onRgbChanged()
@@ -399,9 +439,8 @@ void ColorsPanel::onRgbChanged()
     m_syncing = true;
     const QColor color(ui->spinR->value(), ui->spinG->value(), ui->spinB->value());
     ui->hexEdit->setText(color.name(QColor::HexRgb).toUpper());
-    ui->hsvWell->setColor(color);
+    ui->hsvWell->setColor(color); // → onWellColorChanged → emit
     m_syncing = false;
-    syncRecentStrip();
 }
 
 void ColorsPanel::onHexEdited()
@@ -413,9 +452,8 @@ void ColorsPanel::onHexEdited()
     ui->spinR->setValue(color.red());
     ui->spinG->setValue(color.green());
     ui->spinB->setValue(color.blue());
-    ui->hsvWell->setColor(color);
+    ui->hsvWell->setColor(color); // → onWellColorChanged → emit
     m_syncing = false;
-    syncRecentStrip();
 }
 
 void ColorsPanel::syncRecentStrip()

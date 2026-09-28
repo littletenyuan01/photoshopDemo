@@ -78,7 +78,7 @@
 - **实现状态（重要）**：只有 **移动 / 抓手 / 缩放 / 画笔 / 橡皮 / 油漆桶 / 渐变** 有实际逻辑，
   其余是 **UI 占位**。选中占位工具后 `ToolManager` 回退到中性工具（不消费事件），
   选项栏提示「该工具逻辑尚未接入」。**布局对齐 PS 只为界面完整可演示，不等于功能已实现。**
-- **油漆桶（G）**：左键单击活动层填充。
+- **油漆桶（G）**：左键单击活动层填充；画布光标为油漆桶图标（倾倒口热点）。
   - **对照 GIMP**：`gimpbucketfilltool.c`（事件）→ `gimpdrawable-bucket-fill.c`（apply）+
     `gimppickable-contiguous-region.cc`（by_seed / by_color）；选项见 `gimpbucketfilloptions.c`
    （`fill-mode` / `threshold` / `fill-transparent` / `sample-merged`…）。
@@ -86,7 +86,7 @@
   - **简化未做**：图案、paint-mode、sample-merged、对角邻接、抗锯齿软边、线稿填充。
   - **选区**：有选区时只填 mask 内（先算连通域再 ∩ Selection；空选区不约束）。
   - 新建透明层上点一下即可整层填色（种子全透明时按 GIMP 只比 alpha）；**若已有选区则只填选区内**。
-- **渐变（G）**：左键拖拽起止，松手写入前景→背景渐变。
+- **渐变（G）**：左键拖拽起止，松手写入前景→背景渐变；画布光标为十字+渐变角标。
   - **对照 GIMP**：`gimpgradienttool.c`（拖拽）→ `gimpdrawable-gradient.c` →
     `gimpoperationgradient.c`（逐像素 factor）；选项 `gimpgradientoptions.c`
     （`gradient-type` / `offset` 0..100 / `dither`）+ paint 的 `gradient-reverse` / opacity。
@@ -176,11 +176,11 @@
   【对照 GIMP】这四样在 GIMP 是**四个独立 dockable**，本项目按 PS 外观收进同一停靠区。
 - **颜色页**：`HsvColorWell`——重叠前景/背景方块 + **二维**饱和度/明度色域 + **竖直**色相条
   （已替换原先的水平色相滑杆与一维渐变近似）。下方保留紧凑 RGB/十六进制读数行。
-  色域 ↔ RGB **自洽联动**；**不写 document**（尚无前景色 domain）。
+  色域 ↔ RGB **自洽联动**；前景/背景与左侧工具箱、画布绘制色**双向同步**。
 - **色板页**：搜索 + 最近色条 + 可折叠组（RGB/CMYK/灰度/蜡笔），组下为**色块网格** + 底栏（组/加/删）。
 - **渐变页 / 图案页**：搜索 + 分组（基础/蓝/紫；树/草/水滴）+ **方缩略图**网格 + 同款底栏。
   图案缩略为代码占位花纹，非摄影素材。
-- **限制**：色名/渐变/图案仍为占位数据；底栏按钮无功能；颜色面板与工具箱前景色尚未打通。
+- **限制**：色名/渐变/图案仍为占位数据；底栏按钮无功能。
 
 ### 属性 / 调整 / 库面板（属性页是真实数据）
 
