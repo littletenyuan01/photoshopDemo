@@ -28,8 +28,8 @@ class ImageDocument;
  * dockable（gimp-layer-list 等），可被用户叠进同一 notebook；
  * 本项目按 PS 外观固定成三 Tab。
  *
- * 【文档来源】订阅 Ps::AppSession::documentChanged，不再由 MainWindow 手工转发。
- * 新增面板时只要在这里多转发一次，MainWindow 无需改动。
+ * 【文档来源】订阅 Ps::AppSession::documentChanged，再转发子面板；
+ * 同时订阅 structureChanged，强制图层列表重建（防止子面板漏订信号）。
  */
 class DockPanel : public QWidget
 {
@@ -43,12 +43,15 @@ public:
     void setSession(Ps::AppSession *session);
 
 private slots:
-    /** 会话换文档时转发给三个子面板。 */
+    /** 会话换文档时转发给三个子面板，并重订 structureChanged。 */
     void onSessionDocumentChanged(Ps::ImageDocument *document);
+    /** 文档图层结构变了：强制刷新图层树列表。 */
+    void onDocumentStructureChanged();
 
 private:
     Ui::LayerPanel *ui;
     Ps::AppSession *m_session = nullptr;
+    Ps::ImageDocument *m_document = nullptr;
 };
 
 #endif // DOCKPANEL_H

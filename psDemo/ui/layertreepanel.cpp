@@ -5,6 +5,7 @@
 #include "domain/layer.h"
 
 #include <QIcon>
+#include <QListView>
 #include <QListWidget>
 #include <QListWidgetItem>
 #include <QSignalBlocker>
@@ -43,15 +44,19 @@ LayerTreePanel::LayerTreePanel(QWidget *parent)
 {
     ui->setupUi(this);
     // 图标 / iconSize 见 layertreepanel.ui
-    ui->itemList->setGridSize(QSize(0, 0)); // 0 = 交给样式自动算行高
 
     // GIMP：new_action / delete_action → "layers-new" / "layers-delete"
-    connect(ui->btnNew, &QToolButton::clicked, this, &LayerTreePanel::onNewItem);
-    connect(ui->btnDelete, &QToolButton::clicked, this, &LayerTreePanel::onDeleteItem);
+    // 接到 private slots（进 moc），避免只靠虚函数/lambda 时个别构建下点了没反应
+    connect(ui->btnNew, &QToolButton::clicked, this, &LayerTreePanel::onBtnNewClicked);
+    connect(ui->btnDelete, &QToolButton::clicked, this, &LayerTreePanel::onBtnDeleteClicked);
     connect(ui->itemList, &QListWidget::itemSelectionChanged,
             this, &LayerTreePanel::onListSelectionChanged);
     connect(ui->itemList, &QListWidget::itemChanged,
             this, &LayerTreePanel::onItemChanged);
+
+    // ListMode 下列表行高交给代理/样式；勿设怪异 gridSize
+    ui->itemList->setViewMode(QListView::ListMode);
+    ui->itemList->setUniformItemSizes(false);
 
     // —— 缩略图防抖 ——
     // 单次触发：连发多次 contentChanged（画笔拖动）只会重算一次
@@ -85,24 +90,33 @@ void LayerTreePanel::onDocumentChanged()
     // 订阅策略：让「像素变了」不再触发列表重建。
     // 早先 documentChanged 直连 refreshFromDocument，导致每画一笔就 clear() 重建整表，
     // 选中项/编辑态/滚动位置全部丢失（代码里用 blockSignals 打的补丁正是这个症状）。
+    //
+    // 结构/活动层等用 lambda 转调：比「虚函数成员指针 + UniqueConnection」更稳，
+    // 避免个别构建下 connect 失败后「新建图层点了列表不刷新」。
+    // setDocument 会先 disconnect(旧文档→this)，不会叠连。
     if (Ps::ImageDocument *doc = document()) {
-        connect(doc, &Ps::ImageDocument::structureChanged,
-                this, &LayerTreePanel::refreshFromDocument);
-        connect(doc, &Ps::ImageDocument::activeLayerChanged,
-                this, &LayerTreePanel::onActiveLayerChanged);
-        connect(doc, &Ps::ImageDocument::layerPropertiesChanged,
-                this, &LayerTreePanel::onLayerPropertiesChanged);
+        connect(doc, &Ps::ImageDocument::structureChanged, this, [this]() {
+            refreshFromDocument();
+        });
+        connect(doc, &Ps::ImageDocument::activeLayerChanged, this, [this](int index) {
+            onActiveLayerChanged(index);
+        });
+        connect(doc, &Ps::ImageDocument::layerPropertiesChanged, this, [this](int index) {
+            onLayerPropertiesChanged(index);
+        });
         // 像素改动 → 只安排防抖刷新缩略图，绝不重建列表。
         // 只订阅 pixelsChanged：contentChanged 是汇总信号，结构/属性变化也会发它，
         // 而那时上面几个槽刚刷过 → 缩略图会被白算一遍。
-        connect(doc, &Ps::ImageDocument::pixelsChanged,
-                this, &LayerTreePanel::scheduleThumbnailRefresh);
+        connect(doc, &Ps::ImageDocument::pixelsChanged, this, [this](const QRect &) {
+            scheduleThumbnailRefresh();
+        });
     }
     refreshFromDocument();
 }
 
 void LayerTreePanel::refreshFromDocument()
 {
+    // 【功能】按 LayerStack 全量重建列表：第 0 行 = 栈顶（最新层）
     const QSignalBlocker blocker(ui->itemList);
     ui->itemList->clear();
 
@@ -124,6 +138,9 @@ void LayerTreePanel::refreshFromDocument()
     }
 
     syncActiveRowAndOptions();
+    // 新建层在顶部，滚到顶以免用户以为「没加上」
+    if (ui->itemList->count() > 0)
+        ui->itemList->scrollToItem(ui->itemList->item(0));
 }
 
 void LayerTreePanel::onActiveLayerChanged(int index)
@@ -225,16 +242,39 @@ void LayerTreePanel::commitOpacity(int value)
     doc->setLayerOpacity(index, target);
 }
 
+void LayerTreePanel::onBtnNewClicked()
+{
+    onNewItem();
+}
+
+void LayerTreePanel::onBtnDeleteClicked()
+{
+    onDeleteItem();
+}
+
 void LayerTreePanel::onNewItem()
 {
-    if (Ps::ImageDocument *doc = document())
-        doc->addTransparentLayer();
+    // 【功能】图层面板底栏「新建图层」：栈顶加透明层；列表第 0 行应为最新层
+    Ps::ImageDocument *doc = document();
+    if (!doc)
+        return;
+
+    const int index = doc->addTransparentLayer();
+    if (index < 0)
+        return;
+
+    // 不依赖信号：属性面板能显示「图层 N」而列表仍只有「背景」时，
+    // 根因就是 structureChanged→refresh 断了；这里强制重建列表。
+    refreshFromDocument();
 }
 
 void LayerTreePanel::onDeleteItem()
 {
-    if (Ps::ImageDocument *doc = document())
-        doc->removeLayer(doc->activeLayerIndex());
+    Ps::ImageDocument *doc = document();
+    if (!doc)
+        return;
+    if (doc->removeLayer(doc->activeLayerIndex()))
+        refreshFromDocument();
 }
 
 // —— 私有工具 ——

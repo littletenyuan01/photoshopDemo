@@ -83,6 +83,7 @@ QImage Compositor::composite(const ImageDocument &doc)
 
 QImage Compositor::composite(const ImageDocument &doc, const QRect &rect)
 {
+    // 【功能】自底向顶合成可见层 → 一张预乘预览图（不改各层像素）
     QImage result(doc.width(), doc.height(), QImage::Format_ARGB32_Premultiplied);
     result.fill(Qt::transparent);
 
@@ -90,6 +91,7 @@ QImage Compositor::composite(const ImageDocument &doc, const QRect &rect)
     if (area.isEmpty())
         return result;
 
+    // index 0 = 最底层先画；栈顶最后画盖在上面
     const LayerStack &stack = doc.layers();
     for (int i = 0; i < stack.count(); ++i) {
         const Layer *layer = stack.layerAt(i);
@@ -99,11 +101,18 @@ QImage Compositor::composite(const ImageDocument &doc, const QRect &rect)
         if (!layer->hasPixelData())
             continue;
 
+        // 只遍历已分配瓦片，并与脏区相交才混合（避免扫整层）
+        // 瓦片 bounds 是层内坐标；合成时加上 Layer offset（对照 GimpItem offset）
+        const int layerOx = layer->offsetX();
+        const int layerOy = layer->offsetY();
         layer->tiles().forEachAllocatedTile(
             [&](int, int, const QImage &tile, const QRect &bounds) {
-                if (!bounds.intersects(area))
+                const QRect docBounds = bounds.translated(layerOx, layerOy);
+                if (!docBounds.intersects(area))
                     return;
-                blendNormalPremultipliedAt(result, tile, bounds.x(), bounds.y(),
+                blendNormalPremultipliedAt(result, tile,
+                                           bounds.x() + layerOx,
+                                           bounds.y() + layerOy,
                                            layer->opacity(), area);
             });
     }

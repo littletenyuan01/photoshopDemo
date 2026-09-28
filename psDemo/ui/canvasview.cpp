@@ -238,6 +238,15 @@ void CanvasView::refreshToolContext()
     m_toolContext.foreground = m_fg;
     m_toolContext.background = m_bg;
     m_toolContext.brushRadius = m_brushRadius;
+    m_toolContext.fillTolerance = m_fillTolerance;
+    m_toolContext.fillContiguous = m_fillContiguous;
+    m_toolContext.fillSource = m_fillSource;
+    m_toolContext.fillOpacity = m_fillOpacity;
+    m_toolContext.gradientType = m_gradientType;
+    m_toolContext.gradientOpacity = m_gradientOpacity;
+    m_toolContext.gradientOffsetPercent = m_gradientOffsetPercent;
+    m_toolContext.gradientReverse = m_gradientReverse;
+    m_toolContext.gradientDither = m_gradientDither;
 
     if (m_toolManager)
         m_toolManager->setContext(m_toolContext);
@@ -282,6 +291,26 @@ void CanvasView::setBrushDiameter(int diameter)
 int CanvasView::brushDiameter() const
 {
     return qRound(m_brushRadius * 2.0);
+}
+
+void CanvasView::setFillOptions(int tolerance, bool contiguous, int fillSource, qreal opacity)
+{
+    m_fillTolerance = qBound(0, tolerance, 255);
+    m_fillContiguous = contiguous;
+    m_fillSource = (fillSource == 1) ? 1 : 0; // 图案(2) 暂回退前景
+    m_fillOpacity = qBound(0.0, opacity, 1.0);
+    refreshToolContext();
+}
+
+void CanvasView::setGradientOptions(int type, qreal opacity, int offsetPercent,
+                                    bool reverse, bool dither)
+{
+    m_gradientType = qBound(0, type, 4);
+    m_gradientOpacity = qBound(0.0, opacity, 1.0);
+    m_gradientOffsetPercent = qBound(0, offsetPercent, 100);
+    m_gradientReverse = reverse;
+    m_gradientDither = dither;
+    refreshToolContext();
 }
 
 void CanvasView::updateToolCursor()

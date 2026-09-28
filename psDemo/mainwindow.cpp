@@ -8,7 +8,10 @@
 #include "ui/canvasview.h"
 #include "ui/canvasworkspace.h"
 #include "ui/dockpanel.h"
+#include "engine/compositor.h"
+#include "ui/canvassizedialog.h"
 #include "ui/homescreen.h"
+#include "ui/imagesizedialog.h"
 #include "ui/newdocumentdialog.h"
 #include "ui/propertiespanel.h"
 #include "ui/toolbox.h"
@@ -58,6 +61,11 @@ void MainWindow::setupMenus()
     connect(ui->actionOpen, &QAction::triggered, this, &MainWindow::onOpenDocument);
     connect(ui->actionExit, &QAction::triggered, this, &QWidget::close);
 
+    connect(ui->actionImageSize, &QAction::triggered, this, &MainWindow::onImageSize);
+    connect(ui->actionCanvasSize, &QAction::triggered, this, &MainWindow::onCanvasSize);
+
+    connect(ui->actionLayerNew, &QAction::triggered, this, &MainWindow::onNewLayer);
+
     // —— 视图（缩放已实现）——
     connect(ui->actionZoomFit, &QAction::triggered, this, &MainWindow::onZoomFit);
     connect(ui->actionZoomActual, &QAction::triggered, this, &MainWindow::onZoomActual);
@@ -94,6 +102,21 @@ void MainWindow::setupToolbox()
             this, &MainWindow::onBackgroundColorChanged);
     connect(ui->toolOptionsBar, &ToolOptionsBar::brushDiameterChanged,
             this, &MainWindow::onBrushDiameterChanged);
+    connect(ui->toolOptionsBar, &ToolOptionsBar::fillOptionsChanged, this, [this]() {
+        ui->canvasWorkspace->canvasView()->setFillOptions(
+            ui->toolOptionsBar->fillTolerance(),
+            ui->toolOptionsBar->fillContiguous(),
+            ui->toolOptionsBar->fillType(),
+            ui->toolOptionsBar->fillOpacityPercent() / 100.0);
+    });
+    connect(ui->toolOptionsBar, &ToolOptionsBar::gradientOptionsChanged, this, [this]() {
+        ui->canvasWorkspace->canvasView()->setGradientOptions(
+            ui->toolOptionsBar->gradientType(),
+            ui->toolOptionsBar->gradientOpacityPercent() / 100.0,
+            ui->toolOptionsBar->gradientOffsetPercent(),
+            ui->toolOptionsBar->gradientReverse(),
+            ui->toolOptionsBar->gradientDither());
+    });
     connect(ui->toolOptionsBar, &ToolOptionsBar::homeClicked,
             this, &MainWindow::onShowHomeScreen);
 
@@ -104,6 +127,15 @@ void MainWindow::setupToolbox()
     canvas->setForegroundColor(ui->toolBox->foregroundColor());
     canvas->setBackgroundColor(ui->toolBox->backgroundColor());
     canvas->setBrushDiameter(ui->toolOptionsBar->brushDiameter());
+    canvas->setFillOptions(ui->toolOptionsBar->fillTolerance(),
+                           ui->toolOptionsBar->fillContiguous(),
+                           ui->toolOptionsBar->fillType(),
+                           ui->toolOptionsBar->fillOpacityPercent() / 100.0);
+    canvas->setGradientOptions(ui->toolOptionsBar->gradientType(),
+                               ui->toolOptionsBar->gradientOpacityPercent() / 100.0,
+                               ui->toolOptionsBar->gradientOffsetPercent(),
+                               ui->toolOptionsBar->gradientReverse(),
+                               ui->toolOptionsBar->gradientDither());
 }
 
 void MainWindow::setupHomeStack()
@@ -198,6 +230,78 @@ void MainWindow::onOpenDocument()
 
     m_session->setDocument(std::move(doc));
     statusBar()->showMessage(tr("已打开：%1").arg(path), 4000);
+}
+
+void MainWindow::onNewLayer()
+{
+    Ps::ImageDocument *doc = m_session ? m_session->document() : nullptr;
+    if (!doc) {
+        QMessageBox::information(this, tr("新建图层"), tr("当前没有打开的文档。"));
+        return;
+    }
+
+    const int index = doc->addTransparentLayer();
+    if (index < 0)
+        return;
+
+    const Ps::Layer *layer = doc->layers().layerAt(index);
+    statusBar()->showMessage(
+        tr("已新建：%1").arg(layer ? layer->name() : tr("图层")), 3000);
+}
+
+void MainWindow::onImageSize()
+{
+    Ps::ImageDocument *doc = m_session ? m_session->document() : nullptr;
+    if (!doc) {
+        QMessageBox::information(this, tr("图像大小"), tr("当前没有打开的文档。"));
+        return;
+    }
+
+    const QImage preview = Ps::Compositor::composite(*doc);
+    ImageSizeDialog dialog(doc, preview, this);
+    if (dialog.exec() != QDialog::Accepted)
+        return;
+
+    const QSize size = dialog.resultPixelSize();
+    if (!dialog.resampleEnabled()) {
+        // 未勾选重新采样：像素不变（PPI 尚未写入 domain）
+        statusBar()->showMessage(tr("未重新采样：像素尺寸保持 %1×%2")
+                                     .arg(doc->width())
+                                     .arg(doc->height()),
+                                 3000);
+        return;
+    }
+    if (size.width() == doc->width() && size.height() == doc->height())
+        return;
+
+    doc->scaleImage(size.width(), size.height());
+    ui->canvasWorkspace->canvasView()->zoomFit();
+    statusBar()->showMessage(
+        tr("图像大小已改为 %1×%2").arg(size.width()).arg(size.height()), 3000);
+}
+
+void MainWindow::onCanvasSize()
+{
+    Ps::ImageDocument *doc = m_session ? m_session->document() : nullptr;
+    if (!doc) {
+        QMessageBox::information(this, tr("画布大小"), tr("当前没有打开的文档。"));
+        return;
+    }
+
+    CanvasSizeDialog dialog(doc, ui->toolBox->foregroundColor(),
+                            ui->toolBox->backgroundColor(), this);
+    if (dialog.exec() != QDialog::Accepted)
+        return;
+
+    const QSize size = dialog.resultPixelSize();
+    if (size.width() == doc->width() && size.height() == doc->height())
+        return;
+
+    doc->resizeCanvas(size.width(), size.height(), dialog.anchorRow(), dialog.anchorCol(),
+                      dialog.extensionColor());
+    ui->canvasWorkspace->canvasView()->zoomFit();
+    statusBar()->showMessage(
+        tr("画布大小已改为 %1×%2").arg(size.width()).arg(size.height()), 3000);
 }
 
 void MainWindow::onZoomFit()

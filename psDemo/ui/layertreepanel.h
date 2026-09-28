@@ -58,6 +58,10 @@ protected:
     void onDeleteItem() override;
 
 private slots:
+    /** 底栏「新建图层」按钮：必须进 moc，保证点击一定进槽。 */
+    void onBtnNewClicked();
+    /** 底栏「删除图层」按钮。 */
+    void onBtnDeleteClicked();
     void onListSelectionChanged();
     void onItemChanged(QListWidgetItem *item);
     void onActiveLayerChanged(int index);

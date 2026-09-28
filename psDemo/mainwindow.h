@@ -67,6 +67,9 @@ protected:
 private slots:
     void onNewDocument();
     void onOpenDocument();
+    void onNewLayer();
+    void onImageSize();
+    void onCanvasSize();
     void onShowHomeScreen();
     void onShowWorkspace();
     void onZoomFit();

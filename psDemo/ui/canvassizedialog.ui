@@ -1,0 +1,273 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>CanvasSizeDialog</class>
+ <widget class="QDialog" name="CanvasSizeDialog">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>480</width>
+    <height>420</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>画布大小</string>
+  </property>
+  <property name="modal">
+   <bool>true</bool>
+  </property>
+  <property name="styleSheet">
+   <string notr="true">QDialog#CanvasSizeDialog {
+  background-color: #323232;
+  color: #e8e8e8;
+}
+QLabel { color: #e8e8e8; background: transparent; }
+QLineEdit, QComboBox, QCheckBox {
+  background-color: #3c3c3c;
+  border: 1px solid #222;
+  border-radius: 3px;
+  padding: 3px 6px;
+  color: #eee;
+  min-height: 22px;
+}
+QCheckBox { border: none; background: transparent; }
+QGroupBox {
+  border: 1px solid #1a1a1a;
+  border-radius: 4px;
+  margin-top: 12px;
+  padding-top: 8px;
+  color: #e8e8e8;
+}
+QGroupBox::title {
+  subcontrol-origin: margin;
+  left: 10px;
+  padding: 0 4px;
+}
+QPushButton#okButton {
+  background-color: #0d66d0;
+  color: #fff;
+  border: none;
+  border-radius: 3px;
+  padding: 8px 22px;
+  font-weight: 600;
+  min-width: 72px;
+}
+QPushButton#okButton:hover { background-color: #1473e6; }
+QPushButton#resetButton {
+  background-color: #3a3a3a;
+  color: #ddd;
+  border: 1px solid #222;
+  border-radius: 3px;
+  padding: 8px 18px;
+  min-width: 72px;
+}
+QToolButton#anchorTL, QToolButton#anchorTC, QToolButton#anchorTR,
+QToolButton#anchorML, QToolButton#anchorMC, QToolButton#anchorMR,
+QToolButton#anchorBL, QToolButton#anchorBC, QToolButton#anchorBR {
+  background-color: #3a3a3a;
+  border: 1px solid #222;
+  border-radius: 2px;
+  min-width: 28px;
+  min-height: 28px;
+  max-width: 28px;
+  max-height: 28px;
+  color: #ccc;
+}
+QToolButton#anchorTL:checked, QToolButton#anchorTC:checked, QToolButton#anchorTR:checked,
+QToolButton#anchorML:checked, QToolButton#anchorMC:checked, QToolButton#anchorMR:checked,
+QToolButton#anchorBL:checked, QToolButton#anchorBC:checked, QToolButton#anchorBR:checked {
+  background-color: #0d66d0;
+  border-color: #1473e6;
+  color: #fff;
+}
+QFrame#extColorSwatch {
+  background-color: #ffffff;
+  border: 1px solid #111;
+  min-width: 28px;
+  max-width: 28px;
+  min-height: 22px;
+  max-height: 22px;
+}
+</string>
+  </property>
+  <layout class="QHBoxLayout" name="rootLayout">
+   <property name="spacing"><number>12</number></property>
+   <property name="leftMargin"><number>14</number></property>
+   <property name="topMargin"><number>14</number></property>
+   <property name="rightMargin"><number>14</number></property>
+   <property name="bottomMargin"><number>14</number></property>
+   <item>
+    <layout class="QVBoxLayout" name="leftCol">
+     <property name="spacing"><number>10</number></property>
+     <item>
+      <widget class="QGroupBox" name="currentGroup">
+       <property name="title"><string>当前大小: —</string></property>
+       <layout class="QFormLayout" name="currentForm">
+        <item row="0" column="0">
+         <widget class="QLabel" name="curWidthCaption">
+          <property name="text"><string>宽度:</string></property>
+         </widget>
+        </item>
+        <item row="0" column="1">
+         <widget class="QLabel" name="curWidthLabel">
+          <property name="text"><string>— 像素</string></property>
+         </widget>
+        </item>
+        <item row="1" column="0">
+         <widget class="QLabel" name="curHeightCaption">
+          <property name="text"><string>高度:</string></property>
+         </widget>
+        </item>
+        <item row="1" column="1">
+         <widget class="QLabel" name="curHeightLabel">
+          <property name="text"><string>— 像素</string></property>
+         </widget>
+        </item>
+       </layout>
+      </widget>
+     </item>
+     <item>
+      <widget class="QGroupBox" name="newGroup">
+       <property name="title"><string>新建大小: —</string></property>
+       <layout class="QVBoxLayout" name="newGroupLayout">
+        <item>
+         <layout class="QGridLayout" name="newDimGrid">
+          <item row="0" column="0">
+           <widget class="QLabel" name="newWidthLabel">
+            <property name="text"><string>宽度(W):</string></property>
+           </widget>
+          </item>
+          <item row="0" column="1">
+           <widget class="QLineEdit" name="widthEdit">
+            <property name="text"><string>800</string></property>
+           </widget>
+          </item>
+          <item row="0" column="2">
+           <widget class="QComboBox" name="widthUnitCombo">
+            <item><property name="text"><string>像素</string></property></item>
+            <item><property name="text"><string>英寸</string></property></item>
+            <item><property name="text"><string>厘米</string></property></item>
+            <item><property name="text"><string>毫米</string></property></item>
+           </widget>
+          </item>
+          <item row="1" column="0">
+           <widget class="QLabel" name="newHeightLabel">
+            <property name="text"><string>高度(H):</string></property>
+           </widget>
+          </item>
+          <item row="1" column="1">
+           <widget class="QLineEdit" name="heightEdit">
+            <property name="text"><string>600</string></property>
+           </widget>
+          </item>
+          <item row="1" column="2">
+           <widget class="QComboBox" name="heightUnitCombo">
+            <item><property name="text"><string>像素</string></property></item>
+            <item><property name="text"><string>英寸</string></property></item>
+            <item><property name="text"><string>厘米</string></property></item>
+            <item><property name="text"><string>毫米</string></property></item>
+           </widget>
+          </item>
+         </layout>
+        </item>
+        <item>
+         <widget class="QCheckBox" name="relativeCheck">
+          <property name="text"><string>相对(R)</string></property>
+         </widget>
+        </item>
+        <item>
+         <layout class="QHBoxLayout" name="anchorRow">
+          <item>
+           <widget class="QLabel" name="anchorLabel">
+            <property name="text"><string>定位:</string></property>
+           </widget>
+          </item>
+          <item>
+           <layout class="QGridLayout" name="anchorGrid">
+            <property name="horizontalSpacing"><number>2</number></property>
+            <property name="verticalSpacing"><number>2</number></property>
+            <item row="0" column="0"><widget class="QToolButton" name="anchorTL"><property name="checkable"><bool>true</bool></property><property name="text"><string>↖</string></property></widget></item>
+            <item row="0" column="1"><widget class="QToolButton" name="anchorTC"><property name="checkable"><bool>true</bool></property><property name="text"><string>↑</string></property></widget></item>
+            <item row="0" column="2"><widget class="QToolButton" name="anchorTR"><property name="checkable"><bool>true</bool></property><property name="text"><string>↗</string></property></widget></item>
+            <item row="1" column="0"><widget class="QToolButton" name="anchorML"><property name="checkable"><bool>true</bool></property><property name="text"><string>←</string></property></widget></item>
+            <item row="1" column="1"><widget class="QToolButton" name="anchorMC"><property name="checkable"><bool>true</bool></property><property name="checked"><bool>true</bool></property><property name="text"><string>●</string></property></widget></item>
+            <item row="1" column="2"><widget class="QToolButton" name="anchorMR"><property name="checkable"><bool>true</bool></property><property name="text"><string>→</string></property></widget></item>
+            <item row="2" column="0"><widget class="QToolButton" name="anchorBL"><property name="checkable"><bool>true</bool></property><property name="text"><string>↙</string></property></widget></item>
+            <item row="2" column="1"><widget class="QToolButton" name="anchorBC"><property name="checkable"><bool>true</bool></property><property name="text"><string>↓</string></property></widget></item>
+            <item row="2" column="2"><widget class="QToolButton" name="anchorBR"><property name="checkable"><bool>true</bool></property><property name="text"><string>↘</string></property></widget></item>
+           </layout>
+          </item>
+          <item>
+           <spacer name="anchorSpacer">
+            <property name="orientation"><enum>Qt::Orientation::Horizontal</enum></property>
+            <property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property>
+           </spacer>
+          </item>
+         </layout>
+        </item>
+       </layout>
+      </widget>
+     </item>
+     <item>
+      <layout class="QHBoxLayout" name="extColorRow">
+       <item>
+        <widget class="QLabel" name="extColorLabel">
+         <property name="text"><string>画布扩展颜色:</string></property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QComboBox" name="extColorCombo">
+         <item><property name="text"><string>背景</string></property></item>
+         <item><property name="text"><string>前景</string></property></item>
+         <item><property name="text"><string>白色</string></property></item>
+         <item><property name="text"><string>黑色</string></property></item>
+         <item><property name="text"><string>透明</string></property></item>
+        </widget>
+       </item>
+       <item>
+        <widget class="QFrame" name="extColorSwatch">
+         <property name="frameShape"><enum>QFrame::Shape::StyledPanel</enum></property>
+        </widget>
+       </item>
+       <item>
+        <spacer name="extSpacer">
+         <property name="orientation"><enum>Qt::Orientation::Horizontal</enum></property>
+         <property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property>
+        </spacer>
+       </item>
+      </layout>
+     </item>
+     <item>
+      <spacer name="leftBottomSpacer">
+       <property name="orientation"><enum>Qt::Orientation::Vertical</enum></property>
+       <property name="sizeHint" stdset="0"><size><width>20</width><height>20</height></size></property>
+      </spacer>
+     </item>
+    </layout>
+   </item>
+   <item>
+    <layout class="QVBoxLayout" name="btnCol">
+     <item>
+      <widget class="QPushButton" name="okButton">
+       <property name="text"><string>确定</string></property>
+       <property name="default"><bool>true</bool></property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QPushButton" name="resetButton">
+       <property name="text"><string>复位</string></property>
+      </widget>
+     </item>
+     <item>
+      <spacer name="btnSpacer">
+       <property name="orientation"><enum>Qt::Orientation::Vertical</enum></property>
+       <property name="sizeHint" stdset="0"><size><width>20</width><height>40</height></size></property>
+      </spacer>
+     </item>
+    </layout>
+   </item>
+  </layout>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>

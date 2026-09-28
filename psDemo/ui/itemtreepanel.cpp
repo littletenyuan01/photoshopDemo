@@ -161,14 +161,18 @@ QImage ItemTreePanel::makeChannelThumbnail(const QImage &composite, ThumbChannel
 
 void ItemTreePanel::setDocument(Ps::ImageDocument *document)
 {
-    if (m_document == document)
-        return;
-
+    // 即使指针相同也要重绑：曾出现 structureChanged 漏订后
+    // 「属性已显示图层 N、列表仍只有背景」的不同步。
     if (m_document)
         disconnect(m_document, nullptr, this, nullptr);
 
     m_document = document;
     onDocumentChanged();
+}
+
+void ItemTreePanel::reload()
+{
+    refreshFromDocument();
 }
 
 void ItemTreePanel::onDocumentChanged()

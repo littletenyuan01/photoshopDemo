@@ -11,10 +11,10 @@ namespace Ps {
 
 namespace {
 
-/** 由线段两端点 + 笔刷半径算出脏矩形（图像坐标，含 1px 余量防止边缘漏算）。 */
-QRect dirtyRectForSegment(const QPointF &from, const QPointF &to, qreal radius)
+/** 由线段两端点 + 笔刷半径算出脏矩形（**文档**坐标，含 1px 余量）。 */
+QRect dirtyRectForSegment(const QPointF &fromDoc, const QPointF &toDoc, qreal radius)
 {
-    const QRectF box = QRectF(from, to).normalized();
+    const QRectF box = QRectF(fromDoc, toDoc).normalized();
     const int pad = qCeil(radius) + 1;
     return box.adjusted(-pad, -pad, pad, pad).toAlignedRect();
 }
@@ -49,7 +49,9 @@ bool PaintTool::mousePress(const ToolEvent &event, const ToolContext &ctx, ViewP
     m_painting = true;
     m_lastImagePos = event.imagePos;
 
-    PaintEngine::stampDab(layer->tiles(), event.imagePos, ctx.brushRadius, ctx.foreground, mode);
+    // 瓦片是层内坐标：文档点先减 Layer offset（对照 drawable 局部坐标）
+    const QPointF local = layer->toLayerLocal(event.imagePos);
+    PaintEngine::stampDab(layer->tiles(), local, ctx.brushRadius, ctx.foreground, mode);
     markDocumentDirty(ctx, dirtyRectForSegment(event.imagePos, event.imagePos, ctx.brushRadius));
     return true;
 }
@@ -69,9 +71,13 @@ bool PaintTool::mouseMove(const ToolEvent &event, const ToolContext &ctx, ViewPo
 
     const auto mode = m_erase ? PaintEngine::Mode::Erase : PaintEngine::Mode::Paint;
 
-    // strokeSegment 返回最后一颗 dab 的中心，作为下一段的起点，保证连续
-    m_lastImagePos = PaintEngine::strokeSegment(layer->tiles(), m_lastImagePos, event.imagePos,
-                                                ctx.brushRadius, ctx.foreground, mode);
+    const QPointF fromLocal = layer->toLayerLocal(m_lastImagePos);
+    const QPointF toLocal = layer->toLayerLocal(event.imagePos);
+    // strokeSegment 返回层内最后 dab；再映回文档坐标作下一段起点
+    const QPointF lastLocal = PaintEngine::strokeSegment(
+        layer->tiles(), fromLocal, toLocal,
+        ctx.brushRadius, ctx.foreground, mode);
+    m_lastImagePos = lastLocal + QPointF(layer->offsetX(), layer->offsetY());
     markDocumentDirty(ctx, dirtyRectForSegment(m_lastImagePos, event.imagePos, ctx.brushRadius));
     return true;
 }

@@ -1,7 +1,9 @@
 #include "toolmanager.h"
 
+#include "gradienttool.h"
 #include "handtool.h"
 #include "movetool.h"
+#include "paintbuckettool.h"
 #include "painttool.h"
 #include "tool.h"
 #include "zoomtool.h"
@@ -19,6 +21,8 @@ ToolManager::ToolManager(QObject *parent)
     registerTool(std::make_unique<MoveTool>());
     registerTool(std::make_unique<PaintTool>(Ps::ToolId::Brush, /*eraseMode=*/false));
     registerTool(std::make_unique<PaintTool>(Ps::ToolId::Eraser, /*eraseMode=*/true));
+    registerTool(std::make_unique<PaintBucketTool>());
+    registerTool(std::make_unique<GradientTool>());
     registerTool(std::make_unique<HandTool>());
     registerTool(std::make_unique<ZoomTool>());
 

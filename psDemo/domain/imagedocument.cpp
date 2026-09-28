@@ -1,5 +1,9 @@
 #include "imagedocument.h"
 
+#include <QImage>
+#include <QPainter>
+#include <QtGlobal>
+
 #include <memory>
 
 namespace Ps {
@@ -60,6 +64,20 @@ Layer *ImageDocument::activeLayer()
 const Layer *ImageDocument::activeLayer() const
 {
     return m_layers.layerAt(m_activeLayerIndex);
+}
+
+int ImageDocument::pickLayerAt(int docX, int docY) const
+{
+    // 【功能】自栈顶向下找第一个不透明度 > 0.25 的层（对照 gimp_image_pick_layer）
+    constexpr qreal kPickThreshold = 0.25;
+    for (int i = m_layers.count() - 1; i >= 0; --i) {
+        const Layer *layer = m_layers.layerAt(i);
+        if (!layer)
+            continue;
+        if (layer->opacityAtDocumentPos(docX, docY) > kPickThreshold)
+            return i;
+    }
+    return -1;
 }
 
 int ImageDocument::indexOfLayer(const Layer *layer) const
@@ -133,6 +151,24 @@ void ImageDocument::setLayerBlendMode(int index, BlendMode mode)
     layer->setBlendMode(mode);
 }
 
+void ImageDocument::translateLayer(int index, int dx, int dy)
+{
+    // 【功能】移动工具：只改 offset，脏区覆盖旧位∪新位（对照 gimp_layer_real_translate 两次 update）
+    if (dx == 0 && dy == 0)
+        return;
+    Layer *layer = m_layers.layerAt(index);
+    if (!layer)
+        return;
+
+    const QRect docRect(0, 0, m_width, m_height);
+    const QRect oldBounds = layer->boundsInDocument().intersected(docRect);
+    layer->translate(dx, dy);
+    const QRect newBounds = layer->boundsInDocument().intersected(docRect);
+    // 属性面板将来可读 X/Y；像素刷新靠 markDirty → contentChanged
+    emit layerPropertiesChanged(index);
+    markDirty(oldBounds.united(newBounds));
+}
+
 void ImageDocument::notifyLayerPropertiesChanged(const Layer &layer)
 {
     const int index = indexOfLayer(&layer);
@@ -152,6 +188,7 @@ void ImageDocument::notifyLayerPropertiesChanged(const Layer &layer)
 
 int ImageDocument::addTransparentLayer(const QString &name)
 {
+    // 【功能】栈顶新建透明层并设为活动层（图层面板「新建」/ Ctrl+Shift+N）
     // 空名则自动编号；新层挂在栈顶（合成时最后画、视觉最靠上）
     const QString layerName = name.isEmpty()
                                   ? QStringLiteral("图层 %1").arg(m_layers.count() + 1)
@@ -159,9 +196,11 @@ int ImageDocument::addTransparentLayer(const QString &name)
     auto layer = std::make_unique<Layer>(layerName, m_width, m_height);
     // addLayer 内挂 owner、发 structureChanged + contentChanged（挂载点只有这一处）
     const int index = addLayer(std::move(layer));
+    if (index < 0)
+        return -1;
 
-    m_activeLayerIndex = index;
-    emit activeLayerChanged(index);
+    // 走 setter：统一发 activeLayerChanged + contentChanged，面板/属性栏一起更新
+    setActiveLayerIndex(index);
     return index;
 }
 
@@ -187,6 +226,96 @@ bool ImageDocument::removeLayer(int index)
     emit activeLayerChanged(m_activeLayerIndex);
     emit contentChanged();
     return true;
+}
+
+void ImageDocument::scaleImage(int newWidth, int newHeight)
+{
+    // 【功能】PS「图像大小」+ 重新采样：每层像素缩放到新尺寸（内容跟着变大/变小）
+    newWidth = qMax(1, newWidth);
+    newHeight = qMax(1, newHeight);
+    if (newWidth == m_width && newHeight == m_height)
+        return;
+
+    for (int i = 0; i < m_layers.count(); ++i) {
+        Layer *layer = m_layers.layerAt(i);
+        if (!layer)
+            continue;
+        // 瓦片 → 整图 → 平滑缩放 → 再拆回瓦片
+        QImage src = layer->materialize();
+        if (src.isNull()) {
+            src = QImage(m_width, m_height, QImage::Format_ARGB32_Premultiplied);
+            src.fill(0);
+        }
+        QImage scaled = src.scaled(newWidth, newHeight, Qt::IgnoreAspectRatio,
+                                   Qt::SmoothTransformation);
+        if (scaled.format() != QImage::Format_ARGB32_Premultiplied)
+            scaled = scaled.convertToFormat(QImage::Format_ARGB32_Premultiplied);
+        layer->replaceFromImage(scaled);
+        layer->setOffsetSilent(qRound(layer->offsetX() * qreal(newWidth) / m_width),
+                               qRound(layer->offsetY() * qreal(newHeight) / m_height));
+    }
+
+    m_width = newWidth;
+    m_height = newHeight;
+    m_dirty = true;
+    m_dirtyRect = QRect(0, 0, m_width, m_height);
+    // 尺寸变了：面板缩略图/状态栏都要跟着重建
+    emit structureChanged();
+    emit contentChanged();
+}
+
+void ImageDocument::resizeCanvas(int newWidth, int newHeight,
+                                 int anchorRow, int anchorCol,
+                                 const QColor &extensionColor)
+{
+    // 【功能】PS「画布大小」：改工作台尺寸，图层内容不缩放，只按锚点平移（加边或裁边）
+    newWidth = qMax(1, newWidth);
+    newHeight = qMax(1, newHeight);
+    anchorRow = qBound(0, anchorRow, 2);
+    anchorCol = qBound(0, anchorCol, 2);
+    if (newWidth == m_width && newHeight == m_height)
+        return;
+
+    // 锚点决定旧内容落点：左/上 = 0，中 = 一半，右/下 = 全部差额
+    const int offsetX = (newWidth - m_width) * anchorCol / 2;
+    const int offsetY = (newHeight - m_height) * anchorRow / 2;
+
+    for (int i = 0; i < m_layers.count(); ++i) {
+        Layer *layer = m_layers.layerAt(i);
+        if (!layer)
+            continue;
+
+        QImage src = layer->materialize();
+        if (src.isNull()) {
+            src = QImage(m_width, m_height, QImage::Format_ARGB32_Premultiplied);
+            src.fill(0);
+        }
+
+        QImage neu(newWidth, newHeight, QImage::Format_ARGB32_Premultiplied);
+        // 底层用扩展色填空白；其余层保持透明（对齐 PS 分层画布扩展）
+        if (i == 0 && extensionColor.alpha() > 0)
+            neu.fill(extensionColor);
+        else
+            neu.fill(Qt::transparent);
+
+        QPainter painter(&neu);
+        painter.setCompositionMode(QPainter::CompositionMode_SourceOver);
+        // 画布锚点 + 层原有 offset；写入新缓冲后 offset 归零（像素已烘焙进文档坐标）
+        painter.drawImage(offsetX + layer->offsetX(), offsetY + layer->offsetY(), src);
+        painter.end();
+
+        if (neu.format() != QImage::Format_ARGB32_Premultiplied)
+            neu = neu.convertToFormat(QImage::Format_ARGB32_Premultiplied);
+        layer->replaceFromImage(neu);
+        layer->setOffsetSilent(0, 0);
+    }
+
+    m_width = newWidth;
+    m_height = newHeight;
+    m_dirty = true;
+    m_dirtyRect = QRect(0, 0, m_width, m_height);
+    emit structureChanged();
+    emit contentChanged();
 }
 
 } // namespace Ps

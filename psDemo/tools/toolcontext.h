@@ -23,6 +23,19 @@ struct ToolContext
     QColor foreground {Qt::black};     ///< 前景色（画笔颜色）
     QColor background {Qt::white};     ///< 背景色
     qreal brushRadius = 10.0;          ///< 画笔半径（图像像素）
+
+    // —— 油漆桶（对照 GimpBucketFillOptions 属性名）——
+    int fillTolerance = 32;            ///< ≈ threshold；GIMP 默认 15，此处 32 对齐 PS
+    bool fillContiguous = true;        ///< PS「连续」；GIMP 相似色路径固定 by_seed
+    int fillSource = 0;                ///< ≈ fill-mode：0=FG，1=BG（PATTERN 未实现）
+    qreal fillOpacity = 1.0;           ///< ≈ context opacity [0,1]；无 paint-mode / sample-merged
+
+    // —— 渐变（对照 GimpGradientOptions / PaintOptions）——
+    int gradientType = 0;              ///< ≈ gradient-type：0线/1径/2角/3对称双线/4方距
+    qreal gradientOpacity = 1.0;       ///< ≈ context opacity [0,1]
+    int gradientOffsetPercent = 0;     ///< ≈ offset 0..100
+    bool gradientReverse = false;      ///< ≈ gradient-reverse
+    bool gradientDither = true;        ///< ≈ dither
 };
 
 /**

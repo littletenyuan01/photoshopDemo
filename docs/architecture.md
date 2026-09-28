@@ -161,8 +161,9 @@ classDiagram
     +bool visible
     +qreal opacity
     +BlendMode blendMode
-    +QImage pixels
+    +TileBuffer tiles
     +ImageDocument owner
+    +fill()
     +setName()
     +setVisible()
     +setOpacity()
@@ -194,9 +195,11 @@ classDiagram
 
 说明（**加粗 = 已实现**）：
 
-- **像素层** `Layer`：持有 `QImage`（**实为 Format_ARGB32_Premultiplied**）；
+- **像素层** `Layer`：持有 **`TileBuffer`（64×64 懒分配，预乘 ARGB）**；
+  新建统一 `Layer(extent)` → 可选 `fill` → `addLayer`（透明=0 块瓦片）。
   **并通过 `owner()` 回指 `ImageDocument`** —— `setName/setVisible/setOpacity/setBlendMode`
   内部改值后自动广播 `layerPropertiesChanged`，UI 无需手动 notify。
+  细节见 [`docs/layers/`](layers/README.md)。
 - **`ImageDocument`**：除尺寸/栈/活动层外，还有**分级信号**与**累计脏区**（`markDirty(rect)`），
   以及供 UI 使用的**语义化 setter**（`setLayerVisible/Opacity/Name/BlendMode`）。
 - 蒙版 `LayerMask`：同尺寸灰度；合成时 `alpha *= mask`
@@ -310,7 +313,7 @@ psDemo/
     toolid.h / toolevent.h           [x] 工具枚举 + 规范化事件
     toolcontext.h                    [x] ToolContext + ViewPort
     tool.* / toolmanager.*           [x] 基类 + 注册表 + 事件分发
-    movetool.* / handtool.*          [x] 移动（占位）/ 平移
+    movetool.* / handtool.*          [x] 移动（改 offset）/ 平移
     zoomtool.* / painttool.*         [x] 锚点缩放 / 画笔橡皮
     selectrecttool.* / ...           [ ] 选区类工具
   engine/

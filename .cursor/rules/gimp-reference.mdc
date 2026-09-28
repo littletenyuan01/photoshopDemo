@@ -29,6 +29,9 @@ alwaysApply: true
 
 **禁止**：用户未明确要求时擅自新开功能；禁止未查 `gimp-master` 就落地 domain/engine/tools 或面板业务接线。
 
+**执行约定（强制）**：每次功能开发的**第一条工具调用**必须是检索/阅读 `gimp-master` 对应文件；
+不得先写本仓库实现再补对照。未读过的对照注释须标「待对照」，不得假装已对照。
+
 ## 当前已知债
 
 - 右侧面板：**结构已对照** GIMP `ItemTreeView` → `Layer/Channel/PathTreeView`（见 `ui/itemtreepanel.*` 等）；外观用 PS 三 Tab 壳（`LayerPanel`）

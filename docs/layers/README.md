@@ -9,7 +9,7 @@
 | [layers-structure.md](layers-structure.md) | 层级结构、新建文档/图层生成什么、结构图 |
 | [compositing.md](compositing.md) | 合成器、Alpha、预乘、混合公式、刷新策略 |
 | [data-flow.md](data-flow.md) | **本项目**信号分级、新建/绘制链路、已实现与仍欠 |
-| [tiles-and-memory.md](tiles-and-memory.md) | 瓦片、边缘不满格、step 含义、PS 懒分配 vs 本 Demo |
+| [tiles-and-memory.md](tiles-and-memory.md) | 瓦片、**新建图层统一路径**、透明=未分配、GIMP 对照 |
 
 对照实现：
 

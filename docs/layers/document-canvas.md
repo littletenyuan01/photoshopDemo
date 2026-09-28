@@ -56,14 +56,23 @@ PPI 表示：这些像素按多密对应到物理尺寸（打印）。
 | 图层内容 | 通常重采样缩放 | 默认不缩放，只加空白或裁切 |
 | 比喻 | 把照片冲印得更大/更小 | 换更大/更小的纸，照片本身不动 |
 
-本 Demo 尚未实现这两个菜单；文档宽高目前在创建时固定。
+本 Demo 已接线：
+
+| 菜单 | 对话框 | Domain |
+|------|--------|--------|
+| 图像 → 图像大小… | `ui/imagesizedialog.ui` | `ImageDocument::scaleImage`（勾选「重新采样」时） |
+| 图像 → 画布大小… | `ui/canvassizedialog.ui` | `ImageDocument::resizeCanvas`（锚点 + 扩展色） |
+
+未勾选重新采样时像素不变（PPI 尚未写入 domain）。
 
 ## 6. 本项目新建后实际有什么
 
 以 A4 @ 300、白底为例（像素约 2480×3508）：
 
 1. `ImageDocument`（宽高）
-2. 一层 `Layer`「背景」：同尺寸 `QImage`，填白
+2. 一层 `Layer`「背景」：`TileBuffer` + `fill(白)`（覆盖瓦片均已分配并填白）
 3. `AppSession::setDocument` 广播；`CanvasView` 等订阅刷新
+
+图层面板再「新建」一层时，仍走同一套 `Layer(extent)`，只是不 fill → 0 块瓦片。见 [tiles-and-memory.md](tiles-and-memory.md)。
 
 **不会**单独 new 一个「画布数据对象」；中间窗口是已有视图开始显示新文档。

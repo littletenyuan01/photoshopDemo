@@ -27,6 +27,8 @@ SOURCES += \
     tools/handtool.cpp \
     tools/zoomtool.cpp \
     tools/painttool.cpp \
+    tools/paintbuckettool.cpp \
+    tools/gradienttool.cpp \
     ui/canvasview.cpp \
     ui/canvasworkspace.cpp \
     ui/canvasdocstatusbar.cpp \
@@ -43,7 +45,9 @@ SOURCES += \
     ui/tooloptionsbar.cpp \
     ui/colorpickerdialog.cpp \
     ui/homescreen.cpp \
-    ui/newdocumentdialog.cpp
+    ui/newdocumentdialog.cpp \
+    ui/imagesizedialog.cpp \
+    ui/canvassizedialog.cpp
 
 HEADERS += \
     mainwindow.h \
@@ -64,6 +68,8 @@ HEADERS += \
     tools/handtool.h \
     tools/zoomtool.h \
     tools/painttool.h \
+    tools/paintbuckettool.h \
+    tools/gradienttool.h \
     ui/canvasview.h \
     ui/canvasworkspace.h \
     ui/canvasdocstatusbar.h \
@@ -81,7 +87,9 @@ HEADERS += \
     ui/tooloptionsbar.h \
     ui/colorpickerdialog.h \
     ui/homescreen.h \
-    ui/newdocumentdialog.h
+    ui/newdocumentdialog.h \
+    ui/imagesizedialog.h \
+    ui/canvassizedialog.h
 
 FORMS += \
     mainwindow.ui \
@@ -97,7 +105,9 @@ FORMS += \
     ui/tooloptionsbar.ui \
     ui/colorpickerdialog.ui \
     ui/homescreen.ui \
-    ui/newdocumentdialog.ui
+    ui/newdocumentdialog.ui \
+    ui/imagesizedialog.ui \
+    ui/canvassizedialog.ui
 
 RESOURCES += \
     resources.qrc

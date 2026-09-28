@@ -23,8 +23,12 @@
   ⚠️ 标题栏 logo 的**单击弹系统菜单、双击请求关闭**是 Windows/PS 的平台约定
   （用户实测 PS 同样如此），**不做拦截**；要改的只是「双击就直接没了」这件事。
 - **布局文件**：`mainwindow.ui`、`ui/toolbox.ui`、`ui/tooloptionsbar.ui`、`ui/colorspanel.ui`、`ui/propertiespanel.ui`、`ui/layerpanel.ui`（右侧 `DockPanel` 壳）、`ui/canvasworkspace.ui`
-- **已可点**：新建（弹「新建文档」对话框）、打开、退出；视图缩放；窗口→图层 / 颜色 / 属性；工具切换；画笔/橡皮绘制活动层；抓手平移；缩放工具；前景/背景色；关于；
+- **已可点**：新建（弹「新建文档」对话框）、打开、退出；图像→图像大小 / 画布大小（PS 式对话框）；视图缩放；窗口→图层 / 颜色 / 属性；工具切换；画笔/橡皮绘制活动层；抓手平移；缩放工具；前景/背景色；关于；
   选项条「家」→ 主页全页，主页「新文件」同新建对话框，「打开」同打开文件，顶栏 ← 返回工作区。
+- **图像大小 / 画布大小**：
+  - `ui/imagesizedialog.ui`：左侧预览 + 宽高/单位/分辨率/重新采样；确认且勾选重新采样时调用 `ImageDocument::scaleImage`。
+  - `ui/canvassizedialog.ui`：当前大小 / 新建大小 / 相对 / 定位锚点 / 扩展颜色；确认后调用 `ImageDocument::resizeCanvas`。
+  - 快捷键对齐 PS：`Ctrl+Alt+I` / `Ctrl+Alt+C`。
 - **菜单下拉**：顶层与 Photoshop 中文版对齐（文件 / 编辑 / 图像 / 图层 / 文字 / 选择 / 滤镜 / 3D / 视图 / 窗口 / 帮助），
   含子菜单（导出、调整、图层样式、滤镜分类、窗口面板列表等）。**除上列已接线项外全部灰显占位**，
   tooltip 写「UI 占位，功能尚未接入」——只补齐入口，不假装有功能。
@@ -45,8 +49,12 @@
 
 - **说明**：工具是**独立状态机**（`Tool` 子类），由 `ToolManager` 按 id 分发事件；
   画布只把 `QMouseEvent` 归一化成**图像坐标的 `ToolEvent`** 后转发，自身**不含任何工具分支**。
-- **已注册**：移动（占位）、抓手、缩放、画笔、橡皮。未接入逻辑的工具回退到「移动」这个**中性兜底**，
+- **已注册**：移动、抓手、缩放、画笔、橡皮、油漆桶、渐变。未接入逻辑的工具回退到「移动」这个**中性兜底**，
   切过去不消费事件，而不是意外继承上一个工具的行为。
+- **移动（V）**：按下时按像素点选最上层非透明内容并激活该层（图层面板同步）；
+  拖拽平移其文档偏移（`Layer::offsetX/Y`），不搬瓦片像素。
+  对照 `gimpmovetool.c` + `gimp_image_pick_layer` → `gimp_item_translate`。
+  未做：选区/路径移动、对齐、「仅移动当前层」开关。
 - **视图操作**：画布实现 `ViewPort`，工具经 `zoomAt` / `panBy` 请求缩放平移 ——
   锚点缩放数学只存在于 `CanvasView::zoomAt` 一处。
 - **收益**：新增工具 = 加一个类 + 在 `ToolManager` 注册一行，**`CanvasView` 与 `MainWindow` 都不用改**。
@@ -67,9 +75,23 @@
 - **说明**：**17 个占位槽 / 35 个工具**，分组与顺序对齐 Photoshop 默认工具箱
   （移动 · 选框 · 套索 · 快速选择 · 裁剪 · 吸管 · 画笔 · 图章 · 橡皮擦 · 填充 · 聚焦 · 色调 · 钢笔 · 文字 · 形状 · 抓手 · 缩放）。
   同组共用一个占位，**右键展开子菜单**；工具箱外层是 `QScrollArea`，工具多时可滚动。
-- **实现状态（重要）**：只有 **移动 / 抓手 / 缩放 / 画笔 / 橡皮** 有实际逻辑，
-  其余 30 个是 **UI 占位**。选中占位工具后 `ToolManager` 回退到中性工具（不消费事件），
+- **实现状态（重要）**：只有 **移动 / 抓手 / 缩放 / 画笔 / 橡皮 / 油漆桶 / 渐变** 有实际逻辑，
+  其余是 **UI 占位**。选中占位工具后 `ToolManager` 回退到中性工具（不消费事件），
   选项栏提示「该工具逻辑尚未接入」。**布局对齐 PS 只为界面完整可演示，不等于功能已实现。**
+- **油漆桶（G）**：左键单击活动层填充。
+  - **对照 GIMP**：`gimpbucketfilltool.c`（事件）→ `gimpdrawable-bucket-fill.c`（apply）+
+    `gimppickable-contiguous-region.cc`（by_seed / by_color）；选项见 `gimpbucketfilloptions.c`
+   （`fill-mode` / `threshold` / `fill-transparent` / `sample-merged`…）。
+  - **已接线**：容差（≈threshold）、连续（PS；GIMP 相似色固定 by_seed）、前景|背景（≈fill-mode）、不透明度。
+  - **简化未做**：图案、paint-mode、sample-merged、对角邻接、抗锯齿软边、线稿填充、选区相交。
+  - 新建透明层上点一下即可整层填色（种子全透明时按 GIMP 只比 alpha）。
+- **渐变（G）**：左键拖拽起止，松手写入前景→背景渐变。
+  - **对照 GIMP**：`gimpgradienttool.c`（拖拽）→ `gimpdrawable-gradient.c` →
+    `gimpoperationgradient.c`（逐像素 factor）；选项 `gimpgradientoptions.c`
+    （`gradient-type` / `offset` 0..100 / `dither`）+ paint 的 `gradient-reverse` / opacity。
+  - **形状映射**：线性→LINEAR，径向→RADIAL，角度→CONICAL_ASYMMETRIC，对称→BILINEAR，菱形→SQUARE。
+  - **已接线**：类型 / 不透明度 / 偏移 / 仿色 / 反向。
+  - **简化未做**：完整 GimpGradient 多色标、shapeburst/螺旋、repeat、超采样、paint-mode、选区、实时 GEGL 预览。
 - **图标**：`resources/icons/tools/`（iconfont 英文命名 PNG），经 `:/icons/tools/` 加载；
   映射表见 `docs/ui/iconfont-icons.md`。
 
@@ -87,7 +109,8 @@
 - **同一页内的专有控件按工具显隐**：选区页的「容差/连续/对所有图层取样」只在魔棒与快速选择出现；
   绘画页的「对齐/对所有图层取样」只在仿制图章出现（对应 GIMP 的 `gimp_clone_options_gui`
   在 paint options 之上追加 clone 项）。
-- **⚠️ 实现状态**：**只有「大小」真正生效**（画笔/橡皮直径）。其余所有控件都是 **UI 占位**，
+- **⚠️ 实现状态**：**「大小」**（画笔/橡皮）、**油漆桶页**（容差/连续/填充/不透明度）与
+  **渐变页**（类型/不透明度/偏移/仿色/反向）已接线。其余控件多为 **UI 占位**，
   不改变任何行为；提示语写「该工具逻辑尚未接入（参数为 UI 占位）」。
 - **布局**：各页最小宽度不同（实测**绘画页需 1038px**，故选区 609 / 渐变 654 / 文字 700…）。
   整条套一个 `QScrollArea`：**页面保持自然宽度并左对齐**，窗口不够宽时**横向滚动**；
@@ -123,14 +146,18 @@
 > 概念与结构图见 [`docs/layers/`](layers/README.md)；信号/链路对照见 [`layers/data-flow.md`](layers/data-flow.md)。
 
 - `Layer`：名称、显隐、透明度、混合模式枚举（目前仅 Normal）、像素在 **`TileBuffer`（64×64 懒分配）**；
-  透明新建不分配瓦片；**持 `owner` 回指**，属性 setter 内部自动广播 `layerPropertiesChanged`。
+  **持 `owner` 回指**，属性 setter 内部自动广播 `layerPropertiesChanged`。
+- **新建图层统一路径**（对齐 GIMP `layer_new` → `fill` → `add_layer`）：
+  `Layer(名,w,h)` 预定格数 → 可选 `fill` → `addLayer`。
+  面板「新建」=`addTransparentLayer`（不 fill，0 块瓦片）；新建文档背景=`fill(白)` 占满覆盖格。
+  详见 [`layers/tiles-and-memory.md`](layers/tiles-and-memory.md)、[`layers/data-flow.md`](layers/data-flow.md)。
 - `LayerStack`：自底向顶有序层列表。
 - `ImageDocument`：尺寸、活动层、**分级信号**（`pixelsChanged(QRect)` / `layerPropertiesChanged(int)` /
   `structureChanged()` / `activeLayerChanged(int)` / 汇总 `contentChanged()`）、
   **累计脏区** `dirtyRect()`，以及供 UI 使用的**语义化 setter**。
 - **约定**：UI **不得**直接改 `Layer`，一律走 `ImageDocument::setLayerVisible/Opacity/Name/BlendMode`；
-  像素写入后必须 `markDirty(rect)`。
-- **限制**：无蒙版/调整层；面板已可操作图层。
+  像素写入走 `tiles()`，之后必须 `markDirty(rect)`。
+- **限制**：无蒙版/调整层；新建层时尚无「选填充类型」对话框（固定透明）；面板已可操作图层。
 
 ### 合成预览
 
@@ -165,7 +192,7 @@
   下面「变换」「对齐」两个**可折叠分区**（折叠真的生效：箭头文字与内容体显隐共用同一个开关，
   见 `PropertiesPanel::bindCollapsible`，不会出现「箭头说收起、内容还在」）。
   宽/高 = **活动图层的真实像素尺寸**（只读）；
-  ⚠️ **X / Y / 旋转是 UI 占位**：domain 的 `Layer` 既无 offset 也无变换矩阵，tooltip 已注明，**不伪造数值**。
+  X / Y = **活动层 offset**（domain 已有；属性页数值接线可后续补）；旋转仍为 UI 占位。
 - **调整页**：调整类型列表（亮度/对比度、色阶、曲线…）。
   ⚠️ **尚未接入任何调整算法**，条目的 tooltip 已注明「UI 占位」。
 - **库页**：资源类别列表；⚠️ PS 的「库」是云端/团队共享资源面板，本 Demo 无云端资源，仅列类别占位。
@@ -174,7 +201,7 @@
 ### 图层面板
 
 - **说明**：右侧 `DockPanel` 壳（`layerpanel.ui`）内的 `LayerTreePanel`；列表上方为视觉上层。
-- **操作**：勾选显隐、双击改名、不透明度滑条、新建、删除。
+- **操作**：勾选显隐、双击改名、不透明度滑条、新建（透明空层 / 0 瓦片）、删除。
   ⚠️ **尚无「上移/下移」**：`LayerStack::moveLayer` 已实现但**没有 UI 接线**
   （底栏与「图层」菜单都没有对应按钮/动作），`ImageDocument` 也还没有转发入口
   —— 直接动栈会绕过 `structureChanged` 与 Phase 6 的撤销收口，所以留到接线时一起做。

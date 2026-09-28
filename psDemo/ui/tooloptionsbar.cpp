@@ -1,6 +1,8 @@
 #include "tooloptionsbar.h"
 #include "ui_tooloptionsbar.h"
 
+#include <QCheckBox>
+#include <QComboBox>
 #include <QSpinBox>
 #include <QToolButton>
 
@@ -11,9 +13,24 @@ ToolOptionsBar::ToolOptionsBar(QWidget *parent)
     ui->setupUi(this);
     // 图标 / iconSize / 色块样式见 tooloptionsbar.ui
 
-    // 唯一真正接线的选项：画笔/橡皮直径（其余全是 UI 占位，见头文件说明）
+    // 画笔/橡皮直径
     connect(ui->brushSizeSpin, qOverload<int>(&QSpinBox::valueChanged),
             this, &ToolOptionsBar::brushDiameterChanged);
+
+    // 油漆桶：容差 / 连续 / 填充源 / 不透明度 → 汇总为 fillOptionsChanged
+    const auto emitFill = [this]() { emit fillOptionsChanged(); };
+    connect(ui->fillToleranceSpin, qOverload<int>(&QSpinBox::valueChanged), this, emitFill);
+    connect(ui->fillContiguousCheck, &QCheckBox::toggled, this, emitFill);
+    connect(ui->fillTypeCombo, qOverload<int>(&QComboBox::currentIndexChanged), this, emitFill);
+    connect(ui->fillOpacitySpin, qOverload<int>(&QSpinBox::valueChanged), this, emitFill);
+
+    // 渐变：类型 / 不透明度 / 偏移 / 仿色 / 反向（混合模式暂未接入引擎）
+    const auto emitGrad = [this]() { emit gradientOptionsChanged(); };
+    connect(ui->gradTypeCombo, qOverload<int>(&QComboBox::currentIndexChanged), this, emitGrad);
+    connect(ui->gradOpacitySpin, qOverload<int>(&QSpinBox::valueChanged), this, emitGrad);
+    connect(ui->gradOffsetSpin, qOverload<int>(&QSpinBox::valueChanged), this, emitGrad);
+    connect(ui->gradDitherCheck, &QCheckBox::toggled, this, emitGrad);
+    connect(ui->gradReverseCheck, &QCheckBox::toggled, this, emitGrad);
 
     // 「家」→ 主页（UI 阶段只发信号，由 MainWindow 切到 HomeScreen）
     connect(ui->homeButton, &QToolButton::clicked, this, &ToolOptionsBar::homeClicked);
@@ -36,6 +53,51 @@ void ToolOptionsBar::setBrushDiameter(int diameter)
     ui->brushSizeSpin->blockSignals(true);
     ui->brushSizeSpin->setValue(qBound(1, diameter, 500));
     ui->brushSizeSpin->blockSignals(false);
+}
+
+int ToolOptionsBar::fillTolerance() const
+{
+    return ui->fillToleranceSpin->value();
+}
+
+bool ToolOptionsBar::fillContiguous() const
+{
+    return ui->fillContiguousCheck->isChecked();
+}
+
+int ToolOptionsBar::fillType() const
+{
+    return ui->fillTypeCombo->currentIndex();
+}
+
+int ToolOptionsBar::fillOpacityPercent() const
+{
+    return ui->fillOpacitySpin->value();
+}
+
+int ToolOptionsBar::gradientType() const
+{
+    return ui->gradTypeCombo->currentIndex();
+}
+
+int ToolOptionsBar::gradientOpacityPercent() const
+{
+    return ui->gradOpacitySpin->value();
+}
+
+int ToolOptionsBar::gradientOffsetPercent() const
+{
+    return ui->gradOffsetSpin->value();
+}
+
+bool ToolOptionsBar::gradientReverse() const
+{
+    return ui->gradReverseCheck->isChecked();
+}
+
+bool ToolOptionsBar::gradientDither() const
+{
+    return ui->gradDitherCheck->isChecked();
 }
 
 void ToolOptionsBar::setCurrentTool(Ps::ToolId id)
@@ -137,10 +199,16 @@ QString ToolOptionsBar::hintForTool(Ps::ToolId id)
 {
     // 提示语要短（标签最大宽 320px）。已接入的写用法，其余统一说明「参数是占位」
     switch (id) {
+    case Ps::ToolId::Move:
+        return QObject::tr("点击选中图层并拖拽移动；图层面板同步选中");
     case Ps::ToolId::Brush:
         return QObject::tr("左键绘制（仅「大小」生效）");
     case Ps::ToolId::Eraser:
         return QObject::tr("左键擦除（仅「大小」生效）");
+    case Ps::ToolId::PaintBucket:
+        return QObject::tr("左键填充；透明层单击即可整层填色");
+    case Ps::ToolId::Gradient:
+        return QObject::tr("拖拽绘制渐变；类型/偏移/反向对照 GIMP Blend");
     case Ps::ToolId::Hand:
         return QObject::tr("拖拽平移画布");
     case Ps::ToolId::Zoom:

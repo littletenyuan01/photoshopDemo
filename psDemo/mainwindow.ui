@@ -2345,11 +2345,8 @@
    <property name="shortcut">
     <string>Ctrl+Alt+I</string>
    </property>
-   <property name="enabled">
-    <bool>false</bool>
-   </property>
    <property name="toolTip">
-    <string>UI 占位，功能尚未接入</string>
+    <string>更改图像的像素尺寸或打印尺寸</string>
    </property>
   </action>
   <action name="actionCanvasSize">
@@ -2359,11 +2356,8 @@
    <property name="shortcut">
     <string>Ctrl+Alt+C</string>
    </property>
-   <property name="enabled">
-    <bool>false</bool>
-   </property>
    <property name="toolTip">
-    <string>UI 占位，功能尚未接入</string>
+    <string>更改画布尺寸（加边或裁边，不缩放图层内容）</string>
    </property>
   </action>
   <action name="actionImageRot180">
@@ -2538,11 +2532,8 @@
    <property name="shortcut">
     <string>Ctrl+Shift+N</string>
    </property>
-   <property name="enabled">
-    <bool>false</bool>
-   </property>
    <property name="toolTip">
-    <string>UI 占位，功能尚未接入</string>
+    <string>新建透明图层</string>
    </property>
   </action>
   <action name="actionLayerNewBackground">

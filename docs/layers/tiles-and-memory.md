@@ -30,22 +30,40 @@
 | 瓦片边长 | **tile size**（本 Demo = 64） |
 | 瓦片个数 | `tilesX` / `tilesY` = \(\lceil W/64\rceil\) 等 |
 
-## 4. 新建文档 / 新建透明层（GIMP 与本 Demo）
+## 4. 新建图层：同一条路，差别只在填充
 
-GIMP：`gimp_layer_new` → `gegl_buffer_new(extent)` → `gimp_drawable_fill`；透明填充走 empty/zero tile，写时 unclone 才真正占块内存。
+**结论**：不管透明层还是白底/实色层，**新建图层都走同一套创建逻辑**；透明只是「还没（或不必）给瓦片分配像素内存」。
 
-本 Demo（**已实现**）：
+### GIMP（`layers-commands.c`）
 
-| 操作 | 行为 |
-|------|------|
-| `Layer(name, w, h)` 透明新建 | `TileBuffer` 只记 W/H 与格数，`allocatedTileCount()==0` |
-| `fill(白)` / 实色 | 遍历全部格 `ensureTile` + 填色（白底背景占满覆盖范围） |
-| `fill(透明)` | `clearTiles()`，释放全部块 |
-| 画笔 `stampDab(TileBuffer)` | 只对 dab 覆盖格 `ensureTile` 再写入 |
-| 合成 | `!hasPixelData()` 跳过；否则只混合**已分配**瓦片 |
-| 打开图 | `setFromImage` 按块拆入 |
+```text
+gimp_layer_new(宽, 高, 格式, 名字…)     ← 建层 + GeglBuffer(extent)，预定范围
+    → gimp_drawable_fill(填充类型)        ← 透明 / 白 / 前景色…（唯一分叉）
+    → gimp_image_add_layer(...)
+```
 
-**尚未做**：GEGL 式全局共享 zero-tile COW、scratch 盘、投影分块缓存（见 Roadmap Phase 7）。
+- 填充=透明 → empty/zero tile，写时 unclone 才真正占块  
+- 填充=实色 → 相关瓦片写入，立刻占内存  
+
+### 本 Demo（**已实现**）
+
+```text
+Layer(名, w, h)           ← TileBuffer 只记 W/H 与格数（尚无瓦片块）
+    → [可选] fill(颜色)    ← 透明：clearTiles / 不调；实色：ensure 全部格并填
+    → addLayer(...)       ← 入栈、挂 owner、发 structureChanged
+```
+
+| 场景 | 调用 | 分配情况 |
+|------|------|----------|
+| 图层面板「新建」 | `addTransparentLayer` → `Layer` + 不 fill | **0 块**瓦片 |
+| 新建文档白底背景 | `createBlank` → `Layer` + `fill(白)` | 覆盖范围**全部格**已分配 |
+| 打开图片 | `Layer(名, QImage)` → `setFromImage` | 按块拆入（已有像素） |
+| 画笔写透明层 | `stampDab(tiles)` | 只 ensure dab 碰到的格 |
+| 合成 | `hasPixelData()` | 无块则跳过该层 |
+
+`fill(透明)` 会 `clearTiles()`，与「逻辑全透明、释放块」一致。
+
+**尚未做**：GEGL 式全局共享 zero-tile COW、scratch 盘、投影分块缓存（见 Roadmap Phase 7）；面板尚无「新建时选填充类型」对话框（目前新建层固定等价透明填充）。
 
 ## 5. 关键代码
 
@@ -58,4 +76,4 @@ GIMP：`gimp_layer_new` → `gegl_buffer_new(extent)` → `gimp_drawable_fill`�
 
 ## 6. 一句话
 
-**瓦片 = 固定网格像素块；透明层预定格数、写时分配；白底 fill 会占满覆盖块；本 Demo 已按此实现，无 swap/共享空瓦片。**
+**瓦片 = 固定网格像素块；凡新建图层先同一套 `Layer(extent)`，再按填充决定是否占内存；透明=预定格数、写时分配；本 Demo 已按此实现，无 swap/共享空瓦片。**

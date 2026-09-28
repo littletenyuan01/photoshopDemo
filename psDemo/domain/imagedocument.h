@@ -56,6 +56,12 @@ public:
     Layer *activeLayer();
     const Layer *activeLayer() const;
 
+    /**
+     * 自顶向下点选图层（对照 gimp_image_pick_layer）。
+     * @return 命中层下标；点在透明/空白处返回 -1
+     */
+    int pickLayerAt(int docX, int docY) const;
+
     bool isDirty() const { return m_dirty; }
     void clearDirty();
 
@@ -83,6 +89,12 @@ public:
     /** 改混合模式。 */
     void setLayerBlendMode(int index, BlendMode mode);
 
+    /**
+     * 平移图层（对照 gimp_item_translate / 移动工具）。
+     * 只改 Layer offset，不搬瓦片像素；脏区 = 旧外接矩形 ∪ 新外接矩形。
+     */
+    void translateLayer(int index, int dx, int dy);
+
     // —— 结构操作 ——
 
     /**
@@ -99,13 +111,32 @@ public:
     /** 删除指定层；至少保留一层。删除后修正活动层下标。 */
     bool removeLayer(int index);
 
+    /**
+     * 图像大小：重采样缩放所有图层到 newWidth×newHeight（对齐 PS「重新采样」开启）。
+     * 尺寸未变则忽略。会发 structureChanged + contentChanged。
+     */
+    void scaleImage(int newWidth, int newHeight);
+
+    /**
+     * 画布大小：改文档工作台尺寸，图层内容按锚点平移（不缩放像素）。
+     * @param anchorRow / anchorCol 0=上/左，1=中，2=下/右
+     * @param extensionColor 扩大时底层空白区域填充色；透明则保持透明
+     */
+    void resizeCanvas(int newWidth, int newHeight,
+                      int anchorRow, int anchorCol,
+                      const QColor &extensionColor);
+
     /** 由 Layer::notifyPropertiesChanged 调用；UI 一般不直接调。 */
     void notifyLayerPropertiesChanged(const Layer &layer);
 
 signals:
+    /** 像素脏区变化（图像坐标）；画布将来可只重合成 rect。 */
     void pixelsChanged(const QRect &rect);
+    /** 第 index 层属性变了；图层面板只刷该行。 */
     void layerPropertiesChanged(int index);
+    /** 层数/顺序变了；图层面板需重建列表。 */
     void structureChanged();
+    /** 活动层下标变了。 */
     void activeLayerChanged(int index);
     /** 汇总信号：以上任意一种都发；恒在其后发射。 */
     void contentChanged();
@@ -114,12 +145,12 @@ private:
     /** 按层指针反查下标；不属于本栈返回 -1。 */
     int indexOfLayer(const Layer *layer) const;
 
-    int m_width = 0;
-    int m_height = 0;
+    int m_width = 0;   ///< 文档像素宽
+    int m_height = 0;  ///< 文档像素高
     LayerStack m_layers;
-    int m_activeLayerIndex = -1; // -1 表示无活动层
-    bool m_dirty = false;
-    QRect m_dirtyRect; ///< 累计脏区（图像坐标）
+    int m_activeLayerIndex = -1; ///< -1 = 无活动层
+    bool m_dirty = false;        ///< 相对「已保存」的脏标记（保存未实现）
+    QRect m_dirtyRect;           ///< 累计像素脏区（图像坐标）
 };
 
 } // namespace Ps

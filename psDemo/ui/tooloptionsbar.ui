@@ -441,6 +441,7 @@ QToolButton#homeButton:hover { background-color: #5a5a5a; border-radius: 2px; }<
        <item><widget class="QLabel" name="fillTypeLabel"><property name="text"><string>填充</string></property></widget></item>
        <item>
         <widget class="QComboBox" name="fillTypeCombo">
+         <property name="toolTip"><string>对照 GIMP fill-mode：FG / BG / Pattern（图案未接线）</string></property>
          <item><property name="text"><string>前景色</string></property></item>
          <item><property name="text"><string>背景色</string></property></item>
          <item><property name="text"><string>图案</string></property></item>
@@ -449,6 +450,7 @@ QToolButton#homeButton:hover { background-color: #5a5a5a; border-radius: 2px; }<
        <item><widget class="QLabel" name="fillModeLabel"><property name="text"><string>模式</string></property></widget></item>
        <item>
         <widget class="QComboBox" name="fillModeCombo">
+         <property name="toolTip"><string>对照 GIMP paint-mode（尚未接线）</string></property>
          <item><property name="text"><string>正常</string></property></item>
          <item><property name="text"><string>正片叠底</string></property></item>
          <item><property name="text"><string>滤色</string></property></item>
@@ -456,11 +458,11 @@ QToolButton#homeButton:hover { background-color: #5a5a5a; border-radius: 2px; }<
         </widget>
        </item>
        <item><widget class="QLabel" name="fillOpacityLabel"><property name="text"><string>不透明度</string></property></widget></item>
-       <item><widget class="QSpinBox" name="fillOpacitySpin"><property name="suffix"><string> %</string></property><property name="maximum"><number>100</number></property><property name="value"><number>100</number></property></widget></item>
+       <item><widget class="QSpinBox" name="fillOpacitySpin"><property name="suffix"><string> %</string></property><property name="maximum"><number>100</number></property><property name="value"><number>100</number></property><property name="toolTip"><string>对照 GIMP context opacity</string></property></widget></item>
        <item><widget class="QLabel" name="fillToleranceLabel"><property name="text"><string>容差</string></property></widget></item>
-       <item><widget class="QSpinBox" name="fillToleranceSpin"><property name="maximum"><number>255</number></property><property name="value"><number>32</number></property></widget></item>
-       <item><widget class="QCheckBox" name="fillContiguousCheck"><property name="text"><string>连续</string></property><property name="checked"><bool>true</bool></property></widget></item>
-       <item><widget class="QCheckBox" name="fillSampleMergedCheck"><property name="text"><string>对所有图层取样</string></property></widget></item>
+       <item><widget class="QSpinBox" name="fillToleranceSpin"><property name="maximum"><number>255</number></property><property name="value"><number>32</number></property><property name="toolTip"><string>对照 GIMP threshold（默认 15；此处 32 贴近 PS）</string></property></widget></item>
+       <item><widget class="QCheckBox" name="fillContiguousCheck"><property name="text"><string>连续</string></property><property name="checked"><bool>true</bool></property><property name="toolTip"><string>PS「连续」；开≈GIMP by_seed，关≈by_color</string></property></widget></item>
+       <item><widget class="QCheckBox" name="fillSampleMergedCheck"><property name="text"><string>对所有图层取样</string></property><property name="toolTip"><string>对照 GIMP sample-merged（尚未接线）</string></property></widget></item>
       </layout>
      </widget>
 
@@ -476,7 +478,7 @@ QToolButton#homeButton:hover { background-color: #5a5a5a; border-radius: 2px; }<
        <item><widget class="QLabel" name="gradTypeLabel"><property name="text"><string>类型</string></property></widget></item>
        <item>
         <widget class="QComboBox" name="gradTypeCombo">
-         <property name="toolTip"><string>对照 GIMP 的 gradient-type 属性</string></property>
+         <property name="toolTip"><string>对照 GIMP gradient-type：线/径/圆锥非对称/双线/方距</string></property>
          <item><property name="text"><string>线性</string></property></item>
          <item><property name="text"><string>径向</string></property></item>
          <item><property name="text"><string>角度</string></property></item>
@@ -496,9 +498,9 @@ QToolButton#homeButton:hover { background-color: #5a5a5a; border-radius: 2px; }<
        <item><widget class="QLabel" name="gradOpacityLabel"><property name="text"><string>不透明度</string></property></widget></item>
        <item><widget class="QSpinBox" name="gradOpacitySpin"><property name="suffix"><string> %</string></property><property name="maximum"><number>100</number></property><property name="value"><number>100</number></property></widget></item>
        <item><widget class="QLabel" name="gradOffsetLabel"><property name="text"><string>偏移</string></property></widget></item>
-       <item><widget class="QSpinBox" name="gradOffsetSpin"><property name="suffix"><string> %</string></property><property name="minimum"><number>-100</number></property><property name="maximum"><number>100</number></property><property name="value"><number>0</number></property></widget></item>
-       <item><widget class="QCheckBox" name="gradDitherCheck"><property name="text"><string>仿色</string></property><property name="checked"><bool>true</bool></property></widget></item>
-       <item><widget class="QCheckBox" name="gradReverseCheck"><property name="text"><string>反向</string></property></widget></item>
+       <item><widget class="QSpinBox" name="gradOffsetSpin"><property name="suffix"><string> %</string></property><property name="minimum"><number>0</number></property><property name="maximum"><number>100</number></property><property name="value"><number>0</number></property><property name="toolTip"><string>对照 GIMP offset：起点空段 0..100%</string></property></widget></item>
+       <item><widget class="QCheckBox" name="gradDitherCheck"><property name="text"><string>仿色</string></property><property name="checked"><bool>true</bool></property><property name="toolTip"><string>对照 GIMP dither</string></property></widget></item>
+       <item><widget class="QCheckBox" name="gradReverseCheck"><property name="text"><string>反向</string></property><property name="toolTip"><string>对照 GIMP gradient-reverse</string></property></widget></item>
       </layout>
      </widget>
 

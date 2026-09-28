@@ -28,9 +28,9 @@ QT_END_NAMESPACE
  * `paint-mode` / `opacity` / `clone-type` / `sample-merged` / `align-mode` /
  * `gradient-type` / `gradient-repeat` / `path-polygonal` 等），见各控件 toolTip。
  *
- * ⚠️ **现状**：只有「大小」（`brushSizeSpin`）真正接到绘制（画笔/橡皮直径）。
- * 其余所有控件都是 **UI 占位**，不改变任何行为；占位工具的提示语明确写了
- * 「逻辑尚未接入」。这是刻意的：界面完整可演示，但不假装有功能。
+ * ⚠️ **现状**：已接线——「大小」（画笔/橡皮）、油漆桶页的容差/连续/填充源/不透明度、
+ * 渐变页的类型/不透明度/偏移/仿色/反向。其余控件多为 **UI 占位**；
+ * 占位工具的提示语写「逻辑尚未接入」。
  */
 class ToolOptionsBar : public QWidget
 {
@@ -41,6 +41,21 @@ public:
     ~ToolOptionsBar() override;
 
     int brushDiameter() const;
+
+    // —— 油漆桶选项（pageFill）——
+    int fillTolerance() const;
+    bool fillContiguous() const;
+    /** 0=前景色，1=背景色，2=图案（图案尚未实现，工具侧会回退前景）。 */
+    int fillType() const;
+    int fillOpacityPercent() const;
+
+    // —— 渐变选项（pageGradient）——
+    /** 0线性 / 1径向 / 2角度 / 3对称 / 4菱形。 */
+    int gradientType() const;
+    int gradientOpacityPercent() const;
+    int gradientOffsetPercent() const;
+    bool gradientReverse() const;
+    bool gradientDither() const;
 
     /**
      * 当前工具的提示语（由 MainWindow 显示在状态栏）。
@@ -54,8 +69,12 @@ public slots:
     void setBrushDiameter(int diameter);
 
 signals:
-    /** 画笔/橡皮直径变化（图像像素）。唯一真正接线的选项。 */
+    /** 画笔/橡皮直径变化（图像像素）。 */
     void brushDiameterChanged(int diameter);
+    /** 油漆桶参数变化（容差/连续/填充源/不透明度任一变动）。 */
+    void fillOptionsChanged();
+    /** 渐变参数变化（类型/不透明度/偏移/仿色/反向任一变动）。 */
+    void gradientOptionsChanged();
     /** 左端「家」按钮：请求显示主页（对齐 PS Home）。 */
     void homeClicked();
 

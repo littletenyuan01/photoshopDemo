@@ -19,14 +19,34 @@
 `setLayerVisible` / `setLayerOpacity` / `setLayerName` / `setLayerBlendMode`；  
 图层入栈唯一入口是 `addLayer`（内部挂 `owner`，否则属性信号不发）。
 
-## 2. 一次「新建文档」链路
+## 2. 新建图层（统一路径）
+
+凡新建图层都是 **建层 →（可选）填充 → 入栈**；透明只是填充步骤不占瓦片内存。  
+对照 GIMP：`gimp_layer_new` → `gimp_drawable_fill` → `gimp_image_add_layer`。
+
+```
+Layer(名, docW, docH)          // TileBuffer 预定格数
+  → [可选] layer->fill(颜色)   // 透明新建：跳过；白底：fill(白)
+  → ImageDocument::addLayer    // 挂 owner、structureChanged
+  → （若需）setActiveLayerIndex / activeLayerChanged
+```
+
+| API | 填充 | 瓦片 |
+|-----|------|------|
+| `addTransparentLayer` | 无 | 0 块 |
+| `createBlank` 内背景层 | `fill(白)` | 全覆盖格 |
+| 打开图 `Layer(名, QImage)` | `setFromImage` | 按块拆入 |
+
+面板入口：`layertreepanel` → `addTransparentLayer()`。
+
+## 3. 一次「新建文档」链路
 
 ```
 NewDocumentDialog 确认
   → documentSize() 得到像素宽高
   → ImageDocument::createBlank(w, h, 白)
        · new ImageDocument(w,h)
-       · new Layer「背景」+ fill(白)
+       · new Layer「背景」+ fill(白)   // 同上「建层+填充」
        · addLayer（挂 owner、structureChanged）
   → AppSession::setDocument(doc)
        · emit documentChanged
@@ -38,41 +58,42 @@ NewDocumentDialog 确认
 对照 GIMP：`gimp_image_new_from_template` + `gimp_create_display`；  
 本项目无独立 Display 对象，主窗里固定 `CanvasView` 换文档即可。
 
-## 3. 画一笔时发生什么
+## 4. 画一笔时发生什么
 
 ```
-工具写 activeLayer()->pixels()
-  → ImageDocument::markDirty(rect)   // 累计脏区 + pixelsChanged
+工具写 activeLayer()->tiles()      // stampDab：ensure 碰到的瓦片
+  → ImageDocument::markDirty(rect) // 累计脏区 + pixelsChanged
   →（当前）CanvasView 仍常全量 composite
   → 视图按 m_zoom 画到窗口
 ```
 
 脏区接口已留（`dirtyRect` / `clearDirtyRect`），**局部只重合成**属 Roadmap Phase 7，尚未接到画布。
 
-## 4. 合成与视图（当前简化）
+## 5. 合成与视图（当前简化）
 
 | 项 | 当前 |
 |----|------|
-| 层尺寸 / 偏移 | 与文档同大、无 offset（属性面板 X/Y 为占位） |
+| 层尺寸 / 偏移 | 层缓冲与文档同大；`Layer::offsetX/Y` 控制放置（移动工具改 offset） |
 | 像素存储 | `TileBuffer` 64×64 懒分配；透明新建 0 块 |
 | 混合模式 | 枚举有，合成 v1 一律 Normal |
-| 合成范围 | 可传 `rect`；只混合已分配瓦片 |
+| 合成范围 | 可传 `rect`；只混合已分配瓦片（按 offset 映射到文档） |
 | 视图缩放 | `CanvasView::m_zoom`；≥4x 倾向关掉平滑，见像素块 |
 
-## 5. 图层相关仍欠（相对概念文档）
+## 6. 图层相关仍欠（相对概念文档）
 
 | 能力 | 状态 |
 |------|------|
-| 新建 / 删除 / 显隐 / 改名 / 不透明度 | 已实现 |
+| 新建（统一建层+可选 fill）/ 删除 / 显隐 / 改名 / 不透明度 | 已实现；面板新建固定透明填充 |
+| 新建图层时选填充类型（白/前景色…） | 未做（GIMP 对话框有） |
 | 上移 / 下移 | `LayerStack::moveLayer` 有，**UI 未接线** |
-| 图层偏移 / 自由变换 | 未做 |
-| 图像大小 / 画布大小菜单 | 未做 |
+| 图层偏移 / 自由变换 | 偏移已实现（移动工具）；自由变换未做 |
+| 图像大小 / 画布大小菜单 | 已实现（`.ui` 对话框 + `scaleImage` / `resizeCanvas`） |
 | 文档内持久化 PPI | 未做（对话框仅换算用） |
 | 撤销时 push 图层属性/结构 | Phase 6，未做 |
 | 下方合成缓存、只重算脏块 | Phase 7，未做 |
 | 瓦片存储 / 透明层懒分配 | **已实现**（64×64 `TileBuffer`）；无 GEGL COW/scratch，见 [tiles-and-memory.md](tiles-and-memory.md) |
 
-## 6. 关键代码
+## 7. 关键代码
 
 | 角色 | 路径 |
 |------|------|

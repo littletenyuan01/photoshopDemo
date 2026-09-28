@@ -77,6 +77,11 @@ public:
     void setBackgroundColor(const QColor &c);
     void setBrushDiameter(int diameter);
     int brushDiameter() const;
+    /** 同步油漆桶选项（容差/连续/填充源/不透明度）。 */
+    void setFillOptions(int tolerance, bool contiguous, int fillSource, qreal opacity);
+    /** 同步渐变选项（类型/不透明度/偏移/反向/仿色）。 */
+    void setGradientOptions(int type, qreal opacity, int offsetPercent,
+                            bool reverse, bool dither);
 
     // —— Ps::ViewPort 实现（供工具请求视图操作）——
     void zoomAt(const QPointF &widgetPos, qreal factor) override;
@@ -124,6 +129,16 @@ private:
     QColor m_fg {Qt::black};
     QColor m_bg {Qt::white};
     qreal m_brushRadius = 10.0;
+    int m_fillTolerance = 32;
+    bool m_fillContiguous = true;
+    int m_fillSource = 0;
+    qreal m_fillOpacity = 1.0;
+
+    int m_gradientType = 0;
+    qreal m_gradientOpacity = 1.0;
+    int m_gradientOffsetPercent = 0;
+    bool m_gradientReverse = false;
+    bool m_gradientDither = true;
 };
 
 #endif // CANVASVIEW_H

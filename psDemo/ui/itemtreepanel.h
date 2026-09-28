@@ -46,9 +46,16 @@ class ItemTreePanel : public QWidget
     Q_OBJECT
 
 public:
-    /** 不取得所有权；nullptr 清空。对应 gimp_item_tree_view_set_image。 */
+    /**
+     * 绑定当前文档（不取得所有权）；nullptr 清空。
+     * 对应 gimp_item_tree_view_set_image。
+     * 每次调用都会断开旧连接并重绑信号（即使指针相同），避免漏订 structureChanged。
+     */
     void setDocument(Ps::ImageDocument *document);
     Ps::ImageDocument *document() const { return m_document; }
+
+    /** 按当前 document 重建列表；供 DockPanel 在结构变化时强制刷新。 */
+    void reload();
 
     // —— 缩略图 ——
 

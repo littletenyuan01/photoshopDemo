@@ -26,10 +26,14 @@ class ImageDocument;
 class LayerStack
 {
 public:
+    /** 图层个数。 */
     int count() const { return static_cast<int>(m_layers.size()); }
     bool isEmpty() const { return m_layers.empty(); }
 
-    /** 只读访问单层；改属性请走 ImageDocument 的语义化 setter。 */
+    /**
+     * 按栈下标取层（0 = 最底层）。
+     * 只读访问；改属性请走 ImageDocument 的语义化 setter。
+     */
     Layer *layerAt(int index);
     const Layer *layerAt(int index) const;
 
@@ -43,6 +47,7 @@ private:
     /** 重新排序。目前无人调用，等「上移/下移」接线时用。 */
     void moveLayer(int from, int to);
 
+    /** 自底向顶；unique_ptr 独占每层所有权。 */
     std::vector<std::unique_ptr<Layer>> m_layers;
 };
 

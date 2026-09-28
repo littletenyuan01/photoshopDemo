@@ -42,7 +42,7 @@
 |------|------|
 | `domain/blendmode.h` | 混合模式枚举（现仅 Normal） |
 | `domain/layer.h/.cpp` | 单层属性 + `TileBuffer`；**持 owner 回指，setter 内部自动广播** |
-| `domain/tilebuffer.h/.cpp` | 64×64 瓦片懒分配（透明新建 0 块；写时 `ensureTile`） |
+| `domain/tilebuffer.h/.cpp` | 64×64 瓦片；新建层统一 `Layer(extent)`，透明不分配、fill/画笔才 `ensureTile` |
 | `domain/layerstack.h/.cpp` | 图层列表（`std::vector<unique_ptr>`） |
 | `domain/imagedocument.h/.cpp` | 文档：尺寸、栈、活动层、**分级信号 + 语义化 setter + 累计脏区** |
 
