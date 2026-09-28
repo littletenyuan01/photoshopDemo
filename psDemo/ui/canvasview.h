@@ -6,8 +6,10 @@
 
 #include <QColor>
 #include <QImage>
+#include <QPainterPath>
 #include <QPoint>
 #include <QPointF>
+#include <QTimer>
 #include <QWidget>
 
 namespace Ps {
@@ -22,7 +24,7 @@ struct ToolEvent;
  *
  * 【职责】只做三件事，对应 GIMP display 层的边界：
  * 1. **视图变换**：缩放 / 平移 / 边缘钳制（对应 GimpDisplayShell 的 scale & scroll）
- * 2. **绘制**：合成缓存 + 棋盘格 + 工具浮层
+ * 2. **绘制**：合成缓存 + 棋盘格 + 选区蚂蚁线 + 工具浮层
  * 3. **事件归一化并转发**：把 QMouseEvent 转成图像坐标的 ToolEvent 交给 ToolManager
  *
  * 【不再负责】具体工具逻辑。早先 `mousePressEvent` 里堆着「抓手/缩放/画笔/橡皮」
@@ -116,6 +118,12 @@ private:
     Ps::ToolEvent makeToolEvent(QMouseEvent *event) const;
     /** 按活动工具刷新鼠标光标。 */
     void updateToolCursor();
+    /** 根据文档选区 mask 画蚂蚁线（对照 gimp_display_shell_draw_selection_*）。 */
+    void paintSelectionOutline(QPainter &painter);
+    /** 有选区时开蚂蚁线动画定时器，无选区时停。 */
+    void syncMarchingAntTimer();
+    /** 选区变化时从 mask 重建轮廓路径（文档坐标）。 */
+    void rebuildSelectionOutlinePath();
 
     Ps::ImageDocument *m_document = nullptr; ///< 不拥有；由 AppSession 持有
     QImage m_cache;
@@ -139,6 +147,10 @@ private:
     int m_gradientOffsetPercent = 0;
     bool m_gradientReverse = false;
     bool m_gradientDither = true;
+
+    QTimer *m_antsTimer = nullptr; ///< 蚂蚁线虚线相位动画
+    qreal m_antsPhase = 0.0;
+    QPainterPath m_antsPath; ///< 选区轮廓（文档像素坐标）；selectionChanged 时重建
 };
 
 #endif // CANVASVIEW_H

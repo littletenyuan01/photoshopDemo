@@ -96,6 +96,54 @@ QRect Layer::boundsInDocument() const
     return QRect(m_offsetX, m_offsetY, width(), height());
 }
 
+void Layer::invalidateContentBounds() const
+{
+    m_contentBoundsValid = false;
+}
+
+QRect Layer::computeContentBoundsLocal() const
+{
+    if (!hasPixelData())
+        return QRect();
+
+    int minX = width();
+    int minY = height();
+    int maxX = -1;
+    int maxY = -1;
+
+    m_tiles.forEachAllocatedTile([&](int /*tx*/, int /*ty*/, const QImage &tile, const QRect &bounds) {
+        for (int y = 0; y < tile.height(); ++y) {
+            const QRgb *line = reinterpret_cast<const QRgb *>(tile.constScanLine(y));
+            for (int x = 0; x < tile.width(); ++x) {
+                if (qAlpha(line[x]) == 0)
+                    continue;
+                const int lx = bounds.x() + x;
+                const int ly = bounds.y() + y;
+                if (lx < minX) minX = lx;
+                if (ly < minY) minY = ly;
+                if (lx > maxX) maxX = lx;
+                if (ly > maxY) maxY = ly;
+            }
+        }
+    });
+
+    if (maxX < minX || maxY < minY)
+        return QRect();
+    return QRect(minX, minY, maxX - minX + 1, maxY - minY + 1);
+}
+
+QRect Layer::contentBoundsInDocument() const
+{
+    // 【功能】PS 变换控件框：非透明像素最小外接矩形（文档坐标）
+    if (!m_contentBoundsValid) {
+        m_contentBoundsLocal = computeContentBoundsLocal();
+        m_contentBoundsValid = true;
+    }
+    if (m_contentBoundsLocal.isEmpty())
+        return QRect();
+    return m_contentBoundsLocal.translated(m_offsetX, m_offsetY);
+}
+
 qreal Layer::opacityAtDocumentPos(int docX, int docY) const
 {
     // 【功能】点选命中测试：读层内预乘 alpha（对照 gimp_pickable_get_opacity_at）
@@ -128,12 +176,14 @@ void Layer::fill(const QColor &color)
 {
     // 委托瓦片缓冲：透明 → clearTiles；实色 → 全格分配
     m_tiles.fill(color);
+    invalidateContentBounds();
 }
 
 void Layer::replaceFromImage(const QImage &pixels)
 {
     // 尺寸可能变化（图像大小 / 画布大小）；不在此发属性信号
     m_tiles.setFromImage(pixels);
+    invalidateContentBounds();
 }
 
 } // namespace Ps

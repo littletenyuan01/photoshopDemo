@@ -12,7 +12,9 @@ namespace Ps {
  *
  * 【功能】
  * 1. 按下时按像素点选最上层非透明层并设为活动层（图层面板经 activeLayerChanged 同步）；
- * 2. 拖拽平移该层的文档偏移（改 Layer offset，不搬瓦片像素）。
+ * 2. 拖拽平移该层的文档偏移（改 Layer offset，不搬瓦片像素）；
+ * 3. 浮层：活动层非透明像素最小外接矩形 + 8 锚点（对照 PS Move「显示变换控件」）。
+ *    本阶段只绘制，不响应缩放/旋转拖拽。
  *
  * 【对照 GIMP】
  * - `gimpmovetool.c` + `gimp_image_pick_layer`（!move_current 时点选）
@@ -28,6 +30,8 @@ public:
     explicit MoveTool(QObject *parent = nullptr);
 
     Qt::CursorShape cursorShape() const override;
+    bool hasOverlay() const override { return true; }
+    void drawOverlay(QPainter &painter, const ToolContext &ctx) const override;
 
     bool mousePress(const ToolEvent &event, const ToolContext &ctx, ViewPort &view) override;
     bool mouseMove(const ToolEvent &event, const ToolContext &ctx, ViewPort &view) override;

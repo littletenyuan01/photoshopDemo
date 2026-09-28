@@ -12,6 +12,7 @@ ImageDocument::ImageDocument(int width, int height, QObject *parent)
     : QObject(parent)
     , m_width(width)
     , m_height(height)
+    , m_selection(width, height)
 {
 }
 
@@ -80,6 +81,53 @@ int ImageDocument::pickLayerAt(int docX, int docY) const
     return -1;
 }
 
+void ImageDocument::clearSelection()
+{
+    m_selection.clear();
+    emit selectionChanged();
+}
+
+void ImageDocument::selectAll()
+{
+    m_selection.selectAll();
+    emit selectionChanged();
+}
+
+void ImageDocument::invertSelection()
+{
+    m_selection.invert();
+    emit selectionChanged();
+}
+
+void ImageDocument::selectRectangle(const QRect &rect, ChannelOp op)
+{
+    // 【功能】对照 gimp_channel_select_rectangle → 写入 image selection_mask
+    m_selection.selectRectangle(rect, op);
+    emit selectionChanged();
+}
+
+void ImageDocument::selectEllipse(const QRect &rect, ChannelOp op)
+{
+    // 【功能】对照 gimp_channel_select_ellipse → 写入 image selection_mask
+    m_selection.selectEllipse(rect, op);
+    emit selectionChanged();
+}
+
+void ImageDocument::selectLayerAlpha(int layerIndex, ChannelOp op)
+{
+    // 【功能】对照 gimp_channel_select_alpha / layers-alpha-to-selection
+    Layer *layer = m_layers.layerAt(layerIndex);
+    if (!layer)
+        return;
+
+    QImage pixels;
+    if (layer->hasPixelData())
+        pixels = layer->materialize();
+    // 无瓦片：空图 → 全透明 alpha → Replace 清空选区
+    m_selection.selectFromLayerAlpha(pixels, layer->offsetX(), layer->offsetY(), op);
+    emit selectionChanged();
+}
+
 int ImageDocument::indexOfLayer(const Layer *layer) const
 {
     if (!layer)
@@ -106,6 +154,10 @@ void ImageDocument::markDirty(const QRect &rect)
     m_dirty = true;
     // 累计脏区：与既有并集合并（首次赋值时直接取 rect）
     m_dirtyRect = m_dirtyRect.isNull() ? rect : m_dirtyRect.united(rect);
+
+    // 像素可能变了：失效活动层内容包围盒（变换控件用）
+    if (Layer *layer = activeLayer())
+        layer->invalidateContentBounds();
 
     emit pixelsChanged(rect);
     emit contentChanged();
@@ -255,12 +307,14 @@ void ImageDocument::scaleImage(int newWidth, int newHeight)
                                qRound(layer->offsetY() * qreal(newHeight) / m_height));
     }
 
+    m_selection.scale(newWidth, newHeight);
     m_width = newWidth;
     m_height = newHeight;
     m_dirty = true;
     m_dirtyRect = QRect(0, 0, m_width, m_height);
     // 尺寸变了：面板缩略图/状态栏都要跟着重建
     emit structureChanged();
+    emit selectionChanged();
     emit contentChanged();
 }
 
@@ -310,11 +364,13 @@ void ImageDocument::resizeCanvas(int newWidth, int newHeight,
         layer->setOffsetSilent(0, 0);
     }
 
+    m_selection.resizeCanvas(newWidth, newHeight, offsetX, offsetY);
     m_width = newWidth;
     m_height = newHeight;
     m_dirty = true;
     m_dirtyRect = QRect(0, 0, m_width, m_height);
     emit structureChanged();
+    emit selectionChanged();
     emit contentChanged();
 }
 

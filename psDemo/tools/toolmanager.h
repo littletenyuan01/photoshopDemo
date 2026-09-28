@@ -56,9 +56,10 @@ public:
     bool setActiveTool(Ps::ToolId id, ViewPort &view);
 
     // —— 事件分发：返回 true 表示已被工具消费 ——
-    bool dispatchPress(const ToolEvent &event, ViewPort &view);
-    bool dispatchMove(const ToolEvent &event, ViewPort &view);
-    bool dispatchRelease(const ToolEvent &event, ViewPort &view);
+    /** @param ctx 由 CanvasView 每次事件传入的最新上下文（文档/颜色/选项）。 */
+    bool dispatchPress(const ToolEvent &event, const ToolContext &ctx, ViewPort &view);
+    bool dispatchMove(const ToolEvent &event, const ToolContext &ctx, ViewPort &view);
+    bool dispatchRelease(const ToolEvent &event, const ToolContext &ctx, ViewPort &view);
 
     /** 当前活动工具的光标形状。 */
     Qt::CursorShape activeCursorShape() const;

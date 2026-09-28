@@ -12,6 +12,7 @@ class LayerTreePanel;
 QT_END_NAMESPACE
 
 class QTimer;
+class QMouseEvent;
 
 namespace Ps {
 class Layer;
@@ -25,6 +26,8 @@ class Layer;
  * - 底栏 action：layers-new / layers-new-group / layers-anchor / merge / mask / delete
  * - 底栏外观：加大按钮 + `:/icons/layers/` 下的线框图标（非字母占位）
  * - 锁：GIMP 有 lock content/position/visibility/alpha；此处 UI 先占位
+ * - **Ctrl+点缩略图**：图层 alpha → 选区（GIMP 为 Alt+点；本项目对齐 PS Ctrl+点）；
+ *   纯 Ctrl 再点同一层 → 取消选区
  *
  * 【缩略图】每行左侧显示该层像素的等比缩略图 + 透明棋盘格衬底，对齐 PS 图层面板；
  * 生成逻辑见 ItemTreePanel::makeLayerThumbnail。
@@ -56,6 +59,7 @@ protected:
     void refreshFromDocument() override;
     void onNewItem() override;
     void onDeleteItem() override;
+    bool eventFilter(QObject *watched, QEvent *event) override;
 
 private slots:
     /** 底栏「新建图层」按钮：必须进 moc，保证点击一定进槽。 */
@@ -90,6 +94,13 @@ private:
     /** 请求防抖刷新：短时间内多次触发只重算一次。 */
     void scheduleThumbnailRefresh();
 
+    /**
+     * Ctrl(+修饰) 点缩略图：图层 alpha → 选区。
+     * 纯 Ctrl 再点同一层缩略图 → 取消选区。
+     * @return true 表示已处理（勿再改列表选中/勾选）。
+     */
+    bool tryAlphaToSelectionClick(QMouseEvent *mouse);
+
     Ui::LayerTreePanel *ui;
     /**
      * 缩略图防抖定时器。
@@ -97,6 +108,11 @@ private:
      * 故延迟到停笔后再算一次（对齐 PS：笔迹停下时缩略图才更新）。
      */
     QTimer *m_thumbTimer = nullptr;
+
+    /** 上次「alpha→选区」来源层；-1=无。用于纯 Ctrl 再点同层时切换取消。 */
+    int m_alphaSelectSourceLayer = -1;
+    /** 本面板正在改选区时置位，避免 selectionChanged 把来源层清掉。 */
+    bool m_settingAlphaSelect = false;
 };
 
 #endif // LAYERTREEPANEL_H

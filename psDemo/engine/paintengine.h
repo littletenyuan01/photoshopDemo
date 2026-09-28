@@ -10,6 +10,18 @@
 namespace Ps {
 
 class TileBuffer;
+class Selection;
+
+/**
+ * 可选选区裁剪参数（对照 drawable 与 image mask 相交）。
+ * selection 为空指针、或选区为空时不裁剪（整层可画）。
+ * 放在 PaintEngine 外，避免嵌套类 + 默认实参在 MinGW 下的完整性错误。
+ */
+struct PaintSelectionClip {
+    const Selection *selection = nullptr;
+    int layerOffsetX = 0;
+    int layerOffsetY = 0;
+};
 
 /**
  * 像素绘制引擎（engine）。
@@ -20,9 +32,11 @@ class TileBuffer;
  *
  * 约定：
  * - 图像须为 Format_ARGB32_Premultiplied。
- * - 坐标为**图像像素坐标**。
+ * - 坐标为**层内像素坐标**（调用方已减 Layer offset）。
  * - Paint：SourceOver；Erase：DestinationOut；Fill：直接写入目标色（预乘）；
  *   Gradient：先画到透明叠加层再 SourceOver。
+ * - 选区：对照 `gimp_item_mask_intersect` —— **空选区不约束**；非空则只改 mask>0 的文档像素
+ *   （层内坐标 + layerOffset → 文档坐标查 Selection）。
  */
 class PaintEngine
 {
@@ -32,12 +46,16 @@ public:
         Erase,
     };
 
+    /** @deprecated 兼容旧名；请用 PaintSelectionClip。 */
+    using SelectionClip = PaintSelectionClip;
+
     static void stampDab(QImage &target,
                          const QPointF &center,
                          qreal radius,
                          const QColor &color,
                          Mode mode,
-                         qreal hardness = 0.85);
+                         qreal hardness = 0.85,
+                         PaintSelectionClip clip = PaintSelectionClip());
 
     /** 写入瓦片缓冲：只 ensure dab 覆盖到的格（对照 GEGL 写时分配）。 */
     static void stampDab(TileBuffer &tiles,
@@ -45,7 +63,8 @@ public:
                          qreal radius,
                          const QColor &color,
                          Mode mode,
-                         qreal hardness = 0.85);
+                         qreal hardness = 0.85,
+                         PaintSelectionClip clip = PaintSelectionClip());
 
     static QPointF strokeSegment(QImage &target,
                                  const QPointF &from,
@@ -54,7 +73,8 @@ public:
                                  const QColor &color,
                                  Mode mode,
                                  qreal hardness = 0.85,
-                                 qreal spacing = 0.25);
+                                 qreal spacing = 0.25,
+                                 PaintSelectionClip clip = PaintSelectionClip());
 
     static QPointF strokeSegment(TileBuffer &tiles,
                                  const QPointF &from,
@@ -63,32 +83,25 @@ public:
                                  const QColor &color,
                                  Mode mode,
                                  qreal hardness = 0.85,
-                                 qreal spacing = 0.25);
+                                 qreal spacing = 0.25,
+                                 PaintSelectionClip clip = PaintSelectionClip());
 
     /**
      * 油漆桶填充（对照 GIMP Bucket Fill 的瘦身版）。
      *
-     * GIMP 分层：
-     * - tools：`gimpbucketfilltool.c`（事件）+ `gimpbucketfilloptions.c`（threshold / fill-mode…）
-     * - core：`gimpdrawable-bucket-fill.c`（建 fill buffer 并 apply）
-     * - 区域：`gimppickable-contiguous-region.cc`（by_seed / by_color）
-     *
-     * 本函数把「求连通域 + 写入填充色」合并；无选区相交、sample-merged、对角邻接、抗锯齿软边、图案。
-     * @param seed 种子点（图像像素）
-     * @param fillColor 填充色（含 alpha；内部转预乘写入）
-     * @param tolerance 容差 0..255（GIMP 选项 threshold，内部再 /255 进 float；此处直接在 8bit 比）
-     * @param contiguous true≈by_seed；false≈by_color（GIMP 桶工具默认始终 by_seed）
+     * 有选区时只填 mask 内；种子在选区外则不填。
+     * @param seed 种子点（层内像素）
      * @return 脏矩形；未改动返回空
      */
     static QRect floodFill(TileBuffer &tiles,
                            const QPoint &seed,
                            const QColor &fillColor,
                            int tolerance,
-                           bool contiguous);
+                           bool contiguous,
+                           PaintSelectionClip clip = PaintSelectionClip());
 
     /**
      * 渐变形状（选项栏下标；对照 GimpGradientType 子集）。
-     * UI 文案贴近 PS 五种；算法公式来自 `gimpoperationgradient.c`。
      */
     enum class GradientType {
         Linear = 0,   ///< ≈ GIMP_GRADIENT_LINEAR
@@ -100,14 +113,7 @@ public:
 
     /**
      * 渐变填充（对照 GIMP Blend/Gradient 工具的瘦身版）。
-     *
-     * GIMP 分层：
-     * - tools：`gimpgradienttool.c`（拖拽起止）+ `gimpgradientoptions.c`（offset/type/dither…）
-     * - core：`gimpdrawable-gradient.c`（建缓冲 → 跑 `gimp:gradient` → apply）
-     * - op：`gimpoperationgradient.c`（逐像素算 factor → 采样渐变色）
-     *
-     * 本函数：两色 FG→BG（等价 FG-BG 渐变）、REPEAT_NONE、无 shapeburst/螺旋/超采样/选区。
-     * @param offsetPercent GIMP `offset` 0..100（起点空段比例）；负值按 0 处理
+     * 有选区时只写入 mask 内像素。
      */
     static QRect applyGradient(TileBuffer &tiles,
                                const QPointF &start,
@@ -118,7 +124,8 @@ public:
                                qreal opacity,
                                int offsetPercent,
                                bool reverse,
-                               bool dither);
+                               bool dither,
+                               PaintSelectionClip clip = PaintSelectionClip());
 };
 
 } // namespace Ps

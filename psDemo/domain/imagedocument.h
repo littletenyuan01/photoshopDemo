@@ -3,6 +3,7 @@
 
 #include "blendmode.h"
 #include "layerstack.h"
+#include "selection.h"
 
 #include <QColor>
 #include <QObject>
@@ -14,10 +15,10 @@ namespace Ps {
 
 /**
  * 图像文档：一张「可编辑图」的根对象（domain）。
- * 持有尺寸、图层栈、活动层；UI 只通过 AppSession 观察，不另存一份像素。
+ * 持有尺寸、图层栈、活动层、文档级选区；UI 只通过 AppSession 观察，不另存一份像素。
  * 参考 GIMP 中 Image 与 Layer 的边界（无 PDB、无 XCF）。
  *
- * 【信号分级】刻意拆成四条，让订阅方按需增量更新，避免「一改就整表重建」：
+ * 【信号分级】刻意拆成多条，让订阅方按需增量更新，避免「一改就整表重建」：
  *
  * | 信号                        | 触发场景                       | 谁该订阅                       |
  * |-----------------------------|--------------------------------|--------------------------------|
@@ -25,7 +26,8 @@ namespace Ps {
  * | layerPropertiesChanged(i)   | 显隐/不透明度/名称/混合模式      | 图层面板（只改第 i 行）          |
  * | structureChanged()          | 增删/排序（层数或下标变了）      | 图层面板（唯一需要重建列表的）    |
  * | activeLayerChanged(i)       | 当前编辑目标变了                | 画布/面板（只更选中态）          |
- * | contentChanged()            | 以上任意一种（含整图尺寸变化）   | 只关心「该重画了」的粗粒度订阅方  |
+ * | selectionChanged()          | 选区 mask 变了（不含图层像素）   | 画布蚂蚁线（无需重合成）         |
+ * | contentChanged()            | 像素/结构/属性/尺寸变化（不含纯选区） | 粗粒度订阅方                  |
  *
  * contentChanged 是**汇总信号**，恒在上述四条之后发射，便于状态栏等不需要区分细节的订阅方。
  *
@@ -55,6 +57,29 @@ public:
 
     Layer *activeLayer();
     const Layer *activeLayer() const;
+
+    /** 文档级选区（对照 gimp_image_get_mask）；始终存在，空选区 = mask 全 0。 */
+    Selection &selection() { return m_selection; }
+    const Selection &selection() const { return m_selection; }
+
+    /** 清空选区（对照 Select → None / Ctrl+D）。 */
+    void clearSelection();
+    /** 全选（对照 Select → All / Ctrl+A）。 */
+    void selectAll();
+    /** 反选（对照 Select → Invert）。 */
+    void invertSelection();
+    /**
+     * 矩形写入选区（对照 gimp_channel_select_rectangle）。
+     * @param rect 文档坐标；@param op 替换/加/减/交
+     */
+    void selectRectangle(const QRect &rect, ChannelOp op);
+    /** 椭圆写入选区（对照 gimp_channel_select_ellipse）；内接于 rect。 */
+    void selectEllipse(const QRect &rect, ChannelOp op);
+    /**
+     * 图层 alpha → 选区（对照 gimp_channel_select_alpha / PS Ctrl+点缩略图）。
+     * @param layerIndex 栈下标；@param op 替换/加/减/交
+     */
+    void selectLayerAlpha(int layerIndex, ChannelOp op = ChannelOp::Replace);
 
     /**
      * 自顶向下点选图层（对照 gimp_image_pick_layer）。
@@ -138,7 +163,9 @@ signals:
     void structureChanged();
     /** 活动层下标变了。 */
     void activeLayerChanged(int index);
-    /** 汇总信号：以上任意一种都发；恒在其后发射。 */
+    /** 选区 mask 变了（不触发 contentChanged，避免无谓重合成）。 */
+    void selectionChanged();
+    /** 汇总信号：像素/结构/属性/尺寸变化；纯选区改动不发。 */
     void contentChanged();
 
 private:
@@ -148,6 +175,7 @@ private:
     int m_width = 0;   ///< 文档像素宽
     int m_height = 0;  ///< 文档像素高
     LayerStack m_layers;
+    Selection m_selection;       ///< 文档级选区 mask（对照 GimpImage::selection_mask）
     int m_activeLayerIndex = -1; ///< -1 = 无活动层
     bool m_dirty = false;        ///< 相对「已保存」的脏标记（保存未实现）
     QRect m_dirtyRect;           ///< 累计像素脏区（图像坐标）

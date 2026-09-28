@@ -185,7 +185,7 @@ classDiagram
   }
 
   ImageDocument --> LayerStack
-  ImageDocument --> Selection : 未实现
+  ImageDocument --> Selection
   Layer ..> ImageDocument : owner 回指（setter 自动广播）
   LayerStack --> Layer
   LayerStack --> AdjustmentLayer : 未实现
@@ -203,7 +203,9 @@ classDiagram
 - **`ImageDocument`**：除尺寸/栈/活动层外，还有**分级信号**与**累计脏区**（`markDirty(rect)`），
   以及供 UI 使用的**语义化 setter**（`setLayerVisible/Opacity/Name/BlendMode`）。
 - 蒙版 `LayerMask`：同尺寸灰度；合成时 `alpha *= mask`
-- 选区 `Selection`：文档级一张 mask；绘制时与之相交
+- **选区** `Selection`：文档级一张 `Format_Grayscale8` mask（对照 `gimp_image_get_mask`）；
+  矩形工具写入；蚂蚁线由 `CanvasView` 根据 bounds 绘制；
+  **绘制约束已接**：空选区不裁剪；非空时笔刷/橡皮/油漆桶/渐变只改 mask>0（对照 `gimp_item_mask_intersect`）
 - **调整层**：特殊层，合成阶段对「已合成的下方」做 Levels/Curves（简化非破坏）
 
 ---
@@ -241,7 +243,7 @@ sequenceDiagram
 
 **与 GIMP 的对应**：`ToolManager` + `PaintTool` ≈ `app/tools`（管事件），
 `PaintEngine` ≈ `app/paint/GimpPaintCore`（写缓冲），`Compositor` ≈ projection（只读合成）。
-【本项目简化】无 GEGL、无笔刷资源库、无选区/蒙版相交（`∩ Selection ∩ Mask` 尚未实现）。
+【本项目简化】无 GEGL、无笔刷资源库；选区约束已接（空选区=不裁），图层蒙版相交尚未实现。
 
 ### 5.2 图层合成（预览 / 导出共用）
 
@@ -307,17 +309,18 @@ psDemo/
     imagedocument.*                  [x] 分级信号 + 语义化 setter + 累计脏区
     layer.* / layerstack.*           [x] 图层；Layer 持 owner 回指
     layermask.*                      [ ] 蒙版
-    selection.*                      [ ] 选区
+    selection.*                      [x] 文档级 mask；矩形写入；绘制∩选区已接
     adjustmentlayer.*                [ ] 调整层
   tools/
     toolid.h / toolevent.h           [x] 工具枚举 + 规范化事件
     toolcontext.h                    [x] ToolContext + ViewPort
     tool.* / toolmanager.*           [x] 基类 + 注册表 + 事件分发
     movetool.* / handtool.*          [x] 移动（改 offset）/ 平移
-    zoomtool.* / painttool.*         [x] 锚点缩放 / 画笔橡皮
-    selectrecttool.* / ...           [ ] 选区类工具
+    zoomtool.* / painttool.*         [x] 锚点缩放 / 画笔橡皮（∩选区）
+    rectselecttool.*                 [x] → marqueeselecttool（矩形+椭圆）
+    selectellipse / lasso / ...      [ ] 套索等其余选区工具
   engine/
-    paintengine.*                    [x] dab + 线段插值
+    paintengine.*                    [x] dab + 桶 + 渐变 + SelectionClip
     compositor.*                     [x] 预乘 Alpha 合成（脏区接口已留）
     adjust/levels.* / curves.*       [ ]
     convert/qimage_cv.*              [ ] 可选 OpenCV

@@ -36,6 +36,16 @@ struct ToolContext
     int gradientOffsetPercent = 0;     ///< ≈ offset 0..100
     bool gradientReverse = false;      ///< ≈ gradient-reverse
     bool gradientDither = true;        ///< ≈ dither
+
+    // —— 视图变换（供工具浮层把文档坐标画到控件上；由 CanvasView 填）——
+    qreal viewZoom = 1.0;              ///< 当前缩放
+    QPointF viewOffset;                ///< 文档原点在控件中的位置
+
+    /** 文档坐标 → 控件坐标（与 CanvasView::imageToWidget 同构）。 */
+    QPointF imageToWidget(const QPointF &imagePos) const
+    {
+        return viewOffset + imagePos * viewZoom;
+    }
 };
 
 /**

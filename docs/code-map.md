@@ -32,6 +32,9 @@
 | `tools/handtool.h/.cpp` | 平移；`isPanGesture` 供画布判定中键 / Alt+左键通用手势 |
 | `tools/zoomtool.h/.cpp` | 锚点缩放（左键放大 / 右键缩小） |
 | `tools/painttool.h/.cpp` | 画笔 + 橡皮（同一类、两种 mode；只负责事件→dab，写像素在 PaintEngine） |
+| `tools/paintbuckettool.h/.cpp` | 油漆桶 |
+| `tools/gradienttool.h/.cpp` | 渐变 |
+| `tools/marqueeselecttool.h/.cpp` | **矩形/椭圆选框**：拖拽写入 `Selection`；Shift/Ctrl 加减交 |
 
 **要点**：新增工具 = 加一个类 + 在 `ToolManager` 注册一行，**`CanvasView` 与 `MainWindow` 均无需改动**。
 视图变换由画布实现 `ViewPort` 提供，**锚点缩放数学只存在于 `CanvasView::zoomAt` 一处**。
@@ -44,7 +47,8 @@
 | `domain/layer.h/.cpp` | 单层属性 + `TileBuffer`；**持 owner 回指，setter 内部自动广播** |
 | `domain/tilebuffer.h/.cpp` | 64×64 瓦片；新建层统一 `Layer(extent)`，透明不分配、fill/画笔才 `ensureTile` |
 | `domain/layerstack.h/.cpp` | 图层列表（`std::vector<unique_ptr>`） |
-| `domain/imagedocument.h/.cpp` | 文档：尺寸、栈、活动层、**分级信号 + 语义化 setter + 累计脏区** |
+| `domain/selection.h/.cpp` | **文档级选区 mask**（对照 `GimpSelection`）；`ChannelOp` 加/减/替/交 |
+| `domain/imagedocument.h/.cpp` | 文档：尺寸、栈、活动层、**选区**、分级信号 + 语义化 setter + 累计脏区 |
 
 **要点**：`ImageDocument` 的信号**刻意分级**，让订阅方增量更新而不是整表重建 ——
 `pixelsChanged(QRect)` / `layerPropertiesChanged(int)` / `structureChanged()` /
@@ -57,7 +61,7 @@ UI 不得直接改 `Layer`，一律走 `setLayerVisible/Opacity/Name/BlendMode` 
 | 文件 | 职责 |
 |------|------|
 | `engine/compositor.h/.cpp` | 预乘 Alpha 的 Normal 合成；可按矩形脏区合成 |
-| `engine/paintengine.h/.cpp` | 圆形 dab / 线段插值；画笔 SourceOver、橡皮 DestinationOut |
+| `engine/paintengine.h/.cpp` | 圆形 dab / 线段插值；画笔 SourceOver、橡皮 DestinationOut；**SelectionClip** 约束选区内绘制 |
 
 **要点**：`blendNormalPremultiplied` 按扫描线混合；绘制与合成分离（对齐 GIMP paint vs projection）。
 

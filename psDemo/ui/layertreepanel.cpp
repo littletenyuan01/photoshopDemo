@@ -3,14 +3,19 @@
 
 #include "domain/imagedocument.h"
 #include "domain/layer.h"
+#include "domain/selection.h"
 
+#include <QEvent>
 #include <QIcon>
 #include <QListView>
 #include <QListWidget>
 #include <QListWidgetItem>
+#include <QMouseEvent>
 #include <QSignalBlocker>
 #include <QSize>
 #include <QSlider>
+#include <QStyle>
+#include <QStyleOptionViewItem>
 #include <QTimer>
 #include <QToolButton>
 
@@ -78,6 +83,9 @@ LayerTreePanel::LayerTreePanel(QWidget *parent)
         ui->fillValueLabel->setText(QStringLiteral("%1%").arg(value));
         // 填充尚未进 domain，仅同步 UI 显示
     });
+
+    // Ctrl+点缩略图：alpha → 选区（对齐 PS；GIMP 同类操作为 Alt+点预览）
+    ui->itemList->viewport()->installEventFilter(this);
 }
 
 LayerTreePanel::~LayerTreePanel()
@@ -110,7 +118,13 @@ void LayerTreePanel::onDocumentChanged()
         connect(doc, &Ps::ImageDocument::pixelsChanged, this, [this](const QRect &) {
             scheduleThumbnailRefresh();
         });
+        // 选区被别处改掉（矩形选框等）时，打断「同层再点取消」配对
+        connect(doc, &Ps::ImageDocument::selectionChanged, this, [this]() {
+            if (!m_settingAlphaSelect)
+                m_alphaSelectSourceLayer = -1;
+        });
     }
+    m_alphaSelectSourceLayer = -1;
     refreshFromDocument();
 }
 
@@ -275,6 +289,79 @@ void LayerTreePanel::onDeleteItem()
         return;
     if (doc->removeLayer(doc->activeLayerIndex()))
         refreshFromDocument();
+}
+
+bool LayerTreePanel::eventFilter(QObject *watched, QEvent *event)
+{
+    if (watched == ui->itemList->viewport()
+        && event->type() == QEvent::MouseButtonPress) {
+        auto *mouse = static_cast<QMouseEvent *>(event);
+        if (tryAlphaToSelectionClick(mouse))
+            return true;
+    }
+    return ItemTreePanel::eventFilter(watched, event);
+}
+
+bool LayerTreePanel::tryAlphaToSelectionClick(QMouseEvent *mouse)
+{
+    // 【功能】Ctrl+点图层缩略图 → 该层非透明像素载入选区；再点同层 → 取消
+    // 【对照】GIMP gimp_item_tree_view_item_pre_clicked（Alt+）+ gimp_channel_select_alpha
+    //         PS：Ctrl+点图层缩略图
+    if (!mouse || mouse->button() != Qt::LeftButton)
+        return false;
+    if (!mouse->modifiers().testFlag(Qt::ControlModifier))
+        return false;
+
+    Ps::ImageDocument *doc = document();
+    if (!doc)
+        return false;
+
+    QListWidgetItem *item = ui->itemList->itemAt(mouse->pos());
+    if (!item)
+        return false;
+
+    // 热区放宽：勾选框 + 缩略图整块左侧（style 的 decoration 矩形经常偏/空，导致「点了没反应」）
+    const QRect rowRect = ui->itemList->visualItemRect(item);
+    const int iconW = ui->itemList->iconSize().width();
+    const int hotW = qMax(iconW + 36, 64);
+    const QRect hotRect(rowRect.left(), rowRect.top(), hotW, rowRect.height());
+    if (!hotRect.contains(mouse->pos()))
+        return false;
+
+    const int stackIndex = item->data(Qt::UserRole).toInt();
+    if (stackIndex < 0 || stackIndex >= doc->layers().count())
+        return false;
+
+    const bool shift = mouse->modifiers().testFlag(Qt::ShiftModifier);
+    const bool alt = mouse->modifiers().testFlag(Qt::AltModifier);
+
+    // 纯 Ctrl（无 Shift/Alt）：同一来源层再点 → 取消选区
+    if (!shift && !alt
+        && !doc->selection().isEmpty()
+        && m_alphaSelectSourceLayer == stackIndex) {
+        m_settingAlphaSelect = true;
+        doc->clearSelection();
+        m_settingAlphaSelect = false;
+        m_alphaSelectSourceLayer = -1;
+        doc->setActiveLayerIndex(stackIndex);
+        return true;
+    }
+
+    Ps::ChannelOp op = Ps::ChannelOp::Replace;
+    if (shift && alt)
+        op = Ps::ChannelOp::Intersect;
+    else if (shift)
+        op = Ps::ChannelOp::Add;
+    else if (alt)
+        op = Ps::ChannelOp::Subtract;
+
+    m_settingAlphaSelect = true;
+    doc->selectLayerAlpha(stackIndex, op);
+    m_settingAlphaSelect = false;
+    // 仅 Replace 建立「再点取消」配对；加/减/交不配对
+    m_alphaSelectSourceLayer = (op == Ps::ChannelOp::Replace) ? stackIndex : -1;
+    doc->setActiveLayerIndex(stackIndex);
+    return true;
 }
 
 // —— 私有工具 ——

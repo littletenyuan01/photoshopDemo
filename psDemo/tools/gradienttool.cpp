@@ -104,6 +104,12 @@ bool GradientTool::mouseRelease(const ToolEvent &event, const ToolContext &ctx, 
     const auto type = static_cast<PaintEngine::GradientType>(
         qBound(0, ctx.gradientType, 4));
 
+    // 对照 gimp_item_mask_intersect：渐变只写入选区内
+    PaintEngine::SelectionClip clip;
+    clip.selection = &ctx.document->selection();
+    clip.layerOffsetX = layer->offsetX();
+    clip.layerOffsetY = layer->offsetY();
+
     // 对应 gimp_drawable_gradient(..., start, end, ...)；坐标换到层内
     const QRect dirtyLocal = PaintEngine::applyGradient(
         layer->tiles(),
@@ -115,7 +121,8 @@ bool GradientTool::mouseRelease(const ToolEvent &event, const ToolContext &ctx, 
         ctx.gradientOpacity,
         ctx.gradientOffsetPercent,
         ctx.gradientReverse,
-        ctx.gradientDither);
+        ctx.gradientDither,
+        clip);
 
     if (!dirtyLocal.isEmpty())
         markDocumentDirty(ctx, dirtyLocal.translated(layer->offsetX(), layer->offsetY()));

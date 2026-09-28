@@ -80,6 +80,14 @@ public:
     QRect boundsInDocument() const;
 
     /**
+     * 非透明像素在文档中的最小外接矩形（对照 PS 变换控件 / Free Transform 框）。
+     * 无像素或全透明 → 空矩形。结果按像素变更缓存，平移只改 offset 不重扫。
+     */
+    QRect contentBoundsInDocument() const;
+    /** 像素写入后调用，使下次 contentBoundsInDocument 重算。 */
+    void invalidateContentBounds() const;
+
+    /**
      * 文档坐标处本层不透明度 [0,1]（对照 gimp_pickable_get_opacity_at）。
      * 点在层外、无瓦片或全透明 → 0。
      */
@@ -122,6 +130,9 @@ private:
 
     ImageDocument *m_owner = nullptr; ///< 入栈后回指文档；未入栈为 nullptr
 
+    /** 扫描已分配瓦片，得到层内坐标的 alpha>0 包围盒。 */
+    QRect computeContentBoundsLocal() const;
+
     QString m_name;
     bool m_visible = true;
     qreal m_opacity = 1.0; ///< [0,1]
@@ -129,6 +140,10 @@ private:
     int m_offsetX = 0; ///< 文档坐标 X（对照 GimpItem offset）
     int m_offsetY = 0; ///< 文档坐标 Y
     TileBuffer m_tiles; ///< 本层像素（懒分配瓦片；层内原点）
+
+    /** 层内坐标内容包围盒缓存；与 offset 无关。 */
+    mutable QRect m_contentBoundsLocal;
+    mutable bool m_contentBoundsValid = false;
 };
 
 } // namespace Ps

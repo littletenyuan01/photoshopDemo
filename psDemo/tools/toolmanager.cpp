@@ -2,6 +2,7 @@
 
 #include "gradienttool.h"
 #include "handtool.h"
+#include "marqueeselecttool.h"
 #include "movetool.h"
 #include "paintbuckettool.h"
 #include "painttool.h"
@@ -19,6 +20,8 @@ ToolManager::ToolManager(QObject *parent)
     // 新增工具只需在此加一行；CanvasView / MainWindow 无需改动。
     // 【对照 GIMP】等价于 app/tools/tools-enums.c + gimp_tool_info_new 的注册表角色。
     registerTool(std::make_unique<MoveTool>());
+    registerTool(std::make_unique<MarqueeSelectTool>(MarqueeSelectTool::Shape::Rect));
+    registerTool(std::make_unique<MarqueeSelectTool>(MarqueeSelectTool::Shape::Ellipse));
     registerTool(std::make_unique<PaintTool>(Ps::ToolId::Brush, /*eraseMode=*/false));
     registerTool(std::make_unique<PaintTool>(Ps::ToolId::Eraser, /*eraseMode=*/true));
     registerTool(std::make_unique<PaintBucketTool>());
@@ -99,25 +102,28 @@ bool ToolManager::setActiveTool(Ps::ToolId id, ViewPort &view)
     return true;
 }
 
-bool ToolManager::dispatchPress(const ToolEvent &event, ViewPort &view)
+bool ToolManager::dispatchPress(const ToolEvent &event, const ToolContext &ctx, ViewPort &view)
 {
     if (!m_activeTool)
         return false;
-    return m_activeTool->mousePress(event, m_context, view);
+    m_context = ctx; // 与画布侧保持一致
+    return m_activeTool->mousePress(event, ctx, view);
 }
 
-bool ToolManager::dispatchMove(const ToolEvent &event, ViewPort &view)
+bool ToolManager::dispatchMove(const ToolEvent &event, const ToolContext &ctx, ViewPort &view)
 {
     if (!m_activeTool)
         return false;
-    return m_activeTool->mouseMove(event, m_context, view);
+    m_context = ctx;
+    return m_activeTool->mouseMove(event, ctx, view);
 }
 
-bool ToolManager::dispatchRelease(const ToolEvent &event, ViewPort &view)
+bool ToolManager::dispatchRelease(const ToolEvent &event, const ToolContext &ctx, ViewPort &view)
 {
     if (!m_activeTool)
         return false;
-    return m_activeTool->mouseRelease(event, m_context, view);
+    m_context = ctx;
+    return m_activeTool->mouseRelease(event, ctx, view);
 }
 
 Qt::CursorShape ToolManager::activeCursorShape() const

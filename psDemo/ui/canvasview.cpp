@@ -1,6 +1,7 @@
 #include "canvasview.h"
 
 #include "domain/imagedocument.h"
+#include "domain/selection.h"
 #include "engine/compositor.h"
 #include "pixmaputils.h"
 #include "tools/handtool.h"
@@ -11,12 +12,16 @@
 
 #include <QMouseEvent>
 #include <QPainter>
+#include <QPainterPath>
+#include <QPen>
+#include <QTimer>
 #include <QWheelEvent>
 #include <QtMath>
 
 CanvasView::CanvasView(QWidget *parent)
     : QWidget(parent)
     , m_toolManager(new Ps::ToolManager(this))
+    , m_antsTimer(new QTimer(this))
 {
     setMouseTracking(true);
     setFocusPolicy(Qt::StrongFocus);
@@ -29,6 +34,20 @@ CanvasView::CanvasView(QWidget *parent)
             this, qOverload<>(&QWidget::update));
     connect(m_toolManager, &Ps::ToolManager::cursorChangeRequested,
             this, [this](Qt::CursorShape shape) { setCursor(shape); });
+
+    // 蚂蚁线相位（对照 gimp_display_shell_selection 的 marching-ants-speed）
+    // 间隔略放慢，且只局部 update，减轻缩小时整窗闪烁
+    m_antsTimer->setInterval(100);
+    connect(m_antsTimer, &QTimer::timeout, this, [this]() {
+        m_antsPhase += 1.0;
+        if (m_antsPhase >= 12.0)
+            m_antsPhase = 0.0;
+        // 只重绘图像区域，避免整控件闪
+        if (m_document)
+            update(imageRectInWidget().toAlignedRect().adjusted(-2, -2, 2, 2));
+        else
+            update();
+    });
 
     refreshToolContext();
     updateToolCursor();
@@ -54,14 +73,24 @@ void CanvasView::setDocument(Ps::ImageDocument *document)
             rebuildCache();
             update();
         });
+        // 选区单独订阅：只重画蚂蚁线，不重合成
+        connect(m_document, &Ps::ImageDocument::selectionChanged, this, [this]() {
+            rebuildSelectionOutlinePath();
+            syncMarchingAntTimer();
+            update();
+        });
         rebuildCache();
+        rebuildSelectionOutlinePath();
+        syncMarchingAntTimer();
         if (width() > 50 && height() > 50)
             zoomFit();
         else
             m_pendingFit = true;
     } else {
         m_cache = QImage();
+        m_antsPath = QPainterPath();
         m_pendingFit = false;
+        syncMarchingAntTimer();
         update();
         notifyViewChanged();
     }
@@ -247,6 +276,8 @@ void CanvasView::refreshToolContext()
     m_toolContext.gradientOffsetPercent = m_gradientOffsetPercent;
     m_toolContext.gradientReverse = m_gradientReverse;
     m_toolContext.gradientDither = m_gradientDither;
+    m_toolContext.viewZoom = m_zoom;
+    m_toolContext.viewOffset = m_offset;
 
     if (m_toolManager)
         m_toolManager->setContext(m_toolContext);
@@ -339,9 +370,15 @@ void CanvasView::paintEvent(QPaintEvent *)
     painter.setRenderHint(QPainter::SmoothPixmapTransform, m_zoom < 4.0);
     painter.drawImage(target, m_cache);
 
+    // 选区蚂蚁线（在图像之上、工具浮层之下）
+    paintSelectionOutline(painter);
+
     // 工具浮层最后画：位于图像之上（对应 GIMP display 的 tool_items / preview_items）
     Ps::Tool *tool = m_toolManager ? m_toolManager->activeTool() : nullptr;
     if (tool && tool->hasOverlay()) {
+        // 缩放/平移可能未走 refreshToolContext，绘制前同步视图变换
+        m_toolContext.viewZoom = m_zoom;
+        m_toolContext.viewOffset = m_offset;
         painter.setRenderHint(QPainter::SmoothPixmapTransform, false);
         tool->drawOverlay(painter, m_toolContext);
     }
@@ -378,6 +415,9 @@ void CanvasView::mousePressEvent(QMouseEvent *event)
         return;
     }
 
+    // 每次按下都同步上下文，避免 ToolManager::m_context 与画布侧脱节
+    refreshToolContext();
+
     const Ps::ToolEvent e = makeToolEvent(event);
 
     // 通用平移手势（中键 / Alt+左键）优先于当前工具：由抓手工具承担。
@@ -394,7 +434,7 @@ void CanvasView::mousePressEvent(QMouseEvent *event)
     }
 
     // 其余事件交给活动工具；未消费则视为无操作（不再有工具专属 if 分支）
-    if (m_toolManager->dispatchPress(e, *this)) {
+    if (m_toolManager->dispatchPress(e, m_toolContext, *this)) {
         event->accept();
         return;
     }
@@ -412,6 +452,7 @@ void CanvasView::mouseMoveEvent(QMouseEvent *event)
         return;
     }
 
+    refreshToolContext();
     const Ps::ToolEvent e = makeToolEvent(event);
 
     // 平移进行中：固定发给抓手工具，不因中途切工具而丢失 release
@@ -423,7 +464,7 @@ void CanvasView::mouseMoveEvent(QMouseEvent *event)
         }
     }
 
-    if (m_toolManager->dispatchMove(e, *this)) {
+    if (m_toolManager->dispatchMove(e, m_toolContext, *this)) {
         event->accept();
         return;
     }
@@ -438,6 +479,7 @@ void CanvasView::mouseReleaseEvent(QMouseEvent *event)
         return;
     }
 
+    refreshToolContext();
     const Ps::ToolEvent e = makeToolEvent(event);
 
     if (m_panning) {
@@ -451,7 +493,7 @@ void CanvasView::mouseReleaseEvent(QMouseEvent *event)
         }
     }
 
-    if (m_toolManager->dispatchRelease(e, *this)) {
+    if (m_toolManager->dispatchRelease(e, m_toolContext, *this)) {
         event->accept();
         return;
     }
@@ -510,3 +552,109 @@ QRectF CanvasView::imageRectInWidget() const
         return {};
     return QRectF(m_offset, contentSize());
 }
+
+void CanvasView::syncMarchingAntTimer()
+{
+    const bool need = m_document && !m_document->selection().isEmpty();
+    if (need) {
+        if (!m_antsTimer->isActive())
+            m_antsTimer->start();
+    } else if (m_antsTimer->isActive()) {
+        m_antsTimer->stop();
+        m_antsPhase = 0.0;
+    }
+}
+
+void CanvasView::rebuildSelectionOutlinePath()
+{
+    // 【功能】从 mask 抽外轮廓。把共线的像素边合并成长线段，
+    // 避免「每格一条 moveTo/lineTo」在缩小时又密又闪。
+    m_antsPath = QPainterPath();
+    if (!m_document)
+        return;
+    const Ps::Selection &sel = m_document->selection();
+    if (sel.isEmpty())
+        return;
+
+    const QImage &mask = sel.mask();
+    const QRect b = sel.bounds();
+    auto isOn = [&](int x, int y) -> bool {
+        if (x < 0 || y < 0 || x >= mask.width() || y >= mask.height())
+            return false;
+        return mask.constScanLine(y)[x] > 0;
+    };
+
+    // 水平边：文档坐标 y = ey 上，合并连续的边界段
+    for (int ey = b.top(); ey <= b.bottom() + 1; ++ey) {
+        int runX0 = -1;
+        for (int x = b.left(); x <= b.right() + 1; ++x) {
+            const bool edge = (x <= b.right()) && (isOn(x, ey - 1) != isOn(x, ey));
+            if (edge) {
+                if (runX0 < 0)
+                    runX0 = x;
+            } else if (runX0 >= 0) {
+                m_antsPath.moveTo(runX0, ey);
+                m_antsPath.lineTo(x, ey);
+                runX0 = -1;
+            }
+        }
+    }
+
+    // 竖直边：文档坐标 x = ex
+    for (int ex = b.left(); ex <= b.right() + 1; ++ex) {
+        int runY0 = -1;
+        for (int y = b.top(); y <= b.bottom() + 1; ++y) {
+            const bool edge = (y <= b.bottom()) && (isOn(ex - 1, y) != isOn(ex, y));
+            if (edge) {
+                if (runY0 < 0)
+                    runY0 = y;
+            } else if (runY0 >= 0) {
+                m_antsPath.moveTo(ex, runY0);
+                m_antsPath.lineTo(ex, y);
+                runY0 = -1;
+            }
+        }
+    }
+}
+
+void CanvasView::paintSelectionOutline(QPainter &painter)
+{
+    // 【功能】蚂蚁线：对照 gimp_display_shell_draw_selection_out（虚线描边）
+    // 在**控件坐标**下描边：虚线按屏幕像素计，缩小时不会挤成一团。
+    if (m_antsPath.isEmpty())
+        return;
+
+    QTransform toWidget;
+    toWidget.translate(m_offset.x(), m_offset.y());
+    toWidget.scale(m_zoom, m_zoom);
+    const QPainterPath widgetPath = toWidget.map(m_antsPath);
+
+    painter.save();
+    painter.setRenderHint(QPainter::Antialiasing, false);
+    painter.setBrush(Qt::NoBrush);
+
+    // 虚线长度用屏幕像素（cosmetic），黑白错相位形成 marching ants
+    constexpr qreal kDash = 6.0;
+
+    QPen white(Qt::white);
+    white.setCosmetic(true);
+    white.setWidth(1);
+    white.setStyle(Qt::CustomDashLine);
+    white.setDashPattern({kDash, kDash});
+    white.setDashOffset(m_antsPhase);
+    painter.setPen(white);
+    painter.drawPath(widgetPath);
+
+    QPen black(Qt::black);
+    black.setCosmetic(true);
+    black.setWidth(1);
+    black.setStyle(Qt::CustomDashLine);
+    black.setDashPattern({kDash, kDash});
+    black.setDashOffset(m_antsPhase + kDash);
+    painter.setPen(black);
+    // 固定 1 屏幕像素错位（不要用 1/zoom，缩小时会抖）
+    painter.translate(1.0, 1.0);
+    painter.drawPath(widgetPath);
+    painter.restore();
+}
+

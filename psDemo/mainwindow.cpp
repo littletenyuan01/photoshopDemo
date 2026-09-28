@@ -66,6 +66,17 @@ void MainWindow::setupMenus()
 
     connect(ui->actionLayerNew, &QAction::triggered, this, &MainWindow::onNewLayer);
 
+    // —— 选择（矩形选区已实现：全选 / 取消 / 反选）——
+    ui->actionSelectAll->setEnabled(true);
+    ui->actionSelectAll->setToolTip(tr("选择整幅画布"));
+    ui->actionSelectDeselect->setEnabled(true);
+    ui->actionSelectDeselect->setToolTip(tr("取消当前选区"));
+    ui->actionSelectInverse->setEnabled(true);
+    ui->actionSelectInverse->setToolTip(tr("反转选区"));
+    connect(ui->actionSelectAll, &QAction::triggered, this, &MainWindow::onSelectAll);
+    connect(ui->actionSelectDeselect, &QAction::triggered, this, &MainWindow::onSelectDeselect);
+    connect(ui->actionSelectInverse, &QAction::triggered, this, &MainWindow::onSelectInverse);
+
     // —— 视图（缩放已实现）——
     connect(ui->actionZoomFit, &QAction::triggered, this, &MainWindow::onZoomFit);
     connect(ui->actionZoomActual, &QAction::triggered, this, &MainWindow::onZoomActual);
@@ -393,4 +404,22 @@ void MainWindow::onAbout()
         tr("PhotoshopLite\n"
            "Qt 仿 Photoshop 简历向 Demo。\n"
            "菜单栏顶层结构对齐 Photoshop 中文版；功能按路线图逐步实现。"));
+}
+
+void MainWindow::onSelectAll()
+{
+    if (Ps::ImageDocument *doc = m_session->document())
+        doc->selectAll();
+}
+
+void MainWindow::onSelectDeselect()
+{
+    if (Ps::ImageDocument *doc = m_session->document())
+        doc->clearSelection();
+}
+
+void MainWindow::onSelectInverse()
+{
+    if (Ps::ImageDocument *doc = m_session->document())
+        doc->invertSelection();
 }

@@ -83,8 +83,9 @@
     `gimppickable-contiguous-region.cc`（by_seed / by_color）；选项见 `gimpbucketfilloptions.c`
    （`fill-mode` / `threshold` / `fill-transparent` / `sample-merged`…）。
   - **已接线**：容差（≈threshold）、连续（PS；GIMP 相似色固定 by_seed）、前景|背景（≈fill-mode）、不透明度。
-  - **简化未做**：图案、paint-mode、sample-merged、对角邻接、抗锯齿软边、线稿填充、选区相交。
-  - 新建透明层上点一下即可整层填色（种子全透明时按 GIMP 只比 alpha）。
+  - **简化未做**：图案、paint-mode、sample-merged、对角邻接、抗锯齿软边、线稿填充。
+  - **选区**：有选区时只填 mask 内（先算连通域再 ∩ Selection；空选区不约束）。
+  - 新建透明层上点一下即可整层填色（种子全透明时按 GIMP 只比 alpha）；**若已有选区则只填选区内**。
 - **渐变（G）**：左键拖拽起止，松手写入前景→背景渐变。
   - **对照 GIMP**：`gimpgradienttool.c`（拖拽）→ `gimpdrawable-gradient.c` →
     `gimpoperationgradient.c`（逐像素 factor）；选项 `gimpgradientoptions.c`
@@ -249,7 +250,7 @@
 | 功能 | 简介 | 验收要点 | 状态 |
 |------|------|----------|------|
 | 画笔 / 橡皮 | 在活动层绘制或擦除 | 不污染其他层 | ✅ 已实现（无撤销） |
-| 选区 | 矩形等 + 约束绘制 | 只改选区内 | 计划中 |
+| 选区 | 矩形/椭圆 + mask 蚂蚁线；填充后取消选区；**Ctrl+点缩略图**载入层 alpha | 填充只改选区内且事后无蚂蚁线；Ctrl+点建立外形选区 | ✅ |
 | 蒙版 | 灰度蒙版 | 合成正确 | 计划中 |
 | 撤销 / 重做 | 绘制与图层操作 | 栈行为正确 | 计划中 |
 | 导出 | PNG / JPEG | 导出合成结果 | 计划中 |

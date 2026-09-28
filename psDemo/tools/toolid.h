@@ -10,8 +10,8 @@ namespace Ps {
  *
  * 顺序即工具箱从上到下的顺序，按 Photoshop 的默认工具组排列。
  *
- * ⚠️ **实现状态**：目前 Move / Hand / Zoom / Brush / Eraser / PaintBucket / Gradient
- * 有实际逻辑（见 `tools/ToolManager` 的注册表）。其余是 **UI 占位** —— 选中后
+ * ⚠️ **实现状态**：目前 Move / Hand / Zoom / Brush / Eraser / PaintBucket / Gradient /
+ * RectSelect / EllipseSelect 有实际逻辑（见 `tools/ToolManager` 的注册表）。其余是 **UI 占位** —— 选中后
  * ToolManager 会回退到中性工具（不消费事件，等同无操作），选项栏提示「尚未接入」。
  * 布局对齐 PS 是为了让界面完整可演示，不代表功能已实现。
  */

@@ -42,13 +42,25 @@ bool PaintBucketTool::mousePress(const ToolEvent &event, const ToolContext &ctx,
     const int opacityQ = qBound(0, int(ctx.fillOpacity * 255.0 + 0.5), 255);
     fill.setAlpha((fill.alpha() * opacityQ + 127) / 255);
 
+    // 对照 gimp_item_mask_intersect：空选区不裁；非空只填 mask 内
+    PaintEngine::SelectionClip clip;
+    clip.selection = &ctx.document->selection();
+    clip.layerOffsetX = layer->offsetX();
+    clip.layerOffsetY = layer->offsetY();
+    const bool hadSelection = !ctx.document->selection().isEmpty();
+
     const QRect dirtyLocal = PaintEngine::floodFill(layer->tiles(), seed, fill,
-                                                    ctx.fillTolerance, ctx.fillContiguous);
+                                                    ctx.fillTolerance, ctx.fillContiguous,
+                                                    clip);
     if (dirtyLocal.isEmpty())
         return true; // 已消费点击，只是无需改像素
 
     // 脏区映回文档坐标
     markDocumentDirty(ctx, dirtyLocal.translated(layer->offsetX(), layer->offsetY()));
+
+    // 填充用完选区后取消（本 Demo 约定；PS 默认保留选区）
+    if (hadSelection)
+        ctx.document->clearSelection();
     return true;
 }
 

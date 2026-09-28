@@ -18,6 +18,7 @@ SOURCES += \
     domain/layer.cpp \
     domain/tilebuffer.cpp \
     domain/layerstack.cpp \
+    domain/selection.cpp \
     domain/imagedocument.cpp \
     engine/compositor.cpp \
     engine/paintengine.cpp \
@@ -29,6 +30,7 @@ SOURCES += \
     tools/painttool.cpp \
     tools/paintbuckettool.cpp \
     tools/gradienttool.cpp \
+    tools/marqueeselecttool.cpp \
     ui/canvasview.cpp \
     ui/canvasworkspace.cpp \
     ui/canvasdocstatusbar.cpp \
@@ -56,6 +58,7 @@ HEADERS += \
     domain/layer.h \
     domain/tilebuffer.h \
     domain/layerstack.h \
+    domain/selection.h \
     domain/imagedocument.h \
     engine/compositor.h \
     engine/paintengine.h \
@@ -70,6 +73,7 @@ HEADERS += \
     tools/painttool.h \
     tools/paintbuckettool.h \
     tools/gradienttool.h \
+    tools/marqueeselecttool.h \
     ui/canvasview.h \
     ui/canvasworkspace.h \
     ui/canvasdocstatusbar.h \

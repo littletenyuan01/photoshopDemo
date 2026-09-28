@@ -115,10 +115,24 @@ void TileBuffer::setFromImage(const QImage &image)
     if (src.isNull())
         return;
 
-    // 按格裁切拷贝：CompositionMode_Source 直接覆盖，不做混合
+    // 按格裁切拷贝：CompositionMode_Source 直接覆盖，不做混合。
+    // 全透明格不分配瓦片（选区外填充后仍透明 → 省内存，也避免「整层都有瓦片」的错觉）
     for (int ty = 0; ty < m_tilesY; ++ty) {
         for (int tx = 0; tx < m_tilesX; ++tx) {
             const QRect bounds = tileBounds(tx, ty);
+            bool anyOpaque = false;
+            for (int y = bounds.top(); y <= bounds.bottom() && !anyOpaque; ++y) {
+                const QRgb *line = reinterpret_cast<const QRgb *>(src.constScanLine(y));
+                for (int x = bounds.left(); x <= bounds.right(); ++x) {
+                    if (qAlpha(line[x]) != 0) {
+                        anyOpaque = true;
+                        break;
+                    }
+                }
+            }
+            if (!anyOpaque)
+                continue;
+
             QImage *tile = ensureTile(tx, ty);
             if (!tile)
                 continue;

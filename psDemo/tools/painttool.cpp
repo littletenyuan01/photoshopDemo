@@ -2,6 +2,7 @@
 
 #include "domain/imagedocument.h"
 #include "domain/layer.h"
+#include "domain/selection.h"
 #include "engine/paintengine.h"
 
 #include <QRectF>
@@ -17,6 +18,17 @@ QRect dirtyRectForSegment(const QPointF &fromDoc, const QPointF &toDoc, qreal ra
     const QRectF box = QRectF(fromDoc, toDoc).normalized();
     const int pad = qCeil(radius) + 1;
     return box.adjusted(-pad, -pad, pad, pad).toAlignedRect();
+}
+
+PaintEngine::SelectionClip selectionClipFor(Layer *layer, ImageDocument *doc)
+{
+    PaintEngine::SelectionClip clip;
+    if (!layer || !doc)
+        return clip;
+    clip.selection = &doc->selection();
+    clip.layerOffsetX = layer->offsetX();
+    clip.layerOffsetY = layer->offsetY();
+    return clip;
 }
 
 } // namespace
@@ -45,13 +57,14 @@ bool PaintTool::mousePress(const ToolEvent &event, const ToolContext &ctx, ViewP
         return false;
 
     const auto mode = m_erase ? PaintEngine::Mode::Erase : PaintEngine::Mode::Paint;
+    const auto clip = selectionClipFor(layer, ctx.document);
 
     m_painting = true;
     m_lastImagePos = event.imagePos;
 
     // 瓦片是层内坐标：文档点先减 Layer offset（对照 drawable 局部坐标）
     const QPointF local = layer->toLayerLocal(event.imagePos);
-    PaintEngine::stampDab(layer->tiles(), local, ctx.brushRadius, ctx.foreground, mode);
+    PaintEngine::stampDab(layer->tiles(), local, ctx.brushRadius, ctx.foreground, mode, 0.85, clip);
     markDocumentDirty(ctx, dirtyRectForSegment(event.imagePos, event.imagePos, ctx.brushRadius));
     return true;
 }
@@ -70,13 +83,14 @@ bool PaintTool::mouseMove(const ToolEvent &event, const ToolContext &ctx, ViewPo
         return false;
 
     const auto mode = m_erase ? PaintEngine::Mode::Erase : PaintEngine::Mode::Paint;
+    const auto clip = selectionClipFor(layer, ctx.document);
 
     const QPointF fromLocal = layer->toLayerLocal(m_lastImagePos);
     const QPointF toLocal = layer->toLayerLocal(event.imagePos);
     // strokeSegment 返回层内最后 dab；再映回文档坐标作下一段起点
     const QPointF lastLocal = PaintEngine::strokeSegment(
         layer->tiles(), fromLocal, toLocal,
-        ctx.brushRadius, ctx.foreground, mode);
+        ctx.brushRadius, ctx.foreground, mode, 0.85, 0.25, clip);
     m_lastImagePos = lastLocal + QPointF(layer->offsetX(), layer->offsetY());
     markDocumentDirty(ctx, dirtyRectForSegment(m_lastImagePos, event.imagePos, ctx.brushRadius));
     return true;

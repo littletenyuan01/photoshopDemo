@@ -1,5 +1,6 @@
 #include "paintengine.h"
 
+#include "domain/selection.h"
 #include "domain/tilebuffer.h"
 
 #include <QPainter>
@@ -11,6 +12,47 @@
 namespace Ps {
 
 namespace {
+
+bool clipActive(const PaintSelectionClip &clip)
+{
+    // 对照 gimp_item_mask_intersect：空选区 → 不遮罩绘制
+    // 用 bounds()（内部走 cache）判断，避免仅依赖 isEmpty 的歧义
+    return clip.selection && !clip.selection->bounds().isEmpty();
+}
+
+bool layerPixelSelected(const PaintSelectionClip &clip, int layerX, int layerY)
+{
+    if (!clipActive(clip))
+        return true;
+    return clip.selection->isSelected(layerX + clip.layerOffsetX,
+                                      layerY + clip.layerOffsetY);
+}
+
+/**
+ * 把 after 中「选区外」像素恢复为 before（对照 paint 后 apply selection mask）。
+ * image 像素 (x,y) 对应层坐标 (originInLayer.x()+x, originInLayer.y()+y)。
+ */
+void restoreOutsideSelection(QImage &after,
+                             const QImage &before,
+                             const QPoint &originInLayer,
+                             const PaintSelectionClip &clip)
+{
+    if (!clipActive(clip) || after.isNull() || before.isNull())
+        return;
+    if (after.size() != before.size())
+        return;
+
+    const int w = after.width();
+    const int h = after.height();
+    for (int y = 0; y < h; ++y) {
+        QRgb *dst = reinterpret_cast<QRgb *>(after.scanLine(y));
+        const QRgb *src = reinterpret_cast<const QRgb *>(before.constScanLine(y));
+        for (int x = 0; x < w; ++x) {
+            if (!layerPixelSelected(clip, originInLayer.x() + x, originInLayer.y() + y))
+                dst[x] = src[x];
+        }
+    }
+}
 
 QRect dabBounds(const QPointF &center, qreal radius)
 {
@@ -70,14 +112,15 @@ QPointF strokeSegmentImpl(Target &target,
                           const QColor &color,
                           PaintEngine::Mode mode,
                           qreal hardness,
-                          qreal spacing)
+                          qreal spacing,
+                          const PaintSelectionClip &clip)
 {
     const QPointF delta = to - from;
     const qreal len = qSqrt(delta.x() * delta.x() + delta.y() * delta.y());
     const qreal step = qMax(0.5, radius * 2.0 * qBound(0.05, spacing, 1.0));
 
     if (len < 1e-6) {
-        PaintEngine::stampDab(target, to, radius, color, mode, hardness);
+        PaintEngine::stampDab(target, to, radius, color, mode, hardness, clip);
         return to;
     }
 
@@ -86,11 +129,11 @@ QPointF strokeSegmentImpl(Target &target,
     while (d <= len) {
         const qreal t = d / len;
         last = from + delta * t;
-        PaintEngine::stampDab(target, last, radius, color, mode, hardness);
+        PaintEngine::stampDab(target, last, radius, color, mode, hardness, clip);
         d += step;
     }
     if ((last - to).manhattanLength() > 0.5) {
-        PaintEngine::stampDab(target, to, radius, color, mode, hardness);
+        PaintEngine::stampDab(target, to, radius, color, mode, hardness, clip);
         last = to;
     }
     return last;
@@ -103,9 +146,16 @@ void PaintEngine::stampDab(QImage &target,
                            qreal radius,
                            const QColor &color,
                            Mode mode,
-                           qreal hardness)
+                           qreal hardness,
+                           PaintSelectionClip clip)
 {
+    if (!clipActive(clip)) {
+        stampDabOnImage(target, center, radius, color, mode, hardness);
+        return;
+    }
+    const QImage before = target;
     stampDabOnImage(target, center, radius, color, mode, hardness);
+    restoreOutsideSelection(target, before, QPoint(0, 0), clip);
 }
 
 void PaintEngine::stampDab(TileBuffer &tiles,
@@ -113,7 +163,8 @@ void PaintEngine::stampDab(TileBuffer &tiles,
                            qreal radius,
                            const QColor &color,
                            Mode mode,
-                           qreal hardness)
+                           qreal hardness,
+                           PaintSelectionClip clip)
 {
     // 【功能】在懒分配瓦片上盖一笔圆形 dab；只 ensure 笔触碰到的格
     if (tiles.width() <= 0 || tiles.height() <= 0 || radius <= 0.0)
@@ -124,7 +175,13 @@ void PaintEngine::stampDab(TileBuffer &tiles,
     tiles.forEachTileInRect(dabRect, true, [&](int, int, QImage &tile, const QRect &bounds) {
         // 图像坐标 → 本瓦片局部坐标再画，避免越界写邻格
         const QPointF local(center.x() - bounds.x(), center.y() - bounds.y());
+        if (!clipActive(clip)) {
+            stampDabOnImage(tile, local, radius, color, mode, hardness);
+            return;
+        }
+        const QImage before = tile;
         stampDabOnImage(tile, local, radius, color, mode, hardness);
+        restoreOutsideSelection(tile, before, bounds.topLeft(), clip);
     });
 }
 
@@ -135,9 +192,10 @@ QPointF PaintEngine::strokeSegment(QImage &target,
                                    const QColor &color,
                                    Mode mode,
                                    qreal hardness,
-                                   qreal spacing)
+                                   qreal spacing,
+                                   PaintSelectionClip clip)
 {
-    return strokeSegmentImpl(target, from, to, radius, color, mode, hardness, spacing);
+    return strokeSegmentImpl(target, from, to, radius, color, mode, hardness, spacing, clip);
 }
 
 QPointF PaintEngine::strokeSegment(TileBuffer &tiles,
@@ -147,9 +205,10 @@ QPointF PaintEngine::strokeSegment(TileBuffer &tiles,
                                    const QColor &color,
                                    Mode mode,
                                    qreal hardness,
-                                   qreal spacing)
+                                   qreal spacing,
+                                   PaintSelectionClip clip)
 {
-    return strokeSegmentImpl(tiles, from, to, radius, color, mode, hardness, spacing);
+    return strokeSegmentImpl(tiles, from, to, radius, color, mode, hardness, spacing, clip);
 }
 
 namespace {
@@ -214,18 +273,19 @@ QRect PaintEngine::floodFill(TileBuffer &tiles,
                              const QPoint &seed,
                              const QColor &fillColor,
                              int tolerance,
-                             bool contiguous)
+                             bool contiguous,
+                             PaintSelectionClip clip)
 {
-    // 【功能】油漆桶：种子相似色区域写入填充色
-    // 【对照 GIMP 两步】
-    //   1) gimppickable-contiguous-region：by_seed（连续）/ by_color（本项目「非连续」近似）
-    //   2) gimpdrawable-bucket-fill：建 fill buffer → apply_buffer
-    // 本项目合并为一次物化+写入；无选区相交、无 sample-merged、无对角邻接、无抗锯齿软边。
+    // 【功能】油漆桶：种子相似色区域写入填充色；有选区时最终 ∩ mask
+    // 【对照 GIMP】contiguous-region 得区域 → 与 selection 相交 → apply_buffer
     const int w = tiles.width();
     const int h = tiles.height();
     if (w <= 0 || h <= 0)
         return {};
     if (seed.x() < 0 || seed.y() < 0 || seed.x() >= w || seed.y() >= h)
+        return {};
+    // 种子在选区外：不填充
+    if (!layerPixelSelected(clip, seed.x(), seed.y()))
         return {};
 
     const int tol = qBound(0, tolerance, 255);
@@ -235,6 +295,8 @@ QRect PaintEngine::floodFill(TileBuffer &tiles,
     if (img.format() != QImage::Format_ARGB32_Premultiplied)
         img = img.convertToFormat(QImage::Format_ARGB32_Premultiplied);
 
+    const QImage before = img; // 选区外最终要恢复成填充前的像素
+
     const QRgb seedPx = img.pixel(seed.x(), seed.y());
     if (seedPx == fillPx)
         return {}; // 种子已是目标色，无需再填
@@ -242,42 +304,28 @@ QRect PaintEngine::floodFill(TileBuffer &tiles,
     int seedR = 0, seedG = 0, seedB = 0, seedA = 0;
     unpremultiplyRgb(seedPx, &seedR, &seedG, &seedB, &seedA);
 
-    int minX = seed.x();
-    int minY = seed.y();
-    int maxX = seed.x();
-    int maxY = seed.y();
-    bool any = false;
+    // 先算「拟填充区域」mask（忽略选区）；透明层上会覆盖整层透明连通域。
+    // 然后再与 Selection 求交（对照 GIMP apply 前 ∩ mask），避免只靠 BFS 内联判断漏裁。
+    QImage region(w, h, QImage::Format_Grayscale8);
+    region.fill(0);
 
-    auto paintAt = [&](int x, int y) {
-        img.setPixel(x, y, fillPx);
-        any = true;
-        minX = qMin(minX, x);
-        minY = qMin(minY, y);
-        maxX = qMax(maxX, x);
-        maxY = qMax(maxY, y);
+    auto markAt = [&](int x, int y) {
+        region.scanLine(y)[x] = 255;
     };
 
-    auto matches = [&](int x, int y) {
+    auto matchesColor = [&](int x, int y) {
         return similarToSeed(img.pixel(x, y), seedR, seedG, seedB, seedA, tol);
     };
 
     if (!contiguous) {
-        // 近似 GIMP by_color：整层所有与种子相似的像素（桶工具在 GIMP 默认走 by_seed）
         for (int y = 0; y < h; ++y) {
-            QRgb *line = reinterpret_cast<QRgb *>(img.scanLine(y));
+            uchar *line = region.scanLine(y);
             for (int x = 0; x < w; ++x) {
-                if (!similarToSeed(line[x], seedR, seedG, seedB, seedA, tol))
-                    continue;
-                line[x] = fillPx;
-                any = true;
-                minX = qMin(minX, x);
-                minY = qMin(minY, y);
-                maxX = qMax(maxX, x);
-                maxY = qMax(maxY, y);
+                if (matchesColor(x, y))
+                    line[x] = 255;
             }
         }
     } else {
-        // 连续：4-邻接 BFS ≈ GIMP by_seed（diagonal-neighbors 默认关）
         QVector<quint8> visited(w * h, 0);
         QQueue<QPoint> queue;
         queue.enqueue(seed);
@@ -285,9 +333,9 @@ QRect PaintEngine::floodFill(TileBuffer &tiles,
 
         while (!queue.isEmpty()) {
             const QPoint p = queue.dequeue();
-            if (!matches(p.x(), p.y()))
+            if (!matchesColor(p.x(), p.y()))
                 continue;
-            paintAt(p.x(), p.y());
+            markAt(p.x(), p.y());
 
             const QPoint nbs[] = {
                 QPoint(p.x() + 1, p.y()),
@@ -302,14 +350,47 @@ QRect PaintEngine::floodFill(TileBuffer &tiles,
                 if (visited[idx])
                     continue;
                 visited[idx] = 1;
-                if (matches(n.x(), n.y()))
+                if (matchesColor(n.x(), n.y()))
                     queue.enqueue(n);
             }
         }
     }
 
+    // ∩ 选区：非选中位置从 region 清掉
+    if (clipActive(clip)) {
+        for (int y = 0; y < h; ++y) {
+            uchar *line = region.scanLine(y);
+            for (int x = 0; x < w; ++x) {
+                if (line[x] == 0)
+                    continue;
+                if (!layerPixelSelected(clip, x, y))
+                    line[x] = 0;
+            }
+        }
+    }
+
+    int minX = w, minY = h, maxX = -1, maxY = -1;
+    bool any = false;
+    for (int y = 0; y < h; ++y) {
+        const uchar *line = region.constScanLine(y);
+        QRgb *pix = reinterpret_cast<QRgb *>(img.scanLine(y));
+        for (int x = 0; x < w; ++x) {
+            if (line[x] == 0)
+                continue;
+            pix[x] = fillPx;
+            any = true;
+            minX = qMin(minX, x);
+            minY = qMin(minY, y);
+            maxX = qMax(maxX, x);
+            maxY = qMax(maxY, y);
+        }
+    }
+
     if (!any)
         return {};
+
+    // 双保险：选区外强制恢复填充前像素（与笔刷 dab 的 restoreOutsideSelection 同思路）
+    restoreOutsideSelection(img, before, QPoint(0, 0), clip);
 
     tiles.setFromImage(img);
     return QRect(QPoint(minX, minY), QPoint(maxX, maxY));
@@ -408,7 +489,8 @@ QRect PaintEngine::applyGradient(TileBuffer &tiles,
                                  qreal opacity,
                                  int offsetPercent,
                                  bool reverse,
-                                 bool dither)
+                                 bool dither,
+                                 PaintSelectionClip clip)
 {
     // 【功能】拖拽起止写前景→背景渐变（对照 gimp_drawable_gradient + gimp:gradient）
     const int w = tiles.width();
@@ -460,9 +542,27 @@ QRect PaintEngine::applyGradient(TileBuffer &tiles,
 
     QRandomGenerator *rng = dither ? QRandomGenerator::global() : nullptr;
 
-    for (int y = 0; y < h; ++y) {
+    // 有选区时只扫选区外接框 ∩ 层（对照 mask_intersect 缩小工作区）
+    int x0 = 0, y0 = 0, x1 = w - 1, y1 = h - 1;
+    if (clipActive(clip)) {
+        const QRect selDoc = clip.selection->bounds();
+        const QRect selLayer = selDoc.translated(-clip.layerOffsetX, -clip.layerOffsetY)
+                                   .intersected(QRect(0, 0, w, h));
+        if (selLayer.isEmpty())
+            return {};
+        x0 = selLayer.left();
+        y0 = selLayer.top();
+        x1 = selLayer.right();
+        y1 = selLayer.bottom();
+    }
+
+    bool any = false;
+    for (int y = y0; y <= y1; ++y) {
         QRgb *line = reinterpret_cast<QRgb *>(overlay.scanLine(y));
-        for (int x = 0; x < w; ++x) {
+        for (int x = x0; x <= x1; ++x) {
+            if (!layerPixelSelected(clip, x, y))
+                continue;
+
             // 像素中心（gimpoperationgradient：x+=0.5,y+=0.5）
             const qreal lx = (x + 0.5) - start.x();
             const qreal ly = (y + 0.5) - start.y();
@@ -498,18 +598,24 @@ QRect PaintEngine::applyGradient(TileBuffer &tiles,
             }
             col.setAlpha(qRound(col.alpha() * opacity));
             line[x] = toPremultipliedRgb(col);
+            any = true;
         }
     }
+
+    if (!any)
+        return {};
 
     // SourceOver 叠回图层（对照 apply_buffer + paint opacity）
     {
         QPainter painter(&base);
         painter.setCompositionMode(QPainter::CompositionMode_SourceOver);
+        if (clipActive(clip))
+            painter.setClipRect(QRect(QPoint(x0, y0), QPoint(x1, y1)));
         painter.drawImage(0, 0, overlay);
     }
 
     tiles.setFromImage(base);
-    return QRect(0, 0, w, h);
+    return QRect(QPoint(x0, y0), QPoint(x1, y1));
 }
 
 } // namespace Ps

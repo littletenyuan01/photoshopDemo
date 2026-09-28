@@ -82,6 +82,9 @@ private slots:
     void onBrushDiameterChanged(int diameter);
     void onForegroundColorChanged(const QColor &color);
     void onBackgroundColorChanged(const QColor &color);
+    void onSelectAll();
+    void onSelectDeselect();
+    void onSelectInverse();
 
 private:
     /** 装配菜单动作连接。 */
