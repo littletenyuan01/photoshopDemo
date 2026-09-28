@@ -2615,12 +2615,6 @@
    <property name="text">
     <string>复制图层...</string>
    </property>
-   <property name="enabled">
-    <bool>false</bool>
-   </property>
-   <property name="toolTip">
-    <string>UI 占位，功能尚未接入</string>
-   </property>
   </action>
   <action name="actionLayerDelete">
    <property name="text">

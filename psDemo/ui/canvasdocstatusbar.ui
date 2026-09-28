@@ -54,6 +54,19 @@ QToolButton#infoMenuButton:hover {
   background-color: #5a5a5a;
 }</string>
   </property>
+  <property name="locale">
+   <locale language="Chinese" country="China"/>
+  </property>
+  <action name="actionInfoDocSize">
+   <property name="text">
+    <string>文档大小</string>
+   </property>
+  </action>
+  <action name="actionInfoPixelSize">
+   <property name="text">
+    <string>文档大小（像素）</string>
+   </property>
+  </action>
   <layout class="QHBoxLayout" name="horizontalLayout">
    <property name="spacing">
     <number>2</number>
@@ -79,7 +92,7 @@ QToolButton#infoMenuButton:hover {
       <string>100%</string>
      </property>
      <property name="alignment">
-      <set>Qt::AlignmentFlag::AlignRight|Qt::AlignmentFlag::AlignVCenter</set>
+      <set>Qt::AlignRight|Qt::AlignVCenter</set>
      </property>
     </widget>
    </item>
@@ -96,13 +109,13 @@ QToolButton#infoMenuButton:hover {
    <item>
     <widget class="QToolButton" name="infoMenuButton">
      <property name="text">
-      <string>›</string>
+      <string>&gt;</string>
      </property>
      <property name="toolTip">
       <string>显示选项</string>
      </property>
      <property name="popupMode">
-      <enum>QToolButton::ToolButtonPopupMode::InstantPopup</enum>
+      <enum>QToolButton::InstantPopup</enum>
      </property>
      <property name="autoRaise">
       <bool>true</bool>

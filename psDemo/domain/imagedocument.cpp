@@ -256,6 +256,39 @@ int ImageDocument::addTransparentLayer(const QString &name)
     return index;
 }
 
+int ImageDocument::duplicateLayer(int index)
+{
+    // 【功能】对照 GIMP layers_duplicate_cmd_callback → gimp_item_duplicate + gimp_image_add_layer
+    // 【放置】PS：副本出现在源层上方 → 本栈更高下标 = 面板更靠上
+    Layer *src = m_layers.layerAt(index);
+    if (!src)
+        return -1;
+
+    const QString copyName = src->name().isEmpty()
+                                 ? QStringLiteral("图层 副本")
+                                 : src->name() + QStringLiteral(" 副本");
+    auto copy = std::make_unique<Layer>(copyName, src->width(), src->height());
+    if (src->hasPixelData())
+        copy->replaceFromImage(src->materialize());
+    // owner 尚未挂：属性 setter 不会广播，安全
+    copy->setVisible(src->isVisible());
+    copy->setOpacity(src->opacity());
+    copy->setBlendMode(src->blendMode());
+    copy->setOffsetSilent(src->offsetX(), src->offsetY());
+
+    copy->setOwner(this);
+    const int newIndex = m_layers.insertLayer(index + 1, std::move(copy));
+
+    m_dirty = true;
+    m_dirtyRect = QRect(0, 0, m_width, m_height);
+    emit structureChanged();
+    // 活动层改到副本（setActiveLayerIndex 会再发 contentChanged；此处先发 structure）
+    m_activeLayerIndex = newIndex;
+    emit activeLayerChanged(newIndex);
+    emit contentChanged();
+    return newIndex;
+}
+
 bool ImageDocument::removeLayer(int index)
 {
     // 至少保留一层，避免空文档无合成目标

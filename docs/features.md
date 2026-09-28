@@ -202,7 +202,11 @@
 ### 图层面板
 
 - **说明**：右侧 `DockPanel` 壳（`layerpanel.ui`）内的 `LayerTreePanel`；列表上方为视觉上层。
-- **操作**：勾选显隐、双击改名、不透明度滑条、新建（透明空层 / 0 瓦片）、删除。
+- **操作**：勾选显隐、双击改名、不透明度滑条、新建（透明空层 / 0 瓦片）、删除、**复制图层**
+  （右键 / **图层菜单** / `ImageDocument::duplicateLayer`：深拷贝像素与属性，插到源层上方）。
+- **右键菜单**：对齐 PS 图层面板弹出项（**条目定义在 `layertreepanel.ui`**，多数灰显占位）；
+  已接线：新建、复制、删除、重命名（进行内编辑）、显示/隐藏。
+  对照 GIMP：`layers-actions` + `layers_duplicate_cmd_callback` / `gimp_item_duplicate`。
   ⚠️ **尚无「上移/下移」**：`LayerStack::moveLayer` 已实现但**没有 UI 接线**
   （底栏与「图层」菜单都没有对应按钮/动作），`ImageDocument` 也还没有转发入口
   —— 直接动栈会绕过 `structureChanged` 与 Phase 6 的撤销收口，所以留到接线时一起做。

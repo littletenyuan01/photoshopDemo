@@ -48,7 +48,6 @@ private slots:
 
 private:
     void refreshDocInfo();
-    void setupInfoMenu();
 
     Ui::CanvasDocStatusBar *ui;
     Ps::ImageDocument *m_document = nullptr;

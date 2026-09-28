@@ -13,6 +13,8 @@ QT_END_NAMESPACE
 
 class QTimer;
 class QMouseEvent;
+class QPoint;
+class QMenu;
 
 namespace Ps {
 class Layer;
@@ -28,6 +30,8 @@ class Layer;
  * - 锁：GIMP 有 lock content/position/visibility/alpha；此处 UI 先占位
  * - **Ctrl+点缩略图**：图层 alpha → 选区（GIMP 为 Alt+点；本项目对齐 PS Ctrl+点）；
  *   纯 Ctrl 再点同一层 → 取消选区
+ * - **右键菜单**：对齐 PS 图层面板弹出项（多数灰显占位）；**复制图层**已接 domain
+ *   （对照 GIMP `layers-duplicate` / `layers_duplicate_cmd_callback`）
  *
  * 【缩略图】每行左侧显示该层像素的等比缩略图 + 透明棋盘格衬底，对齐 PS 图层面板；
  * 生成逻辑见 ItemTreePanel::makeLayerThumbnail。
@@ -76,8 +80,12 @@ private slots:
     void onOpacityCommitted();
     /** 防抖定时器到期：只重算活动层那一行（画笔通常只动活动层）。 */
     void onThumbnailTimer();
+    /** 列表右键：弹出由 .ui Action 组装的上下文菜单。 */
+    void onLayerContextMenu(const QPoint &pos);
 
 private:
+    /** 用 .ui 中的 Action 组装右键菜单（QMenu 不能写进带 layout 的 .ui，uic 会失败）。 */
+    void buildLayerContextMenu();
     /** 把滑条数值提交为活动层不透明度；与当前值相同则跳过。 */
     void commitOpacity(int value);
     /** 按 layer 追加一行（含缩略图与 UserRole 身份映射）。 */
@@ -101,6 +109,9 @@ private:
      */
     bool tryAlphaToSelectionClick(QMouseEvent *mouse);
 
+    /** 右键弹出前：按当前活动层刷新可执行项（显隐文案等）。 */
+    void syncLayerContextMenuState();
+
     Ui::LayerTreePanel *ui;
     /**
      * 缩略图防抖定时器。
@@ -108,6 +119,8 @@ private:
      * 故延迟到停笔后再算一次（对齐 PS：笔迹停下时缩略图才更新）。
      */
     QTimer *m_thumbTimer = nullptr;
+    /** 右键菜单壳：条目来自 .ui 的 Action，结构在 buildLayerContextMenu 组装一次。 */
+    QMenu *m_layerContextMenu = nullptr;
 
     /** 上次「alpha→选区」来源层；-1=无。用于纯 Ctrl 再点同层时切换取消。 */
     int m_alphaSelectSourceLayer = -1;

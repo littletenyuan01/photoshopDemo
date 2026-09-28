@@ -23,6 +23,16 @@ int LayerStack::addLayer(std::unique_ptr<Layer> layer)
     return count() - 1;
 }
 
+int LayerStack::insertLayer(int index, std::unique_ptr<Layer> layer)
+{
+    if (index < 0)
+        index = 0;
+    if (index > count())
+        index = count();
+    m_layers.insert(m_layers.begin() + index, std::move(layer));
+    return index;
+}
+
 std::unique_ptr<Layer> LayerStack::takeLayer(int index)
 {
     if (index < 0 || index >= count())

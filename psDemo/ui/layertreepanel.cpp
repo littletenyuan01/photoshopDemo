@@ -6,18 +6,11 @@
 #include "domain/selection.h"
 
 #include <QEvent>
-#include <QIcon>
-#include <QListView>
-#include <QListWidget>
 #include <QListWidgetItem>
+#include <QMenu>
 #include <QMouseEvent>
 #include <QSignalBlocker>
-#include <QSize>
-#include <QSlider>
-#include <QStyle>
-#include <QStyleOptionViewItem>
 #include <QTimer>
-#include <QToolButton>
 
 #include <cmath>
 
@@ -86,6 +79,35 @@ LayerTreePanel::LayerTreePanel(QWidget *parent)
 
     // Ctrl+点缩略图：alpha → 选区（对齐 PS；GIMP 同类操作为 Alt+点预览）
     ui->itemList->viewport()->installEventFilter(this);
+
+    // Action 文案/灰显在 .ui；QMenu 壳在此组装（uic 无法在带 layout 窗体里嵌 QMenu）
+    buildLayerContextMenu();
+    connect(ui->itemList, &QWidget::customContextMenuRequested,
+            this, &LayerTreePanel::onLayerContextMenu);
+    connect(ui->actionCtxNewLayer, &QAction::triggered,
+            this, &LayerTreePanel::onBtnNewClicked);
+    connect(ui->actionCtxDuplicateLayer, &QAction::triggered, this, [this]() {
+        Ps::ImageDocument *d = document();
+        if (!d || d->activeLayerIndex() < 0)
+            return;
+        d->duplicateLayer(d->activeLayerIndex());
+    });
+    connect(ui->actionCtxDeleteLayer, &QAction::triggered,
+            this, &LayerTreePanel::onBtnDeleteClicked);
+    connect(ui->actionCtxRenameLayer, &QAction::triggered, this, [this]() {
+        if (QListWidgetItem *it = ui->itemList->currentItem())
+            ui->itemList->editItem(it);
+    });
+    connect(ui->actionCtxToggleVisible, &QAction::triggered, this, [this]() {
+        Ps::ImageDocument *d = document();
+        if (!d)
+            return;
+        const int i = d->activeLayerIndex();
+        Ps::Layer *L = d->activeLayer();
+        if (!L)
+            return;
+        d->setLayerVisible(i, !L->isVisible());
+    });
 }
 
 LayerTreePanel::~LayerTreePanel()
@@ -362,6 +384,87 @@ bool LayerTreePanel::tryAlphaToSelectionClick(QMouseEvent *mouse)
     m_alphaSelectSourceLayer = (op == Ps::ChannelOp::Replace) ? stackIndex : -1;
     doc->setActiveLayerIndex(stackIndex);
     return true;
+}
+
+void LayerTreePanel::buildLayerContextMenu()
+{
+    // 【对照】PS 图层面板右键；条目 Action 在 .ui，此处只排版结构
+    m_layerContextMenu = new QMenu(this);
+    m_layerContextMenu->addAction(ui->actionCtxNewLayer);
+    m_layerContextMenu->addAction(ui->actionCtxNewGroup);
+    m_layerContextMenu->addAction(ui->actionCtxDuplicateLayer);
+    m_layerContextMenu->addAction(ui->actionCtxDeleteLayer);
+    m_layerContextMenu->addSeparator();
+    m_layerContextMenu->addAction(ui->actionCtxQuickExportPng);
+    m_layerContextMenu->addAction(ui->actionCtxExportAs);
+    m_layerContextMenu->addSeparator();
+    m_layerContextMenu->addAction(ui->actionCtxMergeDown);
+    m_layerContextMenu->addAction(ui->actionCtxMergeVisible);
+    m_layerContextMenu->addAction(ui->actionCtxFlattenImage);
+    m_layerContextMenu->addSeparator();
+    m_layerContextMenu->addAction(ui->actionCtxLockLayer);
+    m_layerContextMenu->addAction(ui->actionCtxRenameLayer);
+    m_layerContextMenu->addAction(ui->actionCtxToggleVisible);
+    m_layerContextMenu->addSeparator();
+    m_layerContextMenu->addAction(ui->actionCtxBlendingOptions);
+    m_layerContextMenu->addSeparator();
+    m_layerContextMenu->addAction(ui->actionCtxNewGroupFromLayers);
+    m_layerContextMenu->addAction(ui->actionCtxFrameFromLayer);
+    m_layerContextMenu->addSeparator();
+    m_layerContextMenu->addAction(ui->actionCtxNewArtboard);
+    m_layerContextMenu->addAction(ui->actionCtxArtboardFromLayers);
+    m_layerContextMenu->addSeparator();
+    m_layerContextMenu->addAction(ui->actionCtxConvertSmartObject);
+    m_layerContextMenu->addAction(ui->actionCtxMaskAllObjects);
+    m_layerContextMenu->addSeparator();
+    m_layerContextMenu->addAction(ui->actionCtxClippingMask);
+    m_layerContextMenu->addAction(ui->actionCtxCopyCss);
+    m_layerContextMenu->addAction(ui->actionCtxCopySvg);
+    m_layerContextMenu->addSeparator();
+    QMenu *colorMenu = m_layerContextMenu->addMenu(tr("颜色"));
+    colorMenu->addAction(ui->actionCtxColorNone);
+    colorMenu->addAction(ui->actionCtxColorRed);
+    colorMenu->addAction(ui->actionCtxColorOrange);
+    colorMenu->addAction(ui->actionCtxColorYellow);
+    colorMenu->addAction(ui->actionCtxColorGreen);
+    colorMenu->addAction(ui->actionCtxColorBlue);
+    colorMenu->addAction(ui->actionCtxColorViolet);
+    colorMenu->addAction(ui->actionCtxColorGray);
+}
+
+void LayerTreePanel::onLayerContextMenu(const QPoint &pos)
+{
+    // 【对照】PS 图层面板右键；GIMP layers-actions + item tree view popup
+    Ps::ImageDocument *doc = document();
+    if (!doc || !m_layerContextMenu)
+        return;
+
+    QListWidgetItem *item = ui->itemList->itemAt(pos);
+    if (item) {
+        const int stackIndex = item->data(Qt::UserRole).toInt();
+        if (stackIndex >= 0)
+            doc->setActiveLayerIndex(stackIndex);
+    }
+
+    syncLayerContextMenuState();
+    m_layerContextMenu->exec(ui->itemList->viewport()->mapToGlobal(pos));
+}
+
+void LayerTreePanel::syncLayerContextMenuState()
+{
+    Ps::ImageDocument *doc = document();
+    Ps::Layer *layer = doc ? doc->activeLayer() : nullptr;
+    const bool hasLayer = layer != nullptr;
+    const bool canDelete = hasLayer && doc->layers().count() > 1;
+
+    ui->actionCtxDuplicateLayer->setEnabled(hasLayer);
+    ui->actionCtxDeleteLayer->setEnabled(canDelete);
+    ui->actionCtxRenameLayer->setEnabled(hasLayer);
+    ui->actionCtxToggleVisible->setEnabled(hasLayer);
+    if (layer) {
+        ui->actionCtxToggleVisible->setText(
+            layer->isVisible() ? tr("隐藏图层") : tr("显示图层"));
+    }
 }
 
 // —— 私有工具 ——

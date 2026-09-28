@@ -65,6 +65,7 @@ void MainWindow::setupMenus()
     connect(ui->actionCanvasSize, &QAction::triggered, this, &MainWindow::onCanvasSize);
 
     connect(ui->actionLayerNew, &QAction::triggered, this, &MainWindow::onNewLayer);
+    connect(ui->actionLayerDuplicate, &QAction::triggered, this, &MainWindow::onDuplicateLayer);
 
     // —— 选择（矩形选区已实现：全选 / 取消 / 反选）——
     ui->actionSelectAll->setEnabled(true);
@@ -258,6 +259,27 @@ void MainWindow::onNewLayer()
     const Ps::Layer *layer = doc->layers().layerAt(index);
     statusBar()->showMessage(
         tr("已新建：%1").arg(layer ? layer->name() : tr("图层")), 3000);
+}
+
+void MainWindow::onDuplicateLayer()
+{
+    // 【功能】图层→复制图层；对照 GIMP layers-duplicate / 图层面板右键
+    Ps::ImageDocument *doc = m_session ? m_session->document() : nullptr;
+    if (!doc) {
+        QMessageBox::information(this, tr("复制图层"), tr("当前没有打开的文档。"));
+        return;
+    }
+    const int src = doc->activeLayerIndex();
+    if (src < 0) {
+        QMessageBox::information(this, tr("复制图层"), tr("请先选中一个图层。"));
+        return;
+    }
+    const int index = doc->duplicateLayer(src);
+    if (index < 0)
+        return;
+    const Ps::Layer *layer = doc->layers().layerAt(index);
+    statusBar()->showMessage(
+        tr("已复制：%1").arg(layer ? layer->name() : tr("图层")), 3000);
 }
 
 void MainWindow::onImageSize()

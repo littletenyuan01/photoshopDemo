@@ -495,6 +495,9 @@ QToolButton:disabled { color: #666; }</string>
           <height>40</height>
          </size>
         </property>
+     <property name="contextMenuPolicy">
+      <enum>Qt::ContextMenuPolicy::CustomContextMenu</enum>
+     </property>
      <property name="selectionMode">
       <enum>QAbstractItemView::SelectionMode::SingleSelection</enum>
      </property>
@@ -742,6 +745,309 @@ QToolButton:disabled { color: #666; }</string>
     </widget>
    </item>
   </layout>
+  <action name="actionCtxNewLayer">
+  <property name="text">
+   <string>新建图层...</string>
+  </property>
+  <property name="shortcut">
+   <string>Ctrl+Shift+N</string>
+  </property>
+ </action>
+ <action name="actionCtxNewGroup">
+  <property name="enabled">
+   <bool>false</bool>
+  </property>
+  <property name="text">
+   <string>新建组...</string>
+  </property>
+  <property name="toolTip">
+   <string>尚未接入</string>
+  </property>
+ </action>
+ <action name="actionCtxDuplicateLayer">
+  <property name="text">
+   <string>复制图层...</string>
+  </property>
+ </action>
+ <action name="actionCtxDeleteLayer">
+  <property name="text">
+   <string>删除图层</string>
+  </property>
+ </action>
+ <action name="actionCtxQuickExportPng">
+  <property name="enabled">
+   <bool>false</bool>
+  </property>
+  <property name="text">
+   <string>快速导出为 PNG</string>
+  </property>
+  <property name="toolTip">
+   <string>尚未接入</string>
+  </property>
+ </action>
+ <action name="actionCtxExportAs">
+  <property name="enabled">
+   <bool>false</bool>
+  </property>
+  <property name="text">
+   <string>导出为...</string>
+  </property>
+  <property name="toolTip">
+   <string>尚未接入</string>
+  </property>
+ </action>
+ <action name="actionCtxMergeDown">
+  <property name="enabled">
+   <bool>false</bool>
+  </property>
+  <property name="text">
+   <string>向下合并</string>
+  </property>
+  <property name="toolTip">
+   <string>尚未接入</string>
+  </property>
+ </action>
+ <action name="actionCtxMergeVisible">
+  <property name="enabled">
+   <bool>false</bool>
+  </property>
+  <property name="text">
+   <string>合并可见图层</string>
+  </property>
+  <property name="toolTip">
+   <string>尚未接入</string>
+  </property>
+ </action>
+ <action name="actionCtxFlattenImage">
+  <property name="enabled">
+   <bool>false</bool>
+  </property>
+  <property name="text">
+   <string>拼合图像</string>
+  </property>
+  <property name="toolTip">
+   <string>尚未接入</string>
+  </property>
+ </action>
+ <action name="actionCtxLockLayer">
+  <property name="enabled">
+   <bool>false</bool>
+  </property>
+  <property name="text">
+   <string>锁定图层...</string>
+  </property>
+  <property name="toolTip">
+   <string>尚未接入</string>
+  </property>
+ </action>
+ <action name="actionCtxRenameLayer">
+  <property name="text">
+   <string>重命名图层...</string>
+  </property>
+ </action>
+ <action name="actionCtxToggleVisible">
+  <property name="text">
+   <string>隐藏图层</string>
+  </property>
+ </action>
+ <action name="actionCtxBlendingOptions">
+  <property name="enabled">
+   <bool>false</bool>
+  </property>
+  <property name="text">
+   <string>混合选项...</string>
+  </property>
+  <property name="toolTip">
+   <string>尚未接入</string>
+  </property>
+ </action>
+ <action name="actionCtxNewGroupFromLayers">
+  <property name="enabled">
+   <bool>false</bool>
+  </property>
+  <property name="text">
+   <string>从图层新建组...</string>
+  </property>
+  <property name="toolTip">
+   <string>尚未接入</string>
+  </property>
+ </action>
+ <action name="actionCtxFrameFromLayer">
+  <property name="enabled">
+   <bool>false</bool>
+  </property>
+  <property name="text">
+   <string>来自图层的画框...</string>
+  </property>
+  <property name="toolTip">
+   <string>尚未接入</string>
+  </property>
+ </action>
+ <action name="actionCtxNewArtboard">
+  <property name="enabled">
+   <bool>false</bool>
+  </property>
+  <property name="text">
+   <string>新建画板...</string>
+  </property>
+  <property name="toolTip">
+   <string>尚未接入</string>
+  </property>
+ </action>
+ <action name="actionCtxArtboardFromLayers">
+  <property name="enabled">
+   <bool>false</bool>
+  </property>
+  <property name="text">
+   <string>来自图层的画板...</string>
+  </property>
+  <property name="toolTip">
+   <string>尚未接入</string>
+  </property>
+ </action>
+ <action name="actionCtxConvertSmartObject">
+  <property name="enabled">
+   <bool>false</bool>
+  </property>
+  <property name="text">
+   <string>转换为智能对象</string>
+  </property>
+  <property name="toolTip">
+   <string>尚未接入</string>
+  </property>
+ </action>
+ <action name="actionCtxMaskAllObjects">
+  <property name="enabled">
+   <bool>false</bool>
+  </property>
+  <property name="text">
+   <string>遮住所有对象</string>
+  </property>
+  <property name="toolTip">
+   <string>尚未接入</string>
+  </property>
+ </action>
+ <action name="actionCtxClippingMask">
+  <property name="enabled">
+   <bool>false</bool>
+  </property>
+  <property name="text">
+   <string>创建剪贴蒙版</string>
+  </property>
+  <property name="toolTip">
+   <string>尚未接入</string>
+  </property>
+ </action>
+ <action name="actionCtxCopyCss">
+  <property name="enabled">
+   <bool>false</bool>
+  </property>
+  <property name="text">
+   <string>复制 CSS</string>
+  </property>
+  <property name="toolTip">
+   <string>尚未接入</string>
+  </property>
+ </action>
+ <action name="actionCtxCopySvg">
+  <property name="enabled">
+   <bool>false</bool>
+  </property>
+  <property name="text">
+   <string>复制 SVG</string>
+  </property>
+  <property name="toolTip">
+   <string>尚未接入</string>
+  </property>
+ </action>
+ <action name="actionCtxColorNone">
+  <property name="enabled">
+   <bool>false</bool>
+  </property>
+  <property name="text">
+   <string>无</string>
+  </property>
+  <property name="toolTip">
+   <string>尚未接入</string>
+  </property>
+ </action>
+ <action name="actionCtxColorRed">
+  <property name="enabled">
+   <bool>false</bool>
+  </property>
+  <property name="text">
+   <string>红</string>
+  </property>
+  <property name="toolTip">
+   <string>尚未接入</string>
+  </property>
+ </action>
+ <action name="actionCtxColorOrange">
+  <property name="enabled">
+   <bool>false</bool>
+  </property>
+  <property name="text">
+   <string>橙</string>
+  </property>
+  <property name="toolTip">
+   <string>尚未接入</string>
+  </property>
+ </action>
+ <action name="actionCtxColorYellow">
+  <property name="enabled">
+   <bool>false</bool>
+  </property>
+  <property name="text">
+   <string>黄</string>
+  </property>
+  <property name="toolTip">
+   <string>尚未接入</string>
+  </property>
+ </action>
+ <action name="actionCtxColorGreen">
+  <property name="enabled">
+   <bool>false</bool>
+  </property>
+  <property name="text">
+   <string>绿</string>
+  </property>
+  <property name="toolTip">
+   <string>尚未接入</string>
+  </property>
+ </action>
+ <action name="actionCtxColorBlue">
+  <property name="enabled">
+   <bool>false</bool>
+  </property>
+  <property name="text">
+   <string>蓝</string>
+  </property>
+  <property name="toolTip">
+   <string>尚未接入</string>
+  </property>
+ </action>
+ <action name="actionCtxColorViolet">
+  <property name="enabled">
+   <bool>false</bool>
+  </property>
+  <property name="text">
+   <string>紫</string>
+  </property>
+  <property name="toolTip">
+   <string>尚未接入</string>
+  </property>
+ </action>
+ <action name="actionCtxColorGray">
+  <property name="enabled">
+   <bool>false</bool>
+  </property>
+  <property name="text">
+   <string>灰</string>
+  </property>
+  <property name="toolTip">
+   <string>尚未接入</string>
+  </property>
+ </action>
  </widget>
  <resources>
   <include location="../resources.qrc"/>

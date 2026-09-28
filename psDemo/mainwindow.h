@@ -68,6 +68,7 @@ private slots:
     void onNewDocument();
     void onOpenDocument();
     void onNewLayer();
+    void onDuplicateLayer();
     void onImageSize();
     void onCanvasSize();
     void onShowHomeScreen();

@@ -48,7 +48,7 @@
 | `domain/tilebuffer.h/.cpp` | 64×64 瓦片；新建层统一 `Layer(extent)`，透明不分配、fill/画笔才 `ensureTile` |
 | `domain/layerstack.h/.cpp` | 图层列表（`std::vector<unique_ptr>`） |
 | `domain/selection.h/.cpp` | **文档级选区 mask**（对照 `GimpSelection`）；`ChannelOp` 加/减/替/交 |
-| `domain/imagedocument.h/.cpp` | 文档：尺寸、栈、活动层、**选区**、分级信号 + 语义化 setter + 累计脏区 |
+| `domain/imagedocument.h/.cpp` | 文档：尺寸、栈、活动层、**选区**、**duplicateLayer**、分级信号 + 语义化 setter + 累计脏区 |
 
 **要点**：`ImageDocument` 的信号**刻意分级**，让订阅方增量更新而不是整表重建 ——
 `pixelsChanged(QRect)` / `layerPropertiesChanged(int)` / `structureChanged()` /
@@ -74,7 +74,7 @@ UI 不得直接改 `Layer`，一律走 `setLayerVisible/Opacity/Name/BlendMode` 
 | `ui/canvasdocstatusbar.ui/.h/.cpp` | 缩放% + 文档信息 + 显示菜单（PS 底栏左侧） |
 | `ui/rulerwidget.h/.cpp` | 像素标尺自绘（外层由 workspace.ui 排布） |
 | `ui/itemtreepanel.h/.cpp` | Item 树面板基类；提供 `applyToolbarIcon` 等共用能力，以及**缩略图生成**（`makeLayerThumbnail` / `makeChannelThumbnail`、`ThumbChannel`） |
-| `ui/layertreepanel.ui/.h/.cpp` | 图层树：列表/**缩略图**/显隐/透明度/增删排序；**增量更新 + 缩略图防抖 + 滑条两段提交** |
+| `ui/layertreepanel.ui/.h/.cpp` | 图层树：列表/**缩略图**/显隐/透明度/增删/**复制**/右键菜单（PS 项占位）；**增量更新 + 缩略图防抖 + 滑条两段提交** |
 | `ui/channeltreepanel.*` / `ui/pathtreepanel.*` | 通道树（**缩略图由合成图推算**，无 domain）/ 路径树（无 domain，无缩略图） |
 | `ui/dockpanel.h/.cpp` | 右侧三 Tab 停靠壳（图层/通道/路径）；**`.ui` 文件仍名为 `layerpanel.ui`**（类为 `DockPanel`）；订阅 session 后转发给三个树 |
 | `ui/colorspanel.ui/.h/.cpp` | 颜色/色板/渐变/图案（对齐 PS 四页）；组内色块/方缩略图网格 |

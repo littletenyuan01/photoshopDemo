@@ -42,6 +42,11 @@ private:
 
     /** 追加到栈顶（最上层），返回新层下标。 */
     int addLayer(std::unique_ptr<Layer> layer);
+    /**
+     * 插入到指定下标（0=最底 … count=栈顶之后）。
+     * @return 实际插入下标；越界会钳到 [0, count]
+     */
+    int insertLayer(int index, std::unique_ptr<Layer> layer);
     /** 取出并移除；调用方获得所有权。越界返回 nullptr。 */
     std::unique_ptr<Layer> takeLayer(int index);
     /** 重新排序。目前无人调用，等「上移/下移」接线时用。 */

@@ -10,9 +10,16 @@ CanvasDocStatusBar::CanvasDocStatusBar(QWidget *parent)
     , ui(new Ui::CanvasDocStatusBar)
 {
     ui->setupUi(this);
-    setupInfoMenu();
-    // 只接 editingFinished：回车与失焦都会发它。
-    // 早先还接了 returnPressed，回车时两者都发 → zoomCommitted 发两次、setZoom 跑两遍。
+    // Action 文案在 .ui；QMenu 不能嵌进带 layout 的 .ui（uic Error 1），故在此挂到按钮
+    auto *menu = new QMenu(ui->infoMenuButton);
+    menu->addAction(ui->actionInfoDocSize);
+    menu->addAction(ui->actionInfoPixelSize);
+    ui->infoMenuButton->setMenu(menu);
+
+    connect(ui->actionInfoDocSize, &QAction::triggered,
+            this, &CanvasDocStatusBar::onShowDocumentSize);
+    connect(ui->actionInfoPixelSize, &QAction::triggered,
+            this, &CanvasDocStatusBar::onShowPixelSize);
     connect(ui->zoomEdit, &QLineEdit::editingFinished,
             this, &CanvasDocStatusBar::onZoomEditingFinished);
     setZoomFactor(1.0);
@@ -24,20 +31,9 @@ CanvasDocStatusBar::~CanvasDocStatusBar()
     delete ui;
 }
 
-void CanvasDocStatusBar::setupInfoMenu()
-{
-    auto *menu = new QMenu(this);
-    QAction *docAct = menu->addAction(tr("文档大小"));
-    QAction *pxAct = menu->addAction(tr("文档大小（像素）"));
-    connect(docAct, &QAction::triggered, this, &CanvasDocStatusBar::onShowDocumentSize);
-    connect(pxAct, &QAction::triggered, this, &CanvasDocStatusBar::onShowPixelSize);
-    ui->infoMenuButton->setMenu(menu);
-}
-
 void CanvasDocStatusBar::setZoomFactor(qreal zoom)
 {
     m_updatingZoomText = true;
-    // 对齐 PS：常见为两位小数百分比，整百则可不写多余 0
     const qreal percent = zoom * 100.0;
     QString text;
     if (qFuzzyCompare(percent, qRound(percent)))
@@ -64,10 +60,8 @@ void CanvasDocStatusBar::onZoomEditingFinished()
     t.replace(QLatin1Char(','), QLatin1Char('.'));
     bool ok = false;
     const qreal percent = t.toDouble(&ok);
-    if (!ok || percent <= 0.0) {
-        // 非法输入：恢复为当前不触发 commit（由外部下次 sync）
+    if (!ok || percent <= 0.0)
         return;
-    }
     emit zoomCommitted(percent / 100.0);
 }
 
@@ -92,18 +86,16 @@ void CanvasDocStatusBar::refreshDocInfo()
 
     const int w = m_document->width();
     const int h = m_document->height();
-
     if (m_infoMode == InfoMode::PixelSize) {
         ui->docInfoLabel->setText(tr("%1 × %2 像素").arg(w).arg(h));
         return;
     }
 
-    // 像素 → 厘米：cm = px / ppi * 2.54（显示用，文档模型暂无独立分辨率字段）
-    const qreal cmW = w / m_displayPpi * 2.54;
-    const qreal cmH = h / m_displayPpi * 2.54;
+    const qreal inchW = w / m_displayPpi;
+    const qreal inchH = h / m_displayPpi;
     ui->docInfoLabel->setText(
-        tr("%1 厘米 × %2 厘米 (%3 ppi)")
-            .arg(cmW, 0, 'f', 2)
-            .arg(cmH, 0, 'f', 2)
+        tr("%1 × %2 英寸 (%3 PPI)")
+            .arg(inchW, 0, 'f', 2)
+            .arg(inchH, 0, 'f', 2)
             .arg(qRound(m_displayPpi)));
 }

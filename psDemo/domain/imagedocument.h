@@ -133,6 +133,12 @@ public:
 
     /** 在栈顶新增透明层，设为活动层。返回新层下标。 */
     int addTransparentLayer(const QString &name = QString());
+    /**
+     * 复制图层（对照 GIMP `layers-duplicate` / `gimp_item_duplicate` + `gimp_image_add_layer`）。
+     * 深拷贝像素与属性，插入到源层上方（栈下标 +1），并设为活动层。
+     * @return 新层下标；失败 -1
+     */
+    int duplicateLayer(int index);
     /** 删除指定层；至少保留一层。删除后修正活动层下标。 */
     bool removeLayer(int index);
 
