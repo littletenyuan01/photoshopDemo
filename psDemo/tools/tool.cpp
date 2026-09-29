@@ -33,6 +33,23 @@ bool Tool::mouseRelease(const ToolEvent &event, const ToolContext &ctx, ViewPort
     return false;
 }
 
+bool Tool::keyPress(int key, Qt::KeyboardModifiers modifiers,
+                    const ToolContext &ctx, ViewPort &view)
+{
+    Q_UNUSED(key)
+    Q_UNUSED(modifiers)
+    Q_UNUSED(ctx)
+    Q_UNUSED(view)
+    return false;
+}
+
+bool Tool::wantsShortcutOverride(int key, Qt::KeyboardModifiers modifiers) const
+{
+    Q_UNUSED(key)
+    Q_UNUSED(modifiers)
+    return false;
+}
+
 void Tool::deactivate(const ToolContext &ctx, ViewPort &view)
 {
     Q_UNUSED(ctx)

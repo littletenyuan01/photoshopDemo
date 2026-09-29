@@ -37,6 +37,7 @@ SOURCES += \
     engine/op/gradientop.cpp \
     engine/op/stampdabop.cpp \
     engine/op/solidfillop.cpp \
+    engine/op/selectpolygonop.cpp \
     engine/op/opregistry.cpp \
     engine/op/oprunner.cpp \
     engine/op/opsinit.cpp \
@@ -51,6 +52,8 @@ SOURCES += \
     tools/paintbuckettool.cpp \
     tools/gradienttool.cpp \
     tools/marqueeselecttool.cpp \
+    tools/lassotool.cpp \
+    tools/polygonallassotool.cpp \
     ui/canvasview.cpp \
     ui/canvasworkspace.cpp \
     ui/canvasdocstatusbar.cpp \
@@ -106,6 +109,7 @@ HEADERS += \
     engine/op/gradientop.h \
     engine/op/stampdabop.h \
     engine/op/solidfillop.h \
+    engine/op/selectpolygonop.h \
     engine/op/oppad.h \
     engine/op/opregistry.h \
     engine/op/oprunner.h \
@@ -125,6 +129,8 @@ HEADERS += \
     tools/paintbuckettool.h \
     tools/gradienttool.h \
     tools/marqueeselecttool.h \
+    tools/lassotool.h \
+    tools/polygonallassotool.h \
     ui/canvasview.h \
     ui/canvasworkspace.h \
     ui/canvasdocstatusbar.h \

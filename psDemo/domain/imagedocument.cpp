@@ -301,6 +301,13 @@ void ImageDocument::selectEllipse(const QRect &rect, ChannelOp op)
     emit selectionChanged();
 }
 
+void ImageDocument::selectPolygon(const QPolygonF &points, ChannelOp op)
+{
+    // 经 OpRunner → SelectPolygonOp（对照 gimp_channel_select_polygon）
+    PaintEngine::selectPolygon(m_selection, points, op);
+    emit selectionChanged();
+}
+
 void ImageDocument::selectLayerAlpha(int layerIndex, ChannelOp op)
 {
     Layer *layer = m_layers.layerAt(layerIndex);

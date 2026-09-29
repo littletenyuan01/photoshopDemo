@@ -66,6 +66,11 @@ public:
     bool dispatchPress(const ToolEvent &event, const ToolContext &ctx, ViewPort &view);
     bool dispatchMove(const ToolEvent &event, const ToolContext &ctx, ViewPort &view);
     bool dispatchRelease(const ToolEvent &event, const ToolContext &ctx, ViewPort &view);
+    /** 键盘分发（对照 GimpToolManager 转发 key_press）。 */
+    bool dispatchKeyPress(int key, Qt::KeyboardModifiers modifiers,
+                          const ToolContext &ctx, ViewPort &view);
+    /** 活动工具是否要拦截菜单快捷键（ShortcutOverride）。 */
+    bool wantsShortcutOverride(int key, Qt::KeyboardModifiers modifiers) const;
 
     /** 当前活动工具的光标。 */
     QCursor activeCursor() const;

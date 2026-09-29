@@ -21,6 +21,7 @@ enum class OpName {
     FloodFill,              ///< 油漆桶洪泛
     Gradient,               ///< 渐变填充
     SolidFill,              ///< 实色/透明填充
+    SelectPolygon,          ///< 多边形/套索写入选区 mask
     LayerMode,              ///< 图层混合色（点算子）
     BrightnessContrast,     ///< 亮度/对比度滤镜
     Count                   ///< 哨兵，勿当作真实算子

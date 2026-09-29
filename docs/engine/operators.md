@@ -12,7 +12,8 @@
 ## 0. 一句话
 
 **注册表只存工厂；调度时按 `OpName` 取一个常驻实例，把本次参数写进去，跑
-`prepare → process → finish`；算子直接读写 `TileBuffer` 的瓦片并返回层内坐标脏矩形。**
+`prepare → process → finish`。绘制算子读写 `TileBuffer` 并返回层内脏矩形；
+选区算子（`SelectPolygonOp`）写 `Selection` mask，返回文档坐标影响区。**
 
 ---
 
@@ -22,13 +23,13 @@
 
 | | 路径 A：缓冲算子 | 路径 B：点算子 |
 |---|---|---|
-| 成员 | `StampDabOp` / `FloodFillOp` / `GradientOp` / `SolidFillOp` | `LayerModeOp` |
+| 成员 | `StampDabOp` / `FloodFillOp` / `GradientOp` / `SolidFillOp` / **`SelectPolygonOp`** | `LayerModeOp` |
 | 基类 | `BufferOp`（有 `prepare`/`process`/`finish` 虚函数） | `PointOp`（**无任何虚函数**） |
 | 触发者 | **用户输入**（鼠标 / 菜单） | **重绘**（`contentChanged` → 重投影） |
 | 调度器 | `OpRunner::run(OpName, OpContext&, Configure)` | `PointOpRegistry::instance(OpName)` 后直接调 |
 | 生命周期 | `configure → prepare → process → finish` | **无**，就是一个参数化函数对象 |
-| 入参 | `OpContext`（`tiles` + `clip` + `roi`） | 函数实参 `backdrop[3]` / `source[3]` / `comp[3]` |
-| 出参 | `QRect` 层内坐标脏矩形 | 就地写 `comp[3]`，无返回 |
+| 入参 | `OpContext`（`tiles` 和/或 `selection` + `clip` + `roi`） | 函数实参 `backdrop[3]` / `source[3]` / `comp[3]` |
+| 出参 | `QRect`：绘制→层内脏矩形；选区→文档坐标影响区 | 就地写 `comp[3]`，无返回 |
 | 上下文 / pad / 脏区 | 有 | 全都没有 |
 
 > 路径 B 之所以这么轻，是因为 `pointop.h` 里的 `PointOp` 是**空壳**（连 `process` 虚函数都没有）。
@@ -37,10 +38,8 @@
 两条路径在时间上的关系：
 
 ```
-用户操作 ──► 路径 A（改像素，返回脏区）──► markDirty ──► contentChanged
-                                                            │
-                                                            ▼
-                                            路径 B（重投影：合成整图/脏区）
+用户绘制 ──► 路径 A（改像素）──► markDirty ──► contentChanged ──► 路径 B 重投影
+用户套索 ──► 路径 A（SelectPolygon 改 mask）──► selectionChanged ──► 蚂蚁线（不重投影）
 ```
 
 ---
@@ -52,7 +51,7 @@
 Ps::opsInit();
 ```
 
-`opsInit()`（`opsinit.cpp`）做 5 次 `add`：
+`opsInit()`（`opsinit.cpp`）做多次 `add`：
 
 ```cpp
 OpRegistry::add({
@@ -61,13 +60,18 @@ OpRegistry::add({
     [] { return std::unique_ptr<BufferOp>(new FloodFillOp); },   // ← 工厂 lambda，不是对象
 });
 ...
+OpRegistry::add({
+    OpName::SelectPolygon,
+    {OpPad::Selection},
+    [] { return std::unique_ptr<BufferOp>(new SelectPolygonOp); },
+});
 PointOpRegistry::add({ OpName::LayerMode,
                        [] { return std::unique_ptr<PointOp>(new LayerModeOp); } });
 ```
 
 `OpRegistry::add` 只是往一个函数内静态 `QHash<int, OpRegistration>` 里插一条。
 
-**此刻进程里一个算子对象都没有**，只有 5 个工厂 lambda + 5 份 pad 声明。构造推迟到第一次调度。
+**此刻进程里一个算子对象都没有**，只有工厂 lambda + pad 声明。构造推迟到第一次调度。
 
 | 注册项 | pad | 工厂 |
 |--------|-----|------|
@@ -75,23 +79,26 @@ PointOpRegistry::add({ OpName::LayerMode,
 | `OpName::FloodFill` | `{Tiles}` | `new FloodFillOp` |
 | `OpName::Gradient` | `{Tiles}` | `new GradientOp` |
 | `OpName::SolidFill` | `{Tiles}` | `new SolidFillOp` |
+| `OpName::SelectPolygon` | `{Selection}` | `new SelectPolygonOp` |
 | `OpName::LayerMode` | —（点算子无 pad） | `new LayerModeOp` |
 
 ---
 
 ## 3. 路径 A：缓冲算子（输入驱动）
 
-### 3.1 四个入口
+### 3.1 入口一览
 
 | 操作 | 入口 | 最终调用 |
 |------|------|----------|
 | 画笔 / 橡皮 | `PaintTool::mousePress` / `mouseMove` | `PaintEngine::stampDab` / `strokeSegment` |
 | 油漆桶 | `PaintBucketTool::mousePress` | `PaintEngine::floodFill` |
 | 渐变 | `GradientTool::mouseRelease` | `PaintEngine::fillGradient` |
-| 编辑→填充 / 清除 | `MainWindow::onFill` / `onClear` → `ImageDocument::fillActiveLayer` / `clearActiveLayerPixels` | `PaintEngine::solidFill` |
+| 编辑→填充 / 清除 | `MainWindow::onFill` / `onClear` → `ImageDocument::…` | `PaintEngine::solidFill` |
+| **自由套索** | `LassoTool::mouseRelease` → `ImageDocument::selectPolygon` | `PaintEngine::selectPolygon` |
+| **多边形套索** | `PolygonalLassoTool`（双击/Enter/点起点）→ 同上 | `PaintEngine::selectPolygon` |
 
-`PaintEngine` 是**门面**：四个函数形状几乎一样，都是「组装 `OpContext` → 给 `OpRunner` 一个
-`Configure` lambda」：
+`PaintEngine` 是**门面**：绘制入口组装 `OpContext::fromTiles`；选区入口组装
+`OpContext::fromSelection`，再交给 `OpRunner` 一个 `Configure` lambda：
 
 ```cpp
 QRect PaintEngine::floodFill(TileBuffer &tiles, const QPoint &seed, const QColor &fillColor,
@@ -104,6 +111,20 @@ QRect PaintEngine::floodFill(TileBuffer &tiles, const QPoint &seed, const QColor
         op.setFillColor(fillColor);
         op.setTolerance(tolerance);
         op.setContiguous(contiguous);
+    });
+}
+```
+
+套索对照（`gimp_channel_select_polygon`）：
+
+```cpp
+QRect PaintEngine::selectPolygon(Selection &selection, const QPolygonF &points, ChannelOp op)
+{
+    OpContext ctx = OpContext::fromSelection(selection);
+    return OpRunner::run(OpName::SelectPolygon, ctx, [&](BufferOp &base) {
+        auto &selOp = static_cast<SelectPolygonOp &>(base);
+        selOp.setPoints(points);
+        selOp.setChannelOp(op);
     });
 }
 ```

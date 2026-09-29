@@ -38,6 +38,8 @@
 | `tools/paintbuckettool.h/.cpp` | 油漆桶 |
 | `tools/gradienttool.h/.cpp` | 渐变 |
 | `tools/marqueeselecttool.h/.cpp` | **矩形/椭圆选框**：拖拽写入 `Selection`；Shift/Ctrl 加减交 |
+| `tools/lassotool.h/.cpp` | **自由套索**：拖拽折线 → `selectPolygon` → `SelectPolygonOp` |
+| `tools/polygonallassotool.h/.cpp` | **多边形套索**：单击顶点 / 双击·Enter 闭合；共用 `SelectPolygonOp` |
 
 **要点**：新增工具 = 加一个类 + 在 `ToolManager` 注册一行，**`CanvasView` 与 `MainWindow` 均无需改动**。
 视图变换由画布实现 `ViewPort` 提供，**锚点缩放数学只存在于 `CanvasView::zoomAt` 一处**。
@@ -72,6 +74,7 @@ UI 不得直接改 `Layer`，一律走 `setLayerVisible/Opacity/Name/BlendMode` 
 | `engine/op/gradientop.*` | 渐变填充算子（形状用共享 `GradientType`） |
 | `engine/op/stampdabop.*` | 圆形 dab（画笔/橡皮）；模式用共享 `PaintMode` |
 | `engine/op/solidfillop.*` | 实色/透明填充（清除、Shift+F5） |
+| `engine/op/selectpolygonop.*` | 多边形写入选区（套索；`OpPad::Selection`） |
 | `engine/op/opname.*` | `OpName` 枚举 + id/title 名字表 |
 | `engine/paintselectionclip.h` | 选区裁剪参数（算子与 PaintEngine 共用） |
 | `engine/painttypes.h` | `PaintMode` / `GradientType`（UI/tools/ops 共用） |

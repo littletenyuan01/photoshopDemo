@@ -65,6 +65,18 @@ public:
     virtual bool mousePress(const ToolEvent &event, const ToolContext &ctx, ViewPort &view) = 0;
     virtual bool mouseMove(const ToolEvent &event, const ToolContext &ctx, ViewPort &view);
     virtual bool mouseRelease(const ToolEvent &event, const ToolContext &ctx, ViewPort &view);
+    /**
+     * 键盘按下（对照 GimpTool::key_press）。
+     * 默认不消费；多边形套索用 Enter 闭合 / Esc 取消 / Backspace 撤点。
+     */
+    virtual bool keyPress(int key, Qt::KeyboardModifiers modifiers,
+                          const ToolContext &ctx, ViewPort &view);
+
+    /**
+     * 是否要从菜单快捷键手中抢走该键（QEvent::ShortcutOverride）。
+     * 多边形套索编辑中需拦截 Delete，否则会触发「编辑→清除」。
+     */
+    virtual bool wantsShortcutOverride(int key, Qt::KeyboardModifiers modifiers) const;
 
     /** 工具被切走时调用（清理拖拽中间态）。 */
     virtual void deactivate(const ToolContext &ctx, ViewPort &view);

@@ -15,14 +15,14 @@ namespace Ps {
 
 namespace {
 
-/** 检查单个 pad 是否满足（Selection pad 目前恒 true）。 */
+/** 检查单个 pad 是否满足。 */
 bool padSatisfied(OpPad pad, const OpContext &ctx)
 {
     switch (pad) {
     case OpPad::Tiles:
         return ctx.tiles != nullptr;
     case OpPad::Selection:
-        return true;
+        return ctx.selection != nullptr;
     }
     return false;
 }

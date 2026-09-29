@@ -7,10 +7,12 @@
 
 #include "gradienttool.h"
 #include "handtool.h"
+#include "lassotool.h"
 #include "marqueeselecttool.h"
 #include "movetool.h"
 #include "paintbuckettool.h"
 #include "painttool.h"
+#include "polygonallassotool.h"
 #include "tool.h"
 #include "zoomtool.h"
 
@@ -27,6 +29,8 @@ ToolManager::ToolManager(QObject *parent)
     registerTool(std::make_unique<MoveTool>());
     registerTool(std::make_unique<MarqueeSelectTool>(MarqueeSelectTool::Shape::Rect));
     registerTool(std::make_unique<MarqueeSelectTool>(MarqueeSelectTool::Shape::Ellipse));
+    registerTool(std::make_unique<LassoTool>());
+    registerTool(std::make_unique<PolygonalLassoTool>());
     registerTool(std::make_unique<PaintTool>(Ps::ToolId::Brush, /*eraseMode=*/false));
     registerTool(std::make_unique<PaintTool>(Ps::ToolId::Eraser, /*eraseMode=*/true));
     registerTool(std::make_unique<PaintBucketTool>());
@@ -129,6 +133,20 @@ bool ToolManager::dispatchRelease(const ToolEvent &event, const ToolContext &ctx
         return false;
     m_context = ctx;
     return m_activeTool->mouseRelease(event, ctx, view);
+}
+
+bool ToolManager::dispatchKeyPress(int key, Qt::KeyboardModifiers modifiers,
+                                   const ToolContext &ctx, ViewPort &view)
+{
+    if (!m_activeTool)
+        return false;
+    m_context = ctx;
+    return m_activeTool->keyPress(key, modifiers, ctx, view);
+}
+
+bool ToolManager::wantsShortcutOverride(int key, Qt::KeyboardModifiers modifiers) const
+{
+    return m_activeTool && m_activeTool->wantsShortcutOverride(key, modifiers);
 }
 
 QCursor ToolManager::activeCursor() const

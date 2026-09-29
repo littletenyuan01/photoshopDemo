@@ -229,6 +229,10 @@ QString ToolOptionsBar::hintForTool(Ps::ToolId id)
         return QObject::tr("拖拽建立矩形选区；拖中 Shift 正方形；按下 Shift 加选 / Ctrl 减选 / 二者相交");
     case Ps::ToolId::EllipseSelect:
         return QObject::tr("拖拽建立椭圆选区；拖中 Shift 正圆；按下 Shift 加选 / Ctrl 减选 / 二者相交");
+    case Ps::ToolId::Lasso:
+        return QObject::tr("拖拽手绘套索；松手闭合；按下 Shift 加选 / Ctrl 减选 / 二者相交");
+    case Ps::ToolId::PolygonalLasso:
+        return QObject::tr("单击加点；Shift 吸附水平/垂直/垂线；双击/Enter 闭合；Backspace 撤点；Esc 取消");
     default:
         return QObject::tr("参数为 UI 占位，逻辑尚未接入");
     }

@@ -1,7 +1,7 @@
 /**
  * opcontext.h — 缓冲算子运行时上下文（engine/op 层）。
  *
- * tiles / clip / roi 由 PaintEngine 组装；OpRunner 校验 pad 后交给算子。
+ * tiles / selection / clip / roi 由 PaintEngine 组装；OpRunner 校验 pad 后交给算子。
  * 对照 GEGL OperationContext / pad 绑定。
  */
 #ifndef ENGINE_OP_OPCONTEXT_H
@@ -13,17 +13,20 @@
 
 namespace Ps {
 
+class Selection;
 class TileBuffer;
 
 /**
  * 算子运行时上下文（对照 GEGL OperationContext / pad 绑定）。
- * tiles → OpPad::Tiles；clip.selection → OpPad::Selection。
+ * tiles → OpPad::Tiles；selection → OpPad::Selection（写入目标）；
+ * clip.selection → 绘制时可选裁剪（与写入 pad 不同用途）。
  * 由 PaintEngine 组装；OpRunner 按注册表校验后再交给算子。
  */
 struct OpContext
 {
-    TileBuffer *tiles = nullptr; ///< 读写目标（层内坐标）
-    PaintSelectionClip clip;     ///< 空选区 / 空指针 → 不裁
+    TileBuffer *tiles = nullptr;     ///< 读写目标（层内坐标）；选区算子可为空
+    Selection *selection = nullptr;  ///< 文档级选区写入目标；绘制算子可为空
+    PaintSelectionClip clip;         ///< 绘制裁剪：空选区 / 空指针 → 不裁
     /**
      * 可选兴趣区（层内坐标）；空 = 整个缓冲。
      *
@@ -39,6 +42,14 @@ struct OpContext
         OpContext ctx;
         ctx.tiles = &tiles;
         ctx.clip = clip;
+        return ctx;
+    }
+
+    /** 选区写入算子上下文（对照 gimp_channel_select_* 作用在 image mask 上）。 */
+    static OpContext fromSelection(Selection &selection)
+    {
+        OpContext ctx;
+        ctx.selection = &selection;
         return ctx;
     }
 };

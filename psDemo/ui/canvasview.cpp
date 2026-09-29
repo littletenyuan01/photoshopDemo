@@ -14,6 +14,7 @@
 #include "tools/toolevent.h"
 #include "tools/toolmanager.h"
 
+#include <QEvent>
 #include <QKeyEvent>
 #include <QMouseEvent>
 #include <QPainter>
@@ -421,6 +422,7 @@ Ps::ToolEvent CanvasView::makeToolEvent(QMouseEvent *event) const
     e.button = event->button();
     e.buttons = event->buttons();
     e.modifiers = event->modifiers();
+    e.doubleClick = (event->type() == QEvent::MouseButtonDblClick);
     return e;
 }
 
@@ -542,6 +544,19 @@ void CanvasView::leaveEvent(QEvent *event)
     QWidget::leaveEvent(event);
 }
 
+bool CanvasView::event(QEvent *event)
+{
+    // 工具编辑中抢走菜单快捷键（如 Delete=清除），再交给 keyPressEvent 分发
+    if (event->type() == QEvent::ShortcutOverride && m_toolManager && m_document) {
+        const auto *ke = static_cast<const QKeyEvent *>(event);
+        if (m_toolManager->wantsShortcutOverride(ke->key(), ke->modifiers())) {
+            event->accept();
+            return true;
+        }
+    }
+    return QWidget::event(event);
+}
+
 void CanvasView::keyPressEvent(QKeyEvent *event)
 {
     if (event->key() == Qt::Key_Space && !event->isAutoRepeat()) {
@@ -551,6 +566,17 @@ void CanvasView::keyPressEvent(QKeyEvent *event)
         event->accept();
         return;
     }
+
+    // 活动工具优先消费（多边形套索 Enter/Esc/Backspace 等）
+    if (m_document && m_toolManager && !event->isAutoRepeat()) {
+        refreshToolContext();
+        if (m_toolManager->dispatchKeyPress(event->key(), event->modifiers(),
+                                            m_toolContext, *this)) {
+            event->accept();
+            return;
+        }
+    }
+
     QWidget::keyPressEvent(event);
 }
 

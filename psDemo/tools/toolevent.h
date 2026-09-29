@@ -29,6 +29,8 @@ struct ToolEvent
     Qt::MouseButton button = Qt::NoButton;
     Qt::MouseButtons buttons = Qt::NoButton;
     Qt::KeyboardModifiers modifiers = Qt::NoModifier;
+    /** 双击按下（QEvent::MouseButtonDblClick）；多边形套索用它闭合。 */
+    bool doubleClick = false;
 
     bool isLeft() const { return button == Qt::LeftButton; }
     bool isRight() const { return button == Qt::RightButton; }

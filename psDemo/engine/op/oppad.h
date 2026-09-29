@@ -14,7 +14,7 @@ namespace Ps {
  */
 enum class OpPad {
     Tiles,     ///< 读写目标 TileBuffer*（对照 input+output buffer）
-    Selection, ///< 可选选区裁剪（对照 mask / aux）
+    Selection, ///< 文档级 Selection* 写入目标（对照 image selection / channel mask）
 };
 
 } // namespace Ps

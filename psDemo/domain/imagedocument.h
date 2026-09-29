@@ -12,6 +12,7 @@
 
 #include <QColor>
 #include <QObject>
+#include <QPolygonF>
 #include <QRect>
 #include <QString>
 #include <memory>
@@ -70,6 +71,11 @@ public:
     void selectRectangle(const QRect &rect, ChannelOp op);
     /** 椭圆选区写入并发 selectionChanged。 */
     void selectEllipse(const QRect &rect, ChannelOp op);
+    /**
+     * 多边形选区写入（自由套索等）；经 PaintEngine → SelectPolygonOp。
+     * 对照 gimp_channel_select_polygon。
+     */
+    void selectPolygon(const QPolygonF &points, ChannelOp op);
     /** 由指定图层 alpha 建立选区；默认 Replace。 */
     void selectLayerAlpha(int layerIndex, ChannelOp op = ChannelOp::Replace);
 

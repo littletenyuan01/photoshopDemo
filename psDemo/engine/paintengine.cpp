@@ -1,7 +1,8 @@
 /**
  * paintengine.cpp — paintengine.h 实现（engine 层）。
  *
- * dab / 洪泛 / 渐变 / 实色填充均走 OpRunner::run；strokeSegment 沿路径插值多 dab。
+ * dab / 洪泛 / 渐变 / 实色填充 / 多边形选区均走 OpRunner::run；
+ * strokeSegment 沿路径插值多 dab。
  */
 #include "paintengine.h"
 
@@ -11,6 +12,7 @@
 #include "engine/op/opcontext.h"
 #include "engine/op/opname.h"
 #include "engine/op/oprunner.h"
+#include "engine/op/selectpolygonop.h"
 #include "engine/op/solidfillop.h"
 #include "engine/op/stampdabop.h"
 
@@ -133,6 +135,18 @@ QRect PaintEngine::solidFill(TileBuffer &tiles,
     OpContext ctx = OpContext::fromTiles(tiles, clip);
     return OpRunner::run(OpName::SolidFill, ctx, [&](BufferOp &base) {
         static_cast<SolidFillOp &>(base).setColor(color);
+    });
+}
+
+QRect PaintEngine::selectPolygon(Selection &selection,
+                                 const QPolygonF &points,
+                                 ChannelOp op)
+{
+    OpContext ctx = OpContext::fromSelection(selection);
+    return OpRunner::run(OpName::SelectPolygon, ctx, [&](BufferOp &base) {
+        auto &selOp = static_cast<SelectPolygonOp &>(base);
+        selOp.setPoints(points);
+        selOp.setChannelOp(op);
     });
 }
 

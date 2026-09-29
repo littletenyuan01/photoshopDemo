@@ -7,12 +7,14 @@
 #ifndef PAINTENGINE_H
 #define PAINTENGINE_H
 
+#include "domain/selection.h"
 #include "engine/paintselectionclip.h"
 #include "engine/painttypes.h"
 
 #include <QColor>
 #include <QPoint>
 #include <QPointF>
+#include <QPolygonF>
 #include <QRect>
 
 namespace Ps {
@@ -79,6 +81,15 @@ public:
     static QRect solidFill(TileBuffer &tiles,
                            const QColor &color,
                            PaintSelectionClip clip = PaintSelectionClip());
+
+    /**
+     * 多边形写入选区（自由套索 / 多边形套索共用）。
+     * 经 OpRunner → SelectPolygonOp；对照 gimp_channel_select_polygon。
+     * @return 影响区域（文档坐标）；点数不足时空矩形。
+     */
+    static QRect selectPolygon(Selection &selection,
+                               const QPolygonF &points,
+                               ChannelOp op);
 };
 
 } // namespace Ps
