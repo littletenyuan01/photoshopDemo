@@ -1,3 +1,8 @@
+/**
+ * rasterio.h — 扁平栅格导出 PNG/JPEG（io 层）。
+ *
+ * 合成当前文档后写出；不改工程路径、不消脏。
+ */
 #ifndef RASTERIO_H
 #define RASTERIO_H
 
@@ -16,6 +21,10 @@ class ImageDocument;
 class RasterIo
 {
 public:
+    /**
+     * 合成并导出；按扩展名选 PNG（透明）或 JPEG（白底）。
+     * @return 成功 true；失败时 errorMessage 非空。
+     */
     static bool exportFile(const ImageDocument &doc, const QString &filePath,
                            QString *errorMessage = nullptr);
 

@@ -1,3 +1,6 @@
+/**
+ * historystack.cpp — HistoryStack 的 push/undo/redo/trim 实现（app 层）。
+ */
 #include "historystack.h"
 
 #include "domain/imagedocument.h"

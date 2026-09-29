@@ -1,3 +1,9 @@
+/**
+ * paintclip.h — 选区/ROI 窗口与 dab 回滚助手（engine/op 层）。
+ *
+ * operationWindow / roiWindow 限制缓冲算子遍历范围；restoreOutsideSelection 供 dab 用。
+ * 避免 materialize 整层 + setFromImage 破坏 TileBuffer 稀疏设计。
+ */
 #ifndef ENGINE_OP_PAINTCLIP_H
 #define ENGINE_OP_PAINTCLIP_H
 
@@ -12,11 +18,13 @@
 namespace Ps {
 namespace OpPaintClip {
 
+/** 选区指针有效且 bounds 非空。 */
 inline bool clipActive(const PaintSelectionClip &clip)
 {
     return clip.selection && !clip.selection->bounds().isEmpty();
 }
 
+/** 层内坐标 (layerX, layerY) 是否在选区内；无选区恒 true。 */
 inline bool layerPixelSelected(const PaintSelectionClip &clip, int layerX, int layerY)
 {
     if (!clipActive(clip))

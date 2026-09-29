@@ -1,3 +1,8 @@
+/**
+ * pathtreepanel.h — 路径树面板声明（ui 层）。
+ *
+ * 尚无 path domain，仅 UI 骨架；行高对齐图层/通道，用路径标记图标代替缩略图。
+ */
 #ifndef PATHTREEPANEL_H
 #define PATHTREEPANEL_H
 

@@ -1,3 +1,8 @@
+/**
+ * pixmaputils.h — 位图/图标公共工具（ui 层）。
+ *
+ * DPR 画布、多档图标光栅化、透明棋盘格；收敛原先四处重复实现。
+ */
 #ifndef PIXMAPUTILS_H
 #define PIXMAPUTILS_H
 

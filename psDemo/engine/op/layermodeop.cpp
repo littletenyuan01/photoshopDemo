@@ -1,3 +1,8 @@
+/**
+ * layermodeop.cpp — layermodeop.h 实现（engine/op 层）。
+ *
+ * blendPixel 纯转发 Blend::pixel；id/name 来自 opNameId/Title。
+ */
 #include "layermodeop.h"
 
 #include "opname.h"

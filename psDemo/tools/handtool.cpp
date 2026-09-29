@@ -1,3 +1,6 @@
+/**
+ * handtool.cpp — 抓手工具实现（tools 层）。
+ */
 #include "handtool.h"
 
 namespace Ps {

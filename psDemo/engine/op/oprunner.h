@@ -1,3 +1,9 @@
+/**
+ * oprunner.h — 缓冲算子调度器（engine/op 层）。
+ *
+ * 查 OpRegistry → pad 校验 → 取常驻实例 → configure → prepare → process → finish。
+ * 对照 GIMP gimp_layer_mode_get_operation 的 per-mode 实例缓存。
+ */
 #ifndef ENGINE_OP_OPRUNNER_H
 #define ENGINE_OP_OPRUNNER_H
 

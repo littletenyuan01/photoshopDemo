@@ -1,3 +1,8 @@
+/**
+ * colorspanel.h — 颜色/色板/渐变/图案停靠面板声明（ui 层）。
+ *
+ * 四页 Tab；前景/背景经信号与工具箱、画布 ToolContext 同步。
+ */
 #ifndef COLORSPANEL_H
 #define COLORSPANEL_H
 

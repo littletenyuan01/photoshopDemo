@@ -1,3 +1,8 @@
+/**
+ * canvasview.h — 画布视图声明（ui 层）。
+ *
+ * 视图变换、投影绘制、事件归一化转发；实现 ViewPort 供工具请求缩放/平移。
+ */
 #ifndef CANVASVIEW_H
 #define CANVASVIEW_H
 

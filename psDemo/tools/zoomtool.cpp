@@ -1,3 +1,6 @@
+/**
+ * zoomtool.cpp — 缩放工具实现（tools 层）。
+ */
 #include "zoomtool.h"
 
 namespace Ps {

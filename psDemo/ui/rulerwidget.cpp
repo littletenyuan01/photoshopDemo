@@ -1,3 +1,6 @@
+/**
+ * rulerwidget.cpp — 像素标尺自绘控件实现（ui 层）。
+ */
 #include "rulerwidget.h"
 
 #include <QPainter>

@@ -1,3 +1,8 @@
+/**
+ * homescreen.h — PS 主页/启动屏声明（ui 层）。
+ *
+ * 新文件/打开/最近项网格；对照 GIMP welcome-dialog Create 页。
+ */
 #ifndef HOMESCREEN_H
 #define HOMESCREEN_H
 

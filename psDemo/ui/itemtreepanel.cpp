@@ -1,3 +1,8 @@
+/**
+ * itemtreepanel.cpp — Item 树面板基类实现（ui 层）。
+ *
+ * makeLayerThumbnail / makeChannelThumbnail / svgIcon 等缩略图与图标工具。
+ */
 #include "itemtreepanel.h"
 
 #include "domain/imagedocument.h"

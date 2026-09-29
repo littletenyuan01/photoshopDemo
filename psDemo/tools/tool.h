@@ -1,3 +1,8 @@
+/**
+ * tool.h — 工具基类声明（tools 层）。
+ *
+ * 交互状态机：mousePress/Move/Release、光标、浮层、deactivate；新增工具无需改 CanvasView。
+ */
 #ifndef TOOL_H
 #define TOOL_H
 

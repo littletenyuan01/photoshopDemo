@@ -1,3 +1,8 @@
+/**
+ * tool.cpp — 工具基类默认实现（tools 层）。
+ *
+ * 默认不消费 move/release；markDocumentDirty 标记脏区并请求重绘。
+ */
 #include "tool.h"
 
 #include "domain/imagedocument.h"

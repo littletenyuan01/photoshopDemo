@@ -1,3 +1,8 @@
+/**
+ * opsinit.cpp — opsinit.h 实现（engine/op 层）。
+ *
+ * 向 OpRegistry / PointOpRegistry 注册 4 个缓冲算子 + LayerModeOp；只存工厂，不构造实例。
+ */
 #include "opsinit.h"
 
 #include "floodfillop.h"

@@ -1,3 +1,6 @@
+/**
+ * paintbuckettool.cpp — 油漆桶工具实现（tools 层）。
+ */
 #include "paintbuckettool.h"
 
 #include "domain/imagedocument.h"

@@ -1,3 +1,6 @@
+/**
+ * tooloptionsbar.cpp — 工具选项栏实现（ui 层）。
+ */
 #include "tooloptionsbar.h"
 #include "ui_tooloptionsbar.h"
 

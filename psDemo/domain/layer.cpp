@@ -1,3 +1,6 @@
+/**
+ * layer.cpp — Layer 属性 setter、坐标换算与内容包围盒扫描（domain 层）。
+ */
 #include "layer.h"
 
 #include "imagedocument.h"
@@ -8,6 +11,7 @@
 
 namespace Ps {
 
+/** 透明新建：只预定 extent，不分配瓦片。 */
 Layer::Layer(const QString &name, int width, int height)
     : m_name(name)
     , m_tiles(width, height)
@@ -15,6 +19,7 @@ Layer::Layer(const QString &name, int width, int height)
     // 故意不 ensureTile / fill：透明层 0 块瓦片，对齐 GIMP 懒分配
 }
 
+/** 打开图片：整图拆入 TileBuffer。 */
 Layer::Layer(const QString &name, const QImage &pixels)
     : m_name(name)
 {

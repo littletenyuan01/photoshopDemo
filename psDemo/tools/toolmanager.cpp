@@ -1,3 +1,8 @@
+/**
+ * toolmanager.cpp — 工具注册表与事件分发实现（tools 层）。
+ *
+ * 构造时注册全部工具；未接入逻辑的工具回退到 MoveTool。
+ */
 #include "toolmanager.h"
 
 #include "gradienttool.h"

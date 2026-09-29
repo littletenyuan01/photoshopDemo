@@ -1,3 +1,8 @@
+/**
+ * handtool.h — 抓手工具声明（tools 层）。
+ *
+ * 拖拽平移画布；isPanGesture 供 CanvasView 判定中键 / Alt+左键通用手势。
+ */
 #ifndef HANDTOOL_H
 #define HANDTOOL_H
 

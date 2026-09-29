@@ -1,3 +1,8 @@
+/**
+ * tilebuffer.h — 64×64 稀疏瓦片像素缓冲（domain 层）。
+ *
+ * 透明层不分配瓦片；首次写入或 fill 才 ensureTile；格式 ARGB32 预乘。
+ */
 #ifndef TILEBUFFER_H
 #define TILEBUFFER_H
 
@@ -83,7 +88,9 @@ public:
      */
     QImage materialize() const;
 
+    /** 可写瓦片遍历回调：(格索引, 瓦片引用, 该格在图像中的矩形)。 */
     using TileCallback = std::function<void(int tx, int ty, QImage &tile, const QRect &bounds)>;
+    /** 只读已分配瓦片遍历回调。 */
     using ConstTileCallback = std::function<void(int tx, int ty, const QImage &tile, const QRect &bounds)>;
 
     /**

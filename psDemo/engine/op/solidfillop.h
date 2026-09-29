@@ -1,3 +1,9 @@
+/**
+ * solidfillop.h — 实色/透明填充算子（engine/op 层）。
+ *
+ * 编辑→填充/清除；无选区整层可走 TileBuffer::fill 或 clearTiles。
+ * 最干净的「工作窗口 + 逐瓦片」样板算子。
+ */
 #ifndef ENGINE_OP_SOLIDFILLOP_H
 #define ENGINE_OP_SOLIDFILLOP_H
 

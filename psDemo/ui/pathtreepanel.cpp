@@ -1,3 +1,6 @@
+/**
+ * pathtreepanel.cpp — 路径树面板实现（ui 层）。
+ */
 #include "pathtreepanel.h"
 #include "ui_pathtreepanel.h"
 

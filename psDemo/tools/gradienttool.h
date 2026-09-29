@@ -1,3 +1,8 @@
+/**
+ * gradienttool.h — 渐变工具声明（tools 层）。
+ *
+ * 拖拽起止点与橡皮筋浮层；松手提交 PaintEngine::fillGradient。
+ */
 #ifndef GRADIENTTOOL_H
 #define GRADIENTTOOL_H
 

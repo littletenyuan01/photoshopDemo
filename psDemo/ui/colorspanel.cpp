@@ -1,3 +1,6 @@
+/**
+ * colorspanel.cpp — 颜色/色板/渐变/图案停靠面板实现（ui 层）。
+ */
 #include "colorspanel.h"
 #include "ui_colorspanel.h"
 

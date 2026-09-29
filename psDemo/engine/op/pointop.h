@@ -1,3 +1,9 @@
+/**
+ * pointop.h — 逐样本点算子基类（engine/op 层）。
+ *
+ * 合成热路径由 Compositor 直接调 LayerModeOp::blendPixel，不走 OpRunner 三段式。
+ * 对照 GeglOperationPointFilter。
+ */
 #ifndef ENGINE_OP_POINTOP_H
 #define ENGINE_OP_POINTOP_H
 

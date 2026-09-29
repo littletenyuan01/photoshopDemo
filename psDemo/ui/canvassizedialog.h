@@ -1,3 +1,8 @@
+/**
+ * canvassizedialog.h —「画布大小」对话框声明（ui 层）。
+ *
+ * 当前/新建大小、相对、定位锚点、扩展颜色。
+ */
 #ifndef CANVASSIZEDIALOG_H
 #define CANVASSIZEDIALOG_H
 
@@ -59,13 +64,13 @@ private:
     static double toPixels(double value, DimUnit unit, double ppi);
 
     Ui::CanvasSizeDialog *ui;
-    Ps::ImageDocument *m_document = nullptr;
-    QColor m_fg;
-    QColor m_bg;
-    int m_origW = 0;
-    int m_origH = 0;
-    QButtonGroup *m_anchorGroup = nullptr;
-    double m_ppi = 72.0;
+    Ps::ImageDocument *m_document = nullptr; ///< 不拥有；用于读当前画布尺寸
+    QColor m_fg;                             ///< 扩展色「前景」选项用
+    QColor m_bg;                             ///< 扩展色「背景」选项用
+    int m_origW = 0;                         ///< 打开对话框时的原始宽（像素）
+    int m_origH = 0;                         ///< 打开对话框时的原始高（像素）
+    QButtonGroup *m_anchorGroup = nullptr;   ///< 3×3 定位锚点互斥组
+    double m_ppi = 72.0;                   ///< 显示用默认分辨率（尚无 domain 字段）
 };
 
 #endif // CANVASSIZEDIALOG_H

@@ -1,3 +1,8 @@
+/**
+ * marqueeselecttool.h — 矩形/椭圆选框工具声明（tools 层）。
+ *
+ * 拖拽写入文档级 Selection；Shift/Ctrl 控制加/减/交选，拖拽中 Shift 约束 1:1。
+ */
 #ifndef MARQUEESELECTTOOL_H
 #define MARQUEESELECTTOOL_H
 
@@ -26,9 +31,10 @@ class MarqueeSelectTool : public Tool
     Q_OBJECT
 
 public:
+    /** 选框形状；构造时绑定 RectSelect 或 EllipseSelect 的 ToolId。 */
     enum class Shape {
-        Rect,
-        Ellipse,
+        Rect,    ///< 矩形选框
+        Ellipse, ///< 椭圆选框（内接于包围盒）
     };
 
     explicit MarqueeSelectTool(Shape shape, QObject *parent = nullptr);
@@ -49,14 +55,14 @@ private:
     QRectF currentImageRect() const;
     QRectF currentWidgetRect() const;
 
-    Shape m_shape = Shape::Rect;
-    bool m_dragging = false;
-    bool m_constrain = false; ///< 拖拽中是否按住 Shift（正方形 / 正圆）
-    ChannelOp m_op = ChannelOp::Replace;
-    QPointF m_startImage;
-    QPointF m_endImage;
-    QPointF m_startWidget;
-    QPointF m_endWidget;
+    Shape m_shape = Shape::Rect;          ///< 矩形或椭圆
+    bool m_dragging = false;              ///< 左键拖拽进行中
+    bool m_constrain = false;             ///< 拖拽中按住 Shift → 正方形/正圆
+    ChannelOp m_op = ChannelOp::Replace;  ///< 按下时锁定的加/减/交/替换
+    QPointF m_startImage;                 ///< 拖拽起点（图像坐标）
+    QPointF m_endImage;                   ///< 拖拽终点（图像坐标，约束前）
+    QPointF m_startWidget;                ///< 拖拽起点（控件坐标，画橡皮筋）
+    QPointF m_endWidget;                  ///< 拖拽终点（控件坐标，约束前）
 };
 
 } // namespace Ps

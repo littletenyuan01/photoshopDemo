@@ -1,3 +1,8 @@
+/**
+ * selection.h — 文档级选区灰度 mask 与 ChannelOp 组合写入（domain 层）。
+ *
+ * 归属 ImageDocument；矩形/椭圆/图层 alpha 等工具均写入同一张 mask。
+ */
 #ifndef SELECTION_H
 #define SELECTION_H
 
@@ -45,18 +50,24 @@ public:
     /** 图像大小（重采样）：最近邻缩放 mask。 */
     void scale(int newWidth, int newHeight);
 
+    /** 是否无任何选中像素（带 bounds 缓存）。 */
     bool isEmpty() const;
     /** 非零像素的外接矩形；空选区返回空矩形。 */
     QRect bounds() const;
 
+    /** 只读 mask 引用（Format_Grayscale8，与文档同尺寸）。 */
     const QImage &mask() const { return m_mask; }
 
     /** 文档坐标取值；越界视为 0。 */
     quint8 value(int docX, int docY) const;
+    /** 文档坐标是否选中（value > 0）。 */
     bool isSelected(int docX, int docY) const { return value(docX, docY) > 0; }
 
+    /** 清空选区（全 0）。 */
     void clear();
+    /** 全选（全 255）。 */
     void selectAll();
+    /** 反相 mask。 */
     void invert();
 
     /**
@@ -87,17 +98,20 @@ public:
                               ChannelOp op);
 
 private:
+    /** 使 isEmpty/bounds 缓存失效。 */
     void invalidateCache() const;
+    /** 扫描 mask 重算空选区标志与外接矩形。 */
     void recomputeCache() const;
+    /** 在 rect 与画布交集内填统一灰度值。 */
     void fillRect(const QRect &rect, quint8 value);
     /** 按 ChannelOp 把 shapeMask（同尺寸灰度，形状内=255）合并进 m_mask。 */
     void combineShapeMask(const QImage &shapeMask, ChannelOp op, const QRect &boundsHint);
 
     QImage m_mask; ///< Format_Grayscale8；文档尺寸
 
-    mutable bool m_cacheValid = false;
-    mutable bool m_empty = true;
-    mutable QRect m_bounds;
+    mutable bool m_cacheValid = false; ///< isEmpty/bounds 缓存是否有效
+    mutable bool m_empty = true;       ///< 缓存：是否无选中像素
+    mutable QRect m_bounds;            ///< 缓存：非零像素外接矩形
 };
 
 } // namespace Ps

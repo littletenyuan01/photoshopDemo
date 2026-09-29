@@ -1,3 +1,6 @@
+/**
+ * newdocumentdialog.cpp —「新建文档」对话框实现（ui 层）。
+ */
 #include "newdocumentdialog.h"
 #include "ui_newdocumentdialog.h"
 

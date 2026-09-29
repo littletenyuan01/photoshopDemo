@@ -1,3 +1,6 @@
+/**
+ * homescreen.cpp — PS 主页/启动屏实现（ui 层）。
+ */
 #include "homescreen.h"
 #include "ui_homescreen.h"
 

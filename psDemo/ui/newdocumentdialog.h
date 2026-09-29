@@ -1,3 +1,8 @@
+/**
+ * newdocumentdialog.h —「新建文档」对话框声明（ui 层）。
+ *
+ * 预设卡片 + 详情栏；创建回传像素尺寸与文档名，颜色模式等尚未进 domain。
+ */
 #ifndef NEWDOCUMENTDIALOG_H
 #define NEWDOCUMENTDIALOG_H
 
@@ -60,7 +65,7 @@ private:
     static QString formatDim(double value, DimUnit unit);
 
     Ui::NewDocumentDialog *ui;
-    DimUnit m_dimUnit = Pixels;
+    DimUnit m_dimUnit = Pixels; ///< 当前宽高编辑单位（与 dimUnitCombo 同步）
 };
 
 #endif // NEWDOCUMENTDIALOG_H

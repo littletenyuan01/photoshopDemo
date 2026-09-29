@@ -1,3 +1,8 @@
+/**
+ * stampdabop.cpp — stampdabop.h 实现（engine/op 层）。
+ *
+ * QRadialGradient 硬/软边 dab；遍历缩至 dab ∩ 选区外接框。
+ */
 #include "stampdabop.h"
 
 #include "paintclip.h"

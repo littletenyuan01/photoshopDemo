@@ -1,3 +1,8 @@
+/**
+ * colorpickerdialog.cpp — PS 风格拾色器实现（ui 层）。
+ *
+ * ColorPlaneWidget / ColorStripWidget / ColorPreviewWidget 内嵌绘制。
+ */
 #include "colorpickerdialog.h"
 #include "ui_colorpickerdialog.h"
 

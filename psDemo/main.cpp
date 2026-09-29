@@ -1,3 +1,8 @@
+/**
+ * main.cpp — QApplication 入口（app 层）。
+ *
+ * 初始化算子注册表、全局 QSS 与主窗口；对照 GIMP gimp_init / app startup。
+ */
 #include "mainwindow.h"
 
 #include "engine/op/opsinit.h"

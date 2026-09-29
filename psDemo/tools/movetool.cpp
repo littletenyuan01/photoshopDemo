@@ -1,3 +1,6 @@
+/**
+ * movetool.cpp — 移动工具实现（tools 层）。
+ */
 #include "movetool.h"
 
 #include "domain/imagedocument.h"

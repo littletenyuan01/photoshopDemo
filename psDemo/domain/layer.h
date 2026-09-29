@@ -1,3 +1,8 @@
+/**
+ * layer.h — 单图层：属性 + TileBuffer 像素 + FilterStack（domain 层）。
+ *
+ * 持 owner 回指 ImageDocument，属性 setter 内部自动广播；像素写入方须自行 markDirty。
+ */
 #ifndef LAYER_H
 #define LAYER_H
 
@@ -140,8 +145,8 @@ private:
     /** 扫描已分配瓦片，得到层内坐标的 alpha>0 包围盒。 */
     QRect computeContentBoundsLocal() const;
 
-    QString m_name;
-    bool m_visible = true;
+    QString m_name;          ///< 图层面板显示名
+    bool m_visible = true;   ///< 是否参与合成
     qreal m_opacity = 1.0; ///< [0,1]
     BlendMode m_blendMode = BlendMode::Normal;
     int m_offsetX = 0; ///< 文档坐标 X（对照 GimpItem offset）

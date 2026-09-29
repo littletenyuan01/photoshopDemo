@@ -1,3 +1,8 @@
+/**
+ * projection.cpp — projection.h 实现（engine 层）。
+ *
+ * sync() 读文档 dirtyRect，小脏区走 Compositor::compositeRegion，否则全量重合成。
+ */
 #include "projection.h"
 
 #include "compositor.h"
@@ -10,6 +15,7 @@ namespace Ps {
 
 namespace {
 
+/** 将脏矩形对齐到 chunk 网格并裁剪到 bounds。 */
 QRect alignToChunks(const QRect &rect, int chunk, const QRect &bounds)
 {
     if (rect.isEmpty() || chunk <= 0)

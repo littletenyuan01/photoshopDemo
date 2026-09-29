@@ -1,3 +1,8 @@
+/**
+ * canvasview.cpp — 画布视图实现（ui 层）。
+ *
+ * 不含工具分支；ToolManager 分发、蚂蚁线、像素网格、通用平移手势。
+ */
 #include "canvasview.h"
 
 #include "domain/imagedocument.h"

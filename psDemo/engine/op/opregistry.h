@@ -1,3 +1,9 @@
+/**
+ * opregistry.h — 缓冲算子注册表（engine/op 层）。
+ *
+ * 启动期 opsInit 写入工厂与 requiredPads；OpRunner 查表调度。
+ * 对照 GIMP gimp_operations_init / GEGL 类型注册。
+ */
 #ifndef ENGINE_OP_OPREGISTRY_H
 #define ENGINE_OP_OPREGISTRY_H
 
@@ -19,14 +25,16 @@ class BufferOp;
 struct OpRegistration
 {
     OpName name = OpName::Count;
-    QVector<OpPad> requiredPads;
-    std::function<std::unique_ptr<BufferOp>()> create;
+    QVector<OpPad> requiredPads;                              ///< OpRunner 执行前校验的 pad
+    std::function<std::unique_ptr<BufferOp>()> create;        ///< 工厂 lambda（非实例）
 };
 
 class OpRegistry
 {
 public:
+    /** 注册一项；同名覆盖。 */
     static void add(OpRegistration reg);
+    /** 按 OpName 查注册项；未注册返回 nullptr。 */
     static const OpRegistration *find(OpName name);
 };
 

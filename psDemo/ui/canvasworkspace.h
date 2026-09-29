@@ -1,3 +1,8 @@
+/**
+ * canvasworkspace.h — 画布工作区声明（ui 层）。
+ *
+ * 标尺 + CanvasView + 底栏状态 + 滚动条；订阅 AppSession 文档广播。
+ */
 #ifndef CANVASWORKSPACE_H
 #define CANVASWORKSPACE_H
 

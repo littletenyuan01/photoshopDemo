@@ -1,3 +1,9 @@
+/**
+ * bufferop.h — 缓冲区域算子基类（engine/op 层）。
+ *
+ * prepare → process → finish 三段式；由 OpRunner 驱动，改 TileBuffer 瓦片并返回脏矩形。
+ * 对照 GeglOperationFilter。
+ */
 #ifndef ENGINE_OP_BUFFEROP_H
 #define ENGINE_OP_BUFFEROP_H
 

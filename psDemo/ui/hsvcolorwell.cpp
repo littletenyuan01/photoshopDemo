@@ -1,3 +1,6 @@
+/**
+ * hsvcolorwell.cpp — PS 式色域控件实现（ui 层）。
+ */
 #include "hsvcolorwell.h"
 
 #include <QMouseEvent>

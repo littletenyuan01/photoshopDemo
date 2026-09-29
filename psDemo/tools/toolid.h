@@ -1,3 +1,8 @@
+/**
+ * toolid.h — 工具 ID 枚举（tools 层）。
+ *
+ * 顺序即工具箱从上到下；分组显示由 ToolBox 的 ToolSlot 负责。
+ */
 #ifndef TOOLID_H
 #define TOOLID_H
 

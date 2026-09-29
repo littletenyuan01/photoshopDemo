@@ -1,3 +1,6 @@
+/**
+ * gradienttool.cpp — 渐变工具实现（tools 层）。
+ */
 #include "gradienttool.h"
 
 #include "domain/imagedocument.h"

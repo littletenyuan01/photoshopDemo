@@ -1,3 +1,8 @@
+/**
+ * paintbuckettool.h — 油漆桶工具声明（tools 层）。
+ *
+ * 左键种子点触发洪泛填充；算法在 PaintEngine::floodFill。
+ */
 #ifndef PAINTBUCKETTOOL_H
 #define PAINTBUCKETTOOL_H
 

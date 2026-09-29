@@ -1,3 +1,6 @@
+/**
+ * imagesizedialog.cpp —「图像大小」对话框实现（ui 层）。
+ */
 #include "imagesizedialog.h"
 #include "ui_imagesizedialog.h"
 

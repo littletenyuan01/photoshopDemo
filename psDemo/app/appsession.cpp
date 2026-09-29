@@ -1,3 +1,8 @@
+/**
+ * appsession.cpp — AppSession::setDocument 的实现（app 层）。
+ *
+ * 关键不变量：旧文档须活到 documentChanged 广播结束后再析构。
+ */
 #include "appsession.h"
 
 #include "domain/imagedocument.h"

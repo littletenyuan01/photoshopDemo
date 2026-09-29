@@ -1,3 +1,8 @@
+/**
+ * dockpanel.h — 右侧三 Tab 停靠壳声明（ui 层）。
+ *
+ * 图层 | 通道 | 路径；订阅 AppSession 并转发子面板，壳层再订 structureChanged。
+ */
 #ifndef DOCKPANEL_H
 #define DOCKPANEL_H
 

@@ -1,3 +1,6 @@
+/**
+ * canvasdocstatusbar.cpp — 画布底栏状态条实现（ui 层）。
+ */
 #include "canvasdocstatusbar.h"
 #include "ui_canvasdocstatusbar.h"
 

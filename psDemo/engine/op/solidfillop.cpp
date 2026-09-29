@@ -1,3 +1,8 @@
+/**
+ * solidfillop.cpp — solidfillop.h 实现（engine/op 层）。
+ *
+ * operationWindow 限窗；透明整层清除走 clearTiles 释放瓦片。
+ */
 #include "solidfillop.h"
 
 #include "paintclip.h"

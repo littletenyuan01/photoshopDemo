@@ -1,3 +1,8 @@
+/**
+ * canvasworkspace.cpp — 画布工作区实现（ui 层）。
+ *
+ * 画布与滚动条双向同步（QSignalBlocker 防回环）；标尺范围随 viewChanged 刷新。
+ */
 #include "canvasworkspace.h"
 #include "ui_canvasworkspace.h"
 

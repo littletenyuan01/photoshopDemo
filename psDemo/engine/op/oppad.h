@@ -1,3 +1,8 @@
+/**
+ * oppad.h — 算子依赖 pad 枚举（engine/op 层）。
+ *
+ * OpRegistry 声明、OpRunner 校验；对照 GEGL input/output/aux pad 名。
+ */
 #ifndef ENGINE_OP_OPPAD_H
 #define ENGINE_OP_OPPAD_H
 

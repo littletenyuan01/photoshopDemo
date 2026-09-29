@@ -1,3 +1,8 @@
+/**
+ * operation.h — 算子轻量基类（engine/op 层）。
+ *
+ * 缓冲算子与点算子的共同 id/name 接口；对照 GEGL GeglOperation 语义壳（不引入 GEGL）。
+ */
 #ifndef ENGINE_OP_OPERATION_H
 #define ENGINE_OP_OPERATION_H
 

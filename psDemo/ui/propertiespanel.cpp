@@ -1,3 +1,6 @@
+/**
+ * propertiespanel.cpp — 属性/调整/库停靠面板实现（ui 层）。
+ */
 #include "propertiespanel.h"
 #include "ui_propertiespanel.h"
 

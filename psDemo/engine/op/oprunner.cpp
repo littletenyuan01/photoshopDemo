@@ -1,3 +1,8 @@
+/**
+ * oprunner.cpp — oprunner.h 实现（engine/op 层）。
+ *
+ * 常驻实例表（unordered_map）与注册表分离；稳态每次 run 零堆分配。
+ */
 #include "oprunner.h"
 
 #include "bufferop.h"
@@ -10,6 +15,7 @@ namespace Ps {
 
 namespace {
 
+/** 检查单个 pad 是否满足（Selection pad 目前恒 true）。 */
 bool padSatisfied(OpPad pad, const OpContext &ctx)
 {
     switch (pad) {
@@ -21,6 +27,7 @@ bool padSatisfied(OpPad pad, const OpContext &ctx)
     return false;
 }
 
+/** 注册表声明的全部 requiredPads 均满足才继续调度。 */
 bool resolveDependencies(const OpRegistration &reg, const OpContext &ctx)
 {
     for (OpPad pad : reg.requiredPads) {

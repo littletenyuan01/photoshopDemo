@@ -1,3 +1,6 @@
+/**
+ * mainwindow.cpp — MainWindow 菜单槽、文件 IO 与组件装配实现（app 层）。
+ */
 #include "mainwindow.h"
 #include "ui_mainwindow.h"
 

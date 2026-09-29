@@ -1,3 +1,8 @@
+/**
+ * psdio.cpp — PsdIo::save 与 PSD 二进制段组装（io 层）。
+ *
+ * 手写大端写入；图层像素由预乘 ARGB 解预乘为直通 RGBA 平面。
+ */
 #include "psdio.h"
 
 #include "domain/blendmode.h"
@@ -65,9 +70,7 @@ void writeU32(QDataStream &out, quint32 v)
 void writeI16(QDataStream &out, qint16 v) { writeU16(out, quint16(v)); }
 void writeI32(QDataStream &out, qint32 v) { writeU32(out, quint32(v)); }
 
-/** Pascal 字符串，填充到 4 字节对齐（含长度字节）。 */
-/**
- * PSD 混合四字符码：PS 的 27 种模式全表（Adobe PSD File Format 的 "Blend mode key"，
+/** PSD 混合四字符码：PS 的 27 种模式全表（Adobe PSD File Format 的 "Blend mode key"，
  * 对照 GIMP `plug-ins/file-psd/psd-export.c` 的 `blend_modes` 表）。
  *
  * 【坑】四字符码里有几个看名字猜不到的：颜色加深=idiv、颜色减淡=div、
@@ -111,6 +114,7 @@ const char *psdBlendKey(BlendMode mode)
     return "norm";
 }
 
+/** Pascal 字符串，填充到 4 字节对齐（含长度字节）。 */
 void writePascalName(QDataStream &out, const QString &name)
 {
     QByteArray utf8 = name.toUtf8();
@@ -126,8 +130,8 @@ void writePascalName(QDataStream &out, const QString &name)
 
 /** 预乘 ARGB → 直通 RGBA 平面（层矩形内）。 */
 struct LayerPlanes {
-    QRect rect; // 文档坐标，right/bottom 为开区间语义用 width/height
-    QByteArray a;
+    QRect rect;     ///< 文档坐标层边界
+    QByteArray a;   ///< Alpha 平面（直通，非预乘）
     QByteArray r;
     QByteArray g;
     QByteArray b;

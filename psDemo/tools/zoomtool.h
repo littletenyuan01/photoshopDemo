@@ -1,3 +1,8 @@
+/**
+ * zoomtool.h — 缩放工具声明（tools 层）。
+ *
+ * 左键锚点放大 / 右键缩小；缩放数学委托 ViewPort::zoomAt。
+ */
 #ifndef ZOOMTOOL_H
 #define ZOOMTOOL_H
 

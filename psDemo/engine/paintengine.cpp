@@ -1,3 +1,8 @@
+/**
+ * paintengine.cpp — paintengine.h 实现（engine 层）。
+ *
+ * dab / 洪泛 / 渐变 / 实色填充均走 OpRunner::run；strokeSegment 沿路径插值多 dab。
+ */
 #include "paintengine.h"
 
 #include "domain/tilebuffer.h"

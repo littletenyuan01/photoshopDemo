@@ -1,3 +1,6 @@
+/**
+ * selection.cpp — Selection mask 重建、几何变更与形状合并（domain 层）。
+ */
 #include "selection.h"
 
 #include <QPainter>
@@ -7,6 +10,7 @@
 
 namespace Ps {
 
+/** 按文档尺寸创建全 0 mask。 */
 Selection::Selection(int width, int height)
 {
     reset(width, height);
@@ -172,6 +176,7 @@ void Selection::invert()
     invalidateCache();
 }
 
+/** 矩形硬边写入；Replace 时空矩形等价 clear。 */
 void Selection::selectRectangle(const QRect &rect, ChannelOp op)
 {
     if (m_mask.isNull())

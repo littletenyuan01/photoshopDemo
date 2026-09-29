@@ -1,3 +1,8 @@
+/**
+ * itemtreepanel.h — Item 树面板基类声明（ui 层）。
+ *
+ * 图层/通道/路径三面板共用：文档绑定、缩略图生成、SVG 图标光栅化。
+ */
 #ifndef ITEMTREEPANEL_H
 #define ITEMTREEPANEL_H
 

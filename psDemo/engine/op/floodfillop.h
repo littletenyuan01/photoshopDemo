@@ -1,3 +1,9 @@
+/**
+ * floodfillop.h — 油漆桶洪泛填充算子（engine/op 层）。
+ *
+ * 传播类算子：整层窗口蔓延后按选区裁；prepare 物化窗口副本，finish 释放。
+ * 对照 GIMP contiguous-region + apply_buffer。
+ */
 #ifndef ENGINE_OP_FLOODFILLOP_H
 #define ENGINE_OP_FLOODFILLOP_H
 

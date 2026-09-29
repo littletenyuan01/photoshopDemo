@@ -1,3 +1,6 @@
+/**
+ * tilebuffer.cpp — TileBuffer 瓦片分配、填充、整图导入与区域遍历（domain 层）。
+ */
 #include "tilebuffer.h"
 
 #include <QPainter>
@@ -52,6 +55,7 @@ QRect TileBuffer::tileBounds(int tx, int ty) const
     return QRect(x, y, w, h);
 }
 
+/** 懒分配：首次访问才创建透明预乘块。 */
 QImage *TileBuffer::ensureTile(int tx, int ty)
 {
     if (!validTileIndex(tx, ty))
@@ -107,6 +111,7 @@ void TileBuffer::fill(const QColor &color)
     }
 }
 
+/** 整图导入：仅含非透明像素的格才分配瓦片。 */
 void TileBuffer::setFromImage(const QImage &image)
 {
     // 统一预乘，避免后续合成/画笔格式不一致

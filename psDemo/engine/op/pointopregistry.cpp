@@ -1,3 +1,8 @@
+/**
+ * pointopregistry.cpp — pointopregistry.h 实现（engine/op 层）。
+ *
+ * 注册表（QHash）与常驻实例表（unordered_map）分离；合成逐瓦片复用实例。
+ */
 #include "pointopregistry.h"
 
 #include "pointop.h"

@@ -1,7 +1,11 @@
+/**
+ * layerstack.cpp — LayerStack 增删插取与重排（domain 层）。
+ */
 #include "layerstack.h"
 
 namespace Ps {
 
+/** 越界返回 nullptr。 */
 Layer *LayerStack::layerAt(int index)
 {
     if (index < 0 || index >= count())

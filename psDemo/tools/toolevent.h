@@ -1,3 +1,8 @@
+/**
+ * toolevent.h — 规范化工具事件（tools 层）。
+ *
+ * CanvasView 分发前已把控件坐标换算成图像坐标；工具无需感知缩放/偏移。
+ */
 #ifndef TOOLEVENT_H
 #define TOOLEVENT_H
 

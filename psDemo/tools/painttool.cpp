@@ -1,3 +1,6 @@
+/**
+ * painttool.cpp — 画笔/橡皮工具实现（tools 层）。
+ */
 #include "painttool.h"
 
 #include "domain/imagedocument.h"
@@ -11,6 +14,7 @@ namespace Ps {
 
 namespace {
 
+/** 组装选区裁剪参数：文档选区 + 活动层 offset（层内坐标绘制用）。 */
 PaintEngine::SelectionClip selectionClipFor(Layer *layer, ImageDocument *doc)
 {
     PaintEngine::SelectionClip clip;

@@ -1,3 +1,8 @@
+/**
+ * psdio.h — PSD 子集导出（io 层）。
+ *
+ * 只写 PS 可打开的 RGB 8-bit 分层文件；完整可编辑请用 `.pslite`。
+ */
 #ifndef PSDIO_H
 #define PSDIO_H
 

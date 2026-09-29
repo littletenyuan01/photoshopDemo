@@ -1,3 +1,8 @@
+/**
+ * appsession.h — 当前文档的唯一持有者与广播中心（app 层）。
+ *
+ * 与 MainWindow、各面板配合；对照 GIMP GimpContext 的 image-changed。
+ */
 #ifndef APPSESSION_H
 #define APPSESSION_H
 
@@ -47,7 +52,7 @@ signals:
     void documentChanged(ImageDocument *doc);
 
 private:
-    std::unique_ptr<ImageDocument> m_document;
+    std::unique_ptr<ImageDocument> m_document; ///< 独占文档所有权；订阅者仅持裸指针观察
 };
 
 } // namespace Ps

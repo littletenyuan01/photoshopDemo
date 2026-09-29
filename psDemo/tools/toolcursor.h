@@ -1,3 +1,8 @@
+/**
+ * toolcursor.h — 工具图标光标辅助（tools 层）。
+ *
+ * 把工具箱 PNG 抠透明底做成 QCursor；渐变工具专用 PS 风格十字光标。
+ */
 #ifndef TOOLCURSOR_H
 #define TOOLCURSOR_H
 

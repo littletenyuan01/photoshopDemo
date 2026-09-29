@@ -1,3 +1,8 @@
+/**
+ * hsvcolorwell.h — PS 式色域控件声明（ui 层）。
+ *
+ * 重叠 FG/BG 色块 + 二维 S/V 平面 + 竖直色相条；只发 colorChanged，不写 domain。
+ */
 #ifndef HSVCOLORWELL_H
 #define HSVCOLORWELL_H
 

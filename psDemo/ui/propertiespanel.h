@@ -1,3 +1,8 @@
+/**
+ * propertiespanel.h — 属性/调整/库停靠面板声明（ui 层）。
+ *
+ * 订阅 AppSession；「属性」页显示真实文档尺寸与活动图层名，折叠分区占位。
+ */
 #ifndef PROPERTIESPANEL_H
 #define PROPERTIESPANEL_H
 

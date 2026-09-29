@@ -1,3 +1,8 @@
+/**
+ * blendmode.h — 图层混合模式枚举：PS 27 种，顺序 = PS 分组顺序（domain 层）。
+ *
+ * 枚举序与图层面板 `.ui` 项、`io/psdio.cpp` 四字符码须三处同步；合成期由 engine/blend 消费。
+ */
 #ifndef BLENDMODE_H
 #define BLENDMODE_H
 

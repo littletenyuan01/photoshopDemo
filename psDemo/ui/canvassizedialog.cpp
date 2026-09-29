@@ -1,3 +1,6 @@
+/**
+ * canvassizedialog.cpp —「画布大小」对话框实现（ui 层）。
+ */
 #include "canvassizedialog.h"
 #include "ui_canvassizedialog.h"
 

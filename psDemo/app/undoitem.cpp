@@ -1,3 +1,6 @@
+/**
+ * undoitem.cpp — 各 UndoItem 子类 pop() 与快照辅助函数的实现（app 层）。
+ */
 #include "undoitem.h"
 
 #include "domain/imagedocument.h"

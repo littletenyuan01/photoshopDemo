@@ -1,3 +1,9 @@
+/**
+ * blend.h — 图层混合色 B(Cb, Cs) 算法声明（engine 层）。
+ *
+ * 27 种 BlendMode 纯函数实现；调度优先经 LayerModeOp，Alpha 合成由 Compositor 完成。
+ * 对照 GIMP gimpoperationlayermode-blend.c。
+ */
 #ifndef ENGINE_BLEND_H
 #define ENGINE_BLEND_H
 

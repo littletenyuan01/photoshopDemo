@@ -1,3 +1,8 @@
+/**
+ * layertreepanel.h — 图层树面板声明（ui 层）。
+ *
+ * 增量更新、缩略图防抖、滑条两段提交；Ctrl+点缩略图 alpha→选区。
+ */
 #ifndef LAYERTREEPANEL_H
 #define LAYERTREEPANEL_H
 

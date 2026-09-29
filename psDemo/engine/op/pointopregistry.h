@@ -1,3 +1,8 @@
+/**
+ * pointopregistry.h — 点算子注册表（engine/op 层）。
+ *
+ * Compositor 合成热路径按 OpName 取常驻 LayerModeOp；对照 gimp_layer_mode_get_operation。
+ */
 #ifndef ENGINE_OP_POINTOPREGISTRY_H
 #define ENGINE_OP_POINTOPREGISTRY_H
 
@@ -13,12 +18,13 @@ class PointOp;
 struct PointOpRegistration
 {
     OpName name = OpName::Count;
-    std::function<std::unique_ptr<PointOp>()> create;
+    std::function<std::unique_ptr<PointOp>()> create; ///< 工厂 lambda（非实例）
 };
 
 class PointOpRegistry
 {
 public:
+    /** 注册一项；同名覆盖。 */
     static void add(PointOpRegistration reg);
 
     /** 注册项查询；未注册返回 nullptr。 */

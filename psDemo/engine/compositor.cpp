@@ -1,3 +1,8 @@
+/**
+ * compositor.cpp — compositor.h 实现（engine 层）。
+ *
+ * blendTileOnto 逐瓦片解预乘 → LayerModeOp::blendPixel → composite_union 写回。
+ */
 #include "compositor.h"
 
 #include "domain/blendmode.h"

@@ -1,9 +1,13 @@
+/**
+ * filterstack.cpp — FilterStack 节点管理与 FilterEval 串联求值（domain 层）。
+ */
 #include "filterstack.h"
 
 #include "engine/filtereval.h"
 
 namespace Ps {
 
+/** 追加到栈顶，返回新下标。 */
 int FilterStack::append(const FilterNode &node)
 {
     m_nodes.append(node);
@@ -35,6 +39,7 @@ bool FilterStack::hasEnabled() const
     return false;
 }
 
+/** 对 source 拷贝自底向顶应用已启用节点；无启用节点时原样返回。 */
 QImage FilterStack::apply(const QImage &source) const
 {
     if (source.isNull() || !hasEnabled())

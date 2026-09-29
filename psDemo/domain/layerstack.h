@@ -1,3 +1,8 @@
+/**
+ * layerstack.h — 自底向顶的图层列表，unique_ptr 独占所有权（domain 层）。
+ *
+ * 改栈方法 private + friend ImageDocument，入栈必经 addLayer 以挂 owner。
+ */
 #ifndef LAYERSTACK_H
 #define LAYERSTACK_H
 

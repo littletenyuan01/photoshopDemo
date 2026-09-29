@@ -1,3 +1,8 @@
+/**
+ * movetool.h — 移动工具声明（tools 层）。
+ *
+ * 点选活动层、拖拽平移 offset、绘制变换控件浮层（只显示不交互）。
+ */
 #ifndef MOVETOOL_H
 #define MOVETOOL_H
 

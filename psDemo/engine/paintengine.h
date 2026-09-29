@@ -1,3 +1,9 @@
+/**
+ * paintengine.h — 像素绘制门面（engine 层）。
+ *
+ * 工具/domain 的稳定 API；内部组装 OpContext 并经 OpRunner 调度缓冲算子。
+ * 返回层内坐标脏矩形，供 markDirty 驱动投影增量 sync。
+ */
 #ifndef PAINTENGINE_H
 #define PAINTENGINE_H
 
@@ -48,6 +54,7 @@ public:
                                qreal spacing = 0.25,
                                PaintSelectionClip clip = PaintSelectionClip());
 
+    /** 油漆桶洪泛；@return 层内坐标脏矩形。 */
     static QRect floodFill(TileBuffer &tiles,
                            const QPoint &seed,
                            const QColor &fillColor,
@@ -55,6 +62,7 @@ public:
                            bool contiguous,
                            PaintSelectionClip clip = PaintSelectionClip());
 
+    /** 渐变填充；@return 层内坐标脏矩形。 */
     static QRect fillGradient(TileBuffer &tiles,
                                const QPointF &start,
                                const QPointF &end,

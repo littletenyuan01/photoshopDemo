@@ -1,3 +1,8 @@
+/**
+ * recentdocuments.h — 最近打开/保存文档列表与缩略图缓存（app 层）。
+ *
+ * QSettings 持久化；供 HomeScreen 与「打开最近的文件」菜单使用。
+ */
 #ifndef RECENTDOCUMENTS_H
 #define RECENTDOCUMENTS_H
 
@@ -16,8 +21,8 @@ namespace Ps {
 class RecentDocuments
 {
 public:
-    static constexpr int kMaxRecent = 12;
-    static constexpr int kThumbEdge = 128;
+    static constexpr int kMaxRecent = 12;   ///< 最近列表上限
+    static constexpr int kThumbEdge = 128;  ///< 缩略图最长边（保比例缩放）
 
     /** 现存文件路径（已剔除丢失项）；最近在前。 */
     static QStringList paths();
@@ -35,8 +40,8 @@ public:
     static QImage thumbnail(const QString &path);
 
 private:
-    static QString normalized(const QString &path);
-    static QString thumbKey(const QString &normalizedPath);
+    static QString normalized(const QString &path);          ///< 绝对路径规范化
+    static QString thumbKey(const QString &normalizedPath);  ///< QSettings 缩略图键（SHA1）
 };
 
 } // namespace Ps

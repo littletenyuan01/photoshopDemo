@@ -1,3 +1,8 @@
+/**
+ * rulerwidget.h — 像素标尺自绘控件声明（ui 层）。
+ *
+ * setRange 设可见图像坐标范围；setCursorValue 画鼠标指示线。
+ */
 #ifndef RULERWIDGET_H
 #define RULERWIDGET_H
 
@@ -41,10 +46,10 @@ private:
     /** 选「好看」的主刻度步长（1/2/5×10^n）。 */
     static qreal niceStep(qreal rawStep);
 
-    Qt::Orientation m_orientation = Qt::Horizontal;
-    qreal m_lower = 0.0;
-    qreal m_upper = 100.0;
-    qreal m_cursor; // NaN = 不显示
+    Qt::Orientation m_orientation = Qt::Horizontal; ///< 水平（顶）或垂直（左）
+    qreal m_lower = 0.0;  ///< 标尺左/上端对应的图像坐标
+    qreal m_upper = 100.0; ///< 标尺右/下端对应的图像坐标
+    qreal m_cursor;        ///< 鼠标指示线位置；NaN = 不显示
 };
 
 #endif // RULERWIDGET_H

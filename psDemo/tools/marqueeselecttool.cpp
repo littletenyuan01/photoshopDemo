@@ -1,3 +1,6 @@
+/**
+ * marqueeselecttool.cpp — 矩形/椭圆选框工具实现（tools 层）。
+ */
 #include "marqueeselecttool.h"
 
 #include "domain/imagedocument.h"

@@ -1,3 +1,6 @@
+/**
+ * dockpanel.cpp — 右侧三 Tab 停靠壳实现（ui 层）。
+ */
 #include "dockpanel.h"
 #include "ui_layerpanel.h"
 

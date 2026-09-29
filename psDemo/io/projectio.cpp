@@ -1,3 +1,6 @@
+/**
+ * projectio.cpp — ProjectIo::save/load 与 v1 混合模式兼容（io 层）。
+ */
 #include "projectio.h"
 
 #include "domain/blendmode.h"

@@ -1,3 +1,8 @@
+/**
+ * filtereval.cpp — filtereval.h 实现（engine 层）。
+ *
+ * 按 OpName 分发；亮度/对比度在解预乘空间逐通道调整后再写回预乘像素。
+ */
 #include "filtereval.h"
 
 #include "domain/filternode.h"

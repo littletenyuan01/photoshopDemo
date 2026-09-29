@@ -1,3 +1,8 @@
+/**
+ * toolbox.h — 左侧工具箱声明（ui 层）。
+ *
+ * 17 占位 / 35 工具按 PS 分组；右键飞出子菜单；前/背景色区对齐 GIMP FgBgEditor。
+ */
 #ifndef TOOLBOX_H
 #define TOOLBOX_H
 

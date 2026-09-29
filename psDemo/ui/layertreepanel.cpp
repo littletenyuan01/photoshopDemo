@@ -1,3 +1,6 @@
+/**
+ * layertreepanel.cpp — 图层树面板实现（ui 层）。
+ */
 #include "layertreepanel.h"
 #include "ui_layertreepanel.h"
 

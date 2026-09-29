@@ -1,3 +1,8 @@
+/**
+ * toolbox.cpp — 左侧工具箱实现（ui 层）。
+ *
+ * ToolSlot 工厂、多档 DPR 图标光栅化、拾色器弹出。
+ */
 #include "toolbox.h"
 #include "ui_toolbox.h"
 #include "colorpickerdialog.h"

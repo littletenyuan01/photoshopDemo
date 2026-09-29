@@ -1,3 +1,9 @@
+/**
+ * premul.h — 预乘/解预乘工具（engine 层）。
+ *
+ * 缓冲与合成统一 ARGB32_Premultiplied；Compositor、缓冲算子、FilterEval 共用。
+ * 对照 GIMP 在 blend/composite 前解预乘、写回时再预乘的约定。
+ */
 #ifndef ENGINE_PREMUL_H
 #define ENGINE_PREMUL_H
 
@@ -6,6 +12,8 @@
 #include <QtGlobal>
 
 namespace Ps {
+
+/** 预乘/解预乘工具；缓冲格式统一 ARGB32_Premultiplied。 */
 namespace Premul {
 
 /** 直通 QColor → 预乘 ARGB32。 */

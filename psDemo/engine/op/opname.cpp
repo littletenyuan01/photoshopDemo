@@ -1,3 +1,8 @@
+/**
+ * opname.cpp — opname.h 实现（engine/op 层）。
+ *
+ * kOpNameTable 为唯一名字表；对照 gimp-layer-modes.c 的 GimpLayerModeInfo。
+ */
 #include "opname.h"
 
 namespace Ps {

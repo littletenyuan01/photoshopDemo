@@ -1,3 +1,8 @@
+/**
+ * toolmanager.h — 工具注册表与事件分发（tools 层）。
+ *
+ * 持有全部工具实例、切换活动工具、转发 repaint/cursor 信号给 CanvasView。
+ */
 #ifndef TOOLMANAGER_H
 #define TOOLMANAGER_H
 

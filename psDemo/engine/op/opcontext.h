@@ -1,3 +1,9 @@
+/**
+ * opcontext.h — 缓冲算子运行时上下文（engine/op 层）。
+ *
+ * tiles / clip / roi 由 PaintEngine 组装；OpRunner 校验 pad 后交给算子。
+ * 对照 GEGL OperationContext / pad 绑定。
+ */
 #ifndef ENGINE_OP_OPCONTEXT_H
 #define ENGINE_OP_OPCONTEXT_H
 
@@ -27,6 +33,7 @@ struct OpContext
      */
     QRect roi;
 
+    /** 从层瓦片与选区裁剪参数构造上下文（roi 默认空 = 整层）。 */
     static OpContext fromTiles(TileBuffer &tiles, const PaintSelectionClip &clip)
     {
         OpContext ctx;

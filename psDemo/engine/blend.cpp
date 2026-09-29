@@ -1,3 +1,8 @@
+/**
+ * blend.cpp — blend.h 实现（engine 层）。
+ *
+ * 逐通道与整像素（HSV/HSL）两套路径；Dissolve 由 Compositor 调 dissolveKeeps。
+ */
 #include "blend.h"
 
 #include <QtGlobal>

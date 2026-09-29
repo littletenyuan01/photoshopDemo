@@ -1,3 +1,8 @@
+/**
+ * imagesizedialog.h —「图像大小」对话框声明（ui 层）。
+ *
+ * 预览 + 宽高/单位/分辨率/重新采样；确认后回传目标像素尺寸。
+ */
 #ifndef IMAGESIZEDIALOG_H
 #define IMAGESIZEDIALOG_H
 
@@ -56,12 +61,12 @@ private:
     static QString formatDim(double value, DimUnit unit);
 
     Ui::ImageSizeDialog *ui;
-    Ps::ImageDocument *m_document = nullptr;
-    QImage m_previewSource;
-    int m_origW = 0;
-    int m_origH = 0;
-    double m_aspect = 1.0;
-    bool m_blockDim = false;
+    Ps::ImageDocument *m_document = nullptr; ///< 不拥有；用于读原始尺寸
+    QImage m_previewSource;                   ///< 左侧预览源图
+    int m_origW = 0;                          ///< 打开对话框时的原始宽（像素）
+    int m_origH = 0;                          ///< 打开对话框时的原始高（像素）
+    double m_aspect = 1.0;                    ///< 宽高比（锁链时用）
+    bool m_blockDim = false;                  ///< 同步宽↔高编辑时防递归
 };
 
 #endif // IMAGESIZEDIALOG_H

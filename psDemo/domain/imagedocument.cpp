@@ -1,3 +1,6 @@
+/**
+ * imagedocument.cpp — ImageDocument 图层/选区/几何/撤销与脏区广播（domain 层）。
+ */
 #include "imagedocument.h"
 
 #include "app/historystack.h"
@@ -16,6 +19,7 @@
 
 namespace Ps {
 
+/** 构造空文档：初始化选区 mask 与 HistoryStack。 */
 ImageDocument::ImageDocument(int width, int height, QObject *parent)
     : QObject(parent)
     , m_width(width)
@@ -129,6 +133,7 @@ std::unique_ptr<ImageDocument> ImageDocument::createBlank(int width, int height,
     return doc;
 }
 
+/** 入栈唯一入口：挂 owner、结构撤销、广播 structureChanged。 */
 int ImageDocument::addLayer(std::unique_ptr<Layer> layer)
 {
     if (!layer)
@@ -332,6 +337,7 @@ void ImageDocument::replaceSelectionMask(const QImage &mask)
     emit selectionChanged();
 }
 
+/** 累计脏区并使活动层内容包围盒缓存失效。 */
 void ImageDocument::markDirty(const QRect &rect)
 {
     if (rect.isEmpty())
@@ -455,6 +461,7 @@ int ImageDocument::addTransparentLayer(const QString &name)
     return index;
 }
 
+/** 深拷贝像素、属性与滤镜栈，插入源层上方。 */
 int ImageDocument::duplicateLayer(int index)
 {
     Layer *src = m_layers.layerAt(index);
@@ -517,6 +524,7 @@ bool ImageDocument::removeLayer(int index)
     return true;
 }
 
+/** 图像大小：各层 Smooth 重采样，选区最近邻缩放。 */
 void ImageDocument::scaleImage(int newWidth, int newHeight)
 {
     newWidth = qMax(1, newWidth);
@@ -554,6 +562,7 @@ void ImageDocument::scaleImage(int newWidth, int newHeight)
     emit contentChanged();
 }
 
+/** 画布大小：按锚点偏移贴入各层，背景层可填扩展色。 */
 void ImageDocument::resizeCanvas(int newWidth, int newHeight,
                                  int anchorRow, int anchorCol,
                                  const QColor &extensionColor)

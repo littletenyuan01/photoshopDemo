@@ -1,3 +1,6 @@
+/**
+ * channeltreepanel.cpp — 通道树面板实现（ui 层）。
+ */
 #include "channeltreepanel.h"
 #include "ui_channeltreepanel.h"
 

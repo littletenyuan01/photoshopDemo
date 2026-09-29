@@ -1,3 +1,8 @@
+/**
+ * painttypes.h — 绘制共享类型（engine 层）。
+ *
+ * PaintMode / GradientType 供 tools、UI、PaintEngine、ops 共用，避免 UI 拉入算子头。
+ */
 #ifndef ENGINE_PAINTTYPES_H
 #define ENGINE_PAINTTYPES_H
 

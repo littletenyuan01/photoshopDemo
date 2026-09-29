@@ -1,3 +1,8 @@
+/**
+ * floodfillop.cpp — floodfillop.h 实现（engine/op 层）。
+ *
+ * BFS/全窗口扫色 + 三态掩码；只写命中 bbox 覆盖的瓦片，避免 setFromImage 整层回写。
+ */
 #include "floodfillop.h"
 
 #include "paintclip.h"

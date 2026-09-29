@@ -1,3 +1,8 @@
+/**
+ * colorpickerdialog.h — PS 风格拾色器声明（ui 层）。
+ *
+ * 二维色板 + 色相滑杆 + HSB/RGB/Lab/CMYK/Hex；自定义绘制控件嵌入 .ui 占位容器。
+ */
 #ifndef COLORPICKERDIALOG_H
 #define COLORPICKERDIALOG_H
 
@@ -26,6 +31,7 @@ class ColorPickerDialog : public QDialog
     Q_OBJECT
 
 public:
+    /** 拾色目标：前景或背景（影响对话框标题与默认文案）。 */
     enum class Mode { Foreground, Background };
 
     explicit ColorPickerDialog(const QColor &initial,

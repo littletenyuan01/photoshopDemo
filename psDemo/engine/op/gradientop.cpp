@@ -1,3 +1,8 @@
+/**
+ * gradientop.cpp — gradientop.h 实现（engine/op 层）。
+ *
+ * 五种 GradientType 因子函数；逐瓦片 SourceOver 写回，无需整层临时图。
+ */
 #include "gradientop.h"
 
 #include "paintclip.h"

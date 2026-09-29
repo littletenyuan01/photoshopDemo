@@ -1,3 +1,6 @@
+/**
+ * recentdocuments.cpp — RecentDocuments 的 QSettings 持久化实现（app 层）。
+ */
 #include "recentdocuments.h"
 
 #include <QBuffer>

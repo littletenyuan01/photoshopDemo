@@ -1,3 +1,9 @@
+/**
+ * compositor.h — 图层合成器（engine 层）。
+ *
+ * 只读文档、输出投影预览；blend（颜色）与 composite_union（Alpha）分工。
+ * 对照 GIMP layer-modes composite；Phase 7 支持 compositeRegion 脏区就地更新。
+ */
 #ifndef COMPOSITOR_H
 #define COMPOSITOR_H
 

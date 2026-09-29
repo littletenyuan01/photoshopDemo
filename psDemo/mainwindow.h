@@ -1,3 +1,8 @@
+/**
+ * mainwindow.h — 主窗口壳：菜单接线与会话装配（app 层）。
+ *
+ * 布局在 mainwindow.ui；文档切换经 AppSession 广播，不再逐个 setDocument。
+ */
 #ifndef MAINWINDOW_H
 #define MAINWINDOW_H
 
@@ -65,6 +70,7 @@ protected:
     void closeEvent(QCloseEvent *event) override;
 
 private slots:
+    // —— 文件 / 编辑 / 图层 / 图像 / 视图 / 窗口 / 帮助（菜单 action 槽）——
     void onNewDocument();
     void onOpenDocument();
     void onSaveDocument();
@@ -139,9 +145,9 @@ private:
     void applyDefaultRightColumnSizes();
 
     Ui::MainWindow *ui;
-    Ps::AppSession *m_session = nullptr;
-    QMetaObject::Connection m_historyConn;
-    QMetaObject::Connection m_docStatusConn;
+    Ps::AppSession *m_session = nullptr; ///< 当前文档持有者与广播中心
+    QMetaObject::Connection m_historyConn;   ///< 活动文档 HistoryStack::changed
+    QMetaObject::Connection m_docStatusConn; ///< 活动文档 contentChanged → 标题/状态栏
     bool m_rightColumnUserSized = false; ///< 用户拖过分隔条后，不再套用默认比例
     bool m_closeConfirming = false;      ///< 正在弹退出确认框（防重入）
 };

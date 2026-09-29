@@ -1,3 +1,6 @@
+/**
+ * rasterio.cpp — RasterIo::exportFile 实现（io 层）。
+ */
 #include "rasterio.h"
 
 #include "domain/imagedocument.h"

@@ -1,3 +1,8 @@
+/**
+ * painttool.h — 画笔/橡皮工具声明（tools 层）。
+ *
+ * 同一类承担 Brush 与 Eraser；事件→dab 插值，像素写入 PaintEngine。
+ */
 #ifndef PAINTTOOL_H
 #define PAINTTOOL_H
 

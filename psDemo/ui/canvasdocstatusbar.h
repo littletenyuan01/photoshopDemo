@@ -1,3 +1,8 @@
+/**
+ * canvasdocstatusbar.h — 画布底栏状态条声明（ui 层）。
+ *
+ * 缩放%、文档信息、显示菜单；对齐 PS 文档窗口底栏左侧。
+ */
 #ifndef CANVASDOCSTATUSBAR_H
 #define CANVASDOCSTATUSBAR_H
 

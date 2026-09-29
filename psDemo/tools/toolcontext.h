@@ -1,3 +1,8 @@
+/**
+ * toolcontext.h — 工具运行上下文与 ViewPort 接口（tools 层）。
+ *
+ * 由 CanvasView 填好文档/颜色/笔刷/视图变换；工具只读，不反向依赖 UI。
+ */
 #ifndef TOOLCONTEXT_H
 #define TOOLCONTEXT_H
 

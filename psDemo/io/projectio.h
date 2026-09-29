@@ -1,3 +1,8 @@
+/**
+ * projectio.h — `.pslite` 工程文件读写（io 层）。
+ *
+ * 对照 GIMP XCF 的最小子集；与 ImageDocument / Layer / Selection 配合。
+ */
 #ifndef PROJECTIO_H
 #define PROJECTIO_H
 

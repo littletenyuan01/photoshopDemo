@@ -1,3 +1,8 @@
+/**
+ * tooloptionsbar.h — 工具选项栏声明（ui 层）。
+ *
+ * QStackedWidget 按工具族整块切换；已接线画笔/油漆桶/渐变参数，其余多为占位。
+ */
 #ifndef TOOLOPTIONSBAR_H
 #define TOOLOPTIONSBAR_H
 

@@ -1,3 +1,8 @@
+/**
+ * channeltreepanel.h — 通道树面板声明（ui 层）。
+ *
+ * 缩略图由合成图推算；防抖 + 增量更新 + 不可见时跳过刷新。
+ */
 #ifndef CHANNELTREEPANEL_H
 #define CHANNELTREEPANEL_H
 
