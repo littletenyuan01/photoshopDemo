@@ -56,10 +56,6 @@ LayerTreePanel::LayerTreePanel(QWidget *parent)
     connect(ui->itemList, &QListWidget::itemChanged,
             this, &LayerTreePanel::onItemChanged);
 
-    // ListMode 下列表行高交给代理/样式；勿设怪异 gridSize
-    ui->itemList->setViewMode(QListView::ListMode);
-    ui->itemList->setUniformItemSizes(false);
-
     // —— 缩略图防抖 ——
     // 单次触发：连发多次 contentChanged（画笔拖动）只会重算一次
     m_thumbTimer = new QTimer(this);

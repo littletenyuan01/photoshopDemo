@@ -20,19 +20,20 @@
 - [x] 活动层绘制
 - [x] **结构收口（留缝）**：信号分级 + 语义化 setter + 累计脏区（见 [docs/ui/ui-review.md](../docs/ui/ui-review.md)）
 - [x] **附带收口**：抽出 `tools/` 工具层与 `app/AppSession` 广播（越晚做越贵的结构债）
-- [ ] 撤销 / 重做 ← **下一步**（Phase 6，收口点已就位）
+- [x] 撤销 / 重做（`HistoryStack` + 四类 UndoItem；Ctrl+Z / Ctrl+Y）
 
 ## Phase 3 — 链路闭合
 
-- [ ] 导出 PNG / JPEG
-- [ ] 菜单与快捷键整理
-- [ ] 按 Wiki 自测整条演示路径
+- [x] 导出 PNG / JPEG（`RasterIo`；文件→导出 / 导出为…）
+- [x] 菜单与快捷键整理（缩放、选区、撤销、清除/填充、空格平移、X/D、[ ] 笔刷…）
+- [x] 按 Wiki 自测整条演示路径（见 [Feature-Pipeline.md](Feature-Pipeline.md)「自测脚本」）
 
 ## Phase 4 — 简历打磨（可选）
 
-- [ ] 截图 / 简短演示说明
-- [ ] README 与 Wiki 对齐
-- [ ] 控制总代码量，删掉无用实验代码
+- [x] 截图 / 简短演示说明（`wiki/Demo.md`；静态图见 `docs/images/`；整窗 `workspace.png` 可自行补拍）
+- [x] README 与 Wiki 对齐（能力表、结构、演示入口、简历话术）
+- [x] 控制总代码量：盘点无孤立实验源文件（`psDemo.pro` 与目录一致）；未做破坏性删减
+  - 通道/路径面板等 UI 占位**保留**（对齐 PS 壳，tooltip 已标未接入）
 
 ## Phase 6 — 撤销与命令层（架构核心 ①）
 
@@ -42,15 +43,15 @@
 
 > 【前置已就位】`ImageDocument` 的语义化 setter（`setLayerVisible/Opacity/Name/BlendMode`）已是唯一的属性变更入口，push 只需加在这里；不透明度滑条已改为「松手才提交」，保证一次操作 = 一次状态变更。见 [docs/ui/ui-review.md](../docs/ui/ui-review.md)。
 
-- [ ] `push` 入口最小集合（先做这 4 类即可闭环）：
-  - [ ] `pushDrawablePixels` — 像素改动（画笔/橡皮/滤镜），按脏矩形存快照
-  - [ ] `pushLayerProp` — 显隐 / 不透明度 / 名称 / 混合模式
-  - [ ] `pushLayerStructure` — 新建 / 删除 / 上移 / 下移 / 合并
-  - [ ] `pushDocumentProp` — 尺寸 / 分辨率 / 活动层
-- [ ] `HistoryStack`：undo/redo 双栈 + 内存上限（超限丢最老）
-- [ ] **命令层收口**：所有改文档状态的 UI 动作统一走命令入口，入口内自动 push
-- [ ] 菜单/快捷键接线：Ctrl+Z / Ctrl+Shift+Z，`编辑` 菜单项解除灰色
-- [ ] 【约束】代码评审口径：**改文档状态而不 push = bug**
+- [x] `push` 入口最小集合（先做这 4 类即可闭环）：
+  - [x] `pushDrawablePixels` — 像素改动（画笔/橡皮/滤镜），整层快照（脏矩形优化后置）
+  - [x] `pushLayerProp` — 显隐 / 不透明度 / 名称 / 混合模式 / 偏移
+  - [x] `pushLayerStructure` — 新建 / 删除 / 复制
+  - [x] `pushDocumentProp` — 图像大小 / 画布大小（`DocumentGeomUndo`）
+- [x] `HistoryStack`：undo/redo 双栈 + 内存上限（超限丢最老）
+- [ ] **命令层收口**：所有改文档状态的 UI 动作统一走命令入口，入口内自动 push（目前各入口手动 push）
+- [x] 菜单/快捷键接线：Ctrl+Z / Ctrl+Y，`编辑` 撤销/重做/清除/填充已解除灰色
+- [x] 【约束】代码评审口径：**改文档状态而不 push = bug**
 
 ## Phase 7 — 投影与脏区分块（架构核心 ②，v1 后加强）
 

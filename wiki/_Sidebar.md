@@ -3,6 +3,7 @@
 - [首页](Home)
 - [项目目标](Project-Goals)
 - [功能链路](Feature-Pipeline)
+- [演示说明](Demo)
 - [架构设计](Architecture)
 - [构建与运行](Build)
 - [开发路线](Roadmap)

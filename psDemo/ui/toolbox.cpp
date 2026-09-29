@@ -150,13 +150,23 @@ void ToolBox::onPickBackground()
 
 void ToolBox::onSwapColors()
 {
+    swapColors();
+}
+
+void ToolBox::onDefaultColors()
+{
+    resetDefaultColors();
+}
+
+void ToolBox::swapColors()
+{
     qSwap(m_fg, m_bg);
     updateColorButtons();
     emit foregroundColorChanged(m_fg);
     emit backgroundColorChanged(m_bg);
 }
 
-void ToolBox::onDefaultColors()
+void ToolBox::resetDefaultColors()
 {
     m_fg = Qt::black;
     m_bg = Qt::white;
@@ -185,21 +195,11 @@ void ToolBox::setBackgroundColor(const QColor &color)
 
 void ToolBox::updateColorButtons()
 {
-    // 前景始终画在上层、浅色粗边；背景在下层右下角 —— 交换只改 fill，不改前后位置
+    // 边框/圆角在 toolbox.ui；此处只改运行时前景/背景色
     ui->fgButton->setStyleSheet(
-        QStringLiteral("QPushButton#fgButton {"
-                       " background-color: %1;"
-                       " border: 2px solid #f0f0f0;"
-                       " border-radius: 1px;"
-                       "}")
-            .arg(m_fg.name()));
+        QStringLiteral("QPushButton#fgButton { background-color: %1; }").arg(m_fg.name()));
     ui->bgButton->setStyleSheet(
-        QStringLiteral("QPushButton#bgButton {"
-                       " background-color: %1;"
-                       " border: 1px solid #111;"
-                       " border-radius: 1px;"
-                       "}")
-            .arg(m_bg.name()));
+        QStringLiteral("QPushButton#bgButton { background-color: %1; }").arg(m_bg.name()));
     ui->fgButton->raise();
     ui->fgButton->setToolTip(tr("前景色（画笔等使用）\n当前：%1").arg(m_fg.name()));
     ui->bgButton->setToolTip(tr("背景色\n当前：%1").arg(m_bg.name()));
@@ -301,7 +301,7 @@ void ToolBox::addSlot(const QVector<ToolItem> &items)
     auto *btn = new QToolButton(ui->toolsHost);
     btn->setCheckable(true);
     btn->setAutoRaise(true);
-    btn->setFixedSize(36, 32);
+    // 尺寸见 toolbox.ui：QWidget#toolsHost > QToolButton
     btn->setContextMenuPolicy(Qt::CustomContextMenu);
     // 右键弹出同组工具（Photoshop 飞出菜单行为）
     connect(btn, &QWidget::customContextMenuRequested, this,
@@ -337,8 +337,8 @@ void ToolBox::buildToolSlots()
              {Ps::ToolId::EllipseSelect, icon("ellipse-select"), tr("椭圆选框工具"), QStringLiteral("M")}});
 
     // 套索（L）
-    addSlot({{Ps::ToolId::Lasso, icon("lasso"), tr("套索工具"), QStringLiteral("L")},
-             {Ps::ToolId::PolygonalLasso, icon("lasso-alt"), tr("多边形套索工具"), QStringLiteral("L")},
+    addSlot({{Ps::ToolId::Lasso, icon("lasso-alt"), tr("套索工具"), QStringLiteral("L")},
+             {Ps::ToolId::PolygonalLasso, icon("lasso"), tr("多边形套索工具"), QStringLiteral("L")},
              {Ps::ToolId::MagneticLasso, icon("magnetic-lasso"), tr("磁性套索工具"), QStringLiteral("L")}});
 
     // 快速选择（W）

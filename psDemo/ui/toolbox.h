@@ -40,6 +40,11 @@ public:
     QColor foregroundColor() const { return m_fg; }
     QColor backgroundColor() const { return m_bg; }
 
+    /** 交换前/背景色（对齐 PS 快捷键 X）。 */
+    void swapColors();
+    /** 恢复黑前景 / 白背景（对齐 PS 快捷键 D）。 */
+    void resetDefaultColors();
+
 public slots:
     void setCurrentTool(Ps::ToolId id);
     void setForegroundColor(const QColor &color);

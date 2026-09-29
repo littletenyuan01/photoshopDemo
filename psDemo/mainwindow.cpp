@@ -13,6 +13,7 @@
 #include "engine/compositor.h"
 #include "io/projectio.h"
 #include "io/psdio.h"
+#include "io/rasterio.h"
 #include "ui/canvassizedialog.h"
 #include "ui/colorspanel.h"
 #include "ui/homescreen.h"
@@ -25,12 +26,19 @@
 #include <QAbstractButton>
 #include <QAction>
 #include <QCloseEvent>
+#include <QDir>
 #include <QFileDialog>
 #include <QFileInfo>
 #include <QImageReader>
+#include <QKeySequence>
 #include <QMessageBox>
 #include <QPushButton>
+#include <QAbstractSpinBox>
+#include <QLineEdit>
+#include <QShortcut>
 #include <QSplitter>
+#include <QTextEdit>
+#include <QTimer>
 
 #include <memory>
 
@@ -74,6 +82,12 @@ void MainWindow::setupMenus()
     ui->actionSaveAs->setToolTip(tr("另存为 PhotoshopLite 工程（.pslite）"));
     connect(ui->actionSave, &QAction::triggered, this, &MainWindow::onSaveDocument);
     connect(ui->actionSaveAs, &QAction::triggered, this, &MainWindow::onSaveDocumentAs);
+    ui->actionExport->setEnabled(true);
+    ui->actionExport->setToolTip(tr("把当前合成结果导出为 PNG（不改工程文件）"));
+    ui->actionExportAs->setEnabled(true);
+    ui->actionExportAs->setToolTip(tr("导出为 PNG 或 JPEG"));
+    connect(ui->actionExport, &QAction::triggered, this, &MainWindow::onExportPng);
+    connect(ui->actionExportAs, &QAction::triggered, this, &MainWindow::onExportAs);
     connect(ui->actionExit, &QAction::triggered, this, &QWidget::close);
 
     connect(ui->actionImageSize, &QAction::triggered, this, &MainWindow::onImageSize);
@@ -81,6 +95,48 @@ void MainWindow::setupMenus()
 
     connect(ui->actionLayerNew, &QAction::triggered, this, &MainWindow::onNewLayer);
     connect(ui->actionLayerDuplicate, &QAction::triggered, this, &MainWindow::onDuplicateLayer);
+    ui->actionLayerDuplicate->setShortcut(QKeySequence(QStringLiteral("Ctrl+J")));
+    ui->actionLayerDuplicate->setToolTip(tr("复制当前图层"));
+    ui->actionLayerDelete->setEnabled(true);
+    ui->actionLayerDelete->setToolTip(tr("删除当前图层（至少保留一层）"));
+    connect(ui->actionLayerDelete, &QAction::triggered, this, &MainWindow::onDeleteLayer);
+
+    ui->actionExportAs->setShortcut(QKeySequence(QStringLiteral("Ctrl+Alt+Shift+W")));
+    ui->actionStepForward->setShortcuts({
+        QKeySequence(QStringLiteral("Ctrl+Shift+Z")),
+        QKeySequence(QStringLiteral("Ctrl+Y")),
+    });
+
+    // 画笔直径 [ / ]（对齐 PS）；Shift 步进 10
+    auto *brushDown = new QShortcut(QKeySequence(Qt::Key_BracketLeft), this);
+    auto *brushUp = new QShortcut(QKeySequence(Qt::Key_BracketRight), this);
+    auto *brushDownFast = new QShortcut(QKeySequence(Qt::SHIFT | Qt::Key_BracketLeft), this);
+    auto *brushUpFast = new QShortcut(QKeySequence(Qt::SHIFT | Qt::Key_BracketRight), this);
+    const auto nudgeBrush = [this](int delta) {
+        const int next = ui->toolOptionsBar->brushDiameter() + delta;
+        ui->toolOptionsBar->setBrushDiameter(next);
+        onBrushDiameterChanged(ui->toolOptionsBar->brushDiameter());
+    };
+    connect(brushDown, &QShortcut::activated, this, [nudgeBrush]() { nudgeBrush(-1); });
+    connect(brushUp, &QShortcut::activated, this, [nudgeBrush]() { nudgeBrush(1); });
+    connect(brushDownFast, &QShortcut::activated, this, [nudgeBrush]() { nudgeBrush(-10); });
+    connect(brushUpFast, &QShortcut::activated, this, [nudgeBrush]() { nudgeBrush(10); });
+
+    const auto typingInField = [this]() -> bool {
+        QWidget *w = focusWidget();
+        return qobject_cast<QLineEdit *>(w) || qobject_cast<QAbstractSpinBox *>(w)
+               || qobject_cast<QTextEdit *>(w);
+    };
+    auto *swapColors = new QShortcut(QKeySequence(Qt::Key_X), this);
+    auto *defaultColors = new QShortcut(QKeySequence(Qt::Key_D), this);
+    connect(swapColors, &QShortcut::activated, this, [this, typingInField]() {
+        if (!typingInField())
+            ui->toolBox->swapColors();
+    });
+    connect(defaultColors, &QShortcut::activated, this, [this, typingInField]() {
+        if (!typingInField())
+            ui->toolBox->resetDefaultColors();
+    });
 
     // —— 选择（矩形选区已实现：全选 / 取消 / 反选）——
     ui->actionSelectAll->setEnabled(true);
@@ -93,7 +149,14 @@ void MainWindow::setupMenus()
     connect(ui->actionSelectDeselect, &QAction::triggered, this, &MainWindow::onSelectDeselect);
     connect(ui->actionSelectInverse, &QAction::triggered, this, &MainWindow::onSelectInverse);
 
-    // —— 编辑：撤销 / 重做（对照 GIMP Edit→Undo/Redo）——
+    // —— 编辑：清除 / 填充 / 撤销 / 重做 ——
+    ui->actionClear->setEnabled(true);
+    ui->actionClear->setToolTip(tr("清除选区或整层像素（透明）"));
+    ui->actionFill->setEnabled(true);
+    ui->actionFill->setToolTip(tr("用前景色填充选区或整层"));
+    connect(ui->actionClear, &QAction::triggered, this, &MainWindow::onClear);
+    connect(ui->actionFill, &QAction::triggered, this, &MainWindow::onFill);
+
     ui->actionUndo->setEnabled(false);
     ui->actionUndo->setToolTip(tr("还原"));
     ui->actionStepForward->setEnabled(false);
@@ -124,20 +187,54 @@ void MainWindow::setupSession()
     ui->dockPanel->setSession(m_session);
     ui->propertiesPanel->setSession(m_session); // 「属性」页展示真实文档/图层数据
     connect(m_session, &Ps::AppSession::documentChanged,
-            this, &MainWindow::onDocumentChangedForHistory);
+            this, &MainWindow::onDocumentChanged);
 }
 
-void MainWindow::onDocumentChangedForHistory(Ps::ImageDocument *doc)
+void MainWindow::onDocumentChanged(Ps::ImageDocument *doc)
 {
     if (m_historyConn) {
         disconnect(m_historyConn);
         m_historyConn = {};
     }
+    if (m_docStatusConn) {
+        disconnect(m_docStatusConn);
+        m_docStatusConn = {};
+    }
     if (doc) {
         m_historyConn = connect(&doc->history(), &Ps::HistoryStack::changed,
                                 this, &MainWindow::updateUndoRedoActions);
+        // 像素/属性/结构变化都会标脏并走 contentChanged → 刷新 * 与路径
+        m_docStatusConn = connect(doc, &Ps::ImageDocument::contentChanged,
+                                  this, &MainWindow::refreshDocumentPathStatus);
     }
     updateUndoRedoActions();
+    refreshDocumentPathStatus();
+}
+
+void MainWindow::refreshDocumentPathStatus()
+{
+    Ps::ImageDocument *doc = m_session ? m_session->document() : nullptr;
+    if (!doc) {
+        setWindowTitle(tr("PhotoshopLite"));
+        statusBar()->clearMessage();
+        return;
+    }
+
+    QString pathText = doc->filePath().isEmpty()
+                           ? tr("未标题-1")
+                           : QDir::toNativeSeparators(doc->filePath());
+    if (doc->isDirty())
+        pathText.prepend(QLatin1Char('*'));
+
+    setWindowTitle(tr("%1 - PhotoshopLite").arg(pathText));
+    // timeout 0：常驻显示路径（有临时 flash 时会被盖住，结束后再刷回来）
+    statusBar()->showMessage(pathText);
+}
+
+void MainWindow::flashStatusMessage(const QString &message, int ms)
+{
+    statusBar()->showMessage(message, ms);
+    QTimer::singleShot(ms, this, [this]() { refreshDocumentPathStatus(); });
 }
 
 void MainWindow::updateUndoRedoActions()
@@ -262,7 +359,7 @@ void MainWindow::onToolChanged(Ps::ToolId id)
     ui->toolOptionsBar->setCurrentTool(id);
     ui->canvasWorkspace->canvasView()->setCurrentTool(id);
     // 工具提示语显示在状态栏（选项条里只放参数，对齐 PS）
-    statusBar()->showMessage(ui->toolOptionsBar->currentHint(), 4000);
+    flashStatusMessage(ui->toolOptionsBar->currentHint(), 4000);
 }
 
 void MainWindow::onBrushDiameterChanged(int diameter)
@@ -290,8 +387,7 @@ void MainWindow::onNewDocument()
     const QSize size = dialog.documentSize();
     m_session->setDocument(Ps::ImageDocument::createBlank(size.width(), size.height(), Qt::white));
     onShowWorkspace();
-    statusBar()->showMessage(
-        tr("已新建 %1×%2 文档").arg(size.width()).arg(size.height()), 3000);
+    flashStatusMessage(tr("已新建 %1×%2 文档").arg(size.width()).arg(size.height()), 3000);
 }
 
 void MainWindow::onOpenDocument()
@@ -326,7 +422,7 @@ bool MainWindow::openPath(const QString &path)
         m_session->setDocument(std::move(doc));
         rememberRecent(path);
         onShowWorkspace();
-        statusBar()->showMessage(tr("已打开工程：%1").arg(path), 4000);
+        flashStatusMessage(tr("已打开工程：%1").arg(path), 4000);
         return true;
     }
 
@@ -358,7 +454,7 @@ bool MainWindow::openPath(const QString &path)
     Ps::RecentDocuments::setThumbnail(path, image);
     rebuildRecentMenu();
     onShowWorkspace();
-    statusBar()->showMessage(tr("已打开：%1").arg(path), 4000);
+    flashStatusMessage(tr("已打开：%1").arg(path), 4000);
     return true;
 }
 
@@ -406,7 +502,8 @@ bool MainWindow::saveDocumentTo(const QString &path)
     doc->setFilePath(path);
     doc->clearDirty();
     rememberRecent(path);
-    statusBar()->showMessage(
+    refreshDocumentPathStatus();
+    flashStatusMessage(
         asPsd ? tr("已存储 PSD（子集）：%1").arg(path)
               : tr("已存储工程：%1").arg(path),
         4000);
@@ -479,6 +576,87 @@ void MainWindow::onSaveDocumentAs()
     saveDocumentAsDialog(/*forcePslite=*/false);
 }
 
+QString MainWindow::suggestExportPath(const QString &suffix) const
+{
+    Ps::ImageDocument *doc = m_session ? m_session->document() : nullptr;
+    QString base = QStringLiteral("untitled");
+    if (doc && !doc->filePath().isEmpty()) {
+        const QFileInfo info(doc->filePath());
+        base = info.completeBaseName();
+        if (!info.absolutePath().isEmpty())
+            return info.absolutePath() + QLatin1Char('/') + base + QLatin1Char('.') + suffix;
+    }
+    return base + QLatin1Char('.') + suffix;
+}
+
+bool MainWindow::exportCompositeTo(const QString &path)
+{
+    Ps::ImageDocument *doc = m_session ? m_session->document() : nullptr;
+    if (!doc) {
+        QMessageBox::information(this, tr("导出"), tr("当前没有文档。"));
+        return false;
+    }
+    QString err;
+    if (!Ps::RasterIo::exportFile(*doc, path, &err)) {
+        QMessageBox::warning(this, tr("导出失败"), err);
+        return false;
+    }
+    flashStatusMessage(tr("已导出：%1").arg(QDir::toNativeSeparators(path)), 4000);
+    return true;
+}
+
+void MainWindow::onExportPng()
+{
+    Ps::ImageDocument *doc = m_session ? m_session->document() : nullptr;
+    if (!doc) {
+        QMessageBox::information(this, tr("导出"), tr("当前没有文档。"));
+        return;
+    }
+    if (doc->filePath().isEmpty()) {
+        QString path = QFileDialog::getSaveFileName(
+            this, tr("快速导出为 PNG"), suggestExportPath(QStringLiteral("png")),
+            tr("PNG 图像 (*.png)"));
+        if (path.isEmpty())
+            return;
+        if (!path.endsWith(QStringLiteral(".png"), Qt::CaseInsensitive))
+            path += QStringLiteral(".png");
+        exportCompositeTo(path);
+        return;
+    }
+    exportCompositeTo(suggestExportPath(QStringLiteral("png")));
+}
+
+void MainWindow::onExportAs()
+{
+    const QString pngFilter = tr("PNG 图像 (*.png)");
+    const QString jpegFilter = tr("JPEG 图像 (*.jpg *.jpeg)");
+    QString selected = pngFilter;
+    QString path = QFileDialog::getSaveFileName(
+        this, tr("导出为"), suggestExportPath(QStringLiteral("png")),
+        pngFilter + QStringLiteral(";;") + jpegFilter, &selected);
+    if (path.isEmpty())
+        return;
+
+    const bool wantJpeg = selected.contains(QStringLiteral("*.jpg"), Qt::CaseInsensitive)
+                          || path.endsWith(QStringLiteral(".jpg"), Qt::CaseInsensitive)
+                          || path.endsWith(QStringLiteral(".jpeg"), Qt::CaseInsensitive);
+    if (wantJpeg) {
+        if (path.endsWith(QStringLiteral(".png"), Qt::CaseInsensitive))
+            path.chop(4);
+        if (!path.endsWith(QStringLiteral(".jpg"), Qt::CaseInsensitive)
+            && !path.endsWith(QStringLiteral(".jpeg"), Qt::CaseInsensitive))
+            path += QStringLiteral(".jpg");
+    } else {
+        if (path.endsWith(QStringLiteral(".jpg"), Qt::CaseInsensitive))
+            path.chop(4);
+        else if (path.endsWith(QStringLiteral(".jpeg"), Qt::CaseInsensitive))
+            path.chop(5);
+        if (!path.endsWith(QStringLiteral(".png"), Qt::CaseInsensitive))
+            path += QStringLiteral(".png");
+    }
+    exportCompositeTo(path);
+}
+
 void MainWindow::onNewLayer()
 {
     Ps::ImageDocument *doc = m_session ? m_session->document() : nullptr;
@@ -492,8 +670,7 @@ void MainWindow::onNewLayer()
         return;
 
     const Ps::Layer *layer = doc->layers().layerAt(index);
-    statusBar()->showMessage(
-        tr("已新建：%1").arg(layer ? layer->name() : tr("图层")), 3000);
+    flashStatusMessage(tr("已新建：%1").arg(layer ? layer->name() : tr("图层")), 3000);
 }
 
 void MainWindow::onDuplicateLayer()
@@ -513,8 +690,21 @@ void MainWindow::onDuplicateLayer()
     if (index < 0)
         return;
     const Ps::Layer *layer = doc->layers().layerAt(index);
-    statusBar()->showMessage(
-        tr("已复制：%1").arg(layer ? layer->name() : tr("图层")), 3000);
+    flashStatusMessage(tr("已复制：%1").arg(layer ? layer->name() : tr("图层")), 3000);
+}
+
+void MainWindow::onDeleteLayer()
+{
+    Ps::ImageDocument *doc = m_session ? m_session->document() : nullptr;
+    if (!doc) {
+        QMessageBox::information(this, tr("删除图层"), tr("当前没有打开的文档。"));
+        return;
+    }
+    if (!doc->removeLayer(doc->activeLayerIndex())) {
+        QMessageBox::information(this, tr("删除图层"), tr("至少保留一个图层。"));
+        return;
+    }
+    flashStatusMessage(tr("已删除图层"), 3000);
 }
 
 void MainWindow::onImageSize()
@@ -533,10 +723,10 @@ void MainWindow::onImageSize()
     const QSize size = dialog.resultPixelSize();
     if (!dialog.resampleEnabled()) {
         // 未勾选重新采样：像素不变（PPI 尚未写入 domain）
-        statusBar()->showMessage(tr("未重新采样：像素尺寸保持 %1×%2")
-                                     .arg(doc->width())
-                                     .arg(doc->height()),
-                                 3000);
+        flashStatusMessage(tr("未重新采样：像素尺寸保持 %1×%2")
+                               .arg(doc->width())
+                               .arg(doc->height()),
+                           3000);
         return;
     }
     if (size.width() == doc->width() && size.height() == doc->height())
@@ -544,7 +734,7 @@ void MainWindow::onImageSize()
 
     doc->scaleImage(size.width(), size.height());
     ui->canvasWorkspace->canvasView()->zoomFit();
-    statusBar()->showMessage(
+    flashStatusMessage(
         tr("图像大小已改为 %1×%2").arg(size.width()).arg(size.height()), 3000);
 }
 
@@ -568,7 +758,7 @@ void MainWindow::onCanvasSize()
     doc->resizeCanvas(size.width(), size.height(), dialog.anchorRow(), dialog.anchorCol(),
                       dialog.extensionColor());
     ui->canvasWorkspace->canvasView()->zoomFit();
-    statusBar()->showMessage(
+    flashStatusMessage(
         tr("画布大小已改为 %1×%2").arg(size.width()).arg(size.height()), 3000);
 }
 
@@ -693,4 +883,22 @@ void MainWindow::onSelectInverse()
 {
     if (Ps::ImageDocument *doc = m_session->document())
         doc->invertSelection();
+}
+
+void MainWindow::onClear()
+{
+    Ps::ImageDocument *doc = m_session->document();
+    if (!doc)
+        return;
+    if (!doc->clearActiveLayerPixels())
+        flashStatusMessage(tr("无法清除：无可见活动层"));
+}
+
+void MainWindow::onFill()
+{
+    Ps::ImageDocument *doc = m_session->document();
+    if (!doc)
+        return;
+    if (!doc->fillActiveLayer(ui->toolBox->foregroundColor()))
+        flashStatusMessage(tr("无法填充：无可见活动层"));
 }

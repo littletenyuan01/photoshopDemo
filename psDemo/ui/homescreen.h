@@ -4,7 +4,6 @@
 #include <QWidget>
 
 class QFrame;
-class QLabel;
 
 QT_BEGIN_NAMESPACE
 namespace Ui {
@@ -18,7 +17,8 @@ QT_END_NAMESPACE
  * 【对齐 PS】选项条「家」或启动默认进入；左侧新文件/打开，右侧最近使用项网格。
  * 【对照 GIMP】welcome-dialog Create 页；本项目用主窗口栈页。
  *
- * 最近列表来自 Ps::RecentDocuments（QSettings）；.ui 中 recentCard 仅作样式模板。
+ * 最近列表来自 Ps::RecentDocuments（QSettings）。
+ * 卡片外观：homescreen.ui 的 recentCard / recentEmptyLabel；cpp 只克隆模板并填数据。
  */
 class HomeScreen : public QWidget
 {
@@ -43,11 +43,11 @@ protected:
 
 private:
     void clearDynamicCards();
+    /** 克隆 .ui 模板 recentCard，填入路径/标题/缩略图（不写死布局数值）。 */
     QFrame *createCard(const QString &path, const QString &title,
                        const QString &subtitle, const QPixmap &thumb);
 
     Ui::HomeScreen *ui;
-    QLabel *m_emptyLabel = nullptr;
 };
 
 #endif // HOMESCREEN_H

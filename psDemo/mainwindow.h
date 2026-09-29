@@ -69,8 +69,11 @@ private slots:
     void onOpenDocument();
     void onSaveDocument();
     void onSaveDocumentAs();
+    void onExportPng();
+    void onExportAs();
     void onNewLayer();
     void onDuplicateLayer();
+    void onDeleteLayer();
     void onImageSize();
     void onCanvasSize();
     void onShowHomeScreen();
@@ -88,10 +91,16 @@ private slots:
     void onSelectAll();
     void onSelectDeselect();
     void onSelectInverse();
+    void onClear();
+    void onFill();
     void onUndo();
     void onRedo();
     void updateUndoRedoActions();
-    void onDocumentChangedForHistory(Ps::ImageDocument *doc);
+    void onDocumentChanged(Ps::ImageDocument *doc);
+    /** 状态栏/标题：未保存路径前加 *；平时常驻显示路径。 */
+    void refreshDocumentPathStatus();
+    /** 短暂提示后恢复路径显示（避免「已存储」一直留在状态栏）。 */
+    void flashStatusMessage(const QString &message, int ms = 4000);
 
 private:
     /** 装配菜单动作连接。 */
@@ -103,6 +112,8 @@ private:
      * @param forcePslite true 时默认/偏向工程格式（供 Ctrl+S 无路径时用）
      */
     bool saveDocumentAsDialog(bool forcePslite = false);
+    bool exportCompositeTo(const QString &path);
+    QString suggestExportPath(const QString &suffix) const;
     /**
      * 打开路径（.pslite / 栅格）；成功则记入最近、切工作区。
      * @return 是否打开成功
@@ -129,6 +140,7 @@ private:
     Ui::MainWindow *ui;
     Ps::AppSession *m_session = nullptr;
     QMetaObject::Connection m_historyConn;
+    QMetaObject::Connection m_docStatusConn;
     bool m_rightColumnUserSized = false; ///< 用户拖过分隔条后，不再套用默认比例
     bool m_closeConfirming = false;      ///< 正在弹退出确认框（防重入）
 };

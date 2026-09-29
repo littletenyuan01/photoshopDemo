@@ -10,6 +10,7 @@
 #include "tools/toolevent.h"
 #include "tools/toolmanager.h"
 
+#include <QKeyEvent>
 #include <QMouseEvent>
 #include <QPainter>
 #include <QPainterPath>
@@ -373,8 +374,12 @@ void CanvasView::paintEvent(QPaintEvent *)
     // 透明区棋盘格（格子 8、白/#c8c8c8）：与面板缩略图同一套实现，见 PixmapUtils
     PixmapUtils::paintChecker(painter, target.toAlignedRect(), 8,
                               QColor(255, 255, 255), QColor(200, 200, 200));
-    painter.setRenderHint(QPainter::SmoothPixmapTransform, m_zoom < 4.0);
+    // 缩小才平滑插值；放大用最近邻，才能看出「一个个像素块」（对齐 PS）
+    painter.setRenderHint(QPainter::SmoothPixmapTransform, m_zoom < 1.0);
     painter.drawImage(target, m_cache);
+
+    // 像素网格（PS 约 ≥500% 出现）
+    paintPixelGrid(painter, target);
 
     // 选区蚂蚁线（在图像之上、工具浮层之下）
     paintSelectionOutline(painter);
@@ -428,7 +433,7 @@ void CanvasView::mousePressEvent(QMouseEvent *event)
 
     // 通用平移手势（中键 / Alt+左键）优先于当前工具：由抓手工具承担。
     // 对齐 PS/GIMP：任何工具下都能临时平移。
-    if (Ps::HandTool::isPanGesture(e)) {
+    if (Ps::HandTool::isPanGesture(e) || (m_spaceHeld && e.isLeft())) {
         if (Ps::Tool *hand = m_toolManager->tool(Ps::ToolId::Hand)) {
             // 上下文按值传给工具，工具不留副本（见 Tool::markDocumentDirty 的注释）
             m_panning = hand->mousePress(e, m_toolContext, *this);
@@ -532,6 +537,30 @@ void CanvasView::leaveEvent(QEvent *event)
     QWidget::leaveEvent(event);
 }
 
+void CanvasView::keyPressEvent(QKeyEvent *event)
+{
+    if (event->key() == Qt::Key_Space && !event->isAutoRepeat()) {
+        m_spaceHeld = true;
+        if (!m_panning)
+            setCursor(Qt::OpenHandCursor);
+        event->accept();
+        return;
+    }
+    QWidget::keyPressEvent(event);
+}
+
+void CanvasView::keyReleaseEvent(QKeyEvent *event)
+{
+    if (event->key() == Qt::Key_Space && !event->isAutoRepeat()) {
+        m_spaceHeld = false;
+        if (!m_panning)
+            updateToolCursor();
+        event->accept();
+        return;
+    }
+    QWidget::keyReleaseEvent(event);
+}
+
 // —— 内部工具 ——
 
 void CanvasView::rebuildCache()
@@ -628,6 +657,54 @@ void CanvasView::rebuildSelectionOutlinePath()
             }
         }
     }
+}
+
+void CanvasView::paintPixelGrid(QPainter &painter, const QRectF &imageRectInWidget)
+{
+    // 【功能】对照 PS View → Show → Pixel Grid：高倍下在像素边界画细线
+    // 阈值：≥ 500%（与 PS 默认「足够大才显示」一致）；再低会密成灰雾
+    constexpr qreal kMinZoomForGrid = 5.0;
+    if (!m_document || m_zoom < kMinZoomForGrid)
+        return;
+
+    const QRectF clip = imageRectInWidget.intersected(QRectF(rect()));
+    if (clip.isEmpty())
+        return;
+
+    // 可见文档像素范围（向外扩 1，盖住边缘）
+    const QPointF tl = widgetToImage(clip.topLeft());
+    const QPointF br = widgetToImage(clip.bottomRight());
+    const int x0 = qMax(0, qFloor(tl.x()));
+    const int y0 = qMax(0, qFloor(tl.y()));
+    const int x1 = qMin(m_document->width(), qCeil(br.x()));
+    const int y1 = qMin(m_document->height(), qCeil(br.y()));
+    if (x1 <= x0 || y1 <= y0)
+        return;
+
+    painter.save();
+    painter.setRenderHint(QPainter::Antialiasing, false);
+    painter.setClipRect(clip);
+
+    QPen pen(QColor(0, 0, 0, 28));
+    pen.setWidth(0); // cosmetic hairline
+    pen.setCosmetic(true);
+    painter.setPen(pen);
+
+    const qreal top = m_offset.y();
+    const qreal bottom = m_offset.y() + m_document->height() * m_zoom;
+    const qreal left = m_offset.x();
+    const qreal right = m_offset.x() + m_document->width() * m_zoom;
+
+    for (int x = x0; x <= x1; ++x) {
+        const qreal wx = m_offset.x() + x * m_zoom;
+        painter.drawLine(QPointF(wx, top), QPointF(wx, bottom));
+    }
+    for (int y = y0; y <= y1; ++y) {
+        const qreal wy = m_offset.y() + y * m_zoom;
+        painter.drawLine(QPointF(left, wy), QPointF(right, wy));
+    }
+
+    painter.restore();
 }
 
 void CanvasView::paintSelectionOutline(QPainter &painter)

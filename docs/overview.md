@@ -11,17 +11,20 @@
 ```text
 photoshopDemo/
 ├── psDemo/                 # Qt 应用（qmake：psDemo.pro）
-│   ├── app/                # 会话：AppSession（文档持有 + 广播）
-│   ├── domain/             # 文档 / 图层（真相数据）
-│   ├── engine/             # 合成等算法
-│   ├── tools/              # 交互状态机：Tool 基类 + ToolManager + 各工具
-│   ├── ui/                 # 视图与面板
+│   ├── app/                # AppSession、RecentDocuments、HistoryStack
+│   ├── domain/             # 文档 / 图层 / 选区（真相数据）
+│   ├── engine/             # 合成、混合、PaintEngine
+│   ├── tools/              # Tool 基类 + ToolManager + 各工具
+│   ├── io/                 # RasterIo / ProjectIo / PsdIo
+│   ├── ui/                 # 画布与面板
 │   ├── mainwindow.*        # 主窗口壳 + .ui
-│   └── ...
+│   └── resources/          # 图标、样式、qrc
 ├── docs/                   # 技术文档（本目录，随代码更新）
 │   ├── ui/                 # 界面壳：审查、图标清单
-│   └── layers/             # 文档 / 图层 / 合成概念
-├── wiki/                   # 项目 Wiki（目标、路线、构建）
+│   ├── layers/             # 文档 / 图层 / 合成概念
+│   └── images/             # 文档截图
+├── wiki/                   # 项目 Wiki（目标、路线、构建、演示）
+├── presentations/          # 离线原理演示稿
 ├── .cursor/rules/          # Cursor 工程规则
 ├── README.md
 └── .gitignore
@@ -34,17 +37,18 @@ photoshopDemo/
 
 | 能力 | 状态 | 说明 |
 |------|------|------|
-| 主窗口 | 已实现 | 菜单：新建 / 打开 / 视图缩放；中央为画布 |
-| 文档/图层模型 | 已实现（基础） | `ImageDocument` + `Layer` + `LayerStack`；分级信号 + 语义化 setter |
-| 会话与广播 | 已实现 | `AppSession`：文档唯一持有者；面板订阅广播而非逐个手工同步 |
-| 画布合成预览 | 已实现 | `Compositor`（PS 27 种混合 + 透明度）+ `CanvasView`（实现 `ViewPort`） |
-| 工具层 | 已实现 | `ToolManager` + `Tool` 基类 + 移动/抓手/缩放/画笔橡皮；新增工具不改画布 |
-| 图层面板 | 已实现（基础） | 新建/删除/显隐/透明度/上下移/重命名；增量更新 |
+| 主窗口 / 主页 | 已实现 | PS 菜单壳；启动默认主页；最近文件 |
+| 文档/图层模型 | 已实现 | `ImageDocument` + `TileBuffer`；分级信号 + 语义化 setter |
+| 会话与广播 | 已实现 | `AppSession`：文档唯一持有者 |
+| 画布合成预览 | 已实现 | PS 27 种混合 + 透明度；缩放/平移/像素网格 |
+| 工具层 | 已实现 | 移动 / 选框 / 画笔橡皮 / 油漆桶渐变 / 抓手缩放 |
+| 选区 | 已实现 | mask + 全选/取消/反选；约束绘制与填充 |
+| 清除 / 填充 | 已实现 | Delete / Shift+F5（前景色） |
+| 图层面板 | 已实现 | 新建/删/复制/显隐/透明度/混合/重命名 |
 | 打开位图 | 已实现 | PNG/JPEG/BMP/WebP → 单层文档 |
-| 缩放/平移 | 已实现 | 滚轮缩放；中键或 Alt+左键拖拽；适应窗口 |
-| 画笔 / 橡皮 | 已实现 | 圆形 dab + 线段插值，写活动层 |
-| 撤销 / 重做 | 计划中 | 收口点已就位（见 `docs/ui/ui-review.md`） |
-| 导出 | 计划中 | — |
+| 工程 / PSD | 已实现 | `.pslite` 读写；PSD 子集写出 |
+| 撤销 / 重做 | 已实现 | 四类 UndoItem；Ctrl+Z / Ctrl+Y |
+| 导出 | 已实现 | PNG / JPEG 合成结果 |
 
 ## 技术栈
 
@@ -52,11 +56,12 @@ photoshopDemo/
 - UI：Qt Widgets（界面用 `.ui`）
 - 构建：qmake（`psDemo.pro`），Qt Creator 开发
 - 像素：`QImage` Format_ARGB32_Premultiplied
-- 算法 / 加速（允许）：**OpenCV**、**CUDA**、CPU 并行；无 GPU 时主链路应可回退 CPU
+- 算法 / 加速（允许）：**OpenCV**、**CUDA**、CPU 并行；无 GPU 时主链路应可回退 CPU（当前主链路为纯 Qt）
 
 ## 相关入口
 
 - 构建说明：`wiki/Build.md`
+- 演示说明：`wiki/Demo.md`
 - 架构：`docs/architecture.md`
-- 功能：`docs/features.md`
-- 代码索引：`docs/code-map.md`
+- 功能清单：`docs/features.md`
+- 简历话术：`wiki/Resume-Notes.md`

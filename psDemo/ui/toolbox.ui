@@ -48,6 +48,13 @@ QToolButton {
   padding: 2px;
   font-size: 11px;
 }
+/* 工具槽按钮尺寸（动态创建时继承，勿在 cpp 里 setFixedSize） */
+QWidget#toolsHost > QToolButton {
+  min-width: 36px;
+  max-width: 36px;
+  min-height: 32px;
+  max-height: 32px;
+}
 QToolButton:hover { background-color: #6e6e6e; }
 QToolButton:checked { background-color: #3d6ea0; border-color: #6aa8e0; }
 QPushButton#fgButton {

@@ -58,8 +58,10 @@ private:
     void syncRecentStrip();
 
     QListWidget *attachChipGrid(QTreeWidget *tree, QTreeWidgetItem *group,
-                                int iconLogical, const QSize &gridCell);
+                                QListWidget *appearanceTemplate);
     void filterPresetTree(QTreeWidget *tree, const QString &needle);
+    /** 按模板格子尺寸与条目数估算网格高度（内容量相关，须留在运行时）。 */
+    void fitChipGridHeight(QListWidget *grid, int itemCount, int colsHint);
 
     Ui::ColorsPanel *ui;
     bool m_syncing = false;  ///< 色域 ↔ RGB 互相同步时防递归

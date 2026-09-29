@@ -185,6 +185,77 @@ void ImageDocument::clearSelection()
     emit selectionChanged();
 }
 
+bool ImageDocument::clearActiveLayerPixels()
+{
+    Layer *layer = activeLayer();
+    if (!layer || !layer->isVisible())
+        return false;
+
+    const int ox = layer->offsetX();
+    const int oy = layer->offsetY();
+
+    if (m_selection.isEmpty()) {
+        pushLayerPixelsUndo(m_activeLayerIndex, tr("清除"));
+        const QRect dirty(ox, oy, layer->width(), layer->height());
+        layer->fill(Qt::transparent);
+        markDirty(dirty);
+        return true;
+    }
+
+    const QRect area = m_selection.bounds().intersected(layer->boundsInDocument());
+    if (area.isEmpty())
+        return false;
+
+    pushLayerPixelsUndo(m_activeLayerIndex, tr("清除"));
+    QImage img = layer->materialize();
+    for (int dy = area.top(); dy <= area.bottom(); ++dy) {
+        for (int dx = area.left(); dx <= area.right(); ++dx) {
+            if (!m_selection.isSelected(dx, dy))
+                continue;
+            img.setPixel(dx - ox, dy - oy, 0);
+        }
+    }
+    layer->replaceFromImage(img);
+    markDirty(area);
+    return true;
+}
+
+bool ImageDocument::fillActiveLayer(const QColor &color)
+{
+    Layer *layer = activeLayer();
+    if (!layer || !layer->isVisible())
+        return false;
+
+    const int ox = layer->offsetX();
+    const int oy = layer->offsetY();
+
+    if (m_selection.isEmpty()) {
+        pushLayerPixelsUndo(m_activeLayerIndex, tr("填充"));
+        const QRect dirty(ox, oy, layer->width(), layer->height());
+        layer->fill(color);
+        markDirty(dirty);
+        return true;
+    }
+
+    const QRect area = m_selection.bounds().intersected(layer->boundsInDocument());
+    if (area.isEmpty())
+        return false;
+
+    pushLayerPixelsUndo(m_activeLayerIndex, tr("填充"));
+    QImage img = layer->materialize();
+    const QRgb premul = qPremultiply(color.rgba());
+    for (int dy = area.top(); dy <= area.bottom(); ++dy) {
+        for (int dx = area.left(); dx <= area.right(); ++dx) {
+            if (!m_selection.isSelected(dx, dy))
+                continue;
+            img.setPixel(dx - ox, dy - oy, premul);
+        }
+    }
+    layer->replaceFromImage(img);
+    markDirty(area);
+    return true;
+}
+
 void ImageDocument::selectAll()
 {
     m_selection.selectAll();

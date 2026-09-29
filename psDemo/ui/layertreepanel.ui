@@ -632,12 +632,18 @@ QToolButton:disabled { color: #666; }</string>
    </item>
    <item>
     <widget class="QListWidget" name="itemList">
-        <property name="iconSize">
-         <size>
-          <width>40</width>
-          <height>40</height>
-         </size>
-        </property>
+     <property name="iconSize">
+      <size>
+       <width>40</width>
+       <height>40</height>
+      </size>
+     </property>
+     <property name="viewMode">
+      <enum>QListView::ViewMode::ListMode</enum>
+     </property>
+     <property name="uniformItemSizes">
+      <bool>false</bool>
+     </property>
      <property name="contextMenuPolicy">
       <enum>Qt::ContextMenuPolicy::CustomContextMenu</enum>
      </property>

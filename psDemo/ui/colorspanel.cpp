@@ -22,8 +22,8 @@
 
 namespace {
 
-constexpr int kChip = 22;          // PS 色板色块逻辑边长
-constexpr int kPresetSquare = 40;  // 渐变/图案方缩略图
+constexpr int kChip = 22;          // 与 colorspanel.ui chipGridTemplate iconSize 一致
+constexpr int kPresetSquare = 40;  // 与 presetGridTemplate iconSize 一致
 constexpr int kDeviceScale = 2;    // 缩略图最高按 2x 光栅化
 
 QString fromUtf8(const char *text)
@@ -260,29 +260,38 @@ void ColorsPanel::onWellSwatchesSwapped()
 }
 
 QListWidget *ColorsPanel::attachChipGrid(QTreeWidget *tree, QTreeWidgetItem *group,
-                                         int iconLogical, const QSize &gridCell)
+                                         QListWidget *tpl)
 {
     auto *holder = new QTreeWidgetItem(group);
     holder->setFlags(Qt::ItemIsEnabled);
     holder->setText(0, QString());
 
+    // 外观全部来自 .ui 模板（chipGridTemplate / presetGridTemplate）
     auto *list = new QListWidget(tree);
-    list->setViewMode(QListView::IconMode);
-    list->setResizeMode(QListView::Adjust);
-    list->setMovement(QListView::Static);
-    list->setWrapping(true);
-    list->setFlow(QListView::LeftToRight);
-    list->setIconSize(QSize(iconLogical, iconLogical));
-    list->setGridSize(gridCell);
-    list->setSpacing(2);
-    list->setFrameShape(QFrame::NoFrame);
-    list->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
-    list->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    list->setViewMode(tpl->viewMode());
+    list->setResizeMode(tpl->resizeMode());
+    list->setMovement(tpl->movement());
+    list->setWrapping(tpl->isWrapping());
+    list->setFlow(tpl->flow());
+    list->setIconSize(tpl->iconSize());
+    list->setGridSize(tpl->gridSize());
+    list->setSpacing(tpl->spacing());
+    list->setUniformItemSizes(tpl->uniformItemSizes());
+    list->setFrameShape(tpl->frameShape());
+    list->setHorizontalScrollBarPolicy(tpl->horizontalScrollBarPolicy());
+    list->setVerticalScrollBarPolicy(tpl->verticalScrollBarPolicy());
     list->setFocusPolicy(Qt::NoFocus);
-    // 高度随内容：先给一行，稍后按 count 调整
-    list->setFixedHeight(gridCell.height() + 4);
+    list->setFixedHeight(tpl->gridSize().height() + 4);
     tree->setItemWidget(holder, 0, list);
     return list;
+}
+
+void ColorsPanel::fitChipGridHeight(QListWidget *grid, int itemCount, int colsHint)
+{
+    const QSize cell = grid->gridSize();
+    const int cols = qMax(1, colsHint);
+    const int rows = qMax(1, (itemCount + cols - 1) / cols);
+    grid->setFixedHeight(rows * cell.height() + 6);
 }
 
 void ColorsPanel::buildSwatchGroups()
@@ -295,24 +304,22 @@ void ColorsPanel::buildSwatchGroups()
         {"蜡笔", kPastelChips, int(sizeof(kPastelChips) / sizeof(kPastelChips[0]))},
     };
 
+    const QSize cell = ui->chipGridTemplate->gridSize();
     for (const SwatchGroupDef &g : groups) {
         auto *group = new QTreeWidgetItem(ui->swatchTree);
         group->setText(0, fromUtf8(g.title));
         group->setFlags(Qt::ItemIsEnabled);
-        QListWidget *grid = attachChipGrid(ui->swatchTree, group, kChip, QSize(kChip + 6, kChip + 6));
+        QListWidget *grid = attachChipGrid(ui->swatchTree, group, ui->chipGridTemplate);
         for (int i = 0; i < g.count; ++i) {
             auto *item = new QListWidgetItem(chipIcon(QColor(g.chips[i].rgb)), QString());
             item->setToolTip(fromUtf8(g.chips[i].name));
             item->setData(Qt::UserRole, fromUtf8(g.chips[i].name));
-            item->setSizeHint(QSize(kChip + 4, kChip + 4));
+            item->setSizeHint(QSize(cell.width() - 4, cell.height() - 4));
             grid->addItem(item);
         }
-        // 一行大约放得下 8 块；超出折行加高
-        const int cols = qMax(1, (ui->swatchTree->viewport()->width() - 24) / (kChip + 6));
-        const int rows = qMax(1, (g.count + cols - 1) / cols);
-        grid->setFixedHeight(rows * (kChip + 6) + 6);
+        const int cols = qMax(1, (ui->swatchTree->viewport()->width() - 24) / cell.width());
+        fitChipGridHeight(grid, g.count, cols);
     }
-    // 默认展开 RGB（对齐截图）
     if (ui->swatchTree->topLevelItemCount() > 0)
         ui->swatchTree->topLevelItem(0)->setExpanded(true);
 }
@@ -326,22 +333,22 @@ void ColorsPanel::buildGradientGroups()
         {"紫色", kPurpleGrads, int(sizeof(kPurpleGrads) / sizeof(kPurpleGrads[0]))},
     };
 
+    const QSize cell = ui->presetGridTemplate->gridSize();
     for (const GradGroupDef &g : groups) {
         auto *group = new QTreeWidgetItem(ui->gradientTree);
         group->setText(0, fromUtf8(g.title));
         group->setFlags(Qt::ItemIsEnabled);
-        QListWidget *grid = attachChipGrid(ui->gradientTree, group, kPresetSquare,
-                                           QSize(kPresetSquare + 8, kPresetSquare + 8));
+        QListWidget *grid = attachChipGrid(ui->gradientTree, group, ui->presetGridTemplate);
         for (int i = 0; i < g.count; ++i) {
             const GradDef &d = g.items[i];
             const QIcon icon = squareGradientIcon(d.from, d.to, d.rainbow);
             auto *item = new QListWidgetItem(icon, QString());
             item->setToolTip(fromUtf8(d.name));
             item->setData(Qt::UserRole, fromUtf8(d.name));
-            item->setSizeHint(QSize(kPresetSquare + 6, kPresetSquare + 6));
+            item->setSizeHint(QSize(cell.width() - 2, cell.height() - 2));
             grid->addItem(item);
         }
-        grid->setFixedHeight(kPresetSquare + 14);
+        fitChipGridHeight(grid, g.count, qMax(1, g.count)); // 渐变组通常单行
         group->setExpanded(fromUtf8(g.title) == fromUtf8("基础"));
     }
 }
@@ -355,23 +362,21 @@ void ColorsPanel::buildPatternGroups()
         {"水滴", kWaterPatterns, int(sizeof(kWaterPatterns) / sizeof(kWaterPatterns[0]))},
     };
 
+    const QSize cell = ui->presetGridTemplate->gridSize();
     for (const PatternGroupDef &g : groups) {
         auto *group = new QTreeWidgetItem(ui->patternTree);
         group->setText(0, fromUtf8(g.title));
         group->setFlags(Qt::ItemIsEnabled);
-        QListWidget *grid = attachChipGrid(ui->patternTree, group, kPresetSquare,
-                                           QSize(kPresetSquare + 8, kPresetSquare + 8));
+        QListWidget *grid = attachChipGrid(ui->patternTree, group, ui->presetGridTemplate);
         for (int i = 0; i < g.count; ++i) {
             const PatternDef &d = g.items[i];
             auto *item = new QListWidgetItem(patternIcon(fromUtf8(d.kind)), QString());
             item->setToolTip(fromUtf8(d.name));
             item->setData(Qt::UserRole, fromUtf8(d.name));
-            item->setSizeHint(QSize(kPresetSquare + 6, kPresetSquare + 6));
+            item->setSizeHint(QSize(cell.width() - 2, cell.height() - 2));
             grid->addItem(item);
         }
-        const int cols = 4;
-        const int rows = qMax(1, (g.count + cols - 1) / cols);
-        grid->setFixedHeight(rows * (kPresetSquare + 8) + 6);
+        fitChipGridHeight(grid, g.count, 4);
         group->setExpanded(fromUtf8(g.title) == fromUtf8("树"));
     }
 }
@@ -461,7 +466,7 @@ void ColorsPanel::syncRecentStrip()
     const QString fg = ui->hsvWell->color().name(QColor::HexRgb);
     const QString bg = ui->hsvWell->backgroundColor().name(QColor::HexRgb);
     ui->strip1->setStyleSheet(
-        QStringLiteral("background-color: %1; border: 1px solid #202020;").arg(fg));
+        QStringLiteral("background-color: %1;").arg(fg));
     ui->strip2->setStyleSheet(
-        QStringLiteral("background-color: %1; border: 1px solid #202020;").arg(bg));
+        QStringLiteral("background-color: %1;").arg(bg));
 }

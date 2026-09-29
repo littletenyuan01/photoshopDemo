@@ -19,58 +19,86 @@
   <property name="windowTitle">
    <string>颜色</string>
   </property>
- <widget class="QToolButton" name="btnPanelMenu">
-  <property name="geometry">
-   <rect>
-    <x>0</x>
-    <y>0</y>
-    <width>22</width>
-    <height>22</height>
-   </rect>
-  </property>
-  <property name="text">
-   <string>≡</string>
-  </property>
-  <property name="toolTip">
-   <string>面板选项</string>
-  </property>
-  <property name="autoRaise">
-   <bool>true</bool>
-  </property>
- </widget>
-
   <layout class="QVBoxLayout" name="rootLayout">
-   <property name="spacing"><number>0</number></property>
-   <property name="leftMargin"><number>0</number></property>
-   <property name="topMargin"><number>0</number></property>
-   <property name="rightMargin"><number>0</number></property>
-   <property name="bottomMargin"><number>0</number></property>
+   <property name="spacing">
+    <number>0</number>
+   </property>
+   <property name="leftMargin">
+    <number>0</number>
+   </property>
+   <property name="topMargin">
+    <number>0</number>
+   </property>
+   <property name="rightMargin">
+    <number>0</number>
+   </property>
+   <property name="bottomMargin">
+    <number>0</number>
+   </property>
    <item>
     <widget class="QTabWidget" name="panelTabs">
-     <property name="currentIndex"><number>0</number></property>
-     <property name="documentMode"><bool>true</bool></property>
-
-     <!-- 颜色：对齐 PS —— 重叠 FG/BG + 二维色域 + 竖直色相 -->
+     <property name="currentIndex">
+      <number>0</number>
+     </property>
+     <property name="documentMode">
+      <bool>true</bool>
+     </property>
      <widget class="QWidget" name="tabColor">
-      <attribute name="title"><string>颜色</string></attribute>
+      <attribute name="title">
+       <string>颜色</string>
+      </attribute>
       <layout class="QVBoxLayout" name="colorTabLayout">
-       <property name="spacing"><number>0</number></property>
-       <property name="leftMargin"><number>0</number></property>
-       <property name="topMargin"><number>0</number></property>
-       <property name="rightMargin"><number>0</number></property>
-       <property name="bottomMargin"><number>0</number></property>
+       <property name="spacing">
+        <number>0</number>
+       </property>
+       <property name="leftMargin">
+        <number>0</number>
+       </property>
+       <property name="topMargin">
+        <number>0</number>
+       </property>
+       <property name="rightMargin">
+        <number>0</number>
+       </property>
+       <property name="bottomMargin">
+        <number>0</number>
+       </property>
        <item>
         <widget class="QScrollArea" name="colorScroll">
-         <property name="widgetResizable"><bool>true</bool></property>
-         <property name="frameShape"><enum>QFrame::Shape::NoFrame</enum></property>
-         <property name="horizontalScrollBarPolicy"><enum>Qt::ScrollBarPolicy::ScrollBarAlwaysOff</enum></property>
+         <property name="frameShape">
+          <enum>QFrame::Shape::NoFrame</enum>
+         </property>
+         <property name="horizontalScrollBarPolicy">
+          <enum>Qt::ScrollBarPolicy::ScrollBarAlwaysOff</enum>
+         </property>
+         <property name="widgetResizable">
+          <bool>true</bool>
+         </property>
          <widget class="QWidget" name="colorScrollBody">
+          <property name="geometry">
+           <rect>
+            <x>0</x>
+            <y>0</y>
+            <width>280</width>
+            <height>317</height>
+           </rect>
+          </property>
           <layout class="QVBoxLayout" name="colorBodyLayout">
-           <property name="spacing"><number>4</number></property>
-           <property name="leftMargin"><number>2</number></property>
-           <property name="topMargin"><number>2</number></property>
-           <property name="rightMargin"><number>2</number></property>
-           <property name="bottomMargin"><number>4</number></property>
+           <property name="spacing">
+            <number>4</number>
+           </property>
+           <property name="leftMargin">
+            <number>2</number>
+           </property>
+           <property name="topMargin">
+            <number>2</number>
+           </property>
+           <property name="rightMargin">
+            <number>2</number>
+           </property>
+           <property name="bottomMargin">
+            <number>4</number>
+           </property>
            <item>
             <widget class="HsvColorWell" name="hsvWell" native="true">
              <property name="sizePolicy">
@@ -79,27 +107,90 @@
                <verstretch>0</verstretch>
               </sizepolicy>
              </property>
-             <property name="minimumSize"><size><width>0</width><height>130</height></size></property>
-             <property name="toolTip"><string>色域：拖动选饱和度/明度；右侧条选色相（对齐 PS 颜色面板）</string></property>
+             <property name="minimumSize">
+              <size>
+               <width>0</width>
+               <height>130</height>
+              </size>
+             </property>
+             <property name="toolTip">
+              <string>色域：拖动选饱和度/明度；右侧条选色相（对齐 PS 颜色面板）</string>
+             </property>
             </widget>
            </item>
            <item>
-            <!-- 辅助 RGB/十六进制（PS 可切换显示模式；本 Demo 常驻一行便于读数） -->
             <layout class="QHBoxLayout" name="rgbRow">
-             <property name="spacing"><number>3</number></property>
-             <item><widget class="QLabel" name="labelR"><property name="text"><string>R</string></property></widget></item>
-             <item><widget class="QSpinBox" name="spinR"><property name="maximum"><number>255</number></property></widget></item>
-             <item><widget class="QLabel" name="labelG"><property name="text"><string>G</string></property></widget></item>
-             <item><widget class="QSpinBox" name="spinG"><property name="maximum"><number>255</number></property></widget></item>
-             <item><widget class="QLabel" name="labelB"><property name="text"><string>B</string></property></widget></item>
-             <item><widget class="QSpinBox" name="spinB"><property name="maximum"><number>255</number></property></widget></item>
-             <item><widget class="QLineEdit" name="hexEdit"><property name="maximumSize"><size><width>72</width><height>16777215</height></size></property><property name="text"><string>#000000</string></property></widget></item>
+             <property name="spacing">
+              <number>3</number>
+             </property>
+             <item>
+              <widget class="QLabel" name="labelR">
+               <property name="text">
+                <string>R</string>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QSpinBox" name="spinR">
+               <property name="maximum">
+                <number>255</number>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QLabel" name="labelG">
+               <property name="text">
+                <string>G</string>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QSpinBox" name="spinG">
+               <property name="maximum">
+                <number>255</number>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QLabel" name="labelB">
+               <property name="text">
+                <string>B</string>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QSpinBox" name="spinB">
+               <property name="maximum">
+                <number>255</number>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QLineEdit" name="hexEdit">
+               <property name="maximumSize">
+                <size>
+                 <width>72</width>
+                 <height>16777215</height>
+                </size>
+               </property>
+               <property name="text">
+                <string>#000000</string>
+               </property>
+              </widget>
+             </item>
             </layout>
            </item>
            <item>
             <spacer name="colorTabSpacer">
-             <property name="orientation"><enum>Qt::Orientation::Vertical</enum></property>
-             <property name="sizeHint" stdset="0"><size><width>10</width><height>4</height></size></property>
+             <property name="orientation">
+              <enum>Qt::Orientation::Vertical</enum>
+             </property>
+             <property name="sizeHint" stdset="0">
+              <size>
+               <width>10</width>
+               <height>4</height>
+              </size>
+             </property>
             </spacer>
            </item>
           </layout>
@@ -108,293 +199,659 @@
        </item>
       </layout>
      </widget>
-
-     <!-- 色板：搜索 + 最近色 + 分组色块网格 + 底栏 -->
      <widget class="QWidget" name="tabSwatches">
-      <attribute name="title"><string>色板</string></attribute>
+      <attribute name="title">
+       <string>色板</string>
+      </attribute>
       <layout class="QVBoxLayout" name="swatchTabLayout">
-       <property name="spacing"><number>4</number></property>
-       <property name="leftMargin"><number>6</number></property>
-       <property name="topMargin"><number>6</number></property>
-       <property name="rightMargin"><number>6</number></property>
-       <property name="bottomMargin"><number>4</number></property>
+       <property name="spacing">
+        <number>4</number>
+       </property>
+       <property name="leftMargin">
+        <number>6</number>
+       </property>
+       <property name="topMargin">
+        <number>6</number>
+       </property>
+       <property name="rightMargin">
+        <number>6</number>
+       </property>
+       <property name="bottomMargin">
+        <number>4</number>
+       </property>
        <item>
         <widget class="QLineEdit" name="swatchSearch">
-         <property name="placeholderText"><string>搜索色板</string></property>
-         <property name="clearButtonEnabled"><bool>true</bool></property>
+         <property name="placeholderText">
+          <string>搜索色板</string>
+         </property>
+         <property name="clearButtonEnabled">
+          <bool>true</bool>
+         </property>
         </widget>
        </item>
        <item>
         <layout class="QHBoxLayout" name="swatchStripRow">
-         <property name="spacing"><number>0</number></property>
+         <property name="spacing">
+          <number>0</number>
+         </property>
          <item>
           <widget class="QFrame" name="strip1">
-           <property name="minimumSize"><size><width>28</width><height>20</height></size></property>
-           <property name="maximumSize"><size><width>28</width><height>20</height></size></property>
-           <property name="toolTip"><string>前景色</string></property>
-           <property name="styleSheet"><string notr="true">background-color: #000000; border: 1px solid #202020;</string></property>
+           <property name="minimumSize">
+            <size>
+             <width>28</width>
+             <height>20</height>
+            </size>
+           </property>
+           <property name="maximumSize">
+            <size>
+             <width>28</width>
+             <height>20</height>
+            </size>
+           </property>
+           <property name="toolTip">
+            <string>前景色</string>
+           </property>
+           <property name="styleSheet">
+            <string notr="true">background-color: #000000; border: 1px solid #202020;</string>
+           </property>
           </widget>
          </item>
          <item>
           <widget class="QFrame" name="strip2">
-           <property name="minimumSize"><size><width>28</width><height>20</height></size></property>
-           <property name="maximumSize"><size><width>28</width><height>20</height></size></property>
-           <property name="toolTip"><string>背景色</string></property>
-           <property name="styleSheet"><string notr="true">background-color: #ffffff; border: 1px solid #202020;</string></property>
+           <property name="minimumSize">
+            <size>
+             <width>28</width>
+             <height>20</height>
+            </size>
+           </property>
+           <property name="maximumSize">
+            <size>
+             <width>28</width>
+             <height>20</height>
+            </size>
+           </property>
+           <property name="toolTip">
+            <string>背景色</string>
+           </property>
+           <property name="styleSheet">
+            <string notr="true">background-color: #ffffff; border: 1px solid #202020;</string>
+           </property>
           </widget>
          </item>
          <item>
           <spacer name="swatchStripSpacer">
-           <property name="orientation"><enum>Qt::Orientation::Horizontal</enum></property>
-           <property name="sizeHint" stdset="0"><size><width>10</width><height>10</height></size></property>
+           <property name="orientation">
+            <enum>Qt::Orientation::Horizontal</enum>
+           </property>
+           <property name="sizeHint" stdset="0">
+            <size>
+             <width>10</width>
+             <height>10</height>
+            </size>
+           </property>
           </spacer>
          </item>
         </layout>
        </item>
        <item>
         <widget class="QTreeWidget" name="swatchTree">
-         <property name="headerHidden"><bool>true</bool></property>
-         <property name="rootIsDecorated"><bool>true</bool></property>
-         <property name="indentation"><number>12</number></property>
-         <property name="toolTip"><string>色板组（对齐 PS：组下为色块网格）</string></property>
-         <column><property name="text"><string>色板</string></property></column>
+         <property name="toolTip">
+          <string>色板组（对齐 PS：组下为色块网格）</string>
+         </property>
+         <property name="indentation">
+          <number>12</number>
+         </property>
+         <property name="rootIsDecorated">
+          <bool>true</bool>
+         </property>
+         <property name="headerHidden">
+          <bool>true</bool>
+         </property>
+         <column>
+          <property name="text">
+           <string>色板</string>
+          </property>
+         </column>
         </widget>
        </item>
        <item>
         <layout class="QHBoxLayout" name="swatchBarLayout">
-         <property name="spacing"><number>2</number></property>
+         <property name="spacing">
+          <number>2</number>
+         </property>
          <item>
           <spacer name="swatchBarSpacer">
-           <property name="orientation"><enum>Qt::Orientation::Horizontal</enum></property>
-           <property name="sizeHint" stdset="0"><size><width>10</width><height>10</height></size></property>
+           <property name="orientation">
+            <enum>Qt::Orientation::Horizontal</enum>
+           </property>
+           <property name="sizeHint" stdset="0">
+            <size>
+             <width>10</width>
+             <height>10</height>
+            </size>
+           </property>
           </spacer>
          </item>
          <item>
           <widget class="QToolButton" name="btnSwatchGroup">
-        <property name="icon">
-         <iconset resource="../resources.qrc">
-          <normaloff>:/icons/ui/folder.svg</normaloff>:/icons/ui/folder.svg</iconset>
-        </property>
-        <property name="toolButtonStyle">
-         <enum>Qt::ToolButtonStyle::ToolButtonIconOnly</enum>
-        </property>
-
-           <property name="toolTip"><string>新建色板组（UI 占位）</string></property>
-           <property name="iconSize"><size><width>18</width><height>18</height></size></property>
-           <property name="autoRaise"><bool>true</bool></property>
+           <property name="toolTip">
+            <string>新建色板组（UI 占位）</string>
+           </property>
+           <property name="icon">
+            <iconset resource="../resources.qrc">
+             <normaloff>:/icons/ui/folder.svg</normaloff>:/icons/ui/folder.svg</iconset>
+           </property>
+           <property name="iconSize">
+            <size>
+             <width>18</width>
+             <height>18</height>
+            </size>
+           </property>
+           <property name="toolButtonStyle">
+            <enum>Qt::ToolButtonStyle::ToolButtonIconOnly</enum>
+           </property>
+           <property name="autoRaise">
+            <bool>true</bool>
+           </property>
           </widget>
          </item>
          <item>
           <widget class="QToolButton" name="btnSwatchAdd">
-        <property name="icon">
-         <iconset resource="../resources.qrc">
-          <normaloff>:/icons/ui/plus.svg</normaloff>:/icons/ui/plus.svg</iconset>
-        </property>
-        <property name="toolButtonStyle">
-         <enum>Qt::ToolButtonStyle::ToolButtonIconOnly</enum>
-        </property>
-
-           <property name="toolTip"><string>添加当前颜色到色板（UI 占位）</string></property>
-           <property name="iconSize"><size><width>18</width><height>18</height></size></property>
-           <property name="autoRaise"><bool>true</bool></property>
+           <property name="toolTip">
+            <string>添加当前颜色到色板（UI 占位）</string>
+           </property>
+           <property name="icon">
+            <iconset resource="../resources.qrc">
+             <normaloff>:/icons/ui/plus.svg</normaloff>:/icons/ui/plus.svg</iconset>
+           </property>
+           <property name="iconSize">
+            <size>
+             <width>18</width>
+             <height>18</height>
+            </size>
+           </property>
+           <property name="toolButtonStyle">
+            <enum>Qt::ToolButtonStyle::ToolButtonIconOnly</enum>
+           </property>
+           <property name="autoRaise">
+            <bool>true</bool>
+           </property>
           </widget>
          </item>
          <item>
           <widget class="QToolButton" name="btnSwatchDelete">
-        <property name="icon">
-         <iconset resource="../resources.qrc">
-          <normaloff>:/icons/layers/delete.svg</normaloff>:/icons/layers/delete.svg</iconset>
-        </property>
-        <property name="toolButtonStyle">
-         <enum>Qt::ToolButtonStyle::ToolButtonIconOnly</enum>
-        </property>
-
-           <property name="toolTip"><string>删除色板（UI 占位）</string></property>
-           <property name="iconSize"><size><width>18</width><height>18</height></size></property>
-           <property name="autoRaise"><bool>true</bool></property>
+           <property name="toolTip">
+            <string>删除色板（UI 占位）</string>
+           </property>
+           <property name="icon">
+            <iconset resource="../resources.qrc">
+             <normaloff>:/icons/layers/delete.svg</normaloff>:/icons/layers/delete.svg</iconset>
+           </property>
+           <property name="iconSize">
+            <size>
+             <width>18</width>
+             <height>18</height>
+            </size>
+           </property>
+           <property name="toolButtonStyle">
+            <enum>Qt::ToolButtonStyle::ToolButtonIconOnly</enum>
+           </property>
+           <property name="autoRaise">
+            <bool>true</bool>
+           </property>
           </widget>
          </item>
         </layout>
        </item>
       </layout>
      </widget>
-
-     <!-- 渐变：搜索 + 分组方缩略图 + 底栏（对齐 PS） -->
      <widget class="QWidget" name="tabGradients">
-      <attribute name="title"><string>渐变</string></attribute>
+      <attribute name="title">
+       <string>渐变</string>
+      </attribute>
       <layout class="QVBoxLayout" name="gradientTabLayout">
-       <property name="spacing"><number>4</number></property>
-       <property name="leftMargin"><number>6</number></property>
-       <property name="topMargin"><number>6</number></property>
-       <property name="rightMargin"><number>6</number></property>
-       <property name="bottomMargin"><number>4</number></property>
+       <property name="spacing">
+        <number>4</number>
+       </property>
+       <property name="leftMargin">
+        <number>6</number>
+       </property>
+       <property name="topMargin">
+        <number>6</number>
+       </property>
+       <property name="rightMargin">
+        <number>6</number>
+       </property>
+       <property name="bottomMargin">
+        <number>4</number>
+       </property>
        <item>
         <widget class="QLineEdit" name="gradientSearch">
-         <property name="placeholderText"><string>搜索渐变</string></property>
-         <property name="clearButtonEnabled"><bool>true</bool></property>
+         <property name="placeholderText">
+          <string>搜索渐变</string>
+         </property>
+         <property name="clearButtonEnabled">
+          <bool>true</bool>
+         </property>
         </widget>
        </item>
        <item>
         <widget class="QTreeWidget" name="gradientTree">
-         <property name="headerHidden"><bool>true</bool></property>
-         <property name="rootIsDecorated"><bool>true</bool></property>
-         <property name="indentation"><number>12</number></property>
-         <property name="toolTip"><string>渐变预设组（对齐 PS）</string></property>
-         <column><property name="text"><string>渐变</string></property></column>
+         <property name="toolTip">
+          <string>渐变预设组（对齐 PS）</string>
+         </property>
+         <property name="indentation">
+          <number>12</number>
+         </property>
+         <property name="rootIsDecorated">
+          <bool>true</bool>
+         </property>
+         <property name="headerHidden">
+          <bool>true</bool>
+         </property>
+         <column>
+          <property name="text">
+           <string>渐变</string>
+          </property>
+         </column>
         </widget>
        </item>
        <item>
         <layout class="QHBoxLayout" name="gradientBarLayout">
-         <property name="spacing"><number>2</number></property>
+         <property name="spacing">
+          <number>2</number>
+         </property>
          <item>
           <spacer name="gradientBarSpacer">
-           <property name="orientation"><enum>Qt::Orientation::Horizontal</enum></property>
-           <property name="sizeHint" stdset="0"><size><width>10</width><height>10</height></size></property>
+           <property name="orientation">
+            <enum>Qt::Orientation::Horizontal</enum>
+           </property>
+           <property name="sizeHint" stdset="0">
+            <size>
+             <width>10</width>
+             <height>10</height>
+            </size>
+           </property>
           </spacer>
          </item>
          <item>
           <widget class="QToolButton" name="btnGradientGroup">
-        <property name="icon">
-         <iconset resource="../resources.qrc">
-          <normaloff>:/icons/ui/folder.svg</normaloff>:/icons/ui/folder.svg</iconset>
-        </property>
-        <property name="toolButtonStyle">
-         <enum>Qt::ToolButtonStyle::ToolButtonIconOnly</enum>
-        </property>
-
-           <property name="toolTip"><string>新建渐变组（UI 占位）</string></property>
-           <property name="iconSize"><size><width>18</width><height>18</height></size></property>
-           <property name="autoRaise"><bool>true</bool></property>
+           <property name="toolTip">
+            <string>新建渐变组（UI 占位）</string>
+           </property>
+           <property name="icon">
+            <iconset resource="../resources.qrc">
+             <normaloff>:/icons/ui/folder.svg</normaloff>:/icons/ui/folder.svg</iconset>
+           </property>
+           <property name="iconSize">
+            <size>
+             <width>18</width>
+             <height>18</height>
+            </size>
+           </property>
+           <property name="toolButtonStyle">
+            <enum>Qt::ToolButtonStyle::ToolButtonIconOnly</enum>
+           </property>
+           <property name="autoRaise">
+            <bool>true</bool>
+           </property>
           </widget>
          </item>
          <item>
           <widget class="QToolButton" name="btnGradientAdd">
-        <property name="icon">
-         <iconset resource="../resources.qrc">
-          <normaloff>:/icons/ui/plus.svg</normaloff>:/icons/ui/plus.svg</iconset>
-        </property>
-        <property name="toolButtonStyle">
-         <enum>Qt::ToolButtonStyle::ToolButtonIconOnly</enum>
-        </property>
-
-           <property name="toolTip"><string>新建渐变（UI 占位）</string></property>
-           <property name="iconSize"><size><width>18</width><height>18</height></size></property>
-           <property name="autoRaise"><bool>true</bool></property>
+           <property name="toolTip">
+            <string>新建渐变（UI 占位）</string>
+           </property>
+           <property name="icon">
+            <iconset resource="../resources.qrc">
+             <normaloff>:/icons/ui/plus.svg</normaloff>:/icons/ui/plus.svg</iconset>
+           </property>
+           <property name="iconSize">
+            <size>
+             <width>18</width>
+             <height>18</height>
+            </size>
+           </property>
+           <property name="toolButtonStyle">
+            <enum>Qt::ToolButtonStyle::ToolButtonIconOnly</enum>
+           </property>
+           <property name="autoRaise">
+            <bool>true</bool>
+           </property>
           </widget>
          </item>
          <item>
           <widget class="QToolButton" name="btnGradientDelete">
-        <property name="icon">
-         <iconset resource="../resources.qrc">
-          <normaloff>:/icons/layers/delete.svg</normaloff>:/icons/layers/delete.svg</iconset>
-        </property>
-        <property name="toolButtonStyle">
-         <enum>Qt::ToolButtonStyle::ToolButtonIconOnly</enum>
-        </property>
-
-           <property name="toolTip"><string>删除渐变（UI 占位）</string></property>
-           <property name="iconSize"><size><width>18</width><height>18</height></size></property>
-           <property name="autoRaise"><bool>true</bool></property>
+           <property name="toolTip">
+            <string>删除渐变（UI 占位）</string>
+           </property>
+           <property name="icon">
+            <iconset resource="../resources.qrc">
+             <normaloff>:/icons/layers/delete.svg</normaloff>:/icons/layers/delete.svg</iconset>
+           </property>
+           <property name="iconSize">
+            <size>
+             <width>18</width>
+             <height>18</height>
+            </size>
+           </property>
+           <property name="toolButtonStyle">
+            <enum>Qt::ToolButtonStyle::ToolButtonIconOnly</enum>
+           </property>
+           <property name="autoRaise">
+            <bool>true</bool>
+           </property>
           </widget>
          </item>
         </layout>
        </item>
       </layout>
      </widget>
-
-     <!-- 图案：搜索 + 分组方缩略图 + 底栏（对齐 PS） -->
      <widget class="QWidget" name="tabPatterns">
-      <attribute name="title"><string>图案</string></attribute>
+      <attribute name="title">
+       <string>图案</string>
+      </attribute>
       <layout class="QVBoxLayout" name="patternTabLayout">
-       <property name="spacing"><number>4</number></property>
-       <property name="leftMargin"><number>6</number></property>
-       <property name="topMargin"><number>6</number></property>
-       <property name="rightMargin"><number>6</number></property>
-       <property name="bottomMargin"><number>4</number></property>
+       <property name="spacing">
+        <number>4</number>
+       </property>
+       <property name="leftMargin">
+        <number>6</number>
+       </property>
+       <property name="topMargin">
+        <number>6</number>
+       </property>
+       <property name="rightMargin">
+        <number>6</number>
+       </property>
+       <property name="bottomMargin">
+        <number>4</number>
+       </property>
        <item>
         <widget class="QLineEdit" name="patternSearch">
-         <property name="placeholderText"><string>搜索图案</string></property>
-         <property name="clearButtonEnabled"><bool>true</bool></property>
+         <property name="placeholderText">
+          <string>搜索图案</string>
+         </property>
+         <property name="clearButtonEnabled">
+          <bool>true</bool>
+         </property>
         </widget>
        </item>
        <item>
         <widget class="QTreeWidget" name="patternTree">
-         <property name="headerHidden"><bool>true</bool></property>
-         <property name="rootIsDecorated"><bool>true</bool></property>
-         <property name="indentation"><number>12</number></property>
-         <property name="toolTip"><string>图案预设组（对齐 PS；缩略图为代码占位花纹）</string></property>
-         <column><property name="text"><string>图案</string></property></column>
+         <property name="toolTip">
+          <string>图案预设组（对齐 PS；缩略图为代码占位花纹）</string>
+         </property>
+         <property name="indentation">
+          <number>12</number>
+         </property>
+         <property name="rootIsDecorated">
+          <bool>true</bool>
+         </property>
+         <property name="headerHidden">
+          <bool>true</bool>
+         </property>
+         <column>
+          <property name="text">
+           <string>图案</string>
+          </property>
+         </column>
         </widget>
        </item>
        <item>
         <layout class="QHBoxLayout" name="patternBarLayout">
-         <property name="spacing"><number>2</number></property>
+         <property name="spacing">
+          <number>2</number>
+         </property>
          <item>
           <spacer name="patternBarSpacer">
-           <property name="orientation"><enum>Qt::Orientation::Horizontal</enum></property>
-           <property name="sizeHint" stdset="0"><size><width>10</width><height>10</height></size></property>
+           <property name="orientation">
+            <enum>Qt::Orientation::Horizontal</enum>
+           </property>
+           <property name="sizeHint" stdset="0">
+            <size>
+             <width>10</width>
+             <height>10</height>
+            </size>
+           </property>
           </spacer>
          </item>
          <item>
           <widget class="QToolButton" name="btnPatternGroup">
-        <property name="icon">
-         <iconset resource="../resources.qrc">
-          <normaloff>:/icons/ui/folder.svg</normaloff>:/icons/ui/folder.svg</iconset>
-        </property>
-        <property name="toolButtonStyle">
-         <enum>Qt::ToolButtonStyle::ToolButtonIconOnly</enum>
-        </property>
-
-           <property name="toolTip"><string>新建图案组（UI 占位）</string></property>
-           <property name="iconSize"><size><width>18</width><height>18</height></size></property>
-           <property name="autoRaise"><bool>true</bool></property>
+           <property name="toolTip">
+            <string>新建图案组（UI 占位）</string>
+           </property>
+           <property name="icon">
+            <iconset resource="../resources.qrc">
+             <normaloff>:/icons/ui/folder.svg</normaloff>:/icons/ui/folder.svg</iconset>
+           </property>
+           <property name="iconSize">
+            <size>
+             <width>18</width>
+             <height>18</height>
+            </size>
+           </property>
+           <property name="toolButtonStyle">
+            <enum>Qt::ToolButtonStyle::ToolButtonIconOnly</enum>
+           </property>
+           <property name="autoRaise">
+            <bool>true</bool>
+           </property>
           </widget>
          </item>
          <item>
           <widget class="QToolButton" name="btnPatternAdd">
-        <property name="icon">
-         <iconset resource="../resources.qrc">
-          <normaloff>:/icons/ui/plus.svg</normaloff>:/icons/ui/plus.svg</iconset>
-        </property>
-        <property name="toolButtonStyle">
-         <enum>Qt::ToolButtonStyle::ToolButtonIconOnly</enum>
-        </property>
-
-           <property name="toolTip"><string>新建图案（UI 占位）</string></property>
-           <property name="iconSize"><size><width>18</width><height>18</height></size></property>
-           <property name="autoRaise"><bool>true</bool></property>
+           <property name="toolTip">
+            <string>新建图案（UI 占位）</string>
+           </property>
+           <property name="icon">
+            <iconset resource="../resources.qrc">
+             <normaloff>:/icons/ui/plus.svg</normaloff>:/icons/ui/plus.svg</iconset>
+           </property>
+           <property name="iconSize">
+            <size>
+             <width>18</width>
+             <height>18</height>
+            </size>
+           </property>
+           <property name="toolButtonStyle">
+            <enum>Qt::ToolButtonStyle::ToolButtonIconOnly</enum>
+           </property>
+           <property name="autoRaise">
+            <bool>true</bool>
+           </property>
           </widget>
          </item>
          <item>
           <widget class="QToolButton" name="btnPatternDelete">
-        <property name="icon">
-         <iconset resource="../resources.qrc">
-          <normaloff>:/icons/layers/delete.svg</normaloff>:/icons/layers/delete.svg</iconset>
-        </property>
-        <property name="toolButtonStyle">
-         <enum>Qt::ToolButtonStyle::ToolButtonIconOnly</enum>
-        </property>
-
-           <property name="toolTip"><string>删除图案（UI 占位）</string></property>
-           <property name="iconSize"><size><width>18</width><height>18</height></size></property>
-           <property name="autoRaise"><bool>true</bool></property>
+           <property name="toolTip">
+            <string>删除图案（UI 占位）</string>
+           </property>
+           <property name="icon">
+            <iconset resource="../resources.qrc">
+             <normaloff>:/icons/layers/delete.svg</normaloff>:/icons/layers/delete.svg</iconset>
+           </property>
+           <property name="iconSize">
+            <size>
+             <width>18</width>
+             <height>18</height>
+            </size>
+           </property>
+           <property name="toolButtonStyle">
+            <enum>Qt::ToolButtonStyle::ToolButtonIconOnly</enum>
+           </property>
+           <property name="autoRaise">
+            <bool>true</bool>
+           </property>
           </widget>
          </item>
         </layout>
        </item>
       </layout>
      </widget>
-
     </widget>
    </item>
   </layout>
+  <widget class="QToolButton" name="btnPanelMenu">
+   <property name="geometry">
+    <rect>
+     <x>0</x>
+     <y>0</y>
+     <width>22</width>
+     <height>22</height>
+    </rect>
+   </property>
+   <property name="toolTip">
+    <string>面板选项</string>
+   </property>
+   <property name="text">
+    <string>≡</string>
+   </property>
+   <property name="autoRaise">
+    <bool>true</bool>
+   </property>
+  </widget>
+  <!-- 芯片网格外观模板：运行时隐藏；attachChipGrid 只克隆属性再填数据 -->
+  <widget class="QListWidget" name="chipGridTemplate">
+   <property name="geometry">
+    <rect>
+     <x>0</x>
+     <y>0</y>
+     <width>120</width>
+     <height>28</height>
+    </rect>
+   </property>
+   <property name="visible">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>色板色块网格模板（运行时隐藏）</string>
+   </property>
+   <property name="frameShape">
+    <enum>QFrame::Shape::NoFrame</enum>
+   </property>
+   <property name="horizontalScrollBarPolicy">
+    <enum>Qt::ScrollBarPolicy::ScrollBarAlwaysOff</enum>
+   </property>
+   <property name="verticalScrollBarPolicy">
+    <enum>Qt::ScrollBarPolicy::ScrollBarAlwaysOff</enum>
+   </property>
+   <property name="autoScroll">
+    <bool>false</bool>
+   </property>
+   <property name="editTriggers">
+    <set>QAbstractItemView::EditTrigger::NoEditTriggers</set>
+   </property>
+   <property name="showDropIndicator" stdset="0">
+    <bool>false</bool>
+   </property>
+   <property name="dragDropMode">
+    <enum>QAbstractItemView::DragDropMode::NoDragDrop</enum>
+   </property>
+   <property name="selectionMode">
+    <enum>QAbstractItemView::SelectionMode::SingleSelection</enum>
+   </property>
+   <property name="iconSize">
+    <size>
+     <width>22</width>
+     <height>22</height>
+    </size>
+   </property>
+   <property name="verticalScrollMode">
+    <enum>QAbstractItemView::ScrollMode::ScrollPerPixel</enum>
+   </property>
+   <property name="movement">
+    <enum>QListView::Movement::Static</enum>
+   </property>
+   <property name="flow">
+    <enum>QListView::Flow::LeftToRight</enum>
+   </property>
+   <property name="isWrapping" stdset="0">
+    <bool>true</bool>
+   </property>
+   <property name="resizeMode">
+    <enum>QListView::ResizeMode::Adjust</enum>
+   </property>
+   <property name="viewMode">
+    <enum>QListView::ViewMode::IconMode</enum>
+   </property>
+   <property name="uniformItemSizes">
+    <bool>true</bool>
+   </property>
+   <property name="spacing">
+    <number>2</number>
+   </property>
+   <property name="gridSize">
+    <size>
+     <width>28</width>
+     <height>28</height>
+    </size>
+   </property>
+  </widget>
+  <widget class="QListWidget" name="presetGridTemplate">
+   <property name="geometry">
+    <rect>
+     <x>0</x>
+     <y>0</y>
+     <width>160</width>
+     <height>48</height>
+    </rect>
+   </property>
+   <property name="visible">
+    <bool>false</bool>
+   </property>
+   <property name="toolTip">
+    <string>渐变/图案方块网格模板（运行时隐藏）</string>
+   </property>
+   <property name="frameShape">
+    <enum>QFrame::Shape::NoFrame</enum>
+   </property>
+   <property name="horizontalScrollBarPolicy">
+    <enum>Qt::ScrollBarPolicy::ScrollBarAlwaysOff</enum>
+   </property>
+   <property name="verticalScrollBarPolicy">
+    <enum>Qt::ScrollBarPolicy::ScrollBarAlwaysOff</enum>
+   </property>
+   <property name="iconSize">
+    <size>
+     <width>40</width>
+     <height>40</height>
+    </size>
+   </property>
+   <property name="movement">
+    <enum>QListView::Movement::Static</enum>
+   </property>
+   <property name="flow">
+    <enum>QListView::Flow::LeftToRight</enum>
+   </property>
+   <property name="isWrapping" stdset="0">
+    <bool>true</bool>
+   </property>
+   <property name="resizeMode">
+    <enum>QListView::ResizeMode::Adjust</enum>
+   </property>
+   <property name="viewMode">
+    <enum>QListView::ViewMode::IconMode</enum>
+   </property>
+   <property name="uniformItemSizes">
+    <bool>true</bool>
+   </property>
+   <property name="spacing">
+    <number>2</number>
+   </property>
+   <property name="gridSize">
+    <size>
+     <width>48</width>
+     <height>48</height>
+    </size>
+   </property>
+  </widget>
  </widget>
  <customwidgets>
   <customwidget>
    <class>HsvColorWell</class>
    <extends>QWidget</extends>
    <header>ui/hsvcolorwell.h</header>
-   <container>0</container>
   </customwidget>
  </customwidgets>
  <resources>

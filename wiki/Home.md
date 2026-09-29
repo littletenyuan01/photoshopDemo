@@ -8,7 +8,8 @@
 | 页面 | 说明 |
 |------|------|
 | [项目目标](Project-Goals.md) | 定位、边界、代码量约束 |
-| [功能链路](Feature-Pipeline.md) | 必须跑通的演示闭环 |
+| [功能链路](Feature-Pipeline.md) | 必须跑通的演示闭环 + 自测脚本 |
+| [演示说明](Demo.md) | 面试 3 分钟操作路径与讲解要点 |
 | [架构设计](Architecture.md) | 模块划分（参考 GIMP） |
 | [构建与运行](Build.md) | 环境、编译、打开工程 |
 | [开发路线](Roadmap.md) | 分阶段实现计划 |

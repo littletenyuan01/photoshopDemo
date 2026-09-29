@@ -87,6 +87,14 @@ QLabel#cardThumb {
   background-color: #f5f5f5;
   border: 1px solid #555;
 }
+QLabel#cardTime {
+  color: #999;
+  font-size: 11px;
+}
+QLabel#recentEmptyLabel {
+  color: #888;
+  font-size: 14px;
+}
 QToolButton#viewListButton, QToolButton#viewGridButton {
   background: transparent;
   border: 1px solid transparent;
@@ -527,15 +535,22 @@ QToolButton#viewGridButton:checked {
              </item>
              <item>
               <widget class="QLabel" name="cardTime">
-               <property name="styleSheet">
-                <string notr="true">color: #999; font-size: 11px;</string>
-               </property>
                <property name="text">
                 <string>示例占位</string>
                </property>
               </widget>
              </item>
             </layout>
+           </widget>
+          </item>
+          <item>
+           <widget class="QLabel" name="recentEmptyLabel">
+            <property name="visible">
+             <bool>false</bool>
+            </property>
+            <property name="text">
+             <string>暂无最近项目</string>
+            </property>
            </widget>
           </item>
           <item>

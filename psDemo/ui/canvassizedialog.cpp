@@ -103,7 +103,7 @@ void CanvasSizeDialog::updateLabels()
 void CanvasSizeDialog::onExtColorChanged()
 {
     ui->extColorSwatch->setStyleSheet(
-        QStringLiteral("QFrame#extColorSwatch { background-color: %1; border: 1px solid #111; }")
+        QStringLiteral("QFrame#extColorSwatch { background-color: %1; }")
             .arg(extensionColor().name(QColor::HexRgb)));
 }
 

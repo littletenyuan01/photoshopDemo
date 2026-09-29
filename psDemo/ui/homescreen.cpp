@@ -24,15 +24,8 @@ HomeScreen::HomeScreen(QWidget *parent)
     , ui(new Ui::HomeScreen)
 {
     ui->setupUi(this);
-    // recentCard 仅作尺寸/样式模板，真正卡片由 refreshRecent 动态创建
+    // recentCard：.ui 样式/尺寸模板，运行时隐藏；动态卡片从其属性克隆
     ui->recentCard->hide();
-
-    m_emptyLabel = new QLabel(tr("暂无最近项目"), ui->contentArea);
-    m_emptyLabel->setObjectName(QStringLiteral("recentEmptyLabel"));
-    m_emptyLabel->setStyleSheet(QStringLiteral("color: #888; font-size: 14px;"));
-    m_emptyLabel->hide();
-    // 插在 spacer 之前
-    ui->cardsLayout->insertWidget(ui->cardsLayout->count() - 1, m_emptyLabel);
 
     connect(ui->newFileButton, &QPushButton::clicked, this, &HomeScreen::newFileRequested);
     connect(ui->openButton, &QPushButton::clicked, this, &HomeScreen::openFileRequested);
@@ -52,7 +45,7 @@ void HomeScreen::clearDynamicCards()
     for (int i = ui->cardsLayout->count() - 1; i >= 0; --i) {
         QLayoutItem *item = ui->cardsLayout->itemAt(i);
         QWidget *w = item ? item->widget() : nullptr;
-        if (!w || w == ui->recentCard || w == m_emptyLabel)
+        if (!w || w == ui->recentCard || w == ui->recentEmptyLabel)
             continue;
         if (w->property(kPathProp).isValid()) {
             ui->cardsLayout->takeAt(i);
@@ -64,23 +57,34 @@ void HomeScreen::clearDynamicCards()
 QFrame *HomeScreen::createCard(const QString &path, const QString &title,
                                const QString &subtitle, const QPixmap &thumb)
 {
+    // 布局/尺寸/样式全部来自 .ui 模板 recentCard，这里只克隆并填数据
+    auto *tpl = ui->recentCard;
     auto *card = new QFrame(ui->contentArea);
-    card->setObjectName(QStringLiteral("recentCard"));
-    card->setMinimumSize(ui->recentCard->minimumSize());
-    card->setMaximumSize(ui->recentCard->maximumSize());
-    card->setFrameShape(QFrame::StyledPanel);
-    card->setCursor(Qt::PointingHandCursor);
+    card->setObjectName(tpl->objectName());
+    card->setMinimumSize(tpl->minimumSize());
+    card->setMaximumSize(tpl->maximumSize());
+    card->setFrameShape(tpl->frameShape());
+    card->setCursor(tpl->cursor());
     card->setToolTip(path);
     card->setProperty(kPathProp, path);
     card->installEventFilter(this);
 
+    auto *srcLayout = qobject_cast<QVBoxLayout *>(tpl->layout());
     auto *layout = new QVBoxLayout(card);
-    layout->setSpacing(8);
-    layout->setContentsMargins(8, 8, 8, 10);
+    if (srcLayout) {
+        layout->setSpacing(srcLayout->spacing());
+        layout->setContentsMargins(srcLayout->contentsMargins());
+    }
 
+    auto *tplThumb = tpl->findChild<QLabel *>(QStringLiteral("cardThumb"));
     auto *thumbLabel = new QLabel(card);
-    thumbLabel->setMinimumHeight(130);
-    thumbLabel->setAlignment(Qt::AlignCenter);
+    thumbLabel->setObjectName(QStringLiteral("cardThumb"));
+    if (tplThumb) {
+        thumbLabel->setMinimumSize(tplThumb->minimumSize());
+        thumbLabel->setMaximumSize(tplThumb->maximumSize());
+        thumbLabel->setAlignment(tplThumb->alignment());
+        thumbLabel->setScaledContents(tplThumb->hasScaledContents());
+    }
     thumbLabel->setPixmap(thumb.isNull()
                               ? QPixmap(QStringLiteral(":/icons/ui/home-card-thumb.png"))
                               : thumb);
@@ -92,7 +96,6 @@ QFrame *HomeScreen::createCard(const QString &path, const QString &title,
 
     auto *timeLabel = new QLabel(subtitle, card);
     timeLabel->setObjectName(QStringLiteral("cardTime"));
-    timeLabel->setStyleSheet(QStringLiteral("color: #999; font-size: 11px;"));
     timeLabel->setAttribute(Qt::WA_TransparentForMouseEvents);
 
     layout->addWidget(thumbLabel);
@@ -106,10 +109,9 @@ void HomeScreen::refreshRecent()
     clearDynamicCards();
 
     const QStringList paths = Ps::RecentDocuments::paths();
-    m_emptyLabel->setVisible(paths.isEmpty());
+    ui->recentEmptyLabel->setVisible(paths.isEmpty());
 
-    // 插在 emptyLabel / spacer 之前：模板 hidden 占 index 0，empty 在 spacer 前
-    int insertAt = ui->cardsLayout->indexOf(m_emptyLabel);
+    int insertAt = ui->cardsLayout->indexOf(ui->recentEmptyLabel);
     if (insertAt < 0)
         insertAt = ui->cardsLayout->count() - 1;
 

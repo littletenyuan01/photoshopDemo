@@ -103,6 +103,8 @@ protected:
     void resizeEvent(QResizeEvent *event) override;
     void showEvent(QShowEvent *event) override;
     void leaveEvent(QEvent *event) override;
+    void keyPressEvent(QKeyEvent *event) override;
+    void keyReleaseEvent(QKeyEvent *event) override;
 
 private:
     void rebuildCache();
@@ -121,6 +123,11 @@ private:
     void updateToolCursor();
     /** 根据文档选区 mask 画蚂蚁线（对照 gimp_display_shell_draw_selection_*）。 */
     void paintSelectionOutline(QPainter &painter);
+    /**
+     * 高倍放大时画像素网格（对照 PS「像素网格」：View → Show → Pixel Grid）。
+     * 仅在 zoom ≥ 500% 时绘制，避免低倍时密线糊成一片。
+     */
+    void paintPixelGrid(QPainter &painter, const QRectF &imageRectInWidget);
     /** 有选区时开蚂蚁线动画定时器，无选区时停。 */
     void syncMarchingAntTimer();
     /** 选区变化时从 mask 重建轮廓路径（文档坐标）。 */
@@ -130,8 +137,9 @@ private:
     QImage m_cache;
     qreal m_zoom = 1.0;
     QPointF m_offset;
-    bool m_panning = false; ///< 通用平移手势（中键 / Alt+左键），由抓手工具承担
+    bool m_panning = false; ///< 通用平移手势（中键 / Alt+左键 / 空格+拖），由抓手工具承担
     bool m_pendingFit = false;
+    bool m_spaceHeld = false; ///< 按住空格：临时抓手（对齐 PS）
 
     Ps::ToolManager *m_toolManager = nullptr;
     Ps::ToolContext m_toolContext;

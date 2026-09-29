@@ -25,6 +25,7 @@ SOURCES += \
     domain/imagedocument.cpp \
     io/projectio.cpp \
     io/psdio.cpp \
+    io/rasterio.cpp \
     engine/blend.cpp \
     engine/compositor.cpp \
     engine/paintengine.cpp \
@@ -71,6 +72,7 @@ HEADERS += \
     domain/imagedocument.h \
     io/projectio.h \
     io/psdio.h \
+    io/rasterio.h \
     engine/blend.h \
     engine/compositor.h \
     engine/paintengine.h \

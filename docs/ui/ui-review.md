@@ -185,8 +185,9 @@ MainWindow ──setDocument()──> AppSession ──documentChanged(doc)─�
    **不得**在 `MainWindow` 里手工 `setDocument`。
 5. **改像素后必须 `markDirty(rect)`**：`Layer::pixels()` 返回可写引用，不写脏区画布不刷新。
 6. **滑条类控件一律两段语义**（拖动预览 / 松手提交），见 `.cursor/rules/percent-sliders.mdc`。
-7. **面板样式一律写进 `resources/styles/dark.qss`**，`.ui` 里不写死静态外观
-   （只有「值随状态变」的内联样式，如前景色块，才留在代码里）。
+7. **布局与静态外观放 `.ui`**：margins / spacing / 固定尺寸 / 边框圆角写在 Designer；
+   **cpp 禁止**再写死同一套数值。运行时只允许改「随文档变」的值（如前景色 `background-color`）。
+   样式表优先 `resources/styles/dark.qss`；`.ui` 内联样式仅用于该控件专属外观。
    选择器**用类名做祖先**（`ColorsPanel QToolButton`），**不要**用提升实例名
    （`QWidget#colorsPanel …`）—— 实测匹配不上；每个 Tab **页容器要显式写底色**
    （全局 `QWidget` 是透明的，不写就露黑底）。详见 [`tech-notes.md`](../tech-notes.md) 同名条目。

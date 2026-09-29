@@ -264,7 +264,8 @@ flowchart LR
 ### 5.3 撤销
 
 > **决策已定**（见 `docs/tech-notes.md`「撤销」一节）：采用 GIMP 的**推入式（push）+ 每对象一类**，
-> 放弃早先「命令模式 vs 瓦片快照」的二选一。排期见 `wiki/Roadmap.md` Phase 6，**未实现**。
+> 放弃早先「命令模式 vs 瓦片快照」的二选一。Phase 6 核心已落地（`HistoryStack` + 四类 UndoItem）；
+> 统一命令层入口仍为可选收口。
 
 **语义**：**改动之前**先把旧状态推入栈，而不是事后记录"做了什么"。
 
@@ -480,8 +481,8 @@ psDemo/
 | tools/ToolManager + Tool 基类 + 4 个工具 | **已实现**（本文 §2 早先规划的 `tools` 层） |
 | LayerPanel → DockPanel + 三个 tree panel | **已实现** |
 | 信号分级 + 语义化 setter + 累计脏区 | **已实现**（撤销与分块重合成的接口就位） |
-| 三、① 推入式撤销（Phase 6） | **计划已定**，未实现 —— 收口点已在 §8.1 |
+| 三、① 推入式撤销（Phase 6） | **已实现**最小闭环（手动 push；无独立 commands 层） |
 | 三、② 脏区分块投影（Phase 7） | **计划已定**，未实现；`pixelsChanged(rect)` 已带脏区但未使用 |
 | 三、③ 节点化非破坏（Phase 8） | **计划已定**，未实现；依赖 ② |
 | 独立 actions/commands 层 | 未实现（当前收口在 domain 语义化 setter） |
-| 其余（Selection / 蒙版 / IO） | 未实现 |
+| 其余（Selection / IO） | Selection + RasterIo/ProjectIo/PsdIo **已实现**；蒙版仍未做 |

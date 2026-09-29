@@ -60,6 +60,18 @@ public:
     void selectEllipse(const QRect &rect, ChannelOp op);
     void selectLayerAlpha(int layerIndex, ChannelOp op = ChannelOp::Replace);
 
+    /**
+     * 编辑→清除（Delete）：活动层可见像素擦为透明。
+     * 有选区只清 mask 内；无选区清整层。对照 GIMP edit-clear。
+     * @return false 若无活动层 / 层隐藏。
+     */
+    bool clearActiveLayerPixels();
+    /**
+     * 编辑→填充（Shift+F5）：用 @p color 填活动层（Demo 无对话框，默认前景色）。
+     * 有选区只填 mask 内；无选区填整层。选区保留。
+     */
+    bool fillActiveLayer(const QColor &color);
+
     int pickLayerAt(int docX, int docY) const;
 
     bool isDirty() const { return m_dirty; }
