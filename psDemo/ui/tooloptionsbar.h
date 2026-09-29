@@ -2,6 +2,8 @@
 #define TOOLOPTIONSBAR_H
 
 #include "tools/toolid.h"
+#include "tools/toolcontext.h"
+#include "engine/paintengine.h"
 
 #include <QWidget>
 
@@ -45,13 +47,11 @@ public:
     // —— 油漆桶选项（pageFill）——
     int fillTolerance() const;
     bool fillContiguous() const;
-    /** 0=前景色，1=背景色，2=图案（图案尚未实现，工具侧会回退前景）。 */
-    int fillType() const;
+    Ps::FillSource fillSource() const;
     int fillOpacityPercent() const;
 
     // —— 渐变选项（pageGradient）——
-    /** 0线性 / 1径向 / 2角度 / 3对称 / 4菱形。 */
-    int gradientType() const;
+    Ps::PaintEngine::GradientType gradientType() const;
     int gradientOpacityPercent() const;
     int gradientOffsetPercent() const;
     bool gradientReverse() const;

@@ -39,8 +39,17 @@ bool PaintBucketTool::mousePress(const ToolEvent &event, const ToolContext &ctx,
         || seed.x() >= layer->width() || seed.y() >= layer->height())
         return false;
 
-    // fill-mode：FG / BG（PATTERN 对应 GIMP_BUCKET_FILL_PATTERN，未实现）
-    QColor fill = (ctx.fillSource == 1) ? ctx.background : ctx.foreground;
+    // fill-mode：FG / BG（PATTERN 对应 GIMP_BUCKET_FILL_PATTERN，未实现 → 回退前景）
+    QColor fill = ctx.foreground;
+    switch (ctx.fillSource) {
+    case FillSource::Background:
+        fill = ctx.background;
+        break;
+    case FillSource::Foreground:
+    case FillSource::Pattern:
+        fill = ctx.foreground;
+        break;
+    }
     // opacity：GIMP 经 apply_buffer 的 context opacity；此处瘦身为改写颜色 alpha
     const int opacityQ = qBound(0, int(ctx.fillOpacity * 255.0 + 0.5), 255);
     fill.setAlpha((fill.alpha() * opacityQ + 127) / 255);

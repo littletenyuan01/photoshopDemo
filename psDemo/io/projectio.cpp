@@ -1,5 +1,6 @@
 #include "projectio.h"
 
+#include "domain/blendmode.h"
 #include "domain/imagedocument.h"
 #include "domain/layer.h"
 #include "domain/selection.h"
@@ -12,6 +13,77 @@
 
 namespace Ps {
 namespace {
+
+/**
+ * v1 文件头里存的混合模式序（仅用于读旧工程，勿再扩展）。
+ * 顺序：正常、正片叠底、滤色、叠加、柔光、强光、变暗、变亮、差值、排除。
+ */
+enum class LegacyBlendModeV1 {
+    Normal = 0,
+    Multiply,
+    Screen,
+    Overlay,
+    SoftLight,
+    HardLight,
+    Darken,
+    Lighten,
+    Difference,
+    Exclusion,
+};
+
+inline constexpr int kLegacyBlendModeV1Count =
+    static_cast<int>(LegacyBlendModeV1::Exclusion) + 1;
+
+/** v1 混合序 → 当前 `BlendMode`；非法值返回 false。 */
+bool mapLegacyV1Blend(int legacy, BlendMode *out)
+{
+    if (!out || legacy < 0 || legacy >= kLegacyBlendModeV1Count)
+        return false;
+
+    switch (static_cast<LegacyBlendModeV1>(legacy)) {
+    case LegacyBlendModeV1::Normal:
+        *out = BlendMode::Normal;
+        return true;
+    case LegacyBlendModeV1::Multiply:
+        *out = BlendMode::Multiply;
+        return true;
+    case LegacyBlendModeV1::Screen:
+        *out = BlendMode::Screen;
+        return true;
+    case LegacyBlendModeV1::Overlay:
+        *out = BlendMode::Overlay;
+        return true;
+    case LegacyBlendModeV1::SoftLight:
+        *out = BlendMode::SoftLight;
+        return true;
+    case LegacyBlendModeV1::HardLight:
+        *out = BlendMode::HardLight;
+        return true;
+    case LegacyBlendModeV1::Darken:
+        *out = BlendMode::Darken;
+        return true;
+    case LegacyBlendModeV1::Lighten:
+        *out = BlendMode::Lighten;
+        return true;
+    case LegacyBlendModeV1::Difference:
+        *out = BlendMode::Difference;
+        return true;
+    case LegacyBlendModeV1::Exclusion:
+        *out = BlendMode::Exclusion;
+        return true;
+    }
+    return false;
+}
+
+bool isSupportedProjectVersion(ProjectFileVersion version)
+{
+    switch (version) {
+    case ProjectFileVersion::V1:
+    case ProjectFileVersion::V2:
+        return true;
+    }
+    return false;
+}
 
 QByteArray imageToPngBytes(const QImage &image)
 {
@@ -73,7 +145,7 @@ bool ProjectIo::save(const ImageDocument &doc, const QString &filePath,
 
     QDataStream out(&file);
     out.setVersion(QDataStream::Qt_6_0);
-    out << kMagic << kVersion;
+    out << kMagic << static_cast<quint32>(kCurrentProjectVersion);
     out << qint32(doc.width()) << qint32(doc.height());
     out << qint32(doc.activeLayerIndex());
     out << qint32(doc.layers().count());
@@ -140,18 +212,22 @@ std::unique_ptr<ImageDocument> ProjectIo::load(const QString &filePath,
     QDataStream in(&file);
     in.setVersion(QDataStream::Qt_6_0);
     quint32 magic = 0;
-    quint32 version = 0;
-    in >> magic >> version;
+    quint32 versionRaw = 0;
+    in >> magic >> versionRaw;
     if (magic != kMagic) {
         if (errorMessage)
             *errorMessage = QObject::tr("不是 PhotoshopLite 工程文件（魔数不匹配）");
         return nullptr;
     }
-    if (version != kVersion) {
+    const auto fileVersion = static_cast<ProjectFileVersion>(versionRaw);
+    if (!isSupportedProjectVersion(fileVersion)) {
         if (errorMessage)
-            *errorMessage = QObject::tr("不支持的工程版本：%1").arg(version);
+            *errorMessage = QObject::tr("不支持的工程版本：%1（当前为 %2）")
+                                .arg(versionRaw)
+                                .arg(static_cast<quint32>(kCurrentProjectVersion));
         return nullptr;
     }
+    const bool legacyV1Blend = (fileVersion == ProjectFileVersion::V1);
 
     qint32 width = 0;
     qint32 height = 0;
@@ -195,7 +271,23 @@ std::unique_ptr<ImageDocument> ProjectIo::load(const QString &filePath,
                                              pixels);
         layer->setVisible(visible != 0);
         layer->setOpacity(qreal(opacity));
-        layer->setBlendMode(static_cast<BlendMode>(blend));
+        // v1：先映射旧 10 种序；v2：整数即当前枚举。越界 = 坏文件，拒绝静默退化。
+        BlendMode mode = BlendMode::Normal;
+        if (legacyV1Blend) {
+            if (!mapLegacyV1Blend(blend, &mode)) {
+                if (errorMessage)
+                    *errorMessage = QObject::tr("图层 %1 的混合模式无效：%2").arg(i).arg(blend);
+                return nullptr;
+            }
+        } else {
+            if (!isValidBlendMode(blend)) {
+                if (errorMessage)
+                    *errorMessage = QObject::tr("图层 %1 的混合模式无效：%2").arg(i).arg(blend);
+                return nullptr;
+            }
+            mode = static_cast<BlendMode>(blend);
+        }
+        layer->setBlendMode(mode);
         layer->setOffsetSilent(ox, oy);
         doc->addLayer(std::move(layer));
     }

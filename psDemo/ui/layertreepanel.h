@@ -2,6 +2,7 @@
 #define LAYERTREEPANEL_H
 
 #include "itemtreepanel.h"
+#include "domain/blendmode.h"
 
 #include <QListWidgetItem>
 
@@ -78,6 +79,10 @@ private slots:
     void onOpacityValueChanged(int value);
     /** 松手：把最终值提交给 domain。 */
     void onOpacityCommitted();
+    /** 混合模式下拉变更（点选提交）→ domain。 */
+    void onBlendModeChanged(int index);
+    /** 弹出列表高亮项变化 → 画布实时预览该混合模式。 */
+    void onBlendModeHighlighted(int index);
     /** 防抖定时器到期：只重算活动层那一行（画笔通常只动活动层）。 */
     void onThumbnailTimer();
     /** 列表右键：弹出由 .ui Action 组装的上下文菜单。 */
@@ -88,6 +93,21 @@ private:
     void buildLayerContextMenu();
     /** 把滑条数值提交为活动层不透明度；与当前值相同则跳过。 */
     void commitOpacity(int value);
+    /**
+     * 重建混合模式下拉（中文文案 + 分隔线 + itemData）。
+     * 之后不得用 combo 下标当 BlendMode。
+     */
+    void setupBlendModeCombo();
+    /** 在已插入分隔线的 combo 里查找 mode 对应行（靠 itemData）。 */
+    int comboIndexForBlendMode(Ps::BlendMode mode) const;
+    /** combo 行 → BlendMode；分隔线/越界返回 false。 */
+    bool blendModeAtComboIndex(int index, Ps::BlendMode *out) const;
+    /** 开始悬停预览：记下打开前的模式。 */
+    void beginBlendModePreview();
+    /** 弹出列表关闭：把图层同步回 combo 当前项（Esc 则还原）。 */
+    void endBlendModePreview();
+    /** 临时/最终写入活动层混合模式（等值则跳过）。 */
+    void applyBlendModeToActiveLayer(Ps::BlendMode mode);
     /** 按 layer 追加一行（含缩略图与 UserRole 身份映射）。 */
     void appendRowForLayer(int stackIndex, Ps::Layer &layer);
     /** 按栈下标找行（行序会变，不能用行号当身份）。 */
@@ -126,6 +146,11 @@ private:
     int m_alphaSelectSourceLayer = -1;
     /** 本面板正在改选区时置位，避免 selectionChanged 把来源层清掉。 */
     bool m_settingAlphaSelect = false;
+
+    /** 混合模式下拉弹出中：悬停预览，勿用属性信号回写 combo 下标。 */
+    bool m_blendPreviewActive = false;
+    Ps::BlendMode m_blendPreviewOriginal = Ps::BlendMode::Normal;
+    int m_blendPreviewLayerIndex = -1;
 };
 
 #endif // LAYERTREEPANEL_H

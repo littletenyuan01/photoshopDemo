@@ -37,7 +37,7 @@ photoshopDemo/
 | 主窗口 | 已实现 | 菜单：新建 / 打开 / 视图缩放；中央为画布 |
 | 文档/图层模型 | 已实现（基础） | `ImageDocument` + `Layer` + `LayerStack`；分级信号 + 语义化 setter |
 | 会话与广播 | 已实现 | `AppSession`：文档唯一持有者；面板订阅广播而非逐个手工同步 |
-| 画布合成预览 | 已实现（基础） | `Compositor`（Normal+透明度）+ `CanvasView`（实现 `ViewPort`） |
+| 画布合成预览 | 已实现 | `Compositor`（PS 27 种混合 + 透明度）+ `CanvasView`（实现 `ViewPort`） |
 | 工具层 | 已实现 | `ToolManager` + `Tool` 基类 + 移动/抓手/缩放/画笔橡皮；新增工具不改画布 |
 | 图层面板 | 已实现（基础） | 新建/删除/显隐/透明度/上下移/重命名；增量更新 |
 | 打开位图 | 已实现 | PNG/JPEG/BMP/WebP → 单层文档 |

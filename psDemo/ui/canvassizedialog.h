@@ -41,6 +41,14 @@ public:
 
 private:
     enum DimUnit { Pixels = 0, Inches = 1, Centimeters = 2, Millimeters = 3 };
+    /** 扩展颜色下拉（与 canvassizedialog.ui 项顺序一致）。 */
+    enum class ExtensionColor {
+        Background = 0,
+        Foreground,
+        White,
+        Black,
+        Transparent,
+    };
 
     void loadFromDocument();
     void resetToOriginal();

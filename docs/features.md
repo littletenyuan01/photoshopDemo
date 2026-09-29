@@ -151,7 +151,7 @@
 
 > 概念与结构图见 [`docs/layers/`](layers/README.md)；信号/链路对照见 [`layers/data-flow.md`](layers/data-flow.md)。
 
-- `Layer`：名称、显隐、透明度、混合模式枚举（目前仅 Normal）、像素在 **`TileBuffer`（64×64 懒分配）**；
+- `Layer`：名称、显隐、透明度、混合模式、像素在 **`TileBuffer`（64×64 懒分配）**；
   **持 `owner` 回指**，属性 setter 内部自动广播 `layerPropertiesChanged`。
 - **新建图层统一路径**（对齐 GIMP `layer_new` → `fill` → `add_layer`）：
   `Layer(名,w,h)` 预定格数 → 可选 `fill` → `addLayer`。
@@ -169,7 +169,14 @@
 
 > 混合公式与预乘说明见 [`layers/compositing.md`](layers/compositing.md)。
 
-- `Compositor`：自底向顶 Normal + opacity，预乘 Alpha 混合；**支持按矩形脏区合成**。
+- `Compositor`：自底向顶，每层相对下方合成结果混合；**支持按矩形脏区合成**。
+  - **混合模式：PS 的 27 种全部实现**（正常/溶解 · 变暗组 · 变亮组 · 对比组 · 反相组 · 分量组）。
+    公式逐条对照 GIMP `gimpoperationlayermode-blend.c`（含 `safe_div`、分量组的 HSV/HSL 处理），
+    Alpha 合成对照 `gimpoperationlayermode-composite.c` 的 `composite_union`；
+    公式表与已知差异见 [`layers/compositing.md`](layers/compositing.md)。
+  - 图层面板 `blendModeCombo` 已接线（`.ui` 里 27 项按 PS 顺序列；选层会回读，改模式即重合成）。
+  - **限制**：整条管线 8-bit sRGB，与 GIMP 现代模式（按模式选线性/感知空间）数值不完全一致；
+    溶解用坐标哈希而非 PRNG（否则全量重合成会闪）。
 - `CanvasView`：棋盘格透明底、滚轮缩放、中键/Alt+左键平移、适应窗口 / 100%。
 - **限制**：画布目前仍是**全量重合成**（`pixelsChanged` 已带脏区但尚未被消费），见 `wiki/Roadmap.md` Phase 7。
 
@@ -230,7 +237,7 @@
   ⚠️ 当前仅为 UI，尚未接入 domain（点选不会真的限制绘制）。
 - **底栏按钮**：加大可点区域（约 30×30）；线框图标见 `resources/icons/layers/`（链接 / fx / 蒙版 / 调整 / 组 / 新建 / 删除），悬停有中文 tip。
 - **图标来源**：整套由 `resources/icons/layers/_gen_svg_icons.py` 生成的 **SVG 矢量**，运行时按显示尺寸光栅化（任意尺寸锐利）。**自绘占位**，可按 `docs/ui/iconfont-icons.md` 的关键词从 iconfont.cn 同名替换。
-- **限制**：无缩略图尺寸选项；混合模式仍为占位；无撤销（改层后暂不可 Ctrl+Z）；
+- **限制**：无缩略图尺寸选项；无撤销（改层后暂不可 Ctrl+Z）；
   底栏除图层新建/删除外多为 UI 占位（链接/样式/蒙版/调整层/图层组、填充滑条、
   图层筛选行都已加 `（UI 占位…）` tooltip，**点了不会有反应**）。
 

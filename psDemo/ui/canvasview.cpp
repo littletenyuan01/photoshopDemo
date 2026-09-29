@@ -324,19 +324,22 @@ int CanvasView::brushDiameter() const
     return qRound(m_brushRadius * 2.0);
 }
 
-void CanvasView::setFillOptions(int tolerance, bool contiguous, int fillSource, qreal opacity)
+void CanvasView::setFillOptions(int tolerance, bool contiguous, Ps::FillSource fillSource, qreal opacity)
 {
     m_fillTolerance = qBound(0, tolerance, 255);
     m_fillContiguous = contiguous;
-    m_fillSource = (fillSource == 1) ? 1 : 0; // 图案(2) 暂回退前景
+    // 图案填充尚未实现：回退前景，避免静默用错颜色
+    m_fillSource = (fillSource == Ps::FillSource::Background)
+                       ? Ps::FillSource::Background
+                       : Ps::FillSource::Foreground;
     m_fillOpacity = qBound(0.0, opacity, 1.0);
     refreshToolContext();
 }
 
-void CanvasView::setGradientOptions(int type, qreal opacity, int offsetPercent,
+void CanvasView::setGradientOptions(Ps::PaintEngine::GradientType type, qreal opacity, int offsetPercent,
                                     bool reverse, bool dither)
 {
-    m_gradientType = qBound(0, type, 4);
+    m_gradientType = type;
     m_gradientOpacity = qBound(0.0, opacity, 1.0);
     m_gradientOffsetPercent = qBound(0, offsetPercent, 100);
     m_gradientReverse = reverse;

@@ -11,7 +11,8 @@ class ImageDocument;
 /**
  * 图层合成器（engine）。
  * 只读文档，输出一张预览图；不修改各层 pixels。
- * v1：自底向顶，仅 Normal + opacity；透明底由 Canvas 画棋盘格表现。
+ * 自底向顶：每层相对下方合成结果做混合（Normal / Multiply / Screen…）。
+ * 公式对照 GIMP layer-modes blend；透明底由 Canvas 画棋盘格表现。
  * 日后蒙版/调整层/OpenCV 加速应挂在本模块，而不是 UI。
  */
 class Compositor

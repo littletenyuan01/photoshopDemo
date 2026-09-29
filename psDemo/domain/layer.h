@@ -55,7 +55,7 @@ public:
     void setOpacity(qreal opacity);
 
     BlendMode blendMode() const { return m_blendMode; }
-    /** 改混合模式（v1 仅 Normal 生效）。 */
+    /** 改混合模式（PS 27 种，合成期生效；见 `engine/blend.cpp`）。 */
     void setBlendMode(BlendMode mode);
 
     /**

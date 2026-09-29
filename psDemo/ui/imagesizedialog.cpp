@@ -75,7 +75,7 @@ void ImageSizeDialog::resetToOriginal()
     ui->widthUnitCombo->setCurrentIndex(Pixels);
     ui->heightUnitCombo->setCurrentIndex(Pixels);
     ui->resEdit->setText(QStringLiteral("72"));
-    ui->resUnitCombo->setCurrentIndex(0);
+    ui->resUnitCombo->setCurrentIndex(static_cast<int>(ResUnit::PixelsPerInch));
     ui->resampleCheck->setChecked(true);
     setDimEditsFromPixels(m_origW, m_origH);
     m_blockDim = false;
@@ -123,7 +123,7 @@ double ImageSizeDialog::resolutionPpi() const
     double v = ui->resEdit->text().trimmed().toDouble(&ok);
     if (!ok || v <= 0.0)
         v = 72.0;
-    if (ui->resUnitCombo->currentIndex() == 1) // 像素/厘米 → PPI
+    if (static_cast<ResUnit>(ui->resUnitCombo->currentIndex()) == ResUnit::PixelsPerCentimeter)
         v *= 2.54;
     return v;
 }

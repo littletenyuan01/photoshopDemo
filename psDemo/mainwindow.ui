@@ -24,8 +24,9 @@
     <normaloff>:/icons/ui/app-logo.png</normaloff>:/icons/ui/app-logo.png</iconset>
   </property>
   <widget class="QStackedWidget" name="mainStack">
+   <!-- 0=workspacePage 工作区；1=homeScreen 主页。启动默认主页（对齐 PS Home） -->
    <property name="currentIndex">
-    <number>0</number>
+    <number>1</number>
    </property>
    <widget class="QWidget" name="workspacePage">
     <layout class="QVBoxLayout" name="rootVerticalLayout">

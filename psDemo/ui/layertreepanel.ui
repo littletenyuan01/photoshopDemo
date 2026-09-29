@@ -17,9 +17,27 @@ QComboBox {
   border-radius: 2px; padding: 1px 4px; min-height: 20px; font-size: 11px;
 }
 QComboBox::drop-down { border: none; width: 16px; }
+/* 弹出列表：白底黑字（对齐 PS 混合模式下拉观感） */
 QComboBox QAbstractItemView {
-  background-color: #2a2a2a; color: #eee; selection-background-color: #2d5a8a;
+  background-color: #ffffff; color: #222222;
+  selection-background-color: #3875d7; selection-color: #ffffff;
+  outline: 0; border: 1px solid #a0a0a0;
 }
+QComboBox QAbstractItemView::item { min-height: 22px; padding: 2px 8px; }
+QComboBox QAbstractItemView::item:hover {
+  background-color: #e5f1fb; color: #222222;
+}
+QComboBox QScrollBar:vertical {
+  background: #f0f0f0; width: 10px; margin: 0;
+}
+QComboBox QScrollBar::handle:vertical {
+  background: #c0c0c0; min-height: 24px; border-radius: 3px;
+}
+QComboBox QScrollBar::handle:vertical:hover { background: #a8a8a8; }
+QComboBox QScrollBar::add-line:vertical,
+QComboBox QScrollBar::sub-line:vertical { height: 0; border: none; }
+QComboBox QScrollBar::add-page:vertical,
+QComboBox QScrollBar::sub-page:vertical { background: #f0f0f0; }
 QListWidget {
   background-color: #323232; color: #eee; border: none; outline: none; font-size: 12px;
 }
@@ -256,12 +274,32 @@ QToolButton:disabled { color: #666; }</string>
             <verstretch>0</verstretch>
            </sizepolicy>
           </property>
-          <property name="toolTip">
-           <string>混合模式</string>
+          <property name="maxVisibleItems">
+           <number>20</number>
           </property>
+          <property name="toolTip">
+           <string>混合模式（27 种，顺序与 PS 图层面板一致）</string>
+          </property>
+          <!--
+            ⚠️ 项文案与顺序都在本 .ui（= Ps::BlendMode = PS 分组顺序）：
+               正常/溶解 · 变暗组 · 变亮组 · 对比组 · 反相组 · 分量组
+            增删模式要同时改 domain/blendmode.h、本列表、io/psdio.cpp 的四字符码，
+            并升 ProjectFileVersion / kCurrentProjectVersion（工程文件存的是枚举整数）。
+            setupBlendModeCombo 只绑 itemData + 插分组分隔线，不改文案。
+          -->
           <item>
            <property name="text">
             <string>正常</string>
+           </property>
+          </item>
+          <item>
+           <property name="text">
+            <string>溶解</string>
+           </property>
+          </item>
+          <item>
+           <property name="text">
+            <string>变暗</string>
            </property>
           </item>
           <item>
@@ -271,12 +309,117 @@ QToolButton:disabled { color: #666; }</string>
           </item>
           <item>
            <property name="text">
+            <string>颜色加深</string>
+           </property>
+          </item>
+          <item>
+           <property name="text">
+            <string>线性加深</string>
+           </property>
+          </item>
+          <item>
+           <property name="text">
+            <string>深色</string>
+           </property>
+          </item>
+          <item>
+           <property name="text">
+            <string>变亮</string>
+           </property>
+          </item>
+          <item>
+           <property name="text">
             <string>滤色</string>
            </property>
           </item>
           <item>
            <property name="text">
+            <string>颜色减淡</string>
+           </property>
+          </item>
+          <item>
+           <property name="text">
+            <string>线性减淡（添加）</string>
+           </property>
+          </item>
+          <item>
+           <property name="text">
+            <string>浅色</string>
+           </property>
+          </item>
+          <item>
+           <property name="text">
             <string>叠加</string>
+           </property>
+          </item>
+          <item>
+           <property name="text">
+            <string>柔光</string>
+           </property>
+          </item>
+          <item>
+           <property name="text">
+            <string>强光</string>
+           </property>
+          </item>
+          <item>
+           <property name="text">
+            <string>亮光</string>
+           </property>
+          </item>
+          <item>
+           <property name="text">
+            <string>线性光</string>
+           </property>
+          </item>
+          <item>
+           <property name="text">
+            <string>点光</string>
+           </property>
+          </item>
+          <item>
+           <property name="text">
+            <string>实色混合</string>
+           </property>
+          </item>
+          <item>
+           <property name="text">
+            <string>差值</string>
+           </property>
+          </item>
+          <item>
+           <property name="text">
+            <string>排除</string>
+           </property>
+          </item>
+          <item>
+           <property name="text">
+            <string>减去</string>
+           </property>
+          </item>
+          <item>
+           <property name="text">
+            <string>划分</string>
+           </property>
+          </item>
+          <item>
+           <property name="text">
+            <string>色相</string>
+           </property>
+          </item>
+          <item>
+           <property name="text">
+            <string>饱和度</string>
+           </property>
+          </item>
+          <item>
+           <property name="text">
+            <string>颜色</string>
+           </property>
+          </item>
+          <item>
+           <property name="text">
+            <string>明度</string>
            </property>
           </item>
          </widget>

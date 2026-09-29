@@ -101,7 +101,7 @@ public:
                            PaintSelectionClip clip = PaintSelectionClip());
 
     /**
-     * 渐变形状（选项栏下标；对照 GimpGradientType 子集）。
+     * 渐变形状（对照 GimpGradientType 子集；数值 = 选项栏 gradTypeCombo 顺序）。
      */
     enum class GradientType {
         Linear = 0,   ///< ≈ GIMP_GRADIENT_LINEAR

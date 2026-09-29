@@ -75,7 +75,7 @@ NewDocumentDialog 确认
 |----|------|
 | 层尺寸 / 偏移 | 层缓冲与文档同大；`Layer::offsetX/Y` 控制放置（移动工具改 offset） |
 | 像素存储 | `TileBuffer` 64×64 懒分配；透明新建 0 块 |
-| 混合模式 | 枚举有，合成 v1 一律 Normal |
+| 混合模式 | PS 的 27 种全实现（枚举 + `engine/blend.cpp` + 面板下拉接线）；`Normal` 时退化为此前的 over |
 | 合成范围 | 可传 `rect`；只混合已分配瓦片（按 offset 映射到文档） |
 | 视图缩放 | `CanvasView::m_zoom`；≥4x 倾向关掉平滑，见像素块 |
 

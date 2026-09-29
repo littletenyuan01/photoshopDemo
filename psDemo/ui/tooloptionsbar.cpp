@@ -65,9 +65,14 @@ bool ToolOptionsBar::fillContiguous() const
     return ui->fillContiguousCheck->isChecked();
 }
 
-int ToolOptionsBar::fillType() const
+Ps::FillSource ToolOptionsBar::fillSource() const
 {
-    return ui->fillTypeCombo->currentIndex();
+    const int index = ui->fillTypeCombo->currentIndex();
+    if (index == static_cast<int>(Ps::FillSource::Background))
+        return Ps::FillSource::Background;
+    if (index == static_cast<int>(Ps::FillSource::Pattern))
+        return Ps::FillSource::Pattern;
+    return Ps::FillSource::Foreground;
 }
 
 int ToolOptionsBar::fillOpacityPercent() const
@@ -75,9 +80,13 @@ int ToolOptionsBar::fillOpacityPercent() const
     return ui->fillOpacitySpin->value();
 }
 
-int ToolOptionsBar::gradientType() const
+Ps::PaintEngine::GradientType ToolOptionsBar::gradientType() const
 {
-    return ui->gradTypeCombo->currentIndex();
+    const int index = ui->gradTypeCombo->currentIndex();
+    const int max = static_cast<int>(Ps::PaintEngine::GradientType::Diamond);
+    if (index < 0 || index > max)
+        return Ps::PaintEngine::GradientType::Linear;
+    return static_cast<Ps::PaintEngine::GradientType>(index);
 }
 
 int ToolOptionsBar::gradientOpacityPercent() const

@@ -138,7 +138,7 @@ void MainWindow::setupToolbox()
         ui->canvasWorkspace->canvasView()->setFillOptions(
             ui->toolOptionsBar->fillTolerance(),
             ui->toolOptionsBar->fillContiguous(),
-            ui->toolOptionsBar->fillType(),
+            ui->toolOptionsBar->fillSource(),
             ui->toolOptionsBar->fillOpacityPercent() / 100.0);
     });
     connect(ui->toolOptionsBar, &ToolOptionsBar::gradientOptionsChanged, this, [this]() {
@@ -163,7 +163,7 @@ void MainWindow::setupToolbox()
     canvas->setBrushDiameter(ui->toolOptionsBar->brushDiameter());
     canvas->setFillOptions(ui->toolOptionsBar->fillTolerance(),
                            ui->toolOptionsBar->fillContiguous(),
-                           ui->toolOptionsBar->fillType(),
+                           ui->toolOptionsBar->fillSource(),
                            ui->toolOptionsBar->fillOpacityPercent() / 100.0);
     canvas->setGradientOptions(ui->toolOptionsBar->gradientType(),
                                ui->toolOptionsBar->gradientOpacityPercent() / 100.0,

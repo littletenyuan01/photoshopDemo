@@ -155,19 +155,22 @@ int CanvasSizeDialog::anchorCol() const
 
 QColor CanvasSizeDialog::extensionColor() const
 {
-    switch (ui->extColorCombo->currentIndex()) {
-    case 1:
+    const int index = ui->extColorCombo->currentIndex();
+    if (index < 0 || index > static_cast<int>(ExtensionColor::Transparent))
+        return m_bg;
+    switch (static_cast<ExtensionColor>(index)) {
+    case ExtensionColor::Foreground:
         return m_fg;
-    case 2:
+    case ExtensionColor::White:
         return Qt::white;
-    case 3:
+    case ExtensionColor::Black:
         return Qt::black;
-    case 4:
+    case ExtensionColor::Transparent:
         return Qt::transparent;
-    case 0:
-    default:
+    case ExtensionColor::Background:
         return m_bg;
     }
+    return m_bg;
 }
 
 double CanvasSizeDialog::toPixels(double value, DimUnit unit, double ppi)

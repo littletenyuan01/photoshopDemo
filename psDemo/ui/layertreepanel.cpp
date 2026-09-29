@@ -1,10 +1,14 @@
 #include "layertreepanel.h"
 #include "ui_layertreepanel.h"
 
+#include "domain/blendmode.h"
 #include "domain/imagedocument.h"
 #include "domain/layer.h"
 #include "domain/selection.h"
 
+#include <QAbstractItemView>
+#include <QComboBox>
+#include <QDebug>
 #include <QEvent>
 #include <QListWidgetItem>
 #include <QMenu>
@@ -71,6 +75,18 @@ LayerTreePanel::LayerTreePanel(QWidget *parent)
             this, &LayerTreePanel::onOpacityValueChanged);
     connect(ui->opacitySlider, &QSlider::sliderReleased,
             this, &LayerTreePanel::onOpacityCommitted);
+    // 先插分隔线并绑 itemData，再 connect —— 避免 setup 过程中误提交
+    setupBlendModeCombo();
+    connect(ui->blendModeCombo, QOverload<int>::of(&QComboBox::currentIndexChanged),
+            this, &LayerTreePanel::onBlendModeChanged);
+    // 弹出列表里光标滑过某一项 → 画布即时预览（未点选则关闭时还原）
+    connect(ui->blendModeCombo, QOverload<int>::of(&QComboBox::highlighted),
+            this, &LayerTreePanel::onBlendModeHighlighted);
+    if (QAbstractItemView *view = ui->blendModeCombo->view()) {
+        view->installEventFilter(this);
+        if (view->window())
+            view->window()->installEventFilter(this);
+    }
 
     connect(ui->fillSlider, &QSlider::valueChanged, this, [this](int value) {
         ui->fillValueLabel->setText(QStringLiteral("%1%").arg(value));
@@ -278,6 +294,128 @@ void LayerTreePanel::commitOpacity(int value)
     doc->setLayerOpacity(index, target);
 }
 
+void LayerTreePanel::setupBlendModeCombo()
+{
+    // 文案 / maxVisibleItems / 白底弹出样式都在 layertreepanel.ui（及 ui_layertreepanel.h）。
+    // 这里只绑 itemData（枚举序）并插分组分隔线 —— 不要用 combo 下标当模式。
+    QComboBox *combo = ui->blendModeCombo;
+    const QSignalBlocker blocker(combo);
+    Q_ASSERT(combo->count() == Ps::kBlendModeCount);
+    for (int i = 0; i < Ps::kBlendModeCount; ++i)
+        combo->setItemData(i, i);
+
+    // 从后往前插，前面下标不漂移：溶解后 / 深色后 / 浅色后 / 实色混合后 / 划分后
+    combo->insertSeparator(23);
+    combo->insertSeparator(19);
+    combo->insertSeparator(12);
+    combo->insertSeparator(7);
+    combo->insertSeparator(2);
+}
+
+int LayerTreePanel::comboIndexForBlendMode(Ps::BlendMode mode) const
+{
+    const int want = static_cast<int>(mode);
+    for (int i = 0; i < ui->blendModeCombo->count(); ++i) {
+        const QVariant data = ui->blendModeCombo->itemData(i);
+        if (data.isValid() && data.toInt() == want)
+            return i;
+    }
+    return 0;
+}
+
+bool LayerTreePanel::blendModeAtComboIndex(int index, Ps::BlendMode *out) const
+{
+    if (!out || index < 0 || index >= ui->blendModeCombo->count())
+        return false;
+    const QVariant data = ui->blendModeCombo->itemData(index);
+    if (!data.isValid())
+        return false;
+    const int modeInt = data.toInt();
+    if (!Ps::isValidBlendMode(modeInt))
+        return false;
+    *out = static_cast<Ps::BlendMode>(modeInt);
+    return true;
+}
+
+void LayerTreePanel::beginBlendModePreview()
+{
+    if (m_blendPreviewActive)
+        return;
+    Ps::ImageDocument *doc = document();
+    Ps::Layer *layer = doc ? doc->activeLayer() : nullptr;
+    if (!layer)
+        return;
+    m_blendPreviewActive = true;
+    m_blendPreviewOriginal = layer->blendMode();
+    m_blendPreviewLayerIndex = doc->activeLayerIndex();
+}
+
+void LayerTreePanel::endBlendModePreview()
+{
+    if (!m_blendPreviewActive)
+        return;
+    const int layerIndex = m_blendPreviewLayerIndex;
+    m_blendPreviewActive = false;
+    m_blendPreviewLayerIndex = -1;
+
+    // 以 combo 当前项为准：点选后已是新模式；Esc 未改下标则回到打开前的模式
+    Ps::BlendMode mode = m_blendPreviewOriginal;
+    blendModeAtComboIndex(ui->blendModeCombo->currentIndex(), &mode);
+
+    Ps::ImageDocument *doc = document();
+    if (!doc || layerIndex < 0)
+        return;
+    const Ps::Layer *layer = doc->layers().layerAt(layerIndex);
+    if (!layer || layer->blendMode() == mode)
+        return;
+    doc->setLayerBlendMode(layerIndex, mode);
+}
+
+void LayerTreePanel::applyBlendModeToActiveLayer(Ps::BlendMode mode)
+{
+    Ps::ImageDocument *doc = document();
+    if (!doc)
+        return;
+    const int layerIndex = (m_blendPreviewActive && m_blendPreviewLayerIndex >= 0)
+                               ? m_blendPreviewLayerIndex
+                               : doc->activeLayerIndex();
+    if (layerIndex < 0)
+        return;
+    const Ps::Layer *layer = doc->layers().layerAt(layerIndex);
+    if (!layer || layer->blendMode() == mode)
+        return;
+    doc->setLayerBlendMode(layerIndex, mode);
+}
+
+void LayerTreePanel::onBlendModeHighlighted(int index)
+{
+    // 弹出列表里高亮（鼠标滑过 / 键盘上下）→ 立即改合成预览
+    Ps::BlendMode mode = Ps::BlendMode::Normal;
+    if (!blendModeAtComboIndex(index, &mode))
+        return; // 分隔线：保持上一预览
+    beginBlendModePreview();
+    // 弹出容器可能晚于 setup 才建成，再挂一次 Hide 监听
+    if (QAbstractItemView *view = ui->blendModeCombo->view()) {
+        view->installEventFilter(this);
+        if (QWidget *win = view->window())
+            win->installEventFilter(this);
+    }
+    applyBlendModeToActiveLayer(mode);
+}
+
+void LayerTreePanel::onBlendModeChanged(int index)
+{
+    Ps::BlendMode mode = Ps::BlendMode::Normal;
+    if (!blendModeAtComboIndex(index, &mode))
+        return;
+    // 点选提交：若正在预览，结束预览态（图层多半已是该模式）
+    if (m_blendPreviewActive) {
+        m_blendPreviewActive = false;
+        m_blendPreviewLayerIndex = -1;
+    }
+    applyBlendModeToActiveLayer(mode);
+}
+
 void LayerTreePanel::onBtnNewClicked()
 {
     onNewItem();
@@ -315,6 +453,13 @@ void LayerTreePanel::onDeleteItem()
 
 bool LayerTreePanel::eventFilter(QObject *watched, QEvent *event)
 {
+    // 混合模式弹出列表关闭 → 结束悬停预览（Esc / 点空白 / 点选后）
+    if (m_blendPreviewActive && event->type() == QEvent::Hide) {
+        QAbstractItemView *view = ui->blendModeCombo->view();
+        if (watched == view || (view && watched == view->window()))
+            endBlendModePreview();
+    }
+
     if (watched == ui->itemList->viewport()
         && event->type() == QEvent::MouseButtonPress) {
         auto *mouse = static_cast<QMouseEvent *>(event);
@@ -514,10 +659,14 @@ void LayerTreePanel::syncActiveRowAndOptions()
 
     Ps::Layer *layer = doc->activeLayer();
     const QSignalBlocker sliderBlocker(ui->opacitySlider);
+    const QSignalBlocker blendBlocker(ui->blendModeCombo);
     if (layer) {
         const int percent = qRound(layer->opacity() * 100.0);
         ui->opacitySlider->setValue(percent);
         ui->opacityValueLabel->setText(QStringLiteral("%1%").arg(percent));
+        // 弹出预览中勿回写 combo，否则高亮项会被拽回
+        if (!m_blendPreviewActive)
+            ui->blendModeCombo->setCurrentIndex(comboIndexForBlendMode(layer->blendMode()));
     }
 }
 

@@ -134,7 +134,7 @@ void NewDocumentDialog::syncDimValidators()
 double NewDocumentDialog::resolutionPpi() const
 {
     const double raw = parsePositiveDouble(ui->resEdit, 72.0);
-    if (ui->resUnitCombo->currentIndex() == 1)
+    if (static_cast<ResUnit>(ui->resUnitCombo->currentIndex()) == ResUnit::PixelsPerCentimeter)
         return raw * 2.54;
     return raw;
 }
@@ -201,7 +201,7 @@ void NewDocumentDialog::applyPreset(int widthPx, int heightPx, int ppi, DimUnit 
         const QSignalBlocker bRes(ui->resEdit);
         const QSignalBlocker bResUnit(ui->resUnitCombo);
         ui->resEdit->setText(QString::number(qMax(1, ppi)));
-        ui->resUnitCombo->setCurrentIndex(0); // 像素/英寸
+        ui->resUnitCombo->setCurrentIndex(static_cast<int>(ResUnit::PixelsPerInch));
         m_dimUnit = unit;
         ui->widthUnitCombo->setCurrentIndex(static_cast<int>(unit));
         syncDimValidators();

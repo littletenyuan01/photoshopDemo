@@ -518,7 +518,10 @@ return QIcon(pm);                                 // 这个 QIcon 只有一张 2
 ### 2026-09 — 预乘 Alpha 合成（Compositor）
 
 - 图层缓冲统一为 `QImage::Format_ARGB32_Premultiplied`，避免直通/预乘混用导致脏边。
-- `blendNormalPremultiplied`：`out = src + dst * (1 - src.a)`（已含 opacity 缩放 src）。
+- 合成拆成两步（对照 GIMP `gimpoperationlayermode-blend.c` / `...-composite.c`）：
+  - `engine/blend.cpp`：逐模式颜色合并 `B(Cb, Cs)`（PS 27 种）
+  - `engine/compositor.cpp`：`composite_union` Alpha 合成；Normal 时退化为 Porter-Duff over
+    （`out = src + dst * (1 - src.a)`，src 已含图层不透明度）
 - `LayerStack` 使用 `std::vector<unique_ptr>`，因 Qt6 `QVector` 对不可拷贝类型不友好。
 
 ### 待记

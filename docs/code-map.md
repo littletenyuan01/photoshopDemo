@@ -46,7 +46,7 @@
 
 | 文件 | 职责 |
 |------|------|
-| `domain/blendmode.h` | 混合模式枚举（现仅 Normal） |
+| `domain/blendmode.h` | 混合模式枚举：**PS 的 27 种**，顺序 = PS 分组顺序 = `.ui` 项顺序；面板用 `itemData`（含分隔线） |
 | `domain/layer.h/.cpp` | 单层属性 + `TileBuffer`；**持 owner 回指，setter 内部自动广播** |
 | `domain/tilebuffer.h/.cpp` | 64×64 瓦片；新建层统一 `Layer(extent)`，透明不分配、fill/画笔才 `ensureTile` |
 | `domain/layerstack.h/.cpp` | 图层列表（`std::vector<unique_ptr>`） |
@@ -63,10 +63,12 @@ UI 不得直接改 `Layer`，一律走 `setLayerVisible/Opacity/Name/BlendMode` 
 
 | 文件 | 职责 |
 |------|------|
-| `engine/compositor.h/.cpp` | 预乘 Alpha 的 Normal 合成；可按矩形脏区合成 |
+| `engine/blend.h/.cpp` | 逐模式颜色合并 `B(Cb, Cs)`（27 种，对照 `gimpoperationlayermode-blend.c`）+ 溶解的坐标哈希 |
+| `engine/compositor.h/.cpp` | 图层遍历 + Alpha 合成（`composite_union`）；可按矩形脏区合成 |
 | `engine/paintengine.h/.cpp` | 圆形 dab / 线段插值；画笔 SourceOver、橡皮 DestinationOut；**SelectionClip** 约束选区内绘制 |
 
-**要点**：`blendNormalPremultiplied` 按扫描线混合；绘制与合成分离（对齐 GIMP paint vs projection）。
+**要点**：`blend`（算什么颜色）与 `compositor`（怎么按 Alpha 叠）分开，对齐 GIMP 的
+`gimpoperationlayermode-blend.c` / `...-composite.c` 两个文件；绘制与合成分离（对齐 GIMP paint vs projection）。
 
 ## ui
 

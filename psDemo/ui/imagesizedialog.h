@@ -34,6 +34,11 @@ public:
 
 private:
     enum DimUnit { Pixels = 0, Inches = 1, Centimeters = 2, Millimeters = 3 };
+    /** 分辨率单位（与 imagesizedialog.ui 中 resUnitCombo 顺序一致）。 */
+    enum class ResUnit {
+        PixelsPerInch = 0,
+        PixelsPerCentimeter = 1,
+    };
 
     void loadFromDocument();
     void resetToOriginal();
