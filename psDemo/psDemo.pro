@@ -16,6 +16,8 @@ SOURCES += \
     mainwindow.cpp \
     app/appsession.cpp \
     app/recentdocuments.cpp \
+    app/historystack.cpp \
+    app/undoitem.cpp \
     domain/layer.cpp \
     domain/tilebuffer.cpp \
     domain/layerstack.cpp \
@@ -59,6 +61,8 @@ HEADERS += \
     mainwindow.h \
     app/appsession.h \
     app/recentdocuments.h \
+    app/historystack.h \
+    app/undoitem.h \
     domain/blendmode.h \
     domain/layer.h \
     domain/tilebuffer.h \

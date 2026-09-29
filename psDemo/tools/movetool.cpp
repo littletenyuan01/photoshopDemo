@@ -105,6 +105,8 @@ bool MoveTool::mousePress(const ToolEvent &event, const ToolContext &ctx, ViewPo
 
     m_dragging = true;
     m_lastImagePos = event.imagePos;
+    // 整次拖拽共用一条属性撤销（对照 layer prop undo）
+    ctx.document->pushLayerOffsetUndo(ctx.document->activeLayerIndex());
     return true;
 }
 

@@ -102,6 +102,9 @@ bool GradientTool::mouseRelease(const ToolEvent &event, const ToolContext &ctx, 
     if (!layer || !layer->isVisible())
         return true;
 
+    ctx.document->pushLayerPixelsUndo(ctx.document->activeLayerIndex(),
+                                      QObject::tr("渐变"));
+
     const PaintEngine::GradientType type = ctx.gradientType;
     // 对照 gimp_item_mask_intersect：渐变只写入选区内
     PaintEngine::SelectionClip clip;

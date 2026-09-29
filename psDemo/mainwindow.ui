@@ -1170,7 +1170,7 @@
     <bool>false</bool>
    </property>
    <property name="toolTip">
-    <string>UI 占位，功能尚未接入</string>
+    <string>还原（Ctrl+Z）</string>
    </property>
   </action>
   <action name="actionStepForward">
@@ -1184,7 +1184,7 @@
     <bool>false</bool>
    </property>
    <property name="toolTip">
-    <string>UI 占位，功能尚未接入</string>
+    <string>重做（Ctrl+Shift+Z）</string>
    </property>
   </action>
   <action name="actionStepBackward">

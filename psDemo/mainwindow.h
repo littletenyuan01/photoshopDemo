@@ -88,6 +88,10 @@ private slots:
     void onSelectAll();
     void onSelectDeselect();
     void onSelectInverse();
+    void onUndo();
+    void onRedo();
+    void updateUndoRedoActions();
+    void onDocumentChangedForHistory(Ps::ImageDocument *doc);
 
 private:
     /** 装配菜单动作连接。 */
@@ -124,6 +128,7 @@ private:
 
     Ui::MainWindow *ui;
     Ps::AppSession *m_session = nullptr;
+    QMetaObject::Connection m_historyConn;
     bool m_rightColumnUserSized = false; ///< 用户拖过分隔条后，不再套用默认比例
     bool m_closeConfirming = false;      ///< 正在弹退出确认框（防重入）
 };

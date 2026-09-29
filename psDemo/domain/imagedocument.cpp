@@ -1,10 +1,15 @@
 #include "imagedocument.h"
 
+#include "app/historystack.h"
+#include "app/undoitem.h"
+
 #include <QImage>
 #include <QPainter>
 #include <QtGlobal>
 
 #include <memory>
+#include <utility>
+#include <vector>
 
 namespace Ps {
 
@@ -13,18 +18,109 @@ ImageDocument::ImageDocument(int width, int height, QObject *parent)
     , m_width(width)
     , m_height(height)
     , m_selection(width, height)
+    , m_history(std::make_unique<HistoryStack>(this))
 {
+}
+
+ImageDocument::~ImageDocument() = default;
+
+ImageDocument::HistorySuppress::HistorySuppress(ImageDocument &doc)
+    : m_doc(doc)
+{
+    ++m_doc.m_historySuppress;
+}
+
+ImageDocument::HistorySuppress::~HistorySuppress()
+{
+    --m_doc.m_historySuppress;
+}
+
+bool ImageDocument::shouldRecordHistory() const
+{
+    return m_historySuppress == 0 && m_history && !m_history->isApplying();
+}
+
+std::unique_ptr<Layer> ImageDocument::takeLayerForUndo(int index)
+{
+    return m_layers.takeLayer(index);
+}
+
+void ImageDocument::insertLayerForUndo(int index, std::unique_ptr<Layer> layer)
+{
+    if (!layer)
+        return;
+    layer->setOwner(this);
+    m_layers.insertLayer(index, std::move(layer));
+}
+
+void ImageDocument::undo()
+{
+    if (m_history)
+        m_history->undo(*this);
+}
+
+void ImageDocument::redo()
+{
+    if (m_history)
+        m_history->redo(*this);
+}
+
+void ImageDocument::pushLayerPixelsUndo(int layerIndex, const QString &label)
+{
+    if (!shouldRecordHistory())
+        return;
+    Layer *layer = m_layers.layerAt(layerIndex);
+    if (!layer)
+        return;
+    m_history->push(std::make_unique<LayerPixelsUndo>(
+        layerIndex, layer->materialize(), label));
+}
+
+void ImageDocument::pushLayerOffsetUndo(int layerIndex)
+{
+    pushLayerPropUndo(layerIndex, tr("移动图层"));
+}
+
+void ImageDocument::pushLayerPropUndo(int index, const QString &label)
+{
+    if (!shouldRecordHistory())
+        return;
+    Layer *layer = m_layers.layerAt(index);
+    if (!layer)
+        return;
+    m_history->push(std::make_unique<LayerPropUndo>(
+        index, captureLayerProps(*layer), label));
+}
+
+void ImageDocument::pushDocumentGeomUndo(const QString &label)
+{
+    if (!shouldRecordHistory())
+        return;
+    std::vector<DocumentGeomUndo::LayerState> layers;
+    layers.reserve(size_t(m_layers.count()));
+    for (int i = 0; i < m_layers.count(); ++i) {
+        Layer *layer = m_layers.layerAt(i);
+        if (!layer)
+            continue;
+        DocumentGeomUndo::LayerState st;
+        st.props = captureLayerProps(*layer);
+        st.pixels = layer->materialize();
+        st.width = layer->width();
+        st.height = layer->height();
+        layers.push_back(std::move(st));
+    }
+    m_history->push(std::make_unique<DocumentGeomUndo>(
+        m_width, m_height, m_selection.mask().copy(),
+        std::move(layers), m_activeLayerIndex, label));
 }
 
 std::unique_ptr<ImageDocument> ImageDocument::createBlank(int width, int height,
                                                           const QColor &background)
 {
     auto doc = std::make_unique<ImageDocument>(width, height);
+    HistorySuppress suppress(*doc);
     auto bg = std::make_unique<Layer>(QStringLiteral("背景"), width, height);
     bg->fill(background);
-    // 走 addLayer 而不是 m_layers.addLayer：那里是挂 owner 的唯一位置。
-    // 早先直接调 m_layers.addLayer 漏挂 owner → 改背景层显隐/透明度时属性信号不发、
-    // 画布与面板静默不同步（有实测复现：contentChanged 发 0 次）。
     const int index = doc->addLayer(std::move(bg));
     doc->m_activeLayerIndex = index;
     return doc;
@@ -35,8 +131,12 @@ int ImageDocument::addLayer(std::unique_ptr<Layer> layer)
     if (!layer)
         return -1;
 
-    layer->setOwner(this);   // ← 唯一的 owner 挂载点：所有入栈都必须经此
+    layer->setOwner(this);
     const int index = m_layers.addLayer(std::move(layer));
+
+    if (shouldRecordHistory()) {
+        m_history->push(LayerStructureUndo::forAdded(index, tr("新建图层")));
+    }
 
     m_dirty = true;
     m_dirtyRect = QRect(0, 0, m_width, m_height);
@@ -47,7 +147,6 @@ int ImageDocument::addLayer(std::unique_ptr<Layer> layer)
 
 void ImageDocument::setActiveLayerIndex(int index)
 {
-    // 允许 -1（无选中）；拒绝越界
     if (index < -1 || index >= m_layers.count())
         return;
     if (m_activeLayerIndex == index)
@@ -69,7 +168,6 @@ const Layer *ImageDocument::activeLayer() const
 
 int ImageDocument::pickLayerAt(int docX, int docY) const
 {
-    // 【功能】自栈顶向下找第一个不透明度 > 0.25 的层（对照 gimp_image_pick_layer）
     constexpr qreal kPickThreshold = 0.25;
     for (int i = m_layers.count() - 1; i >= 0; --i) {
         const Layer *layer = m_layers.layerAt(i);
@@ -101,21 +199,18 @@ void ImageDocument::invertSelection()
 
 void ImageDocument::selectRectangle(const QRect &rect, ChannelOp op)
 {
-    // 【功能】对照 gimp_channel_select_rectangle → 写入 image selection_mask
     m_selection.selectRectangle(rect, op);
     emit selectionChanged();
 }
 
 void ImageDocument::selectEllipse(const QRect &rect, ChannelOp op)
 {
-    // 【功能】对照 gimp_channel_select_ellipse → 写入 image selection_mask
     m_selection.selectEllipse(rect, op);
     emit selectionChanged();
 }
 
 void ImageDocument::selectLayerAlpha(int layerIndex, ChannelOp op)
 {
-    // 【功能】对照 gimp_channel_select_alpha / layers-alpha-to-selection
     Layer *layer = m_layers.layerAt(layerIndex);
     if (!layer)
         return;
@@ -123,7 +218,6 @@ void ImageDocument::selectLayerAlpha(int layerIndex, ChannelOp op)
     QImage pixels;
     if (layer->hasPixelData())
         pixels = layer->materialize();
-    // 无瓦片：空图 → 全透明 alpha → Replace 清空选区
     m_selection.selectFromLayerAlpha(pixels, layer->offsetX(), layer->offsetY(), op);
     emit selectionChanged();
 }
@@ -132,7 +226,6 @@ int ImageDocument::indexOfLayer(const Layer *layer) const
 {
     if (!layer)
         return -1;
-    // 层数通常个位数～几十，线性查找足够；不引入额外索引带来的失效风险
     for (int i = 0; i < m_layers.count(); ++i) {
         if (m_layers.layerAt(i) == layer)
             return i;
@@ -158,10 +251,8 @@ void ImageDocument::markDirty(const QRect &rect)
         return;
 
     m_dirty = true;
-    // 累计脏区：与既有并集合并（首次赋值时直接取 rect）
     m_dirtyRect = m_dirtyRect.isNull() ? rect : m_dirtyRect.united(rect);
 
-    // 像素可能变了：失效活动层内容包围盒（变换控件用）
     if (Layer *layer = activeLayer())
         layer->invalidateContentBounds();
 
@@ -174,14 +265,12 @@ void ImageDocument::markDirty()
     markDirty(QRect(0, 0, m_width, m_height));
 }
 
-// —— 语义化 setter ——
-
 void ImageDocument::setLayerVisible(int index, bool visible)
 {
     Layer *layer = m_layers.layerAt(index);
-    if (!layer)
+    if (!layer || layer->isVisible() == visible)
         return;
-    // Layer::setVisible 内部会回调 notifyLayerPropertiesChanged，无需在此重复广播
+    pushLayerPropUndo(index, tr("图层可见性"));
     layer->setVisible(visible);
 }
 
@@ -190,28 +279,39 @@ void ImageDocument::setLayerOpacity(int index, qreal opacity)
     Layer *layer = m_layers.layerAt(index);
     if (!layer)
         return;
-    layer->setOpacity(opacity);
+    const qreal clamped = qBound(0.0, opacity, 1.0);
+    if (qFuzzyCompare(layer->opacity(), clamped))
+        return;
+    pushLayerPropUndo(index, tr("图层不透明度"));
+    layer->setOpacity(clamped);
 }
 
 void ImageDocument::setLayerName(int index, const QString &name)
 {
     Layer *layer = m_layers.layerAt(index);
-    if (!layer)
+    if (!layer || layer->name() == name)
         return;
+    pushLayerPropUndo(index, tr("图层名称"));
     layer->setName(name);
 }
 
-void ImageDocument::setLayerBlendMode(int index, BlendMode mode)
+void ImageDocument::pushLayerPropertiesUndo(int index, const QString &label)
+{
+    pushLayerPropUndo(index, label);
+}
+
+void ImageDocument::setLayerBlendMode(int index, BlendMode mode, bool recordHistory)
 {
     Layer *layer = m_layers.layerAt(index);
-    if (!layer)
+    if (!layer || layer->blendMode() == mode)
         return;
+    if (recordHistory)
+        pushLayerPropUndo(index, tr("图层混合模式"));
     layer->setBlendMode(mode);
 }
 
 void ImageDocument::translateLayer(int index, int dx, int dy)
 {
-    // 【功能】移动工具：只改 offset，脏区覆盖旧位∪新位（对照 gimp_layer_real_translate 两次 update）
     if (dx == 0 && dy == 0)
         return;
     Layer *layer = m_layers.layerAt(index);
@@ -222,7 +322,6 @@ void ImageDocument::translateLayer(int index, int dx, int dy)
     const QRect oldBounds = layer->boundsInDocument().intersected(docRect);
     layer->translate(dx, dy);
     const QRect newBounds = layer->boundsInDocument().intersected(docRect);
-    // 属性面板将来可读 X/Y；像素刷新靠 markDirty → contentChanged
     emit layerPropertiesChanged(index);
     markDirty(oldBounds.united(newBounds));
 }
@@ -234,7 +333,6 @@ void ImageDocument::notifyLayerPropertiesChanged(const Layer &layer)
         return;
 
     m_dirty = true;
-    // 整图重合成（属性变更可能影响任意像素），但面板只需更新第 index 行
     m_dirtyRect = m_dirtyRect.isNull() ? QRect(0, 0, m_width, m_height)
                                        : m_dirtyRect.united(QRect(0, 0, m_width, m_height));
 
@@ -242,30 +340,22 @@ void ImageDocument::notifyLayerPropertiesChanged(const Layer &layer)
     emit contentChanged();
 }
 
-// —— 结构操作 ——
-
 int ImageDocument::addTransparentLayer(const QString &name)
 {
-    // 【功能】栈顶新建透明层并设为活动层（图层面板「新建」/ Ctrl+Shift+N）
-    // 空名则自动编号；新层挂在栈顶（合成时最后画、视觉最靠上）
     const QString layerName = name.isEmpty()
                                   ? QStringLiteral("图层 %1").arg(m_layers.count() + 1)
                                   : name;
     auto layer = std::make_unique<Layer>(layerName, m_width, m_height);
-    // addLayer 内挂 owner、发 structureChanged + contentChanged（挂载点只有这一处）
     const int index = addLayer(std::move(layer));
     if (index < 0)
         return -1;
 
-    // 走 setter：统一发 activeLayerChanged + contentChanged，面板/属性栏一起更新
     setActiveLayerIndex(index);
     return index;
 }
 
 int ImageDocument::duplicateLayer(int index)
 {
-    // 【功能】对照 GIMP layers_duplicate_cmd_callback → gimp_item_duplicate + gimp_image_add_layer
-    // 【放置】PS：副本出现在源层上方 → 本栈更高下标 = 面板更靠上
     Layer *src = m_layers.layerAt(index);
     if (!src)
         return -1;
@@ -276,7 +366,6 @@ int ImageDocument::duplicateLayer(int index)
     auto copy = std::make_unique<Layer>(copyName, src->width(), src->height());
     if (src->hasPixelData())
         copy->replaceFromImage(src->materialize());
-    // owner 尚未挂：属性 setter 不会广播，安全
     copy->setVisible(src->isVisible());
     copy->setOpacity(src->opacity());
     copy->setBlendMode(src->blendMode());
@@ -285,10 +374,13 @@ int ImageDocument::duplicateLayer(int index)
     copy->setOwner(this);
     const int newIndex = m_layers.insertLayer(index + 1, std::move(copy));
 
+    if (shouldRecordHistory()) {
+        m_history->push(LayerStructureUndo::forAdded(newIndex, tr("复制图层")));
+    }
+
     m_dirty = true;
     m_dirtyRect = QRect(0, 0, m_width, m_height);
     emit structureChanged();
-    // 活动层改到副本（setActiveLayerIndex 会再发 contentChanged；此处先发 structure）
     m_activeLayerIndex = newIndex;
     emit activeLayerChanged(newIndex);
     emit contentChanged();
@@ -297,15 +389,18 @@ int ImageDocument::duplicateLayer(int index)
 
 bool ImageDocument::removeLayer(int index)
 {
-    // 至少保留一层，避免空文档无合成目标
     if (m_layers.count() <= 1)
         return false;
     if (index < 0 || index >= m_layers.count())
         return false;
 
-    m_layers.takeLayer(index);
+    auto taken = m_layers.takeLayer(index);
+    if (shouldRecordHistory() && taken) {
+        // 撤销删除时恢复该层并选中它
+        m_history->push(LayerStructureUndo::forRemoved(
+            index, std::move(taken), index, tr("删除图层")));
+    }
 
-    // 删除后夹紧活动层下标，避免悬空
     if (m_activeLayerIndex >= m_layers.count())
         m_activeLayerIndex = m_layers.count() - 1;
     else if (m_activeLayerIndex > index)
@@ -321,17 +416,17 @@ bool ImageDocument::removeLayer(int index)
 
 void ImageDocument::scaleImage(int newWidth, int newHeight)
 {
-    // 【功能】PS「图像大小」+ 重新采样：每层像素缩放到新尺寸（内容跟着变大/变小）
     newWidth = qMax(1, newWidth);
     newHeight = qMax(1, newHeight);
     if (newWidth == m_width && newHeight == m_height)
         return;
 
+    pushDocumentGeomUndo(tr("图像大小"));
+
     for (int i = 0; i < m_layers.count(); ++i) {
         Layer *layer = m_layers.layerAt(i);
         if (!layer)
             continue;
-        // 瓦片 → 整图 → 平滑缩放 → 再拆回瓦片
         QImage src = layer->materialize();
         if (src.isNull()) {
             src = QImage(m_width, m_height, QImage::Format_ARGB32_Premultiplied);
@@ -351,7 +446,6 @@ void ImageDocument::scaleImage(int newWidth, int newHeight)
     m_height = newHeight;
     m_dirty = true;
     m_dirtyRect = QRect(0, 0, m_width, m_height);
-    // 尺寸变了：面板缩略图/状态栏都要跟着重建
     emit structureChanged();
     emit selectionChanged();
     emit contentChanged();
@@ -361,7 +455,6 @@ void ImageDocument::resizeCanvas(int newWidth, int newHeight,
                                  int anchorRow, int anchorCol,
                                  const QColor &extensionColor)
 {
-    // 【功能】PS「画布大小」：改工作台尺寸，图层内容不缩放，只按锚点平移（加边或裁边）
     newWidth = qMax(1, newWidth);
     newHeight = qMax(1, newHeight);
     anchorRow = qBound(0, anchorRow, 2);
@@ -369,7 +462,8 @@ void ImageDocument::resizeCanvas(int newWidth, int newHeight,
     if (newWidth == m_width && newHeight == m_height)
         return;
 
-    // 锚点决定旧内容落点：左/上 = 0，中 = 一半，右/下 = 全部差额
+    pushDocumentGeomUndo(tr("画布大小"));
+
     const int offsetX = (newWidth - m_width) * anchorCol / 2;
     const int offsetY = (newHeight - m_height) * anchorRow / 2;
 
@@ -385,7 +479,6 @@ void ImageDocument::resizeCanvas(int newWidth, int newHeight,
         }
 
         QImage neu(newWidth, newHeight, QImage::Format_ARGB32_Premultiplied);
-        // 底层用扩展色填空白；其余层保持透明（对齐 PS 分层画布扩展）
         if (i == 0 && extensionColor.alpha() > 0)
             neu.fill(extensionColor);
         else
@@ -393,7 +486,6 @@ void ImageDocument::resizeCanvas(int newWidth, int newHeight,
 
         QPainter painter(&neu);
         painter.setCompositionMode(QPainter::CompositionMode_SourceOver);
-        // 画布锚点 + 层原有 offset；写入新缓冲后 offset 归零（像素已烘焙进文档坐标）
         painter.drawImage(offsetX + layer->offsetX(), offsetY + layer->offsetY(), src);
         painter.end();
 

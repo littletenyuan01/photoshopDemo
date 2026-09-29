@@ -39,6 +39,9 @@ bool PaintBucketTool::mousePress(const ToolEvent &event, const ToolContext &ctx,
         || seed.x() >= layer->width() || seed.y() >= layer->height())
         return false;
 
+    ctx.document->pushLayerPixelsUndo(ctx.document->activeLayerIndex(),
+                                      QObject::tr("油漆桶"));
+
     // fill-mode：FG / BG（PATTERN 对应 GIMP_BUCKET_FILL_PATTERN，未实现 → 回退前景）
     QColor fill = ctx.foreground;
     switch (ctx.fillSource) {

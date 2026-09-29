@@ -2,6 +2,7 @@
 #include "ui_mainwindow.h"
 
 #include "app/appsession.h"
+#include "app/historystack.h"
 #include "app/recentdocuments.h"
 #include "domain/imagedocument.h"
 #include "domain/layer.h"
@@ -92,6 +93,14 @@ void MainWindow::setupMenus()
     connect(ui->actionSelectDeselect, &QAction::triggered, this, &MainWindow::onSelectDeselect);
     connect(ui->actionSelectInverse, &QAction::triggered, this, &MainWindow::onSelectInverse);
 
+    // —— 编辑：撤销 / 重做（对照 GIMP Edit→Undo/Redo）——
+    ui->actionUndo->setEnabled(false);
+    ui->actionUndo->setToolTip(tr("还原"));
+    ui->actionStepForward->setEnabled(false);
+    ui->actionStepForward->setToolTip(tr("重做"));
+    connect(ui->actionUndo, &QAction::triggered, this, &MainWindow::onUndo);
+    connect(ui->actionStepForward, &QAction::triggered, this, &MainWindow::onRedo);
+
     // —— 视图（缩放已实现）——
     connect(ui->actionZoomFit, &QAction::triggered, this, &MainWindow::onZoomFit);
     connect(ui->actionZoomActual, &QAction::triggered, this, &MainWindow::onZoomActual);
@@ -114,6 +123,50 @@ void MainWindow::setupSession()
     ui->canvasWorkspace->setSession(m_session);
     ui->dockPanel->setSession(m_session);
     ui->propertiesPanel->setSession(m_session); // 「属性」页展示真实文档/图层数据
+    connect(m_session, &Ps::AppSession::documentChanged,
+            this, &MainWindow::onDocumentChangedForHistory);
+}
+
+void MainWindow::onDocumentChangedForHistory(Ps::ImageDocument *doc)
+{
+    if (m_historyConn) {
+        disconnect(m_historyConn);
+        m_historyConn = {};
+    }
+    if (doc) {
+        m_historyConn = connect(&doc->history(), &Ps::HistoryStack::changed,
+                                this, &MainWindow::updateUndoRedoActions);
+    }
+    updateUndoRedoActions();
+}
+
+void MainWindow::updateUndoRedoActions()
+{
+    Ps::ImageDocument *doc = m_session ? m_session->document() : nullptr;
+    const bool canUndo = doc && doc->history().canUndo();
+    const bool canRedo = doc && doc->history().canRedo();
+    ui->actionUndo->setEnabled(canUndo);
+    ui->actionStepForward->setEnabled(canRedo);
+    if (canUndo)
+        ui->actionUndo->setText(tr("还原(&U) %1").arg(doc->history().undoText()));
+    else
+        ui->actionUndo->setText(tr("还原(&U)"));
+    if (canRedo)
+        ui->actionStepForward->setText(tr("向前一步 %1").arg(doc->history().redoText()));
+    else
+        ui->actionStepForward->setText(tr("向前一步"));
+}
+
+void MainWindow::onUndo()
+{
+    if (Ps::ImageDocument *doc = m_session ? m_session->document() : nullptr)
+        doc->undo();
+}
+
+void MainWindow::onRedo()
+{
+    if (Ps::ImageDocument *doc = m_session ? m_session->document() : nullptr)
+        doc->redo();
 }
 
 void MainWindow::setupToolbox()
@@ -291,9 +344,12 @@ bool MainWindow::openPath(const QString &path)
 
     // 栅格打开 = 单「背景」层（不可再编辑图层结构于原文件；请另存 .pslite）
     auto doc = std::make_unique<Ps::ImageDocument>(image.width(), image.height());
-    auto layer = std::make_unique<Ps::Layer>(tr("背景"), image);
-    const int index = doc->addLayer(std::move(layer));
-    doc->setActiveLayerIndex(index);
+    {
+        Ps::ImageDocument::HistorySuppress suppress(*doc);
+        auto layer = std::make_unique<Ps::Layer>(tr("背景"), image);
+        const int index = doc->addLayer(std::move(layer));
+        doc->setActiveLayerIndex(index);
+    }
     doc->setFilePath(path);
     doc->clearDirty();
 

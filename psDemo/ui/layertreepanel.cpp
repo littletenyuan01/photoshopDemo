@@ -355,20 +355,34 @@ void LayerTreePanel::endBlendModePreview()
     if (!m_blendPreviewActive)
         return;
     const int layerIndex = m_blendPreviewLayerIndex;
+    const Ps::BlendMode original = m_blendPreviewOriginal;
     m_blendPreviewActive = false;
     m_blendPreviewLayerIndex = -1;
 
     // 以 combo 当前项为准：点选后已是新模式；Esc 未改下标则回到打开前的模式
-    Ps::BlendMode mode = m_blendPreviewOriginal;
+    Ps::BlendMode mode = original;
     blendModeAtComboIndex(ui->blendModeCombo->currentIndex(), &mode);
 
     Ps::ImageDocument *doc = document();
     if (!doc || layerIndex < 0)
         return;
     const Ps::Layer *layer = doc->layers().layerAt(layerIndex);
-    if (!layer || layer->blendMode() == mode)
+    if (!layer)
         return;
-    doc->setLayerBlendMode(layerIndex, mode);
+    if (layer->blendMode() == mode) {
+        // 预览态已写到 mode：若相对打开前有变，补一条撤销（先回写 original 再正式提交）
+        if (mode != original) {
+            doc->setLayerBlendMode(layerIndex, original, false);
+            doc->setLayerBlendMode(layerIndex, mode, true);
+        }
+        return;
+    }
+    if (mode == original)
+        doc->setLayerBlendMode(layerIndex, mode, false); // 还原预览，不记历史
+    else {
+        doc->setLayerBlendMode(layerIndex, original, false);
+        doc->setLayerBlendMode(layerIndex, mode, true);
+    }
 }
 
 void LayerTreePanel::applyBlendModeToActiveLayer(Ps::BlendMode mode)
@@ -384,7 +398,8 @@ void LayerTreePanel::applyBlendModeToActiveLayer(Ps::BlendMode mode)
     const Ps::Layer *layer = doc->layers().layerAt(layerIndex);
     if (!layer || layer->blendMode() == mode)
         return;
-    doc->setLayerBlendMode(layerIndex, mode);
+    // 悬停预览不记历史；点选提交走 onBlendModeChanged / endBlendModePreview
+    doc->setLayerBlendMode(layerIndex, mode, !m_blendPreviewActive);
 }
 
 void LayerTreePanel::onBlendModeHighlighted(int index)
@@ -408,10 +423,11 @@ void LayerTreePanel::onBlendModeChanged(int index)
     Ps::BlendMode mode = Ps::BlendMode::Normal;
     if (!blendModeAtComboIndex(index, &mode))
         return;
-    // 点选提交：若正在预览，结束预览态（图层多半已是该模式）
     if (m_blendPreviewActive) {
-        m_blendPreviewActive = false;
-        m_blendPreviewLayerIndex = -1;
+        // 点选提交：复用 end 逻辑补撤销条目
+        // 先把 combo 已是 mode，end 会按 currentIndex 提交
+        endBlendModePreview();
+        return;
     }
     applyBlendModeToActiveLayer(mode);
 }

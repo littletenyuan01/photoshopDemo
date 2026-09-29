@@ -243,6 +243,7 @@ std::unique_ptr<ImageDocument> ProjectIo::load(const QString &filePath,
     }
 
     auto doc = std::make_unique<ImageDocument>(width, height);
+    ImageDocument::HistorySuppress suppress(*doc);
 
     for (int i = 0; i < layerCount; ++i) {
         QString name;

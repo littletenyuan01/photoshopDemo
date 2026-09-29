@@ -62,6 +62,10 @@ bool PaintTool::mousePress(const ToolEvent &event, const ToolContext &ctx, ViewP
     m_painting = true;
     m_lastImagePos = event.imagePos;
 
+    // 对照 gimp_drawable_push_undo：改像素前推入旧缓冲；一笔一条
+    ctx.document->pushLayerPixelsUndo(ctx.document->activeLayerIndex(),
+                                      m_erase ? QObject::tr("橡皮擦") : QObject::tr("画笔"));
+
     // 瓦片是层内坐标：文档点先减 Layer offset（对照 drawable 局部坐标）
     const QPointF local = layer->toLayerLocal(event.imagePos);
     PaintEngine::stampDab(layer->tiles(), local, ctx.brushRadius, ctx.foreground, mode, 0.85, clip);
