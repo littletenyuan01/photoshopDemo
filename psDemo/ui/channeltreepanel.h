@@ -3,6 +3,9 @@
 
 #include "itemtreepanel.h"
 
+#include <QImage>
+#include <QRect>
+
 QT_BEGIN_NAMESPACE
 namespace Ui {
 class ChannelTreePanel;
@@ -67,6 +70,10 @@ private:
     QTimer *m_thumbTimer = nullptr;
     /** 不可见期间发生过像素变化，等显示时补刷新。 */
     bool m_thumbDirty = false;
+    /** 通道缩略图共用的合成底图（增量更新，避免每次全图分配）。 */
+    QImage m_compositeCache;
+    /** 尚未刷进 m_compositeCache 的脏区（文档坐标）。 */
+    QRect m_compositeDirtyRect;
 };
 
 #endif // CHANNELTREEPANEL_H

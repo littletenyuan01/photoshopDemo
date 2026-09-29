@@ -47,10 +47,12 @@
 | 文件 | 职责 |
 |------|------|
 | `domain/blendmode.h` | 混合模式枚举：**PS 的 27 种**，顺序 = PS 分组顺序 = `.ui` 项顺序；面板用 `itemData`（含分隔线） |
-| `domain/layer.h/.cpp` | 单层属性 + `TileBuffer`；**持 owner 回指，setter 内部自动广播** |
+| `domain/layer.h/.cpp` | 单层属性 + `TileBuffer` + `FilterStack`；**持 owner 回指，setter 内部自动广播** |
 | `domain/tilebuffer.h/.cpp` | 64×64 瓦片；新建层统一 `Layer(extent)`，透明不分配、fill/画笔才 `ensureTile` |
 | `domain/layerstack.h/.cpp` | 图层列表（`std::vector<unique_ptr>`） |
 | `domain/selection.h/.cpp` | **文档级选区 mask**（对照 `GimpSelection`）；`ChannelOp` 加/减/替/交 |
+| `domain/filternode.h` | 滤镜节点（`OpName` + 开关 + 参数；对照 drawable filter） |
+| `domain/filterstack.h/.cpp` | 图层滤镜栈：增/删/开关；`apply` 对临时图求值，不写瓦片 |
 | `domain/imagedocument.h/.cpp` | 文档：尺寸、栈、活动层、**选区**、**duplicateLayer**、分级信号 + 语义化 setter + 累计脏区 |
 
 **要点**：`ImageDocument` 的信号**刻意分级**，让订阅方增量更新而不是整表重建 ——
@@ -63,12 +65,30 @@ UI 不得直接改 `Layer`，一律走 `setLayerVisible/Opacity/Name/BlendMode` 
 
 | 文件 | 职责 |
 |------|------|
-| `engine/blend.h/.cpp` | 逐模式颜色合并 `B(Cb, Cs)`（27 种，对照 `gimpoperationlayermode-blend.c`）+ 溶解的坐标哈希 |
-| `engine/compositor.h/.cpp` | 图层遍历 + Alpha 合成（`composite_union`）；可按矩形脏区合成 |
-| `engine/paintengine.h/.cpp` | 圆形 dab / 线段插值；画笔 SourceOver、橡皮 DestinationOut；**SelectionClip** 约束选区内绘制 |
+| `engine/blend.h/.cpp` | 混合色 `B(Cb, Cs)` 算法实现（27 种）；调度优先走 `LayerModeOp` |
+| `engine/op/` | `OpName` 枚举+名字表；`OpRegistry`/`OpRunner`；`PointOpRegistry`；`layermodecatalog` |
+| `engine/op/layermodeop.*` | 图层混合算子 → 调 `Blend::pixel` / dissolve |
+| `engine/op/floodfillop.*` | 油漆桶洪泛算子 |
+| `engine/op/gradientop.*` | 渐变填充算子（形状用共享 `GradientType`） |
+| `engine/op/stampdabop.*` | 圆形 dab（画笔/橡皮）；模式用共享 `PaintMode` |
+| `engine/op/solidfillop.*` | 实色/透明填充（清除、Shift+F5） |
+| `engine/op/opname.*` | `OpName` 枚举 + id/title 名字表 |
+| `engine/paintselectionclip.h` | 选区裁剪参数（算子与 PaintEngine 共用） |
+| `engine/painttypes.h` | `PaintMode` / `GradientType`（UI/tools/ops 共用） |
+| `engine/premul.h` | 预乘/解预乘（compositor 与缓冲算子共用） |
+| `engine/compositor.h/.cpp` | 图层遍历 + Alpha `composite_union`；`compositeRegion` 脏区就地更新；颜色经注册表取 `LayerModeOp`；启用滤镜层走临时求值 |
+| `engine/projection.h/.cpp` | 文档投影缓存（对照 GimpProjection）；64 块有效位图 + 增量 `sync` |
+| `engine/paintengine.h/.cpp` | 门面：`OpRunner::run(OpName, …)`；笔画插值仍在此 |
+| `engine/filtereval.h/.cpp` | 滤镜节点求值（亮度/对比度等）；只改临时图 |
 
-**要点**：`blend`（算什么颜色）与 `compositor`（怎么按 Alpha 叠）分开，对齐 GIMP 的
-`gimpoperationlayermode-blend.c` / `...-composite.c` 两个文件；绘制与合成分离（对齐 GIMP paint vs projection）。
+**要点**：`blend`（算什么颜色）与 `compositor`（怎么按 Alpha 叠）分开，对齐 GIMP；
+算子是可命名调度壳，算法可仍在 `blend` / op 实现文件。绘制 dab 与合成分离。
+
+**要点（算子调度）**：
+- `OpRunner` / `PointOpRegistry` 按 `OpName` **常驻实例**（对照 GIMP `gimp_layer_mode_get_operation` 的 per-mode op 缓存）；反复调度只重设参数，不再每次 `new`。
+- 算子返回**层内脏矩形**，由调用方直接交给 `markDirty`；工具侧不再自行推算脏区。
+- 缓冲算子用 `OpContext::roi` + `OpPaintClip::operationWindow()` 把遍历限制在瓦片窗口，避免整层 `materialize()` / `setFromImage()`（后者会把 TileBuffer 的稀疏瓦片设计废掉）。
+- **完整调用链、时序与示例**（含 `prepare→process→finish` 契约、实例复用四条硬约束、坐标系换算、与 GIMP 对照）见 [engine/operators.md](engine/operators.md)。
 
 ## ui
 
@@ -85,7 +105,6 @@ UI 不得直接改 `Layer`，一律走 `setLayerVisible/Opacity/Name/BlendMode` 
 | `ui/colorspanel.ui/.h/.cpp` | 颜色/色板/渐变/图案（对齐 PS 四页）；组内色块/方缩略图网格 |
 | `ui/hsvcolorwell.h/.cpp` | PS 式色域：重叠 FG/BG + 二维 S/V + 竖直色相 |
 | `ui/propertiespanel.ui/.h/.cpp` | 属性/调整/库停靠面板；「属性」页显示**真实**文档尺寸与活动图层名，可折叠分区 |
-| `ui/panelchrome.h` | 停靠面板公共外观件（Tab 栏右上角 ≡ 按钮），三个面板共用 |
 | `ui/pixmaputils.h` | 位图/图标公共工具：DPR 画布、多档图标光栅化、透明棋盘格（原先在 itemtreepanel / colorspanel / canvasview / toolbox 四处各写一份） |
 | `ui/toolbox.ui/.h/.cpp` | 左侧工具箱：17 个占位槽 / 35 个工具，按 PS 分组，右键飞出菜单（对齐 GIMP Toolbox 结构） |
 | `ui/tooloptionsbar.ui/.h/.cpp` | 工具选项栏：`QStackedWidget` 11 个工具族参数页，随工具整块切换（对照 GIMP `gimp_tool_options_gui()`）；左端「家」发 `homeClicked` |

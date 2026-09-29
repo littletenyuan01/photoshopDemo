@@ -321,13 +321,15 @@ psDemo/
     rectselecttool.*                 [x] → marqueeselecttool（矩形+椭圆）
     selectellipse / lasso / ...      [ ] 套索等其余选区工具
   engine/
-    paintengine.*                    [x] dab + 桶 + 渐变 + SelectionClip
-    compositor.*                     [x] 预乘 Alpha 合成（脏区接口已留）
+    paintengine.*                    [x] 门面：全部像素写经 op 转发
+    compositor.*                     [x] 预乘 Alpha 合成；颜色经 LayerModeOp
+    blend.*                          [x] 混合色算法（被 LayerModeOp 调用）
+    op/                              [x] LayerMode / FloodFill / Gradient / StampDab / SolidFill
     adjust/levels.* / curves.*       [ ]
     convert/qimage_cv.*              [ ] 可选 OpenCV
     accel/                           [ ] 可选 CUDA / 并行
-  history/
-    historystack.* / command.*       [ ] 撤销（Phase 6）
+  app/
+    historystack.* / undoitem.*      [x] 推入式撤销（Phase 6）
   io/
     projectio.*                      [x] .pslite 工程（图层+选区）
     psdio.*                          [x] .psd 子集导出（图层像素）；打开/完整 PSD 另做
@@ -391,7 +393,7 @@ psDemo/
 
 **GIMP 的洞见**：图层混合模式、滤镜、非破坏编辑**全都是 GEGL 节点，走同一条路**；滤镜因而成为「可重排、可带蒙版、可整体开关」的**节点栈**，而不是「点一下 → 改像素 → 写回图层」的一次性栅格化。
 
-**本项目落地方式**：**不引入 GEGL**。只取「滤镜是节点」的语义，做成一个**只读滤镜节点栈**：
+**本项目落地方式**：**不引入 GEGL**。Phase 6.5 已落地 `engine/op`：启动 `opsInit` 注册、pad 依赖、`OpRunner` 显式 prepare→process→finish；合成侧经 `PointOpRegistry` 取 `LayerModeOp`。Phase 8 再做**只读滤镜节点栈**：
 
 - `Layer` 允许**无可编辑像素**（调整层无自有像素，只声明参数与输入）
 - 滤镜节点：增 / 删 / 重排 / 开关 / 参数；**只读**，不得就地改写 `Layer::pixels`
@@ -409,7 +411,10 @@ psDemo/
 - 文档级脏区信令：`dirty(QRect)` / `structureChanged()` / `activeLayerChanged()`
 - `Compositor` 由「全量合成」升级为「按脏矩形 + 分块（如 64×64）缓存重算」
 - 取消各处散落的 `update()`，统一由脏区驱动
-- 【现状】`Compositor` 已可按矩形脏区合成，但**缺少上层调度**——即有零件、无管线
+- 【现状】**管线已通**：`engine/projection.*` 是上层调度（对照 `GimpProjection`）——
+  `Projection::sync()` 取 `ImageDocument::dirtyRect()`、对齐 64 chunk，脏区小于全图时走
+  `Compositor::compositeRegion()` 就地重算。仍欠：分块有效位图、优先级渲染线程。
+  算子侧如何把脏区报上来，见 [engine/operators.md](engine/operators.md) §3.6
 
 ### ① 推入式撤销 + 每对象一类
 
@@ -482,7 +487,8 @@ psDemo/
 | LayerPanel → DockPanel + 三个 tree panel | **已实现** |
 | 信号分级 + 语义化 setter + 累计脏区 | **已实现**（撤销与分块重合成的接口就位） |
 | 三、① 推入式撤销（Phase 6） | **已实现**最小闭环（手动 push；无独立 commands 层） |
-| 三、② 脏区分块投影（Phase 7） | **计划已定**，未实现；`pixelsChanged(rect)` 已带脏区但未使用 |
-| 三、③ 节点化非破坏（Phase 8） | **计划已定**，未实现；依赖 ② |
+| 轻量算子壳（Phase 6.5） | **已实现**：注册表 + Runner + 混合/洪泛/渐变/填充；无 GEGL |
+| 三、② 脏区分块投影（Phase 7） | **已实现**：`Projection` + `compositeRegion` + 64 块有效位 |
+| 三、③ 节点化非破坏（Phase 8） | **首片已实现**：`FilterStack` + BrightnessContrast + 合成接入；调整层 / 对话框后置 |
 | 独立 actions/commands 层 | 未实现（当前收口在 domain 语义化 setter） |
 | 其余（Selection / IO） | Selection + RasterIo/ProjectIo/PsdIo **已实现**；蒙版仍未做 |

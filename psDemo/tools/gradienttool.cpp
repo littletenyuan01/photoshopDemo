@@ -105,7 +105,7 @@ bool GradientTool::mouseRelease(const ToolEvent &event, const ToolContext &ctx, 
     ctx.document->pushLayerPixelsUndo(ctx.document->activeLayerIndex(),
                                       QObject::tr("渐变"));
 
-    const PaintEngine::GradientType type = ctx.gradientType;
+    const GradientType type = ctx.gradientType;
     // 对照 gimp_item_mask_intersect：渐变只写入选区内
     PaintEngine::SelectionClip clip;
     clip.selection = &ctx.document->selection();
@@ -113,7 +113,7 @@ bool GradientTool::mouseRelease(const ToolEvent &event, const ToolContext &ctx, 
     clip.layerOffsetY = layer->offsetY();
 
     // 对应 gimp_drawable_gradient(..., start, end, ...)；坐标换到层内
-    const QRect dirtyLocal = PaintEngine::applyGradient(
+    const QRect dirtyLocal = PaintEngine::fillGradient(
         layer->tiles(),
         layer->toLayerLocal(m_startImage),
         layer->toLayerLocal(m_endImage),

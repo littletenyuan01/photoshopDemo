@@ -2,6 +2,9 @@
 
 #include "app/historystack.h"
 #include "app/undoitem.h"
+#include "domain/filternode.h"
+#include "engine/op/opname.h"
+#include "engine/paintengine.h"
 
 #include <QImage>
 #include <QPainter>
@@ -193,30 +196,21 @@ bool ImageDocument::clearActiveLayerPixels()
 
     const int ox = layer->offsetX();
     const int oy = layer->offsetY();
-
-    if (m_selection.isEmpty()) {
-        pushLayerPixelsUndo(m_activeLayerIndex, tr("清除"));
-        const QRect dirty(ox, oy, layer->width(), layer->height());
-        layer->fill(Qt::transparent);
-        markDirty(dirty);
-        return true;
-    }
-
-    const QRect area = m_selection.bounds().intersected(layer->boundsInDocument());
-    if (area.isEmpty())
+    if (!m_selection.isEmpty()
+        && m_selection.bounds().intersected(layer->boundsInDocument()).isEmpty())
         return false;
 
     pushLayerPixelsUndo(m_activeLayerIndex, tr("清除"));
-    QImage img = layer->materialize();
-    for (int dy = area.top(); dy <= area.bottom(); ++dy) {
-        for (int dx = area.left(); dx <= area.right(); ++dx) {
-            if (!m_selection.isSelected(dx, dy))
-                continue;
-            img.setPixel(dx - ox, dy - oy, 0);
-        }
-    }
-    layer->replaceFromImage(img);
-    markDirty(area);
+
+    PaintSelectionClip clip;
+    clip.selection = m_selection.isEmpty() ? nullptr : &m_selection;
+    clip.layerOffsetX = ox;
+    clip.layerOffsetY = oy;
+    const QRect dirtyLocal = PaintEngine::solidFill(layer->tiles(), Qt::transparent, clip);
+    if (dirtyLocal.isEmpty())
+        return false;
+
+    markDirty(dirtyLocal.translated(ox, oy));
     return true;
 }
 
@@ -228,31 +222,53 @@ bool ImageDocument::fillActiveLayer(const QColor &color)
 
     const int ox = layer->offsetX();
     const int oy = layer->offsetY();
-
-    if (m_selection.isEmpty()) {
-        pushLayerPixelsUndo(m_activeLayerIndex, tr("填充"));
-        const QRect dirty(ox, oy, layer->width(), layer->height());
-        layer->fill(color);
-        markDirty(dirty);
-        return true;
-    }
-
-    const QRect area = m_selection.bounds().intersected(layer->boundsInDocument());
-    if (area.isEmpty())
+    if (!m_selection.isEmpty()
+        && m_selection.bounds().intersected(layer->boundsInDocument()).isEmpty())
         return false;
 
     pushLayerPixelsUndo(m_activeLayerIndex, tr("填充"));
-    QImage img = layer->materialize();
-    const QRgb premul = qPremultiply(color.rgba());
-    for (int dy = area.top(); dy <= area.bottom(); ++dy) {
-        for (int dx = area.left(); dx <= area.right(); ++dx) {
-            if (!m_selection.isSelected(dx, dy))
-                continue;
-            img.setPixel(dx - ox, dy - oy, premul);
-        }
-    }
-    layer->replaceFromImage(img);
-    markDirty(area);
+
+    PaintSelectionClip clip;
+    clip.selection = m_selection.isEmpty() ? nullptr : &m_selection;
+    clip.layerOffsetX = ox;
+    clip.layerOffsetY = oy;
+    const QRect dirtyLocal = PaintEngine::solidFill(layer->tiles(), color, clip);
+    if (dirtyLocal.isEmpty())
+        return false;
+
+    markDirty(dirtyLocal.translated(ox, oy));
+    return true;
+}
+
+int ImageDocument::addBrightnessContrastFilter(qreal brightness, qreal contrast)
+{
+    Layer *layer = activeLayer();
+    if (!layer || !layer->isVisible())
+        return -1;
+
+    FilterNode node(OpName::BrightnessContrast);
+    node.setBrightness(brightness);
+    node.setContrast(contrast);
+    const int index = layer->filters().append(node);
+    markDirty(layer->boundsInDocument().intersected(QRect(0, 0, m_width, m_height)));
+    return index;
+}
+
+bool ImageDocument::setLayerFilterEnabled(int layerIndex, int filterIndex, bool enabled)
+{
+    Layer *layer = m_layers.layerAt(layerIndex);
+    if (!layer || !layer->filters().setEnabled(filterIndex, enabled))
+        return false;
+    markDirty(layer->boundsInDocument().intersected(QRect(0, 0, m_width, m_height)));
+    return true;
+}
+
+bool ImageDocument::removeLayerFilter(int layerIndex, int filterIndex)
+{
+    Layer *layer = m_layers.layerAt(layerIndex);
+    if (!layer || !layer->filters().removeAt(filterIndex))
+        return false;
+    markDirty(layer->boundsInDocument().intersected(QRect(0, 0, m_width, m_height)));
     return true;
 }
 
@@ -403,12 +419,26 @@ void ImageDocument::notifyLayerPropertiesChanged(const Layer &layer)
     if (index < 0)
         return;
 
-    m_dirty = true;
-    m_dirtyRect = m_dirtyRect.isNull() ? QRect(0, 0, m_width, m_height)
-                                       : m_dirtyRect.united(QRect(0, 0, m_width, m_height));
+    const QRect docRect(0, 0, m_width, m_height);
+    // Phase 7：属性变更只脏内容区，避免整图画布重投影
+    QRect dirty = layer.contentBoundsInDocument().intersected(docRect);
+    if (dirty.isEmpty())
+        dirty = layer.boundsInDocument().intersected(docRect);
+    if (!dirty.isEmpty()) {
+        m_dirty = true;
+        m_dirtyRect = m_dirtyRect.isNull() ? dirty : m_dirtyRect.united(dirty);
+    }
 
     emit layerPropertiesChanged(index);
     emit contentChanged();
+}
+
+void ImageDocument::notifyLayerLabelChanged(const Layer &layer)
+{
+    const int index = indexOfLayer(&layer);
+    if (index < 0)
+        return;
+    emit layerPropertiesChanged(index);
 }
 
 int ImageDocument::addTransparentLayer(const QString &name)
@@ -441,6 +471,8 @@ int ImageDocument::duplicateLayer(int index)
     copy->setOpacity(src->opacity());
     copy->setBlendMode(src->blendMode());
     copy->setOffsetSilent(src->offsetX(), src->offsetY());
+    for (int i = 0; i < src->filters().count(); ++i)
+        copy->filters().append(src->filters().at(i));
 
     copy->setOwner(this);
     const int newIndex = m_layers.insertLayer(index + 1, std::move(copy));

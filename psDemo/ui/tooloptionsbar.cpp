@@ -80,13 +80,13 @@ int ToolOptionsBar::fillOpacityPercent() const
     return ui->fillOpacitySpin->value();
 }
 
-Ps::PaintEngine::GradientType ToolOptionsBar::gradientType() const
+Ps::GradientType ToolOptionsBar::gradientType() const
 {
     const int index = ui->gradTypeCombo->currentIndex();
-    const int max = static_cast<int>(Ps::PaintEngine::GradientType::Diamond);
+    const int max = static_cast<int>(Ps::GradientType::Diamond);
     if (index < 0 || index > max)
-        return Ps::PaintEngine::GradientType::Linear;
-    return static_cast<Ps::PaintEngine::GradientType>(index);
+        return Ps::GradientType::Linear;
+    return static_cast<Ps::GradientType>(index);
 }
 
 int ToolOptionsBar::gradientOpacityPercent() const

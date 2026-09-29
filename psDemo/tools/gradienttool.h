@@ -10,7 +10,7 @@ namespace Ps {
 /**
  * 渐变工具（tools 层）。
  *
- * 【职责】只管拖拽起止与浮层预览线；写像素在 PaintEngine::applyGradient。
+ * 【职责】只管拖拽起止与浮层预览线；写像素在 PaintEngine::fillGradient。
  * 【对照 GIMP】`app/tools/gimpgradienttool.c`（继承 DrawTool：
  *   press 记录 start → motion 更新 end → release/commit 调 drawable-gradient）。
  * 本项目瘦身为「拖完立刻提交」（≈ instant 模式），无 GEGL 实时预览滤镜、无端点编辑器。

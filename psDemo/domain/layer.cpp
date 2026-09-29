@@ -34,7 +34,9 @@ void Layer::setName(const QString &name)
     if (m_name == name)
         return;
     m_name = name;
-    notifyPropertiesChanged();
+    // 改名不影响投影像素；只刷新面板标签
+    if (m_owner)
+        m_owner->notifyLayerLabelChanged(*this);
 }
 
 void Layer::setVisible(bool visible)

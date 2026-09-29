@@ -2,6 +2,7 @@
 #define LAYER_H
 
 #include "blendmode.h"
+#include "filterstack.h"
 #include "tilebuffer.h"
 
 #include <QColor>
@@ -19,7 +20,7 @@ class ImageDocument;
  *
  * 【功能】一层可编辑图像：属性（名/显隐/不透明度/混合）+ 像素像素（TileBuffer）。
  * 像素真相在 TileBuffer（64×64 懒分配）中；格式 ARGB32 预乘。
- * 对应 GIMP GimpLayer + GeglBuffer 瓦片语义的瘦身版：无组层、无滤镜栈、无 scratch。
+ * 对应 GIMP GimpLayer + GeglBuffer 瓦片语义的瘦身版：无组层；滤镜栈只读求值。
  *
  * 【变更通知】本类持有 owner 回指（由 ImageDocument 在入栈时设置）。
  * 属性 setter 内部改值后会通知 owner 发信号，因此 **UI 调用 setter 即自动刷新**。
@@ -100,6 +101,12 @@ public:
     /** 是否已有任意已分配瓦片（透明新建层为 false）。 */
     bool hasPixelData() const { return !m_tiles.isEmpty(); }
 
+    /**
+     * 图层滤镜栈（非破坏）。合成时对 materialize 结果求值，不写回 tiles。
+     */
+    FilterStack &filters() { return m_filters; }
+    const FilterStack &filters() const { return m_filters; }
+
     /** 拼成整层临时图（缩略图 / 重采样）；无瓦片时为全透明同尺寸图。 */
     QImage materialize() const { return m_tiles.materialize(); }
 
@@ -140,6 +147,7 @@ private:
     int m_offsetX = 0; ///< 文档坐标 X（对照 GimpItem offset）
     int m_offsetY = 0; ///< 文档坐标 Y
     TileBuffer m_tiles; ///< 本层像素（懒分配瓦片；层内原点）
+    FilterStack m_filters; ///< 非破坏滤镜节点（对照 drawable filter stack）
 
     /** 层内坐标内容包围盒缓存；与 offset 无关。 */
     mutable QRect m_contentBoundsLocal;

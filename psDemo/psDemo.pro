@@ -22,13 +22,26 @@ SOURCES += \
     domain/tilebuffer.cpp \
     domain/layerstack.cpp \
     domain/selection.cpp \
+    domain/filterstack.cpp \
     domain/imagedocument.cpp \
     io/projectio.cpp \
     io/psdio.cpp \
     io/rasterio.cpp \
     engine/blend.cpp \
     engine/compositor.cpp \
+    engine/projection.cpp \
     engine/paintengine.cpp \
+    engine/filtereval.cpp \
+    engine/op/layermodeop.cpp \
+    engine/op/floodfillop.cpp \
+    engine/op/gradientop.cpp \
+    engine/op/stampdabop.cpp \
+    engine/op/solidfillop.cpp \
+    engine/op/opregistry.cpp \
+    engine/op/oprunner.cpp \
+    engine/op/opsinit.cpp \
+    engine/op/opname.cpp \
+    engine/op/pointopregistry.cpp \
     tools/tool.cpp \
     tools/toolmanager.cpp \
     tools/movetool.cpp \
@@ -69,13 +82,37 @@ HEADERS += \
     domain/tilebuffer.h \
     domain/layerstack.h \
     domain/selection.h \
+    domain/filternode.h \
+    domain/filterstack.h \
     domain/imagedocument.h \
     io/projectio.h \
     io/psdio.h \
     io/rasterio.h \
     engine/blend.h \
     engine/compositor.h \
+    engine/projection.h \
     engine/paintengine.h \
+    engine/filtereval.h \
+    engine/paintselectionclip.h \
+    engine/painttypes.h \
+    engine/premul.h \
+    engine/op/operation.h \
+    engine/op/pointop.h \
+    engine/op/bufferop.h \
+    engine/op/opcontext.h \
+    engine/op/paintclip.h \
+    engine/op/layermodeop.h \
+    engine/op/floodfillop.h \
+    engine/op/gradientop.h \
+    engine/op/stampdabop.h \
+    engine/op/solidfillop.h \
+    engine/op/oppad.h \
+    engine/op/opregistry.h \
+    engine/op/oprunner.h \
+    engine/op/opsinit.h \
+    engine/op/opname.h \
+    engine/op/pointopregistry.h \
+    engine/op/layermodecatalog.h \
     tools/toolid.h \
     tools/toolevent.h \
     tools/toolcontext.h \

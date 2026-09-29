@@ -72,6 +72,16 @@ public:
      */
     bool fillActiveLayer(const QColor &color);
 
+    /**
+     * 给活动层追加亮度/对比度滤镜节点（非破坏，不写瓦片）。
+     * @return 滤镜下标；失败 -1。
+     */
+    int addBrightnessContrastFilter(qreal brightness = 0.12, qreal contrast = 0.18);
+    /** 开关指定滤镜；index 越界返回 false。 */
+    bool setLayerFilterEnabled(int layerIndex, int filterIndex, bool enabled);
+    /** 移除指定滤镜。 */
+    bool removeLayerFilter(int layerIndex, int filterIndex);
+
     int pickLayerAt(int docX, int docY) const;
 
     bool isDirty() const { return m_dirty; }
@@ -134,6 +144,8 @@ public:
                       const QColor &extensionColor);
 
     void notifyLayerPropertiesChanged(const Layer &layer);
+    /** 仅名称等标签变化：不标投影脏区、不发 contentChanged。 */
+    void notifyLayerLabelChanged(const Layer &layer);
 
 signals:
     void pixelsChanged(const QRect &rect);

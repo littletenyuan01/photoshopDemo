@@ -3,7 +3,6 @@
 
 #include "tools/toolid.h"
 #include "tools/toolcontext.h"
-#include "engine/paintengine.h"
 
 #include <QWidget>
 
@@ -51,7 +50,7 @@ public:
     int fillOpacityPercent() const;
 
     // —— 渐变选项（pageGradient）——
-    Ps::PaintEngine::GradientType gradientType() const;
+    Ps::GradientType gradientType() const;
     int gradientOpacityPercent() const;
     int gradientOffsetPercent() const;
     bool gradientReverse() const;

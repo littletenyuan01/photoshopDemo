@@ -3,9 +3,9 @@
 
 #include "tools/toolcontext.h"
 #include "tools/toolid.h"
+#include "engine/projection.h"
 
 #include <QColor>
-#include <QImage>
 #include <QPainterPath>
 #include <QPoint>
 #include <QPointF>
@@ -24,7 +24,7 @@ struct ToolEvent;
  *
  * 【职责】只做三件事，对应 GIMP display 层的边界：
  * 1. **视图变换**：缩放 / 平移 / 边缘钳制（对应 GimpDisplayShell 的 scale & scroll）
- * 2. **绘制**：合成缓存 + 棋盘格 + 选区蚂蚁线 + 工具浮层
+ * 2. **绘制**：Projection 缓存 + 棋盘格 + 选区蚂蚁线 + 工具浮层
  * 3. **事件归一化并转发**：把 QMouseEvent 转成图像坐标的 ToolEvent 交给 ToolManager
  *
  * 【不再负责】具体工具逻辑。早先 `mousePressEvent` 里堆着「抓手/缩放/画笔/橡皮」
@@ -82,7 +82,7 @@ public:
     /** 同步油漆桶选项（容差/连续/填充源/不透明度）。 */
     void setFillOptions(int tolerance, bool contiguous, Ps::FillSource fillSource, qreal opacity);
     /** 同步渐变选项（类型/不透明度/偏移/反向/仿色）。 */
-    void setGradientOptions(Ps::PaintEngine::GradientType type, qreal opacity, int offsetPercent,
+    void setGradientOptions(Ps::GradientType type, qreal opacity, int offsetPercent,
                             bool reverse, bool dither);
 
     // —— Ps::ViewPort 实现（供工具请求视图操作）——
@@ -107,7 +107,7 @@ protected:
     void keyReleaseEvent(QKeyEvent *event) override;
 
 private:
-    void rebuildCache();
+    void syncProjection();
     void notifyViewChanged();
     /** 将 m_offset 钳制到合法范围，保证文档不整体移出视口。 */
     void clampOffset();
@@ -134,7 +134,7 @@ private:
     void rebuildSelectionOutlinePath();
 
     Ps::ImageDocument *m_document = nullptr; ///< 不拥有；由 AppSession 持有
-    QImage m_cache;
+    Ps::Projection m_projection;             ///< 只读投影缓存（对照 GimpProjection）
     qreal m_zoom = 1.0;
     QPointF m_offset;
     bool m_panning = false; ///< 通用平移手势（中键 / Alt+左键 / 空格+拖），由抓手工具承担
@@ -151,7 +151,7 @@ private:
     Ps::FillSource m_fillSource = Ps::FillSource::Foreground;
     qreal m_fillOpacity = 1.0;
 
-    Ps::PaintEngine::GradientType m_gradientType = Ps::PaintEngine::GradientType::Linear;
+    Ps::GradientType m_gradientType = Ps::GradientType::Linear;
     qreal m_gradientOpacity = 1.0;
     int m_gradientOffsetPercent = 0;
     bool m_gradientReverse = false;

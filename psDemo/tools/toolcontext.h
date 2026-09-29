@@ -1,7 +1,7 @@
 #ifndef TOOLCONTEXT_H
 #define TOOLCONTEXT_H
 
-#include "engine/paintengine.h"
+#include "engine/painttypes.h"
 
 #include <QColor>
 #include <QPointF>
@@ -43,7 +43,7 @@ struct ToolContext
     qreal fillOpacity = 1.0;           ///< ≈ context opacity [0,1]；无 paint-mode / sample-merged
 
     // —— 渐变（对照 GimpGradientOptions / PaintOptions）——
-    PaintEngine::GradientType gradientType = PaintEngine::GradientType::Linear;
+    GradientType gradientType = GradientType::Linear;
     qreal gradientOpacity = 1.0;       ///< ≈ context opacity [0,1]
     int gradientOffsetPercent = 0;     ///< ≈ offset 0..100
     bool gradientReverse = false;      ///< ≈ gradient-reverse

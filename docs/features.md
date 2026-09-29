@@ -29,7 +29,7 @@
   - 打开：`.pslite` + 常见栅格图（PSD 打开未做）。
 - **布局文件**：`mainwindow.ui`、`ui/toolbox.ui`、`ui/tooloptionsbar.ui`、`ui/colorspanel.ui`、`ui/propertiespanel.ui`、`ui/layerpanel.ui`（右侧 `DockPanel` 壳）、`ui/canvasworkspace.ui`
 - **已可点**：新建、打开（工程/图像）、存储 / 存储为、导出 PNG/JPEG、退出；
-  编辑→撤销/重做/清除/填充；选择→全选/取消/反选；图像→图像大小 / 画布大小；视图缩放；
+  编辑→撤销/重做/清除/填充；图像→调整→亮度/对比度（非破坏滤镜）；选择→全选/取消/反选；图像→图像大小 / 画布大小；视图缩放；
   窗口→图层 / 颜色 / 属性；工具切换；画笔/橡皮/油漆桶/渐变；抓手；缩放工具；前景/背景色；关于；
   选项条「家」→ 主页全页。
   快捷键：`Ctrl+Z/Y`、`Delete`、`Shift+F5`、`Ctrl+A`、空格平移、`X`/`D` 换色、`[`/`]` 笔刷大小。

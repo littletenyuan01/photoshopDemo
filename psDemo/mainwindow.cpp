@@ -157,6 +157,11 @@ void MainWindow::setupMenus()
     connect(ui->actionClear, &QAction::triggered, this, &MainWindow::onClear);
     connect(ui->actionFill, &QAction::triggered, this, &MainWindow::onFill);
 
+    // —— 图像→调整：亮度/对比度（非破坏滤镜节点，无对话框用默认参数）——
+    ui->actionAdjBrightness->setEnabled(true);
+    ui->actionAdjBrightness->setToolTip(tr("给活动层追加亮度/对比度滤镜（非破坏，可重复叠加）"));
+    connect(ui->actionAdjBrightness, &QAction::triggered, this, &MainWindow::onBrightnessContrast);
+
     ui->actionUndo->setEnabled(false);
     ui->actionUndo->setToolTip(tr("还原"));
     ui->actionStepForward->setEnabled(false);
@@ -901,4 +906,15 @@ void MainWindow::onFill()
         return;
     if (!doc->fillActiveLayer(ui->toolBox->foregroundColor()))
         flashStatusMessage(tr("无法填充：无可见活动层"));
+}
+
+void MainWindow::onBrightnessContrast()
+{
+    Ps::ImageDocument *doc = m_session->document();
+    if (!doc)
+        return;
+    if (doc->addBrightnessContrastFilter() < 0)
+        flashStatusMessage(tr("无法调整：无可见活动层"));
+    else
+        flashStatusMessage(tr("已添加亮度/对比度滤镜（非破坏）"));
 }

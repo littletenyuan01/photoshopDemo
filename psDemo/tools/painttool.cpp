@@ -5,20 +5,11 @@
 #include "domain/selection.h"
 #include "engine/paintengine.h"
 
-#include <QRectF>
-#include <QtMath>
+#include <QPointF>
 
 namespace Ps {
 
 namespace {
-
-/** 由线段两端点 + 笔刷半径算出脏矩形（**文档**坐标，含 1px 余量）。 */
-QRect dirtyRectForSegment(const QPointF &fromDoc, const QPointF &toDoc, qreal radius)
-{
-    const QRectF box = QRectF(fromDoc, toDoc).normalized();
-    const int pad = qCeil(radius) + 1;
-    return box.adjusted(-pad, -pad, pad, pad).toAlignedRect();
-}
 
 PaintEngine::SelectionClip selectionClipFor(Layer *layer, ImageDocument *doc)
 {
@@ -68,8 +59,11 @@ bool PaintTool::mousePress(const ToolEvent &event, const ToolContext &ctx, ViewP
 
     // 瓦片是层内坐标：文档点先减 Layer offset（对照 drawable 局部坐标）
     const QPointF local = layer->toLayerLocal(event.imagePos);
-    PaintEngine::stampDab(layer->tiles(), local, ctx.brushRadius, ctx.foreground, mode, 0.85, clip);
-    markDocumentDirty(ctx, dirtyRectForSegment(event.imagePos, event.imagePos, ctx.brushRadius));
+    // 脏区由算子返回（已与层范围求交），工具侧不再自己推算
+    const QRect dirtyLocal = PaintEngine::stampDab(
+        layer->tiles(), local, ctx.brushRadius, ctx.foreground, mode, 0.85, clip);
+    if (!dirtyLocal.isEmpty())
+        markDocumentDirty(ctx, dirtyLocal.translated(layer->offsetX(), layer->offsetY()));
     return true;
 }
 
@@ -91,12 +85,14 @@ bool PaintTool::mouseMove(const ToolEvent &event, const ToolContext &ctx, ViewPo
 
     const QPointF fromLocal = layer->toLayerLocal(m_lastImagePos);
     const QPointF toLocal = layer->toLayerLocal(event.imagePos);
-    // strokeSegment 返回层内最后 dab；再映回文档坐标作下一段起点
-    const QPointF lastLocal = PaintEngine::strokeSegment(
+    // 一次鼠标移动 = 一段笔画；算子返回本段扫过的**全部** dab 的并集脏区。
+    // （旧代码用「已更新过的」m_lastImagePos 当脏区起点，等于只标了末端一个 dab）
+    const QRect dirtyLocal = PaintEngine::strokeSegment(
         layer->tiles(), fromLocal, toLocal,
         ctx.brushRadius, ctx.foreground, mode, 0.85, 0.25, clip);
-    m_lastImagePos = lastLocal + QPointF(layer->offsetX(), layer->offsetY());
-    markDocumentDirty(ctx, dirtyRectForSegment(m_lastImagePos, event.imagePos, ctx.brushRadius));
+    m_lastImagePos = event.imagePos;
+    if (!dirtyLocal.isEmpty())
+        markDocumentDirty(ctx, dirtyLocal.translated(layer->offsetX(), layer->offsetY()));
     return true;
 }
 

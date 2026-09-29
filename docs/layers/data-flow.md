@@ -61,13 +61,21 @@ NewDocumentDialog 确认
 ## 4. 画一笔时发生什么
 
 ```
-工具写 activeLayer()->tiles()      // stampDab：ensure 碰到的瓦片
-  → ImageDocument::markDirty(rect) // 累计脏区 + pixelsChanged
-  →（当前）CanvasView 仍常全量 composite
-  → 视图按 m_zoom 画到窗口
+Tool → PaintEngine → OpRunner(OpName::StampDab) → StampDabOp
+  → 写 activeLayer()->tiles()（瓦片窗口遍历，不整层物化）
+  → 返回层内坐标脏矩形 → 工具层 translated 到文档坐标
+  → ImageDocument::markDirty(rect)（累计 dirtyRect + contentChanged）
+  → CanvasView::syncProjection → Projection::sync
+       · dirty 对齐 64 chunk；小于全图 → Compositor::compositeRegion 就地重算
+       · 否则 Compositor::composite 全量
+  → 视图按 m_zoom 画 Projection::image()
 ```
 
-脏区接口已留（`dirtyRect` / `clearDirtyRect`），**局部只重合成**属 Roadmap Phase 7，尚未接到画布。
+**算子返回的脏矩形是投影重算范围的直接输入**：报小了不刷新（拖尾）、报大了白算。
+完整调用链（含 `prepare/process/finish` 契约、常驻实例、坐标换算）见
+[../engine/operators.md](../engine/operators.md)。
+
+仍欠：分块有效位图、优先级渲染线程（当前是同步重算该脏区）。
 
 ## 5. 合成与视图（当前简化）
 
@@ -89,8 +97,8 @@ NewDocumentDialog 确认
 | 图层偏移 / 自由变换 | 偏移已实现（移动工具）；自由变换未做 |
 | 图像大小 / 画布大小菜单 | 已实现（`.ui` 对话框 + `scaleImage` / `resizeCanvas`） |
 | 文档内持久化 PPI | 未做（对话框仅换算用） |
-| 撤销时 push 图层属性/结构 | Phase 6，未做 |
-| 下方合成缓存、只重算脏块 | Phase 7，未做 |
+| 撤销时 push 图层属性/结构 | **已做**（Phase 6：属性/结构/像素/文档几何） |
+| 下方合成缓存、只重算脏块 | **已实现**（`engine/projection.*` + `Compositor::compositeRegion`，脏区对齐 64 chunk）；仍欠分块有效位图 / 优先级渲染 |
 | 瓦片存储 / 透明层懒分配 | **已实现**（64×64 `TileBuffer`）；无 GEGL COW/scratch，见 [tiles-and-memory.md](tiles-and-memory.md) |
 
 ## 7. 关键代码

@@ -2037,10 +2037,10 @@
     <string>亮度/对比度...</string>
    </property>
    <property name="enabled">
-    <bool>false</bool>
+    <bool>true</bool>
    </property>
    <property name="toolTip">
-    <string>UI 占位，功能尚未接入</string>
+    <string>给活动层追加亮度/对比度滤镜（非破坏，不写回像素）</string>
    </property>
   </action>
   <action name="actionAdjLevels">

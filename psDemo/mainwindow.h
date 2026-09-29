@@ -93,6 +93,7 @@ private slots:
     void onSelectInverse();
     void onClear();
     void onFill();
+    void onBrightnessContrast();
     void onUndo();
     void onRedo();
     void updateUndoRedoActions();

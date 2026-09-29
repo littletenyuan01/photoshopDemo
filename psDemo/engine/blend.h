@@ -8,14 +8,14 @@
 namespace Ps {
 
 /**
- * 图层混合的**纯函数层**：只做「一个像素按某种模式混成什么颜色」，
- * 不管 Alpha 合成、不管图层遍历、不碰 Qt GUI（engine 分层要求）。
+ * 图层混合的**算法实现**（纯函数）。
  *
- * 与 GIMP 的对应关系（一一对应，便于对照阅读）：
- * - 本文件 / `blend.cpp`            ⇔ `app/operations/layer-modes/gimpoperationlayermode-blend.c`
- * - `Compositor::blendTileOnto`    ⇔ `app/operations/layer-modes/gimpoperationlayermode-composite.c`
+ * 调度入口优先用 `engine/op/LayerModeOp`（算子壳）；本命名空间保留实现与兼容调用。
  *
- * 坐标约定与 GIMP 一致：`in` = **下方已合成结果**（backdrop），`layer` = **当前层**。
+ * 与 GIMP 的对应关系：
+ * - 本文件 / `blend.cpp`            ⇔ `gimpoperationlayermode-blend.c`
+ * - `Compositor::blendTileOnto`    ⇔ `gimpoperationlayermode-composite.c`
+ * - `LayerModeOp`                  ⇔ 可调度的 GeglOperation 语义壳（无 GEGL）
  */
 namespace Blend {
 

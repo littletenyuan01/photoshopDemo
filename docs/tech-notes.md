@@ -478,12 +478,12 @@ return QIcon(pm);                                 // 这个 QIcon 只有一张 2
 - 文档载入后 `zoomFit` 居中；首次 `resize` 若尺寸未就绪则延迟 fit，避免偏左上。
 - `RulerWidget` 为自绘例外（无独立 .ui）；外壳必须用 `.ui`。
 
-### 2026-09 — 画笔 / 橡皮（PaintEngine）
+### 2026-09 — 画笔 / 橡皮（PaintEngine → StampDabOp）
 
-- 【对照 GIMP】`app/tools`（事件）与 `app/paint/GimpPaintCore`（写缓冲）分离；本项目为 `CanvasView` 事件 + `PaintEngine` dab。
+- 【对照 GIMP】`app/tools`（事件）与 `app/paint` / GEGL ops（写缓冲）分离；本项目为 Tool + `PaintEngine` 门面 + `OpRunner`/`StampDabOp`。
 - 圆形径向渐变 dab；`strokeSegment` 按直径比例间距插值，避免拖动断笔。
-- 画笔 `SourceOver`，橡皮 `DestinationOut`；只改 `activeLayer()->pixels()`。
-- 未做：撤销瓦片、选区 mask、流量/硬度 UI、笔刷预设。
+- 画笔 `SourceOver`，橡皮 `DestinationOut`；只改 `activeLayer()->tiles()`。
+- 选区裁剪已接（`PaintSelectionClip`）；未做：流量 UI、笔刷预设、撤销瓦片级粒度。
 
 ### 2026-09 — iconfont 图标与工具分组
 

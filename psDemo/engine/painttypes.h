@@ -1,0 +1,28 @@
+#ifndef ENGINE_PAINTTYPES_H
+#define ENGINE_PAINTTYPES_H
+
+namespace Ps {
+
+/**
+ * 绘制侧共享类型（tools / UI / PaintEngine / ops 共用）。
+ * 放在独立头文件，避免 UI 为拿一个枚举而拉入全部算子。
+ */
+
+/** 画笔 / 橡皮（对照 paint core 的 paint vs erase）。 */
+enum class PaintMode {
+    Paint,
+    Erase,
+};
+
+/** 渐变形状（数值 = 选项栏 gradTypeCombo 顺序）。 */
+enum class GradientType {
+    Linear = 0,
+    Radial,
+    Angle,
+    Reflected,
+    Diamond,
+};
+
+} // namespace Ps
+
+#endif // ENGINE_PAINTTYPES_H

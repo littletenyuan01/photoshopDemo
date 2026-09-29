@@ -35,6 +35,18 @@
 - [x] 控制总代码量：盘点无孤立实验源文件（`psDemo.pro` 与目录一致）；未做破坏性删减
   - 通道/路径面板等 UI 占位**保留**（对齐 PS 壳，tooltip 已标未接入）
 
+## Phase 6.5 — 轻量算子壳（engine/op，无 GEGL）
+
+> 对照 GEGL/`gimp_operations_init`：**注册表 + pad 依赖 + Runner 调度**，不引入 GEGL 库。  
+> Buffer：`OpRunner` 显式 prepare→process→finish。Point：`PointOpRegistry`（合成热路径）。滤镜节点栈：Phase 8 首片已落地（BrightnessContrast）。
+
+- [x] `Operation` / `PointOp` / `BufferOp` / `OpContext` / `OpPad`
+- [x] `OpRegistry` + `opsInit` + `OpRunner`（缓冲算子）
+- [x] `PointOpRegistry` + `layermodecatalog`（`BlendMode` → `OpName::LayerMode`）
+- [x] `LayerModeOp` — Compositor 经注册表创建
+- [x] `FloodFillOp` / `GradientOp` / `StampDabOp` / `SolidFillOp` — PaintEngine → OpRunner
+- [x] 图层滤镜节点栈（→ Phase 8 首片：FilterStack + BrightnessContrast）
+
 ## Phase 6 — 撤销与命令层（架构核心 ①）
 
 > **为什么不在最后做**：撤销是「改动前先推快照」的语义。若先做各按钮功能、事后补撤销，**每个改文档状态的入口都要回头改一遍**，且漏一处即静默不可撤销。故本相位必须**前置于按钮功能批量实现**。
@@ -59,11 +71,11 @@
 
 > 【本项目简化】不分块稀疏存储、不做优先级调度线程。只做「**脏矩形集合 + 分块缓存 + 按需重算**」。
 
-- [ ] **模型与投影严格分离**：文档是真相；投影是只读缓存；`CanvasView` 只消费投影
-- [ ] 文档级脏区信令：`dirty(QRect)` / `structureChanged()` / `activeLayerChanged()`
-- [ ] `Compositor` 由「全量合成」升级为「按脏矩形 + 分块（如 64×64）缓存重算」
-- [ ] 取消各处散落的 `update()` / 全量重合成，统一由脏区驱动
-- [ ] 【成本约束】不引入后台渲染线程；保持同步，只减计算量
+- [x] **模型与投影严格分离**：`engine/Projection` 持有只读合成缓存；`CanvasView` 只 `sync` + 绘制
+- [x] 文档级脏区信令：`markDirty(QRect)` / `dirtyRect` / `clearDirtyRect`（既有）
+- [x] `Compositor::compositeRegion` + `Projection::sync` 按脏矩形就地重算（脏区对齐 64 块网格）
+- [x] 投影分块有效位图（`QBitArray`）；图层属性脏区收窄到内容包围盒；通道缩略图增量合成缓存
+- [x] 【成本约束】不引入后台渲染线程；保持同步，只减计算量
 
 ## Phase 8 — 节点化非破坏编辑（架构核心 ③）
 
@@ -72,10 +84,11 @@
 > 【本项目简化】**不引入 GEGL**，只取其「滤镜是节点、可重排可开关」的语义，做成**只读滤镜节点栈 + 扁平的 `Layer`**。
 
 - [ ] `Layer` **允许无可编辑像素**（调整层无自有像素；滤镜节点只声明参数与输入）
-- [ ] 滤镜节点栈：增 / 删 / 重排 / 开关 / 参数
+- [x] 滤镜节点栈：增 / 删 / 开关 / 参数（`FilterNode` + `FilterStack`；重排后置）
 - [ ] 调整层：对「已合成的下方结果」应用（色阶 / 曲线起步）
-- [ ] 投影管线支持节点求值；【前置】Phase 7 的脏区机制必须已在位
-- [ ] 【硬约束】节点栈只读，不得就地改写 `Layer::pixels`
+- [x] 投影管线支持节点求值：`Compositor` 对启用滤镜层 `materialize`→`filters.apply`→混合；【前置】Phase 7 已在位
+- [x] 【硬约束】节点栈只读，不得就地改写 `Layer` 瓦片（`FilterEval` 只改临时图）
+- [x] 首个滤镜：`OpName::BrightnessContrast` + 菜单「图像→调整→亮度/对比度」（默认参数，无对话框）
 
 ## Phase 5 — 有余力再做（可选 stretch，非 v1）
 

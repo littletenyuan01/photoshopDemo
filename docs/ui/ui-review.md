@@ -149,7 +149,7 @@ MainWindow ──setDocument()──> AppSession ──documentChanged(doc)─�
 | `bool m_updatingScrollBars` 手写守卫 | 改为 `QSignalBlocker`（RAII），提前 return 也不会卡住守卫 |
 | `syncRulersAndScrollBars` 里 h/v 各写 15 行 | 抽出 `syncScrollBar()` 与 `handleScroll()`，两轴共用 |
 | `LayerPanel` vs `LayerTreePanel` 命名歧义 | 前者改名 **`DockPanel`**（它是三 Tab 停靠壳，不含图层逻辑）；`.ui` 文件名保留 `layerpanel.ui` 以免与 Designer 反复来回 |
-| 三个面板各抄一遍「Tab 栏右上角 ≡ 按钮」 | 提为 `PanelChrome::addMenuButton`（`ui/panelchrome.h`），三处共用 |
+| 三个面板各抄一遍「Tab 栏右上角 ≡ 按钮」 | 改为**声明下沉**：按钮在各面板 `.ui` 里（`btnPanelMenu`），ctor 只剩一行 `setCornerWidget`（Designer 无法直接设 Tab 角标）。**未**单独建 `PanelChrome` 类 |
 | `applyToolbarIcon` 图标尺寸写死 24px | 加 `logicalSize` 默认参数：列表底栏仍 24px，更矮的颜色/属性面板底栏用 18px |
 
 ---
@@ -159,7 +159,7 @@ MainWindow ──setDocument()──> AppSession ──documentChanged(doc)─�
 | # | 欠账 | 影响 | 计划 |
 |---|------|------|------|
 | 1 | **独立 actions/commands 层未建** | 目前收口在 `ImageDocument` 的语义化 setter；动作的可撤销性、菜单勾选态、快捷键尚无统一注册点 | 与 Phase 6 一并做 |
-| 2 | **`Compositor` 仍全量重合成** | `rebuildCache()` 每次 `contentChanged` 都算整图；`pixelsChanged(rect)` 已带脏区但未被使用 | Phase 7 |
+| 2 | **投影分块有效位图、优先级渲染线程** | `Projection::sync()` 已消费 `dirtyRect()` 并对齐 64 chunk 增量重算（`Compositor::compositeRegion`）；但仍是同步全算该脏区，无分块有效位图、无优先级 | Phase 7 后续 |
 | 3 | **工具元数据分散两处** | `toolid.h`（枚举）/ `toolbox.cpp`（图标+中文名+快捷键）/ `tooloptionsbar.cpp`（显示名+提示）。新增工具仍要改 3 个文件 | 建议做 `ToolInfo` 注册表（对照 GIMP `GimpToolInfo`） |
 | 4 | **`ToolBox` 仍参与路由** | 工具切换经 `MainWindow::onToolChanged` 中转到画布；理想是 `ToolBox` 只发信号、由 session/context 广播 | 建议随 actions 层一并收敛 |
 | 5 | **通道 / 路径面板无 domain** | 列表内容是硬编码占位（RGB/红/绿/蓝、工作路径） | 见 `gimp-reference.mdc` 已知债 |

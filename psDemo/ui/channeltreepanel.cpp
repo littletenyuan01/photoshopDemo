@@ -2,6 +2,7 @@
 #include "ui_channeltreepanel.h"
 
 #include "domain/imagedocument.h"
+#include "domain/tilebuffer.h"
 #include "engine/compositor.h"
 
 #include <QIcon>
@@ -15,6 +16,7 @@
 #include <QSlider>
 #include <QTimer>
 #include <QToolButton>
+#include <QtGlobal>
 
 namespace {
 
@@ -79,8 +81,16 @@ void ChannelTreePanel::onDocumentChanged()
         // 像素变化 → 防抖 + 增量；**不再**整表重建（会丢选中项，且每帧重算代价高）
         // 只订阅 pixelsChanged：contentChanged 是所有信号的汇总，连结构变化/属性变化
         // 都会走到这里，而那时 refreshFromDocument 刚重建过缩略图 → 白合成一遍。
+        // 像素变化 → 防抖 + 累计脏区增量合成缩略图底图
         connect(doc, &Ps::ImageDocument::pixelsChanged,
-                this, &ChannelTreePanel::scheduleThumbnailRefresh);
+                this, [this](const QRect &rect) {
+                    if (!rect.isEmpty()) {
+                        m_compositeDirtyRect = m_compositeDirtyRect.isNull()
+                                                   ? rect
+                                                   : m_compositeDirtyRect.united(rect);
+                    }
+                    scheduleThumbnailRefresh();
+                });
         // 结构真的变了（目前通道行固定，仅换文档时走到）才重建
         connect(doc, &Ps::ImageDocument::structureChanged,
                 this, &ChannelTreePanel::refreshFromDocument);
@@ -97,9 +107,12 @@ void ChannelTreePanel::refreshFromDocument()
 
     // 【诚实标注】尚无 Channel domain：合成图与分量都由 Compositor 实时推算，
     // 不是真实通道数据。等通道 domain 开建后应改为读取真实通道。
-    QImage composite;
-    if (doc)
-        composite = Ps::Compositor::composite(*doc);
+    m_compositeCache = QImage();
+    m_compositeDirtyRect = QRect();
+    if (doc) {
+        m_compositeCache = Ps::Compositor::composite(*doc);
+        m_compositeDirtyRect = QRect();
+    }
 
     for (const ChannelRow &row : kRows) {
         auto *item = new QListWidgetItem(row.name, ui->itemList);
@@ -108,7 +121,7 @@ void ChannelTreePanel::refreshFromDocument()
         item->setData(kChannelRole, static_cast<int>(row.kind));
         item->setToolTip(tr(row.tip));
 
-        const QImage thumb = ItemTreePanel::makeChannelThumbnail(composite, row.kind);
+        const QImage thumb = ItemTreePanel::makeChannelThumbnail(m_compositeCache, row.kind);
         if (!thumb.isNull())
             item->setIcon(QIcon(QPixmap::fromImage(thumb)));
     }
@@ -149,9 +162,42 @@ void ChannelTreePanel::updateThumbnails()
     if (!doc || ui->itemList->count() == 0)
         return;
 
-    // 一次刷新只合成一次，供所有行共用
-    const QImage composite = Ps::Compositor::composite(*doc);
-    if (composite.isNull())
+    const int w = doc->width();
+    const int h = doc->height();
+    if (w <= 0 || h <= 0)
+        return;
+
+    const QRect full(0, 0, w, h);
+    const bool cacheOk = !m_compositeCache.isNull()
+                         && m_compositeCache.size() == full.size()
+                         && m_compositeCache.format() == QImage::Format_ARGB32_Premultiplied;
+
+    QRect dirty = m_compositeDirtyRect.intersected(full);
+    // 与投影块对齐，减少碎矩形
+    constexpr int kChunk = Ps::TileBuffer::kTileSize;
+    if (!dirty.isEmpty() && dirty != full) {
+        const int x0 = qMax(0, (dirty.left() / kChunk) * kChunk);
+        const int y0 = qMax(0, (dirty.top() / kChunk) * kChunk);
+        const int x1 = qMin(full.right(), ((dirty.right() + kChunk) / kChunk) * kChunk - 1);
+        const int y1 = qMin(full.bottom(), ((dirty.bottom() + kChunk) / kChunk) * kChunk - 1);
+        dirty = QRect(QPoint(x0, y0), QPoint(x1, y1));
+    }
+
+    const bool patch = cacheOk
+                       && !dirty.isEmpty()
+                       && dirty != full
+                       && (qint64(dirty.width()) * dirty.height()
+                           < qint64(full.width()) * full.height());
+
+    if (patch) {
+        if (!Ps::Compositor::compositeRegion(m_compositeCache, *doc, dirty))
+            m_compositeCache = Ps::Compositor::composite(*doc);
+    } else {
+        m_compositeCache = Ps::Compositor::composite(*doc);
+    }
+    m_compositeDirtyRect = QRect();
+
+    if (m_compositeCache.isNull())
         return;
 
     // 只换图标：不碰文字 / 勾选 / 选中态，否则会打断用户操作
@@ -160,7 +206,7 @@ void ChannelTreePanel::updateThumbnails()
         if (!item)
             continue;
         const auto kind = static_cast<ThumbChannel>(item->data(kChannelRole).toInt());
-        const QImage thumb = ItemTreePanel::makeChannelThumbnail(composite, kind);
+        const QImage thumb = ItemTreePanel::makeChannelThumbnail(m_compositeCache, kind);
         if (!thumb.isNull())
             item->setIcon(QIcon(QPixmap::fromImage(thumb)));
     }

@@ -2,7 +2,6 @@
 
 #include "domain/imagedocument.h"
 #include "domain/selection.h"
-#include "engine/compositor.h"
 #include "pixmaputils.h"
 #include "tools/handtool.h"
 #include "tools/tool.h"
@@ -69,10 +68,10 @@ void CanvasView::setDocument(Ps::ImageDocument *document)
 
     if (m_document) {
         // 只订阅「像素变了」与「结构变了」：
-        // 图层属性变化（显隐/透明度）也走 contentChanged，画布需重合成，
-        // 但那是 Compositor 的事，画布不必区分。
+        // 图层属性变化（显隐/透明度）也走 contentChanged，画布需重投影，
+        // 合成细节在 Projection / Compositor，画布不必区分。
         connect(m_document, &Ps::ImageDocument::contentChanged, this, [this]() {
-            rebuildCache();
+            syncProjection();
             update();
         });
         // 选区单独订阅：只重画蚂蚁线，不重合成
@@ -81,7 +80,8 @@ void CanvasView::setDocument(Ps::ImageDocument *document)
             syncMarchingAntTimer();
             update();
         });
-        rebuildCache();
+        m_projection.bind(m_document);
+        syncProjection();
         rebuildSelectionOutlinePath();
         syncMarchingAntTimer();
         // 启动默认在主页时工作区是隐藏的：此时 width/height 往往是未布局完的小值，
@@ -91,7 +91,7 @@ void CanvasView::setDocument(Ps::ImageDocument *document)
         else
             m_pendingFit = true;
     } else {
-        m_cache = QImage();
+        m_projection.bind(nullptr);
         m_antsPath = QPainterPath();
         m_pendingFit = false;
         syncMarchingAntTimer();
@@ -340,7 +340,7 @@ void CanvasView::setFillOptions(int tolerance, bool contiguous, Ps::FillSource f
     refreshToolContext();
 }
 
-void CanvasView::setGradientOptions(Ps::PaintEngine::GradientType type, qreal opacity, int offsetPercent,
+void CanvasView::setGradientOptions(Ps::GradientType type, qreal opacity, int offsetPercent,
                                     bool reverse, bool dither)
 {
     m_gradientType = type;
@@ -364,7 +364,7 @@ void CanvasView::paintEvent(QPaintEvent *)
     QPainter painter(this);
     painter.fillRect(rect(), QColor(45, 45, 48));
 
-    if (!m_document || m_cache.isNull()) {
+    if (!m_document || m_projection.isNull()) {
         painter.setPen(QColor(180, 180, 180));
         painter.drawText(rect(), Qt::AlignCenter, tr("无文档 — 请新建或打开图像"));
         return;
@@ -376,7 +376,7 @@ void CanvasView::paintEvent(QPaintEvent *)
                               QColor(255, 255, 255), QColor(200, 200, 200));
     // 缩小才平滑插值；放大用最近邻，才能看出「一个个像素块」（对齐 PS）
     painter.setRenderHint(QPainter::SmoothPixmapTransform, m_zoom < 1.0);
-    painter.drawImage(target, m_cache);
+    painter.drawImage(target, m_projection.image());
 
     // 像素网格（PS 约 ≥500% 出现）
     paintPixelGrid(painter, target);
@@ -563,14 +563,9 @@ void CanvasView::keyReleaseEvent(QKeyEvent *event)
 
 // —— 内部工具 ——
 
-void CanvasView::rebuildCache()
+void CanvasView::syncProjection()
 {
-    if (!m_document) {
-        m_cache = QImage();
-        return;
-    }
-    // 目前仍是全量重合成；脏区局部重算见 docs/architecture.md §8.1 主线 ②
-    m_cache = Ps::Compositor::composite(*m_document);
+    m_projection.sync();
 }
 
 void CanvasView::notifyViewChanged()
