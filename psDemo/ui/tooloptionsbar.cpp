@@ -223,9 +223,9 @@ QString ToolOptionsBar::hintForTool(Ps::ToolId id)
     case Ps::ToolId::Zoom:
         return QObject::tr("左键放大，右键缩小");
     case Ps::ToolId::RectSelect:
-        return QObject::tr("拖拽建立矩形选区；Shift 加选 / Ctrl 减选 / 二者相交");
+        return QObject::tr("拖拽建立矩形选区；拖中 Shift 正方形；按下 Shift 加选 / Ctrl 减选 / 二者相交");
     case Ps::ToolId::EllipseSelect:
-        return QObject::tr("拖拽建立椭圆选区；Shift 加选 / Ctrl 减选 / 二者相交");
+        return QObject::tr("拖拽建立椭圆选区；拖中 Shift 正圆；按下 Shift 加选 / Ctrl 减选 / 二者相交");
     default:
         return QObject::tr("参数为 UI 占位，逻辑尚未接入");
     }

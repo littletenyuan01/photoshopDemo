@@ -38,9 +38,27 @@ ChannelOp MarqueeSelectTool::opFromModifiers(Qt::KeyboardModifiers modifiers)
     return ChannelOp::Replace;
 }
 
+QPointF MarqueeSelectTool::constrainedEnd(const QPointF &start, const QPointF &end, bool constrain)
+{
+    if (!constrain)
+        return end;
+
+    const qreal dx = end.x() - start.x();
+    const qreal dy = end.y() - start.y();
+    const qreal side = qMin(qAbs(dx), qAbs(dy));
+    const qreal sx = (dx < 0.0) ? -side : side;
+    const qreal sy = (dy < 0.0) ? -side : side;
+    return QPointF(start.x() + sx, start.y() + sy);
+}
+
 QRectF MarqueeSelectTool::currentImageRect() const
 {
-    return QRectF(m_startImage, m_endImage).normalized();
+    return QRectF(m_startImage, constrainedEnd(m_startImage, m_endImage, m_constrain)).normalized();
+}
+
+QRectF MarqueeSelectTool::currentWidgetRect() const
+{
+    return QRectF(m_startWidget, constrainedEnd(m_startWidget, m_endWidget, m_constrain)).normalized();
 }
 
 void MarqueeSelectTool::drawOverlay(QPainter &painter, const ToolContext &ctx) const
@@ -49,7 +67,7 @@ void MarqueeSelectTool::drawOverlay(QPainter &painter, const ToolContext &ctx) c
     if (!m_dragging)
         return;
 
-    const QRectF r = QRectF(m_startWidget, m_endWidget).normalized();
+    const QRectF r = currentWidgetRect();
     if (r.width() < 0.5 && r.height() < 0.5)
         return;
 
@@ -89,6 +107,8 @@ bool MarqueeSelectTool::mousePress(const ToolEvent &event, const ToolContext &ct
 
     m_dragging = true;
     m_op = opFromModifiers(event.modifiers);
+    // 按下时的 Shift 已用于加选；拖中再按住 Shift 才约束为正方形/正圆（对齐 PS）
+    m_constrain = false;
     m_startImage = event.imagePos;
     m_endImage = event.imagePos;
     m_startWidget = event.widgetPos;
@@ -106,6 +126,7 @@ bool MarqueeSelectTool::mouseMove(const ToolEvent &event, const ToolContext &ctx
     if (!(event.buttons & Qt::LeftButton))
         return false;
 
+    m_constrain = event.modifiers.testFlag(Qt::ShiftModifier);
     m_endImage = event.imagePos;
     m_endWidget = event.widgetPos;
     emit repaintRequested();
@@ -118,6 +139,7 @@ bool MarqueeSelectTool::mouseRelease(const ToolEvent &event, const ToolContext &
     if (!m_dragging)
         return false;
 
+    m_constrain = event.modifiers.testFlag(Qt::ShiftModifier);
     m_endImage = event.imagePos;
     m_endWidget = event.widgetPos;
     m_dragging = false;
@@ -148,6 +170,7 @@ void MarqueeSelectTool::deactivate(const ToolContext &ctx, ViewPort &view)
     if (!m_dragging)
         return;
     m_dragging = false;
+    m_constrain = false;
     emit repaintRequested();
 }
 
