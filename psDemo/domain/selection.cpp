@@ -57,6 +57,21 @@ void Selection::scale(int newWidth, int newHeight)
     invalidateCache();
 }
 
+void Selection::replaceFromImage(const QImage &mask)
+{
+    if (m_mask.isNull() || mask.isNull()) {
+        clear();
+        return;
+    }
+    QImage src = mask;
+    if (src.format() != QImage::Format_Grayscale8)
+        src = src.convertToFormat(QImage::Format_Grayscale8);
+    if (src.size() != m_mask.size())
+        src = src.scaled(m_mask.size(), Qt::IgnoreAspectRatio, Qt::FastTransformation);
+    m_mask = src;
+    invalidateCache();
+}
+
 void Selection::invalidateCache() const
 {
     m_cacheValid = false;

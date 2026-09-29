@@ -328,7 +328,8 @@ psDemo/
   history/
     historystack.* / command.*       [ ] 撤销（Phase 6）
   io/
-    rasterio.* / projectio.*         [ ] 导出与工程文件
+    projectio.*                      [x] .pslite 工程（图层+选区）
+    psdio.*                          [x] .psd 子集导出（图层像素）；打开/完整 PSD 另做
   ui/
     canvasview.*                     [x] 视图变换 / 绘制 / 事件归一化转发
     canvasworkspace.*                [x] 标尺 + 画布 + 底栏 + 滚动条

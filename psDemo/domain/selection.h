@@ -60,6 +60,12 @@ public:
     void invert();
 
     /**
+     * 用灰度图整体替换 mask（工程文件加载用）。
+     * 会缩放到当前文档尺寸；非 Grayscale8 时先转换。
+     */
+    void replaceFromImage(const QImage &mask);
+
+    /**
      * 矩形选区写入（对照 gimp_channel_select_rectangle → gimp_channel_combine_rect）。
      * @param rect 文档坐标；与画布求交后写入；空矩形且 Replace 则清空。
      */

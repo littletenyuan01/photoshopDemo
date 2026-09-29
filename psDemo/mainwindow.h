@@ -67,6 +67,8 @@ protected:
 private slots:
     void onNewDocument();
     void onOpenDocument();
+    void onSaveDocument();
+    void onSaveDocumentAs();
     void onNewLayer();
     void onDuplicateLayer();
     void onImageSize();
@@ -90,6 +92,13 @@ private slots:
 private:
     /** 装配菜单动作连接。 */
     void setupMenus();
+    /** 按扩展名保存（.pslite / .psd）；成功则清脏并记 filePath。 */
+    bool saveDocumentTo(const QString &path);
+    /**
+     * 弹出「存储为」：可选 .pslite（完整工程）或 .psd（子集）。
+     * @param forcePslite true 时默认/偏向工程格式（供 Ctrl+S 无路径时用）
+     */
+    bool saveDocumentAsDialog(bool forcePslite = false);
     /** 把 session 交给画布工作区与右侧面板（一次性，之后靠广播）。 */
     void setupSession();
     /** 连接工具箱 ↔ 选项栏 ↔ 画布；以及「家」→ 主页。 */

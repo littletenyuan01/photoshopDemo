@@ -9,6 +9,8 @@
 #include "ui/canvasworkspace.h"
 #include "ui/dockpanel.h"
 #include "engine/compositor.h"
+#include "io/projectio.h"
+#include "io/psdio.h"
 #include "ui/canvassizedialog.h"
 #include "ui/colorspanel.h"
 #include "ui/homescreen.h"
@@ -18,6 +20,7 @@
 #include "ui/toolbox.h"
 #include "ui/tooloptionsbar.h"
 
+#include <QAbstractButton>
 #include <QCloseEvent>
 #include <QFileDialog>
 #include <QImageReader>
@@ -60,6 +63,12 @@ void MainWindow::setupMenus()
     // —— 文件（已实现）——
     connect(ui->actionNew, &QAction::triggered, this, &MainWindow::onNewDocument);
     connect(ui->actionOpen, &QAction::triggered, this, &MainWindow::onOpenDocument);
+    ui->actionSave->setEnabled(true);
+    ui->actionSave->setToolTip(tr("存储为 PhotoshopLite 工程（.pslite）"));
+    ui->actionSaveAs->setEnabled(true);
+    ui->actionSaveAs->setToolTip(tr("另存为 PhotoshopLite 工程（.pslite）"));
+    connect(ui->actionSave, &QAction::triggered, this, &MainWindow::onSaveDocument);
+    connect(ui->actionSaveAs, &QAction::triggered, this, &MainWindow::onSaveDocumentAs);
     connect(ui->actionExit, &QAction::triggered, this, &QWidget::close);
 
     connect(ui->actionImageSize, &QAction::triggered, this, &MainWindow::onImageSize);
@@ -227,11 +236,26 @@ void MainWindow::onOpenDocument()
 {
     const QString path = QFileDialog::getOpenFileName(
         this,
-        tr("打开图像"),
+        tr("打开"),
         QString(),
-        tr("图像文件 (*.png *.jpg *.jpeg *.bmp *.webp);;所有文件 (*.*)"));
+        tr("PhotoshopLite 工程 (*.pslite);;"
+           "图像文件 (*.png *.jpg *.jpeg *.bmp *.webp);;"
+           "所有文件 (*.*)"));
     if (path.isEmpty())
         return;
+
+    if (path.endsWith(QStringLiteral(".pslite"), Qt::CaseInsensitive)) {
+        QString err;
+        auto doc = Ps::ProjectIo::load(path, &err);
+        if (!doc) {
+            QMessageBox::warning(this, tr("打开失败"), err);
+            return;
+        }
+        m_session->setDocument(std::move(doc));
+        onShowWorkspace();
+        statusBar()->showMessage(tr("已打开工程：%1").arg(path), 4000);
+        return;
+    }
 
     QImageReader reader(path);
     reader.setAutoTransform(true); // 尊重 EXIF 方向
@@ -242,19 +266,106 @@ void MainWindow::onOpenDocument()
         return;
     }
 
-    // 目前：打开 = 单「背景」层；多层工程格式以后再做
+    // 栅格打开 = 单「背景」层（不可再编辑图层结构于原文件；请另存 .pslite）
     auto doc = std::make_unique<Ps::ImageDocument>(image.width(), image.height());
     auto layer = std::make_unique<Ps::Layer>(tr("背景"), image);
-    // 走 ImageDocument::addLayer —— 它是挂 Layer::owner 的唯一入口。
-    // （早先这里直接调 layers().addLayer，漏挂 owner 导致改背景层显隐/透明度时
-    //   属性信号不发、画布与面板静默不同步。现在 LayerStack 改栈方法是 private，
-    //   绕过会编译不过。）
     const int index = doc->addLayer(std::move(layer));
     doc->setActiveLayerIndex(index);
     doc->clearDirty();
 
     m_session->setDocument(std::move(doc));
+    onShowWorkspace();
     statusBar()->showMessage(tr("已打开：%1").arg(path), 4000);
+}
+
+bool MainWindow::saveDocumentTo(const QString &path)
+{
+    Ps::ImageDocument *doc = m_session ? m_session->document() : nullptr;
+    if (!doc) {
+        QMessageBox::information(this, tr("存储"), tr("当前没有文档。"));
+        return false;
+    }
+    QString err;
+    const bool asPsd = path.endsWith(QStringLiteral(".psd"), Qt::CaseInsensitive);
+    const bool ok = asPsd ? Ps::PsdIo::save(*doc, path, &err)
+                          : Ps::ProjectIo::save(*doc, path, &err);
+    if (!ok) {
+        QMessageBox::warning(this, tr("存储失败"), err);
+        return false;
+    }
+    doc->setFilePath(path);
+    doc->clearDirty();
+    statusBar()->showMessage(
+        asPsd ? tr("已存储 PSD（子集）：%1").arg(path)
+              : tr("已存储工程：%1").arg(path),
+        4000);
+    return true;
+}
+
+bool MainWindow::saveDocumentAsDialog(bool forcePslite)
+{
+    Ps::ImageDocument *doc = m_session ? m_session->document() : nullptr;
+    if (!doc) {
+        QMessageBox::information(this, tr("存储"), tr("当前没有文档。"));
+        return false;
+    }
+
+    const QString psliteFilter = tr("PhotoshopLite 工程 (*.pslite)");
+    const QString psdFilter = tr("Photoshop 文件 (*.psd)");
+    const QString filters = psliteFilter + QStringLiteral(";;") + psdFilter;
+
+    QString selected = psliteFilter;
+    QString suggested = doc->filePath();
+    if (suggested.isEmpty()) {
+        suggested = QStringLiteral("untitled.pslite");
+    } else if (forcePslite
+               && suggested.endsWith(QStringLiteral(".psd"), Qt::CaseInsensitive)) {
+        suggested.chop(4);
+        suggested += QStringLiteral(".pslite");
+    }
+
+    QString path = QFileDialog::getSaveFileName(
+        this, tr("存储为"), suggested, filters, &selected);
+    if (path.isEmpty())
+        return false;
+
+    // 以对话框所选过滤器为准；路径已带扩展名时也尊重扩展名
+    const bool wantPsd = selected.contains(QStringLiteral("*.psd"), Qt::CaseInsensitive)
+                         || path.endsWith(QStringLiteral(".psd"), Qt::CaseInsensitive);
+    if (wantPsd) {
+        if (path.endsWith(QStringLiteral(".pslite"), Qt::CaseInsensitive))
+            path.chop(7);
+        if (!path.endsWith(QStringLiteral(".psd"), Qt::CaseInsensitive))
+            path += QStringLiteral(".psd");
+    } else {
+        if (path.endsWith(QStringLiteral(".psd"), Qt::CaseInsensitive))
+            path.chop(4);
+        if (!path.endsWith(QStringLiteral(".pslite"), Qt::CaseInsensitive))
+            path += QStringLiteral(".pslite");
+    }
+    return saveDocumentTo(path);
+}
+
+void MainWindow::onSaveDocument()
+{
+    Ps::ImageDocument *doc = m_session ? m_session->document() : nullptr;
+    if (!doc) {
+        QMessageBox::information(this, tr("存储"), tr("当前没有文档。"));
+        return;
+    }
+    // Ctrl+S：始终写 .pslite；无工程路径或当前是 .psd 时弹出「存储为」
+    const QString path = doc->filePath();
+    if (path.isEmpty()
+        || !path.endsWith(QStringLiteral(".pslite"), Qt::CaseInsensitive)) {
+        saveDocumentAsDialog(/*forcePslite=*/true);
+        return;
+    }
+    saveDocumentTo(path);
+}
+
+void MainWindow::onSaveDocumentAs()
+{
+    saveDocumentAsDialog(/*forcePslite=*/false);
 }
 
 void MainWindow::onNewLayer()
@@ -401,12 +512,14 @@ void MainWindow::closeEvent(QCloseEvent *event)
     box.setWindowTitle(tr("退出 PhotoshopLite"));
     box.setText(tr("确定要退出 PhotoshopLite 吗？"));
     const Ps::ImageDocument *document = m_session ? m_session->document() : nullptr;
+    QPushButton *saveQuitButton = nullptr;
     if (document && document->isDirty()) {
-        // 诚实提示：本版本还没有实现保存，别让用户以为点了「退出」还能找回来
-        box.setInformativeText(tr("当前文档有未保存的修改。本版本尚未实现保存功能，"
-                                  "退出后修改会丢失。"));
+        box.setInformativeText(tr("当前文档有未保存的修改。"));
+        saveQuitButton = box.addButton(tr("存储并退出"), QMessageBox::AcceptRole);
+        box.addButton(tr("不存储退出"), QMessageBox::DestructiveRole);
+    } else {
+        box.addButton(tr("退出"), QMessageBox::AcceptRole);
     }
-    QPushButton *quitButton = box.addButton(tr("退出"), QMessageBox::AcceptRole);
     QPushButton *cancelButton = box.addButton(tr("取消"), QMessageBox::RejectRole);
     box.setDefaultButton(cancelButton); // 默认停在「取消」，避免回车/手滑直接退出
 
@@ -414,9 +527,21 @@ void MainWindow::closeEvent(QCloseEvent *event)
     box.exec();
     m_closeConfirming = false;
 
-    if (box.clickedButton() != quitButton) {
+    const QAbstractButton *clicked = box.clickedButton();
+    if (clicked == cancelButton || !clicked) {
         event->ignore();
         return;
+    }
+    if (clicked == saveQuitButton) {
+        if (document->filePath().isEmpty()) {
+            if (!saveDocumentAsDialog()) {
+                event->ignore();
+                return;
+            }
+        } else if (!saveDocumentTo(document->filePath())) {
+            event->ignore();
+            return;
+        }
     }
     QMainWindow::closeEvent(event);
 }

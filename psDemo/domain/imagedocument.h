@@ -90,6 +90,16 @@ public:
     bool isDirty() const { return m_dirty; }
     void clearDirty();
 
+    /** 工程文件路径（空 = 尚未存储过）。 */
+    QString filePath() const { return m_filePath; }
+    void setFilePath(const QString &path) { m_filePath = path; }
+
+    /**
+     * 用灰度图替换选区 mask（工程加载）；发 selectionChanged。
+     * 尺寸会适配到当前文档大小。
+     */
+    void replaceSelectionMask(const QImage &mask);
+
     // —— 脏区 ——
 
     /**
@@ -183,7 +193,8 @@ private:
     LayerStack m_layers;
     Selection m_selection;       ///< 文档级选区 mask（对照 GimpImage::selection_mask）
     int m_activeLayerIndex = -1; ///< -1 = 无活动层
-    bool m_dirty = false;        ///< 相对「已保存」的脏标记（保存未实现）
+    bool m_dirty = false;        ///< 相对「已保存」的脏标记
+    QString m_filePath;          ///< 关联的 .pslite 路径；空表示未存储
     QRect m_dirtyRect;           ///< 累计像素脏区（图像坐标）
 };
 

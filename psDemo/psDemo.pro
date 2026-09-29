@@ -20,6 +20,8 @@ SOURCES += \
     domain/layerstack.cpp \
     domain/selection.cpp \
     domain/imagedocument.cpp \
+    io/projectio.cpp \
+    io/psdio.cpp \
     engine/compositor.cpp \
     engine/paintengine.cpp \
     tools/tool.cpp \
@@ -60,6 +62,8 @@ HEADERS += \
     domain/layerstack.h \
     domain/selection.h \
     domain/imagedocument.h \
+    io/projectio.h \
+    io/psdio.h \
     engine/compositor.h \
     engine/paintengine.h \
     tools/toolid.h \

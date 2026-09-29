@@ -146,6 +146,12 @@ void ImageDocument::clearDirty()
     m_dirtyRect = QRect();
 }
 
+void ImageDocument::replaceSelectionMask(const QImage &mask)
+{
+    m_selection.replaceFromImage(mask);
+    emit selectionChanged();
+}
+
 void ImageDocument::markDirty(const QRect &rect)
 {
     if (rect.isEmpty())
