@@ -478,7 +478,7 @@ QToolButton#viewGridButton:checked {
              <cursorShape>PointingHandCursor</cursorShape>
             </property>
             <property name="toolTip">
-             <string>最近文档占位（尚无最近文件列表逻辑）</string>
+             <string>最近项卡片模板（运行时隐藏，由 refreshRecent 克隆）</string>
             </property>
             <layout class="QVBoxLayout" name="cardLayout">
              <property name="spacing">

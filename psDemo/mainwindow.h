@@ -99,6 +99,15 @@ private:
      * @param forcePslite true 时默认/偏向工程格式（供 Ctrl+S 无路径时用）
      */
     bool saveDocumentAsDialog(bool forcePslite = false);
+    /**
+     * 打开路径（.pslite / 栅格）；成功则记入最近、切工作区。
+     * @return 是否打开成功
+     */
+    bool openPath(const QString &path);
+    /** 把当前文档合成图写入最近项缩略图缓存。 */
+    void rememberRecent(const QString &path);
+    /** 按 RecentDocuments 重建「打开最近的文件」子菜单。 */
+    void rebuildRecentMenu();
     /** 把 session 交给画布工作区与右侧面板（一次性，之后靠广播）。 */
     void setupSession();
     /** 连接工具箱 ↔ 选项栏 ↔ 画布；以及「家」→ 主页。 */

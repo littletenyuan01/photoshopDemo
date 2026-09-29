@@ -3,6 +3,9 @@
 
 #include <QWidget>
 
+class QFrame;
+class QLabel;
+
 QT_BEGIN_NAMESPACE
 namespace Ui {
 class HomeScreen;
@@ -10,16 +13,12 @@ class HomeScreen;
 QT_END_NAMESPACE
 
 /**
- * Photoshop 风格「主页 / 启动屏」壳。
+ * Photoshop 风格「主页 / 启动屏」。
  *
- * 【对齐 PS】选项条左端「家」按钮进入本页：左侧新文件/打开/主页导航，
- * 右侧「最近使用项」网格（当前为占位卡片）。
+ * 【对齐 PS】选项条「家」或启动默认进入；左侧新文件/打开，右侧最近使用项网格。
+ * 【对照 GIMP】welcome-dialog Create 页；本项目用主窗口栈页。
  *
- * 【对照 GIMP】`app/dialogs/welcome-dialog.c` 的 Create 页（New / Open +
- * Recent Images）。GIMP 做成模态 Welcome Dialog；本项目按 PS 做成
- * **主窗口内全页切换**（QStackedWidget），更贴截图。
- *
- * ⚠️ UI 阶段：只发信号，不写 document / 最近文件持久化。
+ * 最近列表来自 Ps::RecentDocuments（QSettings）；.ui 中 recentCard 仅作样式模板。
  */
 class HomeScreen : public QWidget
 {
@@ -29,16 +28,26 @@ public:
     explicit HomeScreen(QWidget *parent = nullptr);
     ~HomeScreen() override;
 
+    /** 从 RecentDocuments 重建卡片（进主页时调用）。 */
+    void refreshRecent();
+
 signals:
-    /** 用户点「新文件」—— 应由 MainWindow 弹出 NewDocumentDialog。 */
     void newFileRequested();
-    /** 用户点「打开」—— 可接到已有打开文件流程。 */
     void openFileRequested();
-    /** 顶栏返回箭头：回到编辑工作区。 */
     void backToWorkspaceRequested();
+    /** 用户点击某最近项；path 为绝对路径。 */
+    void recentFileActivated(const QString &path);
+
+protected:
+    bool eventFilter(QObject *watched, QEvent *event) override;
 
 private:
+    void clearDynamicCards();
+    QFrame *createCard(const QString &path, const QString &title,
+                       const QString &subtitle, const QPixmap &thumb);
+
     Ui::HomeScreen *ui;
+    QLabel *m_emptyLabel = nullptr;
 };
 
 #endif // HOMESCREEN_H

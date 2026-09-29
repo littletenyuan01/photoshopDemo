@@ -2,6 +2,7 @@
 #include "ui_mainwindow.h"
 
 #include "app/appsession.h"
+#include "app/recentdocuments.h"
 #include "domain/imagedocument.h"
 #include "domain/layer.h"
 // 必须早于 ui_mainwindow.h：其中 DockPanel 头文件对 CanvasView 仅有前向声明
@@ -21,8 +22,10 @@
 #include "ui/tooloptionsbar.h"
 
 #include <QAbstractButton>
+#include <QAction>
 #include <QCloseEvent>
 #include <QFileDialog>
+#include <QFileInfo>
 #include <QImageReader>
 #include <QMessageBox>
 #include <QPushButton>
@@ -48,6 +51,7 @@ MainWindow::MainWindow(QWidget *parent)
 
     setupHomeStack();
     setupMenus();
+    rebuildRecentMenu();
     setupSession();
     createInitialDocument(); // 启动即有可演示文档，避免空白壳
     setupToolbox();          // 放在文档之后：工具箱初始状态要与画布一致
@@ -178,10 +182,15 @@ void MainWindow::setupHomeStack()
     connect(ui->homeScreen, &HomeScreen::newFileRequested, this, &MainWindow::onNewDocument);
     connect(ui->homeScreen, &HomeScreen::openFileRequested, this, &MainWindow::onOpenDocument);
     connect(ui->homeScreen, &HomeScreen::backToWorkspaceRequested, this, &MainWindow::onShowWorkspace);
+    connect(ui->homeScreen, &HomeScreen::recentFileActivated, this, [this](const QString &path) {
+        openPath(path);
+    });
 }
 
 void MainWindow::onShowHomeScreen()
 {
+    ui->homeScreen->refreshRecent();
+    rebuildRecentMenu();
     ui->mainStack->setCurrentWidget(ui->homeScreen);
 }
 
@@ -243,18 +252,29 @@ void MainWindow::onOpenDocument()
            "所有文件 (*.*)"));
     if (path.isEmpty())
         return;
+    openPath(path);
+}
+
+bool MainWindow::openPath(const QString &path)
+{
+    if (path.isEmpty())
+        return false;
 
     if (path.endsWith(QStringLiteral(".pslite"), Qt::CaseInsensitive)) {
         QString err;
         auto doc = Ps::ProjectIo::load(path, &err);
         if (!doc) {
             QMessageBox::warning(this, tr("打开失败"), err);
-            return;
+            Ps::RecentDocuments::remove(path);
+            rebuildRecentMenu();
+            ui->homeScreen->refreshRecent();
+            return false;
         }
         m_session->setDocument(std::move(doc));
+        rememberRecent(path);
         onShowWorkspace();
         statusBar()->showMessage(tr("已打开工程：%1").arg(path), 4000);
-        return;
+        return true;
     }
 
     QImageReader reader(path);
@@ -263,7 +283,10 @@ void MainWindow::onOpenDocument()
     if (image.isNull()) {
         QMessageBox::warning(this, tr("打开失败"),
                              tr("无法读取：%1\n%2").arg(path, reader.errorString()));
-        return;
+        Ps::RecentDocuments::remove(path);
+        rebuildRecentMenu();
+        ui->homeScreen->refreshRecent();
+        return false;
     }
 
     // 栅格打开 = 单「背景」层（不可再编辑图层结构于原文件；请另存 .pslite）
@@ -271,11 +294,42 @@ void MainWindow::onOpenDocument()
     auto layer = std::make_unique<Ps::Layer>(tr("背景"), image);
     const int index = doc->addLayer(std::move(layer));
     doc->setActiveLayerIndex(index);
+    doc->setFilePath(path);
     doc->clearDirty();
 
     m_session->setDocument(std::move(doc));
+    Ps::RecentDocuments::add(path);
+    Ps::RecentDocuments::setThumbnail(path, image);
+    rebuildRecentMenu();
     onShowWorkspace();
     statusBar()->showMessage(tr("已打开：%1").arg(path), 4000);
+    return true;
+}
+
+void MainWindow::rememberRecent(const QString &path)
+{
+    Ps::RecentDocuments::add(path);
+    if (Ps::ImageDocument *doc = m_session ? m_session->document() : nullptr)
+        Ps::RecentDocuments::setThumbnail(path, Ps::Compositor::composite(*doc));
+    rebuildRecentMenu();
+}
+
+void MainWindow::rebuildRecentMenu()
+{
+    ui->menuOpenRecent->clear();
+    const QStringList paths = Ps::RecentDocuments::paths();
+    if (paths.isEmpty()) {
+        ui->actionRecentPlaceholder->setText(tr("（无最近文件）"));
+        ui->actionRecentPlaceholder->setEnabled(false);
+        ui->menuOpenRecent->addAction(ui->actionRecentPlaceholder);
+        return;
+    }
+
+    for (const QString &path : paths) {
+        QAction *act = ui->menuOpenRecent->addAction(QFileInfo(path).fileName());
+        act->setToolTip(path);
+        connect(act, &QAction::triggered, this, [this, path]() { openPath(path); });
+    }
 }
 
 bool MainWindow::saveDocumentTo(const QString &path)
@@ -295,6 +349,7 @@ bool MainWindow::saveDocumentTo(const QString &path)
     }
     doc->setFilePath(path);
     doc->clearDirty();
+    rememberRecent(path);
     statusBar()->showMessage(
         asPsd ? tr("已存储 PSD（子集）：%1").arg(path)
               : tr("已存储工程：%1").arg(path),

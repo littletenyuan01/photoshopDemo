@@ -14,6 +14,7 @@
 #include <QPainter>
 #include <QPainterPath>
 #include <QPen>
+#include <QShowEvent>
 #include <QTimer>
 #include <QWheelEvent>
 #include <QtMath>
@@ -82,7 +83,9 @@ void CanvasView::setDocument(Ps::ImageDocument *document)
         rebuildCache();
         rebuildSelectionOutlinePath();
         syncMarchingAntTimer();
-        if (width() > 50 && height() > 50)
+        // 启动默认在主页时工作区是隐藏的：此时 width/height 往往是未布局完的小值，
+        // 若立刻 zoomFit 会得到错误的十几 %（窗口拉开后也不会再 fit）。等真正显示再适配。
+        if (isVisible() && width() > 50 && height() > 50)
             zoomFit();
         else
             m_pendingFit = true;
@@ -514,6 +517,13 @@ void CanvasView::resizeEvent(QResizeEvent *event)
         update();
         notifyViewChanged();
     }
+}
+
+void CanvasView::showEvent(QShowEvent *event)
+{
+    QWidget::showEvent(event);
+    if (m_pendingFit && m_document && width() > 50 && height() > 50)
+        zoomFit();
 }
 
 void CanvasView::leaveEvent(QEvent *event)

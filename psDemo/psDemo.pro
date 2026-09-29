@@ -15,6 +15,7 @@ SOURCES += \
     main.cpp \
     mainwindow.cpp \
     app/appsession.cpp \
+    app/recentdocuments.cpp \
     domain/layer.cpp \
     domain/tilebuffer.cpp \
     domain/layerstack.cpp \
@@ -57,6 +58,7 @@ SOURCES += \
 HEADERS += \
     mainwindow.h \
     app/appsession.h \
+    app/recentdocuments.h \
     domain/blendmode.h \
     domain/layer.h \
     domain/tilebuffer.h \
