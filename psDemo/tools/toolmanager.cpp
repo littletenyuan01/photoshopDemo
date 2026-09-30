@@ -20,6 +20,7 @@
 #include "painttool.h"
 #include "polygonallassotool.h"
 #include "quickselecttool.h"
+#include "shapetool.h"
 #include "tonetool.h"
 #include "tool.h"
 #include "zoomtool.h"
@@ -54,6 +55,10 @@ ToolManager::ToolManager(QObject *parent)
     registerTool(std::make_unique<FocusTool>(Ps::ToolId::Smudge, FocusMode::Smudge));
     registerTool(std::make_unique<ToneTool>(Ps::ToolId::Dodge, ToneMode::Dodge));
     registerTool(std::make_unique<ToneTool>(Ps::ToolId::Sponge, ToneMode::Sponge));
+    registerTool(std::make_unique<ShapeTool>(Ps::ToolId::ShapeRect, ShapeKind::Rect));
+    registerTool(std::make_unique<ShapeTool>(Ps::ToolId::ShapeEllipse, ShapeKind::Ellipse));
+    registerTool(std::make_unique<ShapeTool>(Ps::ToolId::ShapeTriangle, ShapeKind::Triangle));
+    registerTool(std::make_unique<ShapeTool>(Ps::ToolId::ShapeLine, ShapeKind::Line));
     registerTool(std::make_unique<HandTool>());
     registerTool(std::make_unique<ZoomTool>());
 

@@ -16,6 +16,7 @@
 #include "pointopregistry.h"
 #include "selectfloodop.h"
 #include "selectpolygonop.h"
+#include "shapefillop.h"
 #include "solidfillop.h"
 #include "stampdabop.h"
 #include "tonedabop.h"
@@ -78,6 +79,12 @@ void opsInit()
         OpName::ToneDab,
         {OpPad::Tiles},
         [] { return std::unique_ptr<BufferOp>(new ToneDabOp); },
+    });
+
+    OpRegistry::add({
+        OpName::ShapeFill,
+        {OpPad::Tiles},
+        [] { return std::unique_ptr<BufferOp>(new ShapeFillOp); },
     });
 
     PointOpRegistry::add({

@@ -18,7 +18,8 @@ namespace Ps {
  * ⚠️ **实现状态**：目前 Move / Hand / Zoom / Brush / Eraser / PaintBucket / Gradient /
  * RectSelect / EllipseSelect / Lasso / PolygonalLasso / MagneticLasso /
  * MagicWand / QuickSelect / Crop / Eyedropper / CloneStamp / Blur / Sharpen / Smudge /
- * Dodge / Sponge 有实际逻辑（见 `tools/ToolManager` 的注册表）。其余是 **UI 占位** —— 选中后
+ * Dodge / Sponge / ShapeRect / ShapeEllipse / ShapeTriangle / ShapeLine
+ * 有实际逻辑（见 `tools/ToolManager` 的注册表）。其余是 **UI 占位** —— 选中后
  * ToolManager 会回退到中性工具（不消费事件，等同无操作），选项栏提示「尚未接入」。
  * 布局对齐 PS 是为了让界面完整可演示，不代表功能已实现。
  */

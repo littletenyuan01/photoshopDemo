@@ -93,6 +93,9 @@ public:
                             bool reverse, bool dither);
     /** 同步仿制图章选项（对齐 / 对所有图层取样）。 */
     void setCloneStampOptions(bool align, bool sampleMerged);
+    /** 同步形状选项（填充/描边/粗细/圆角/抗锯齿）。 */
+    void setShapeOptions(bool fill, bool stroke, qreal strokeWidth,
+                         qreal cornerRadius, bool antialias);
 
     // —— Ps::ViewPort 实现（供工具请求视图操作）——
     void zoomAt(const QPointF &widgetPos, qreal factor) override;
@@ -177,6 +180,12 @@ private:
 
     bool m_cloneAlign = true;
     bool m_cloneSampleMerged = false;
+
+    bool m_shapeFill = true;
+    bool m_shapeStroke = false;
+    qreal m_shapeStrokeWidth = 2.0;
+    qreal m_shapeCornerRadius = 0.0;
+    bool m_shapeAntialias = true;
 
     QTimer *m_antsTimer = nullptr; ///< 蚂蚁线虚线相位动画
     qreal m_antsPhase = 0.0;

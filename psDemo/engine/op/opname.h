@@ -26,6 +26,7 @@ enum class OpName {
     CloneStampDab,          ///< 仿制图章 dab
     FocusDab,               ///< 模糊 / 锐化 / 涂抹 dab
     ToneDab,                ///< 减淡 / 海绵 dab
+    ShapeFill,              ///< 形状填充 / 描边
     LayerMode,              ///< 图层混合色（点算子）
     BrightnessContrast,     ///< 亮度/对比度滤镜
     Count                   ///< 哨兵，勿当作真实算子

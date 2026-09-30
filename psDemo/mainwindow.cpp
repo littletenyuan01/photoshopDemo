@@ -328,6 +328,14 @@ void MainWindow::setupToolbox()
             ui->toolOptionsBar->cloneAlign(),
             ui->toolOptionsBar->cloneSampleMerged());
     });
+    connect(ui->toolOptionsBar, &ToolOptionsBar::shapeOptionsChanged, this, [this]() {
+        ui->canvasWorkspace->canvasView()->setShapeOptions(
+            ui->toolOptionsBar->shapeFill(),
+            ui->toolOptionsBar->shapeStroke(),
+            ui->toolOptionsBar->shapeStrokeWidth(),
+            ui->toolOptionsBar->shapeCornerRadius(),
+            ui->toolOptionsBar->shapeAntialias());
+    });
     connect(ui->toolOptionsBar, &ToolOptionsBar::homeClicked,
             this, &MainWindow::onShowHomeScreen);
 
@@ -354,6 +362,11 @@ void MainWindow::setupToolbox()
                                ui->toolOptionsBar->gradientDither());
     canvas->setCloneStampOptions(ui->toolOptionsBar->cloneAlign(),
                                  ui->toolOptionsBar->cloneSampleMerged());
+    canvas->setShapeOptions(ui->toolOptionsBar->shapeFill(),
+                            ui->toolOptionsBar->shapeStroke(),
+                            ui->toolOptionsBar->shapeStrokeWidth(),
+                            ui->toolOptionsBar->shapeCornerRadius(),
+                            ui->toolOptionsBar->shapeAntialias());
 }
 
 void MainWindow::setupHomeStack()

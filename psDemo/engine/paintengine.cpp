@@ -16,6 +16,7 @@
 #include "engine/op/oprunner.h"
 #include "engine/op/selectfloodop.h"
 #include "engine/op/selectpolygonop.h"
+#include "engine/op/shapefillop.h"
 #include "engine/op/solidfillop.h"
 #include "engine/op/stampdabop.h"
 #include "engine/op/tonedabop.h"
@@ -265,6 +266,31 @@ QRect PaintEngine::toneStrokeSegment(TileBuffer &tiles,
         dirty = unitedDirty(dirty,
                             toneDab(tiles, to, radius, mode, strength, hardness, clip));
     return dirty;
+}
+
+QRect PaintEngine::fillShape(TileBuffer &tiles,
+                             ShapeKind kind,
+                             const QRectF &rect,
+                             const QColor &color,
+                             bool fill,
+                             bool stroke,
+                             qreal strokeWidth,
+                             qreal cornerRadius,
+                             bool antialias,
+                             PaintSelectionClip clip)
+{
+    OpContext ctx = OpContext::fromTiles(tiles, clip);
+    return OpRunner::run(OpName::ShapeFill, ctx, [&](BufferOp &base) {
+        auto &op = static_cast<ShapeFillOp &>(base);
+        op.setKind(kind);
+        op.setRect(rect);
+        op.setColor(color);
+        op.setFill(fill);
+        op.setStroke(stroke);
+        op.setStrokeWidth(strokeWidth);
+        op.setCornerRadius(cornerRadius);
+        op.setAntialias(antialias);
+    });
 }
 
 QRect PaintEngine::floodFill(TileBuffer &tiles,

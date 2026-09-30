@@ -44,6 +44,14 @@ enum class ToneMode {
     Sponge,    ///< 提高饱和度
 };
 
+/** 形状工具种类（对照工具箱 ShapeRect…ShapeLine）。 */
+enum class ShapeKind {
+    Rect = 0,
+    Ellipse,
+    Triangle,
+    Line,
+};
+
 } // namespace Ps
 
 #endif // ENGINE_PAINTTYPES_H

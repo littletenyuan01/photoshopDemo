@@ -39,6 +39,7 @@ SOURCES += \
     engine/op/clonestampdabop.cpp \
     engine/op/focusdabop.cpp \
     engine/op/tonedabop.cpp \
+    engine/op/shapefillop.cpp \
     engine/op/solidfillop.cpp \
     engine/op/selectpolygonop.cpp \
     engine/op/selectfloodop.cpp \
@@ -66,6 +67,7 @@ SOURCES += \
     tools/clonestamptool.cpp \
     tools/focustool.cpp \
     tools/tonetool.cpp \
+    tools/shapetool.cpp \
     ui/canvasview.cpp \
     ui/canvasworkspace.cpp \
     ui/canvasdocstatusbar.cpp \
@@ -124,6 +126,7 @@ HEADERS += \
     engine/op/clonestampdabop.h \
     engine/op/focusdabop.h \
     engine/op/tonedabop.h \
+    engine/op/shapefillop.h \
     engine/op/solidfillop.h \
     engine/op/selectpolygonop.h \
     engine/op/selectfloodop.h \
@@ -156,6 +159,7 @@ HEADERS += \
     tools/clonestamptool.h \
     tools/focustool.h \
     tools/tonetool.h \
+    tools/shapetool.h \
     ui/canvasview.h \
     ui/canvasworkspace.h \
     ui/canvasdocstatusbar.h \

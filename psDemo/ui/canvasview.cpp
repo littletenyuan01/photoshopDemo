@@ -295,6 +295,11 @@ void CanvasView::refreshToolContext()
     m_toolContext.gradientDither = m_gradientDither;
     m_toolContext.cloneAlign = m_cloneAlign;
     m_toolContext.cloneSampleMerged = m_cloneSampleMerged;
+    m_toolContext.shapeFill = m_shapeFill;
+    m_toolContext.shapeStroke = m_shapeStroke;
+    m_toolContext.shapeStrokeWidth = m_shapeStrokeWidth;
+    m_toolContext.shapeCornerRadius = m_shapeCornerRadius;
+    m_toolContext.shapeAntialias = m_shapeAntialias;
     m_toolContext.viewZoom = m_zoom;
     m_toolContext.viewOffset = m_offset;
 
@@ -378,6 +383,17 @@ void CanvasView::setCloneStampOptions(bool align, bool sampleMerged)
 {
     m_cloneAlign = align;
     m_cloneSampleMerged = sampleMerged;
+    refreshToolContext();
+}
+
+void CanvasView::setShapeOptions(bool fill, bool stroke, qreal strokeWidth,
+                                 qreal cornerRadius, bool antialias)
+{
+    m_shapeFill = fill;
+    m_shapeStroke = stroke;
+    m_shapeStrokeWidth = qMax(1.0, strokeWidth);
+    m_shapeCornerRadius = qMax(0.0, cornerRadius);
+    m_shapeAntialias = antialias;
     refreshToolContext();
 }
 

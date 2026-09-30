@@ -51,6 +51,8 @@
 | `engine/op/focusdabop.h/.cpp` | **FocusDabOp**：盒模糊 / 锐化 / 沿笔画涂抹 |
 | `tools/tonetool.h/.cpp` | **减淡/海绵**：→ `PaintEngine::toneDab` |
 | `engine/op/tonedabop.h/.cpp` | **ToneDabOp**：提亮 / 提高饱和度 |
+| `tools/shapetool.h/.cpp` | **形状**：拖框 → `PaintEngine::fillShape` |
+| `engine/op/shapefillop.h/.cpp` | **ShapeFillOp**：矩形/椭圆/三角/直线栅格化 |
 | `engine/magneticedgesnap.h` | 邻域梯度吸附（对照 iscissors 导数图瘦身） |
 | `engine/op/selectfloodop.*` | 连通域/相似色写入选区 |
 

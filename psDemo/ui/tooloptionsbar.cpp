@@ -46,6 +46,15 @@ ToolOptionsBar::ToolOptionsBar(QWidget *parent)
     connect(ui->paintAlignCheck, &QCheckBox::toggled, this, emitClone);
     connect(ui->paintSampleMergedCheck, &QCheckBox::toggled, this, emitClone);
 
+    // 形状：填充默认前景色；描边默认关
+    ui->shapeFillCombo->setCurrentIndex(1);
+    const auto emitShape = [this]() { emit shapeOptionsChanged(); };
+    connect(ui->shapeFillCombo, qOverload<int>(&QComboBox::currentIndexChanged), this, emitShape);
+    connect(ui->shapeStrokeCombo, qOverload<int>(&QComboBox::currentIndexChanged), this, emitShape);
+    connect(ui->shapeWidthSpin, qOverload<int>(&QSpinBox::valueChanged), this, emitShape);
+    connect(ui->shapeRadiusSpin, qOverload<int>(&QSpinBox::valueChanged), this, emitShape);
+    connect(ui->shapeSmoothCheck, &QCheckBox::toggled, this, emitShape);
+
     // 「家」→ 主页（UI 阶段只发信号，由 MainWindow 切到 HomeScreen）
     connect(ui->homeButton, &QToolButton::clicked, this, &ToolOptionsBar::homeClicked);
 
@@ -146,6 +155,32 @@ bool ToolOptionsBar::cloneAlign() const
 bool ToolOptionsBar::cloneSampleMerged() const
 {
     return ui->paintSampleMergedCheck->isChecked();
+}
+
+bool ToolOptionsBar::shapeFill() const
+{
+    // 0=无；1=前景色；图案/渐变回退前景
+    return ui->shapeFillCombo->currentIndex() != 0;
+}
+
+bool ToolOptionsBar::shapeStroke() const
+{
+    return ui->shapeStrokeCombo->currentIndex() != 0;
+}
+
+int ToolOptionsBar::shapeStrokeWidth() const
+{
+    return ui->shapeWidthSpin->value();
+}
+
+int ToolOptionsBar::shapeCornerRadius() const
+{
+    return ui->shapeRadiusSpin->value();
+}
+
+bool ToolOptionsBar::shapeAntialias() const
+{
+    return ui->shapeSmoothCheck->isChecked();
 }
 
 void ToolOptionsBar::setCurrentTool(Ps::ToolId id)
@@ -291,6 +326,14 @@ QString ToolOptionsBar::hintForTool(Ps::ToolId id)
         return QObject::tr("拖拽提亮像素（大小生效）");
     case Ps::ToolId::Sponge:
         return QObject::tr("拖拽提高饱和度（大小生效）");
+    case Ps::ToolId::ShapeRect:
+        return QObject::tr("拖拽画矩形；Shift 正方形；选项栏调填充/描边");
+    case Ps::ToolId::ShapeEllipse:
+        return QObject::tr("拖拽画椭圆；Shift 正圆；选项栏调填充/描边");
+    case Ps::ToolId::ShapeTriangle:
+        return QObject::tr("拖拽画三角形；Shift 等比例；选项栏调填充/描边");
+    case Ps::ToolId::ShapeLine:
+        return QObject::tr("拖拽画直线；Shift 吸附 45°；粗细见选项栏");
     default:
         return QObject::tr("参数为 UI 占位，逻辑尚未接入");
     }

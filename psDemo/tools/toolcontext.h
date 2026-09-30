@@ -63,6 +63,13 @@ struct ToolContext
     bool cloneAlign = true;            ///< 对齐（跨笔保留源-目标偏移）
     bool cloneSampleMerged = false;    ///< 对所有图层取样
 
+    // —— 形状（对照选项栏 pageShape）——
+    bool shapeFill = true;             ///< 填充（前景色）；图案/渐变未做
+    bool shapeStroke = false;          ///< 描边
+    qreal shapeStrokeWidth = 2.0;      ///< 描边粗细（像素）
+    qreal shapeCornerRadius = 0.0;     ///< 矩形圆角
+    bool shapeAntialias = true;        ///< 消除锯齿
+
     // —— 视图变换（供工具浮层把文档坐标画到控件上；由 CanvasView 填）——
     qreal viewZoom = 1.0;              ///< 当前缩放
     QPointF viewOffset;                ///< 文档原点在控件中的位置

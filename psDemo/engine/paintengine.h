@@ -132,6 +132,21 @@ public:
                                    qreal spacing = 0.25,
                                    PaintSelectionClip clip = PaintSelectionClip());
 
+    /**
+     * 形状填充 / 描边（矩形·椭圆·三角·直线）。
+     * @param rect 层内坐标；直线时 topLeft/bottomRight 为两端点
+     */
+    static QRect fillShape(TileBuffer &tiles,
+                           ShapeKind kind,
+                           const QRectF &rect,
+                           const QColor &color,
+                           bool fill,
+                           bool stroke,
+                           qreal strokeWidth = 2.0,
+                           qreal cornerRadius = 0.0,
+                           bool antialias = true,
+                           PaintSelectionClip clip = PaintSelectionClip());
+
     /** 油漆桶洪泛；@return 层内坐标脏矩形。 */
     static QRect floodFill(TileBuffer &tiles,
                            const QPoint &seed,

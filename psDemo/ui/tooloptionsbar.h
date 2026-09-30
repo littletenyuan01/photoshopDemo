@@ -36,7 +36,7 @@ QT_END_NAMESPACE
  *
  * ⚠️ **现状**：已接线——「大小」（画笔/橡皮/图章）、油漆桶页的容差/连续/填充源/不透明度、
  * 渐变页的类型/不透明度/偏移/仿色/反向、**选区页魔棒项（容差/连续/取样）**、
- * **绘画页图章项（对齐/取样）**。其余控件多为 **UI 占位**；
+ * **绘画页图章项（对齐/取样）**、**形状页（填充/描边/粗细/圆角/抗锯齿）**。其余控件多为 **UI 占位**；
  * 占位工具的提示语写「逻辑尚未接入」。
  */
 class ToolOptionsBar : public QWidget
@@ -71,6 +71,13 @@ public:
     bool cloneAlign() const;
     bool cloneSampleMerged() const;
 
+    // —— 形状（pageShape）——
+    bool shapeFill() const;
+    bool shapeStroke() const;
+    int shapeStrokeWidth() const;
+    int shapeCornerRadius() const;
+    bool shapeAntialias() const;
+
     /**
      * 当前工具的提示语（由 MainWindow 显示在状态栏）。
      * 【为什么不在选项条里】PS 的选项条只有参数，没有说明文字；放在条里既浪费宽度，
@@ -93,6 +100,8 @@ signals:
     void gradientOptionsChanged();
     /** 仿制图章参数变化（对齐 / 对所有图层取样）。 */
     void cloneStampOptionsChanged();
+    /** 形状参数变化（填充/描边/粗细/圆角/抗锯齿）。 */
+    void shapeOptionsChanged();
     /** 左端「家」按钮：请求显示主页（对齐 PS Home）。 */
     void homeClicked();
 

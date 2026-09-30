@@ -23,7 +23,7 @@
 
 | | 路径 A：缓冲算子 | 路径 B：点算子 |
 |---|---|---|
-| 成员 | `StampDabOp` / … / **`CloneStampDabOp`** / **`FocusDabOp`** / **`ToneDabOp`** | `LayerModeOp` |
+| 成员 | `StampDabOp` / … / **`CloneStampDabOp`** / **`FocusDabOp`** / **`ToneDabOp`** / **`ShapeFillOp`** | `LayerModeOp` |
 | 基类 | `BufferOp`（有 `prepare`/`process`/`finish` 虚函数） | `PointOp`（**无任何虚函数**） |
 | 触发者 | **用户输入**（鼠标 / 菜单） | **重绘**（`contentChanged` → 重投影） |
 | 调度器 | `OpRunner::run(OpName, OpContext&, Configure)` | `PointOpRegistry::instance(OpName)` 后直接调 |
@@ -84,6 +84,7 @@ PointOpRegistry::add({ OpName::LayerMode,
 | `OpName::CloneStampDab` | `{Tiles}` | `new CloneStampDabOp` |
 | `OpName::FocusDab` | `{Tiles}` | `new FocusDabOp` |
 | `OpName::ToneDab` | `{Tiles}` | `new ToneDabOp` |
+| `OpName::ShapeFill` | `{Tiles}` | `new ShapeFillOp` |
 | `OpName::LayerMode` | —（点算子无 pad） | `new LayerModeOp` |
 
 ---
@@ -105,6 +106,7 @@ PointOpRegistry::add({ OpName::LayerMode,
 | **仿制图章** | `CloneStampTool` → 同上 | `PaintEngine::cloneStampDab` / `cloneStrokeSegment` |
 | **模糊/锐化/涂抹** | `FocusTool` | `PaintEngine::focusDab` / `focusStrokeSegment` |
 | **减淡/海绵** | `ToneTool` | `PaintEngine::toneDab` / `toneStrokeSegment` |
+| **形状** | `ShapeTool` | `PaintEngine::fillShape` |
 
 `PaintEngine` 是**门面**：绘制入口组装 `OpContext::fromTiles`；选区入口组装
 `OpContext::fromSelection`，再交给 `OpRunner` 一个 `Configure` lambda：
