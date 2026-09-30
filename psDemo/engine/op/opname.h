@@ -22,6 +22,10 @@ enum class OpName {
     Gradient,               ///< 渐变填充
     SolidFill,              ///< 实色/透明填充
     SelectPolygon,          ///< 多边形/套索写入选区 mask
+    SelectFlood,            ///< 连通域/相似色写入选区（魔棒）
+    CloneStampDab,          ///< 仿制图章 dab
+    FocusDab,               ///< 模糊 / 锐化 / 涂抹 dab
+    ToneDab,                ///< 减淡 / 海绵 dab
     LayerMode,              ///< 图层混合色（点算子）
     BrightnessContrast,     ///< 亮度/对比度滤镜
     Count                   ///< 哨兵，勿当作真实算子

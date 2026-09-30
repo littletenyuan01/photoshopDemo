@@ -57,7 +57,7 @@
 
 - **说明**：工具是**独立状态机**（`Tool` 子类），由 `ToolManager` 按 id 分发事件；
   画布只把 `QMouseEvent` 归一化成**图像坐标的 `ToolEvent`** 后转发，自身**不含任何工具分支**。
-- **已注册**：移动、抓手、缩放、画笔、橡皮、油漆桶、渐变、矩形/椭圆选框、**自由套索 / 多边形套索**。未接入逻辑的工具回退到「移动」这个**中性兜底**，
+- **已注册**：移动、抓手、缩放、画笔、橡皮、油漆桶、渐变、选区工具族、**裁剪、吸管、仿制图章、模糊/锐化/涂抹、减淡/海绵**。未接入逻辑的工具回退到「移动」这个**中性兜底**，
   切过去不消费事件，而不是意外继承上一个工具的行为。
 - **移动（V）**：按下时按像素点选最上层非透明内容并激活该层（图层面板同步）；
   拖拽平移其文档偏移（`Layer::offsetX/Y`），不搬瓦片像素。
@@ -83,7 +83,7 @@
 - **说明**：**17 个占位槽 / 35 个工具**，分组与顺序对齐 Photoshop 默认工具箱
   （移动 · 选框 · 套索 · 快速选择 · 裁剪 · 吸管 · 画笔 · 图章 · 橡皮擦 · 填充 · 聚焦 · 色调 · 钢笔 · 文字 · 形状 · 抓手 · 缩放）。
   同组共用一个占位，**右键展开子菜单**；工具箱外层是 `QScrollArea`，工具多时可滚动。
-- **实现状态（重要）**：只有 **移动 / 抓手 / 缩放 / 画笔 / 橡皮 / 油漆桶 / 渐变 / 矩形·椭圆选框 / 自由·多边形套索** 有实际逻辑，
+- **实现状态（重要）**：只有 **移动 / 抓手 / 缩放 / 画笔 / 橡皮 / 油漆桶 / 渐变 / 选区工具族 / 裁剪 / 吸管 / 仿制图章 / 模糊·锐化·涂抹 / 减淡·海绵** 有实际逻辑，
   其余是 **UI 占位**。选中占位工具后 `ToolManager` 回退到中性工具（不消费事件），
   选项栏提示「该工具逻辑尚未接入」。**布局对齐 PS 只为界面完整可演示，不等于功能已实现。**
 - **油漆桶（G）**：左键单击活动层填充；画布光标为油漆桶图标（倾倒口热点）。
@@ -106,12 +106,40 @@
   - **算子路径**：`LassoTool` → `ImageDocument::selectPolygon` → `PaintEngine::selectPolygon` →
     `OpRunner` → `SelectPolygonOp`（`OpPad::Selection`；硬边、无羽化）。
   - **修饰键**：按下时 Shift 加选 / Ctrl 减选 / Shift+Ctrl 相交（与选框一致）。
-  - **简化未做**：磁性套索、编辑顶点、羽化/抗锯齿、GIMP 式自由+折线混绘。
+  - **简化未做**：编辑顶点、羽化/抗锯齿、GIMP 式自由+折线混绘。
 - **多边形套索（L）**：单击落点，橡皮筋跟鼠标；闭合后同样走 `SelectPolygonOp`。
   - **对照 GIMP**：`gimppolygonselecttool.c`（折线 widget + `key_press`）。
   - **闭合**：双击 / Enter / 点近起点（≥3 点）；**Esc** 取消；**Backspace/Delete** 撤末点。
   - **Shift 吸附**（对齐 PS）：橡皮筋/落点约束到水平、垂直、45° 对角，以及**相对前一边的平行/垂直**方向。
   - **基建**：`Tool::keyPress` + `ShortcutOverride`（避免 Delete 误触「清除」）+ `ToolEvent::doubleClick`。
+- **磁性套索（L）**：拖拽时把折线吸到局部强边缘，松手闭合。
+  - **对照 GIMP**：`gimpiscissorstool.c` + `gimptilehandleriscissors`（模糊 + 导数梯度）；本项目不做全图 livewire。
+  - **算法**：按下时 `Compositor::composite` 缓存；采样点经 `MagneticEdgeSnap::snap`（邻域 Sobel 最大幅值）。
+  - **算子路径**：同自由套索 → `SelectPolygonOp`。
+  - **简化未做**：宽度/对比度/频率选项栏、种子点编辑、Dijkstra 最优路径。
+- **魔棒（W）**：单击按颜色建选区。
+  - **对照 GIMP**：`gimpfuzzyselecttool.c` → `gimp_pickable_contiguous_region_by_seed` / `by_color`。
+  - **算子**：`SelectFloodOp`（`OpPad::Selection`）；选项栏容差 / 连续 / 对所有图层取样已接线。
+  - **修饰键**：Shift 加选 / Ctrl 减选 / 二者相交。
+- **快速选择（W，精简）**：拖拽中对笔刷路径采样点做连通域洪泛并扩张选区（非 PS 完整边缘模型）。
+  - **算子**：同 `SelectFloodOp`；始终连续；首击可 Replace，后续 Add。
+- **裁剪（C）**：拖出矩形，框外变暗；**Enter / 双击**确认，**Esc** 取消；**Shift** 正方形。
+  - **对照 GIMP**：`gimpcroptool.c` → `gimp_image_crop`；本项目 `ImageDocument::cropTo`（可撤销）。
+  - **简化未做**：透视裁剪、选项栏固定比例/宽高、拖动调整手柄。
+- **吸管（I）**：单击取合成像素为前景；**Alt+单击**为背景。
+  - **对照 GIMP**：`gimpcolorpickertool.c`；本 Demo 固定 sample-merged。
+- **仿制图章（S）**：**Alt+单击**设源；拖拽把源处像素刷到目标。
+  - **对照 GIMP**：`gimpclonetool.c` / `gimp_clone_options`（align-mode / sample-merged）。
+  - **算子**：`CloneStampDabOp`；经 `PaintEngine::cloneStampDab` / `cloneStrokeSegment`。
+  - **选项**：对齐（跨笔保留偏移）、对所有图层取样；笔刷「大小」已接线。
+  - **手势例外**：图章下 Alt+左键设源，不抢给抓手平移（中键/空格仍可平移）。
+- **模糊 / 锐化 / 涂抹**：拖拽在活动层上局部处理；笔刷「大小」生效。
+  - **对照 GIMP**：`gimpconvolvetool.c`（blur/sharpen）/ `gimpsmudgetool.c`。
+  - **算子**：`FocusDabOp`（`FocusMode`）；经 `PaintEngine::focusDab` / `focusStrokeSegment`。
+  - **简化**：强度固定 0.5；模糊为 5×5 盒滤波；涂抹沿笔画方向拖色。
+- **减淡 / 海绵**：拖拽提亮或提高饱和度；笔刷「大小」生效。
+  - **对照 GIMP**：`gimpdodgeburntool.c` / `gimpspongetool.c`（本 Demo 无加深 Burn）。
+  - **算子**：`ToneDabOp`（`ToneMode`）；经 `PaintEngine::toneDab` / `toneStrokeSegment`。
 - **图标**：`resources/icons/tools/`（iconfont 英文命名 PNG），经 `:/icons/tools/` 加载；
   映射表见 `docs/ui/iconfont-icons.md`。
 
@@ -129,8 +157,8 @@
 - **同一页内的专有控件按工具显隐**：选区页的「容差/连续/对所有图层取样」只在魔棒与快速选择出现；
   绘画页的「对齐/对所有图层取样」只在仿制图章出现（对应 GIMP 的 `gimp_clone_options_gui`
   在 paint options 之上追加 clone 项）。
-- **⚠️ 实现状态**：**「大小」**（画笔/橡皮）、**油漆桶页**（容差/连续/填充/不透明度）与
-  **渐变页**（类型/不透明度/偏移/仿色/反向）已接线。其余控件多为 **UI 占位**，
+- **⚠️ 实现状态**：**「大小」**（画笔/橡皮/图章）、**油漆桶页**（容差/连续/填充/不透明度）、
+  **渐变页**（类型/不透明度/偏移/仿色/反向）、**选区页魔棒项**、**绘画页图章项（对齐/取样）**已接线。其余控件多为 **UI 占位**，
   不改变任何行为；提示语写「该工具逻辑尚未接入（参数为 UI 占位）」。
 - **布局**：各页最小宽度不同（实测**绘画页需 1038px**，故选区 609 / 渐变 654 / 文字 700…）。
   整条套一个 `QScrollArea`：**页面保持自然宽度并左对齐**，窗口不够宽时**横向滚动**；
@@ -281,7 +309,7 @@
 | 功能 | 简介 | 验收要点 | 状态 |
 |------|------|----------|------|
 | 画笔 / 橡皮 | 在活动层绘制或擦除 | 不污染其他层 | ✅（可撤销） |
-| 选区 | 矩形/椭圆/**自由·多边形套索** + mask 蚂蚁线；填充后取消选区；**Ctrl+点缩略图**载入层 alpha | 填充只改选区内且事后无蚂蚁线；Ctrl+点建立外形选区 | ✅ |
+| 选区 | 形状选区 + **魔棒/快速选择** + mask 蚂蚁线；填充后取消选区；**Ctrl+点缩略图**载入层 alpha | 填充只改选区内且事后无蚂蚁线；Ctrl+点建立外形选区 | ✅ |
 | 清除 / 填充 | Delete 清选区或整层；Shift+F5 前景色填充 | 尊重选区；可撤销 | ✅ |
 | 蒙版 | 灰度蒙版 | 合成正确 | 计划中 |
 | 撤销 / 重做 | 绘制与图层操作 | 栈行为正确 | ✅ |

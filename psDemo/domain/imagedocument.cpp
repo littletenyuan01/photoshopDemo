@@ -6,6 +6,8 @@
 #include "app/historystack.h"
 #include "app/undoitem.h"
 #include "domain/filternode.h"
+#include "domain/layer.h"
+#include "engine/compositor.h"
 #include "engine/op/opname.h"
 #include "engine/paintengine.h"
 
@@ -305,6 +307,32 @@ void ImageDocument::selectPolygon(const QPolygonF &points, ChannelOp op)
 {
     // 经 OpRunner → SelectPolygonOp（对照 gimp_channel_select_polygon）
     PaintEngine::selectPolygon(m_selection, points, op);
+    emit selectionChanged();
+}
+
+void ImageDocument::selectFlood(const QPoint &seedDoc, int tolerance, bool contiguous,
+                                bool sampleMerged, ChannelOp op)
+{
+    // 对照 Fuzzy Select：sample_merged → 合成 pickable；否则活动 drawable
+    QImage sample;
+    if (sampleMerged) {
+        sample = Compositor::composite(*this);
+    } else {
+        Layer *layer = activeLayer();
+        sample = QImage(m_width, m_height, QImage::Format_ARGB32_Premultiplied);
+        sample.fill(Qt::transparent);
+        if (layer && layer->hasPixelData()) {
+            QPainter p(&sample);
+            p.setCompositionMode(QPainter::CompositionMode_Source);
+            p.drawImage(layer->offsetX(), layer->offsetY(), layer->materialize());
+        }
+    }
+    if (sample.isNull())
+        return;
+    if (sample.format() != QImage::Format_ARGB32_Premultiplied)
+        sample = sample.convertToFormat(QImage::Format_ARGB32_Premultiplied);
+
+    PaintEngine::selectFlood(m_selection, sample, seedDoc, tolerance, contiguous, op);
     emit selectionChanged();
 }
 
@@ -617,6 +645,55 @@ void ImageDocument::resizeCanvas(int newWidth, int newHeight,
     m_selection.resizeCanvas(newWidth, newHeight, offsetX, offsetY);
     m_width = newWidth;
     m_height = newHeight;
+    m_dirty = true;
+    m_dirtyRect = QRect(0, 0, m_width, m_height);
+    emit structureChanged();
+    emit selectionChanged();
+    emit contentChanged();
+}
+
+void ImageDocument::cropTo(const QRect &rect)
+{
+    // 对照 gimp_image_crop：保留 rect 内内容，文档原点移到 rect 左上
+    const QRect r = rect.normalized().intersected(QRect(0, 0, m_width, m_height));
+    if (r.width() < 1 || r.height() < 1)
+        return;
+    if (r.x() == 0 && r.y() == 0 && r.width() == m_width && r.height() == m_height)
+        return;
+
+    pushDocumentGeomUndo(tr("裁剪"));
+
+    for (int i = 0; i < m_layers.count(); ++i) {
+        Layer *layer = m_layers.layerAt(i);
+        if (!layer)
+            continue;
+
+        QImage src = layer->materialize();
+        if (src.isNull()) {
+            src = QImage(layer->width(), layer->height(), QImage::Format_ARGB32_Premultiplied);
+            src.fill(Qt::transparent);
+        }
+
+        // 先落到文档坐标，再裁切（层可能有 offset）
+        QImage full(m_width, m_height, QImage::Format_ARGB32_Premultiplied);
+        full.fill(Qt::transparent);
+        {
+            QPainter painter(&full);
+            painter.setCompositionMode(QPainter::CompositionMode_Source);
+            painter.drawImage(layer->offsetX(), layer->offsetY(), src);
+        }
+
+        QImage cropped = full.copy(r);
+        if (cropped.format() != QImage::Format_ARGB32_Premultiplied)
+            cropped = cropped.convertToFormat(QImage::Format_ARGB32_Premultiplied);
+        layer->replaceFromImage(cropped);
+        layer->setOffsetSilent(0, 0);
+    }
+
+    // 旧 mask 平移：新原点 = 旧 (r.x, r.y)
+    m_selection.resizeCanvas(r.width(), r.height(), -r.x(), -r.y());
+    m_width = r.width();
+    m_height = r.height();
     m_dirty = true;
     m_dirtyRect = QRect(0, 0, m_width, m_height);
     emit structureChanged();

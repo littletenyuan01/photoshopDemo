@@ -12,6 +12,7 @@
 
 #include <QColor>
 #include <QObject>
+#include <QPoint>
 #include <QPolygonF>
 #include <QRect>
 #include <QString>
@@ -76,6 +77,12 @@ public:
      * 对照 gimp_channel_select_polygon。
      */
     void selectPolygon(const QPolygonF &points, ChannelOp op);
+    /**
+     * 连通域/相似色选区（魔棒）；经 PaintEngine → SelectFloodOp。
+     * @param sampleMerged true=合成图取样（对照 sample-merged）；false=活动层
+     */
+    void selectFlood(const QPoint &seedDoc, int tolerance, bool contiguous,
+                     bool sampleMerged, ChannelOp op);
     /** 由指定图层 alpha 建立选区；默认 Replace。 */
     void selectLayerAlpha(int layerIndex, ChannelOp op = ChannelOp::Replace);
 
@@ -188,6 +195,12 @@ public:
     void resizeCanvas(int newWidth, int newHeight,
                       int anchorRow, int anchorCol,
                       const QColor &extensionColor);
+
+    /**
+     * 裁剪文档到 @p rect（文档坐标，与画布求交）。
+     * 对照 gimp_image_crop：各层贴到文档坐标后裁切，选区同步平移。
+     */
+    void cropTo(const QRect &rect);
 
     /** Layer 属性 setter 回调：标脏并发 layerPropertiesChanged + contentChanged。 */
     void notifyLayerPropertiesChanged(const Layer &layer);

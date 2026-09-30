@@ -12,6 +12,7 @@
 #include "engine/painttypes.h"
 
 #include <QColor>
+#include <QImage>
 #include <QPoint>
 #include <QPointF>
 #include <QPolygonF>
@@ -56,6 +57,81 @@ public:
                                qreal spacing = 0.25,
                                PaintSelectionClip clip = PaintSelectionClip());
 
+    /**
+     * 仿制图章单次 dab。
+     * @param center       目标 dab 中心（层内坐标）
+     * @param sourceCenter 采样中心（文档坐标）
+     * @param sample       文档尺寸预乘 ARGB（合成或单层）
+     */
+    static QRect cloneStampDab(TileBuffer &tiles,
+                               const QPointF &center,
+                               const QPointF &sourceCenter,
+                               qreal radius,
+                               const QImage &sample,
+                               qreal hardness = 0.85,
+                               qreal opacity = 1.0,
+                               PaintSelectionClip clip = PaintSelectionClip());
+
+    /**
+     * 沿 from→to 插值仿制笔画。
+     * @param sourceFrom / sourceTo 与 from/to 同步移动的采样中心（文档坐标）
+     */
+    static QRect cloneStrokeSegment(TileBuffer &tiles,
+                                    const QPointF &from,
+                                    const QPointF &to,
+                                    const QPointF &sourceFrom,
+                                    const QPointF &sourceTo,
+                                    qreal radius,
+                                    const QImage &sample,
+                                    qreal hardness = 0.85,
+                                    qreal opacity = 1.0,
+                                    qreal spacing = 0.25,
+                                    PaintSelectionClip clip = PaintSelectionClip());
+
+    /**
+     * 聚焦工具单次 dab（模糊 / 锐化 / 涂抹）。
+     * @param smudgeDelta 涂抹采样偏移（层内）；Blur/Sharpen 忽略
+     */
+    static QRect focusDab(TileBuffer &tiles,
+                          const QPointF &center,
+                          qreal radius,
+                          FocusMode mode,
+                          qreal strength = 0.5,
+                          qreal hardness = 0.85,
+                          const QPointF &smudgeDelta = QPointF(),
+                          PaintSelectionClip clip = PaintSelectionClip());
+
+    /** 沿 from→to 插值聚焦笔画。 */
+    static QRect focusStrokeSegment(TileBuffer &tiles,
+                                    const QPointF &from,
+                                    const QPointF &to,
+                                    qreal radius,
+                                    FocusMode mode,
+                                    qreal strength = 0.5,
+                                    qreal hardness = 0.85,
+                                    qreal spacing = 0.25,
+                                    PaintSelectionClip clip = PaintSelectionClip());
+
+    /** 色调工具单次 dab（减淡 / 海绵）。 */
+    static QRect toneDab(TileBuffer &tiles,
+                         const QPointF &center,
+                         qreal radius,
+                         ToneMode mode,
+                         qreal strength = 0.4,
+                         qreal hardness = 0.85,
+                         PaintSelectionClip clip = PaintSelectionClip());
+
+    /** 沿 from→to 插值色调笔画。 */
+    static QRect toneStrokeSegment(TileBuffer &tiles,
+                                   const QPointF &from,
+                                   const QPointF &to,
+                                   qreal radius,
+                                   ToneMode mode,
+                                   qreal strength = 0.4,
+                                   qreal hardness = 0.85,
+                                   qreal spacing = 0.25,
+                                   PaintSelectionClip clip = PaintSelectionClip());
+
     /** 油漆桶洪泛；@return 层内坐标脏矩形。 */
     static QRect floodFill(TileBuffer &tiles,
                            const QPoint &seed,
@@ -90,6 +166,18 @@ public:
     static QRect selectPolygon(Selection &selection,
                                const QPolygonF &points,
                                ChannelOp op);
+
+    /**
+     * 连通域/相似色写入选区（魔棒）。
+     * 经 OpRunner → SelectFloodOp；对照 gimp_pickable_contiguous_region_*。
+     * @param sample 文档尺寸预乘 ARGB 采样图（合成或单层）
+     */
+    static QRect selectFlood(Selection &selection,
+                             const QImage &sample,
+                             const QPoint &seed,
+                             int tolerance,
+                             bool contiguous,
+                             ChannelOp op);
 };
 
 } // namespace Ps

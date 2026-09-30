@@ -34,8 +34,9 @@ QT_END_NAMESPACE
  * `paint-mode` / `opacity` / `clone-type` / `sample-merged` / `align-mode` /
  * `gradient-type` / `gradient-repeat` / `path-polygonal` 等），见各控件 toolTip。
  *
- * ⚠️ **现状**：已接线——「大小」（画笔/橡皮）、油漆桶页的容差/连续/填充源/不透明度、
- * 渐变页的类型/不透明度/偏移/仿色/反向。其余控件多为 **UI 占位**；
+ * ⚠️ **现状**：已接线——「大小」（画笔/橡皮/图章）、油漆桶页的容差/连续/填充源/不透明度、
+ * 渐变页的类型/不透明度/偏移/仿色/反向、**选区页魔棒项（容差/连续/取样）**、
+ * **绘画页图章项（对齐/取样）**。其余控件多为 **UI 占位**；
  * 占位工具的提示语写「逻辑尚未接入」。
  */
 class ToolOptionsBar : public QWidget
@@ -54,12 +55,21 @@ public:
     Ps::FillSource fillSource() const;
     int fillOpacityPercent() const;
 
+    // —— 魔棒 / 快速选择（pageSelection 专有项）——
+    int selTolerance() const;
+    bool selContiguous() const;
+    bool selSampleMerged() const;
+
     // —— 渐变选项（pageGradient）——
     Ps::GradientType gradientType() const;
     int gradientOpacityPercent() const;
     int gradientOffsetPercent() const;
     bool gradientReverse() const;
     bool gradientDither() const;
+
+    // —— 仿制图章（pagePaint 专有项）——
+    bool cloneAlign() const;
+    bool cloneSampleMerged() const;
 
     /**
      * 当前工具的提示语（由 MainWindow 显示在状态栏）。
@@ -77,8 +87,12 @@ signals:
     void brushDiameterChanged(int diameter);
     /** 油漆桶参数变化（容差/连续/填充源/不透明度任一变动）。 */
     void fillOptionsChanged();
+    /** 魔棒/快速选择参数变化（容差/连续/取样）。 */
+    void selectionFloodOptionsChanged();
     /** 渐变参数变化（类型/不透明度/偏移/仿色/反向任一变动）。 */
     void gradientOptionsChanged();
+    /** 仿制图章参数变化（对齐 / 对所有图层取样）。 */
+    void cloneStampOptionsChanged();
     /** 左端「家」按钮：请求显示主页（对齐 PS Home）。 */
     void homeClicked();
 

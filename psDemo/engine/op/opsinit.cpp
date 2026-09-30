@@ -5,16 +5,20 @@
  */
 #include "opsinit.h"
 
+#include "clonestampdabop.h"
 #include "floodfillop.h"
+#include "focusdabop.h"
 #include "gradientop.h"
 #include "layermodeop.h"
 #include "opname.h"
 #include "oppad.h"
 #include "opregistry.h"
 #include "pointopregistry.h"
+#include "selectfloodop.h"
 #include "selectpolygonop.h"
 #include "solidfillop.h"
 #include "stampdabop.h"
+#include "tonedabop.h"
 
 namespace Ps {
 
@@ -45,11 +49,35 @@ void opsInit()
         [] { return std::unique_ptr<BufferOp>(new SolidFillOp); },
     });
 
-    // 选区写入：requiredPads = Selection（对照 gimp_channel_select_polygon）
+    // 选区写入：requiredPads = Selection
     OpRegistry::add({
         OpName::SelectPolygon,
         {OpPad::Selection},
         [] { return std::unique_ptr<BufferOp>(new SelectPolygonOp); },
+    });
+
+    OpRegistry::add({
+        OpName::SelectFlood,
+        {OpPad::Selection},
+        [] { return std::unique_ptr<BufferOp>(new SelectFloodOp); },
+    });
+
+    OpRegistry::add({
+        OpName::CloneStampDab,
+        {OpPad::Tiles},
+        [] { return std::unique_ptr<BufferOp>(new CloneStampDabOp); },
+    });
+
+    OpRegistry::add({
+        OpName::FocusDab,
+        {OpPad::Tiles},
+        [] { return std::unique_ptr<BufferOp>(new FocusDabOp); },
+    });
+
+    OpRegistry::add({
+        OpName::ToneDab,
+        {OpPad::Tiles},
+        [] { return std::unique_ptr<BufferOp>(new ToneDabOp); },
     });
 
     PointOpRegistry::add({

@@ -86,9 +86,13 @@ public:
     int brushDiameter() const;
     /** 同步油漆桶选项（容差/连续/填充源/不透明度）。 */
     void setFillOptions(int tolerance, bool contiguous, Ps::FillSource fillSource, qreal opacity);
+    /** 同步魔棒/快速选择选项（容差/连续/对所有图层取样）。 */
+    void setSelectionFloodOptions(int tolerance, bool contiguous, bool sampleMerged);
     /** 同步渐变选项（类型/不透明度/偏移/反向/仿色）。 */
     void setGradientOptions(Ps::GradientType type, qreal opacity, int offsetPercent,
                             bool reverse, bool dither);
+    /** 同步仿制图章选项（对齐 / 对所有图层取样）。 */
+    void setCloneStampOptions(bool align, bool sampleMerged);
 
     // —— Ps::ViewPort 实现（供工具请求视图操作）——
     void zoomAt(const QPointF &widgetPos, qreal factor) override;
@@ -98,6 +102,10 @@ public:
 signals:
     void viewChanged();
     void cursorImagePosChanged(const QPointF &imagePos, bool inside);
+    /** 吸管取前景色（转给 ToolBox / ColorsPanel）。 */
+    void foregroundPicked(const QColor &color);
+    /** 吸管取背景色。 */
+    void backgroundPicked(const QColor &color);
 
 protected:
     bool event(QEvent *event) override;
@@ -157,11 +165,18 @@ private:
     Ps::FillSource m_fillSource = Ps::FillSource::Foreground;
     qreal m_fillOpacity = 1.0;
 
+    int m_selTolerance = 32;
+    bool m_selContiguous = true;
+    bool m_selSampleMerged = false;
+
     Ps::GradientType m_gradientType = Ps::GradientType::Linear;
     qreal m_gradientOpacity = 1.0;
     int m_gradientOffsetPercent = 0;
     bool m_gradientReverse = false;
     bool m_gradientDither = true;
+
+    bool m_cloneAlign = true;
+    bool m_cloneSampleMerged = false;
 
     QTimer *m_antsTimer = nullptr; ///< 蚂蚁线虚线相位动画
     qreal m_antsPhase = 0.0;

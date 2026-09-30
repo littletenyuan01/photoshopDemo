@@ -319,7 +319,7 @@ psDemo/
     movetool.* / handtool.*          [x] 移动（改 offset）/ 平移
     zoomtool.* / painttool.*         [x] 锚点缩放 / 画笔橡皮（∩选区）
     rectselecttool.*                 [x] → marqueeselecttool（矩形+椭圆）
-    selectellipse / lasso / ...      [x] 椭圆选框 + 自由/多边形套索（SelectPolygonOp）
+    selectellipse / lasso / ...      [x] 椭圆选框 + 套索三件套（SelectPolygonOp）
   engine/
     paintengine.*                    [x] 门面：全部像素写经 op 转发
     compositor.*                     [x] 预乘 Alpha 合成；颜色经 LayerModeOp

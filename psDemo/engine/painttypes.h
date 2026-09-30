@@ -28,6 +28,22 @@ enum class GradientType {
     Diamond,
 };
 
+/**
+ * 聚焦工具模式（对照 GIMP Convolve / Smudge）。
+ * Blur / Sharpen 走卷积；Smudge 沿笔画方向拖拽采样。
+ */
+enum class FocusMode {
+    Blur = 0,
+    Sharpen,
+    Smudge,
+};
+
+/** 色调工具：减淡 / 海绵（对照 GIMP DodgeBurn / Sponge）。 */
+enum class ToneMode {
+    Dodge = 0, ///< 提亮
+    Sponge,    ///< 提高饱和度
+};
+
 } // namespace Ps
 
 #endif // ENGINE_PAINTTYPES_H

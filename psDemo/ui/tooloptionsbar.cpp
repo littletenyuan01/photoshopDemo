@@ -27,6 +27,12 @@ ToolOptionsBar::ToolOptionsBar(QWidget *parent)
     connect(ui->fillTypeCombo, qOverload<int>(&QComboBox::currentIndexChanged), this, emitFill);
     connect(ui->fillOpacitySpin, qOverload<int>(&QSpinBox::valueChanged), this, emitFill);
 
+    // 魔棒 / 快速选择：容差 / 连续 / 对所有图层取样
+    const auto emitSelFlood = [this]() { emit selectionFloodOptionsChanged(); };
+    connect(ui->selToleranceSpin, qOverload<int>(&QSpinBox::valueChanged), this, emitSelFlood);
+    connect(ui->selContiguousCheck, &QCheckBox::toggled, this, emitSelFlood);
+    connect(ui->selSampleMergedCheck, &QCheckBox::toggled, this, emitSelFlood);
+
     // 渐变：类型 / 不透明度 / 偏移 / 仿色 / 反向（混合模式暂未接入引擎）
     const auto emitGrad = [this]() { emit gradientOptionsChanged(); };
     connect(ui->gradTypeCombo, qOverload<int>(&QComboBox::currentIndexChanged), this, emitGrad);
@@ -34,6 +40,11 @@ ToolOptionsBar::ToolOptionsBar(QWidget *parent)
     connect(ui->gradOffsetSpin, qOverload<int>(&QSpinBox::valueChanged), this, emitGrad);
     connect(ui->gradDitherCheck, &QCheckBox::toggled, this, emitGrad);
     connect(ui->gradReverseCheck, &QCheckBox::toggled, this, emitGrad);
+
+    // 仿制图章：对齐 / 对所有图层取样
+    const auto emitClone = [this]() { emit cloneStampOptionsChanged(); };
+    connect(ui->paintAlignCheck, &QCheckBox::toggled, this, emitClone);
+    connect(ui->paintSampleMergedCheck, &QCheckBox::toggled, this, emitClone);
 
     // 「家」→ 主页（UI 阶段只发信号，由 MainWindow 切到 HomeScreen）
     connect(ui->homeButton, &QToolButton::clicked, this, &ToolOptionsBar::homeClicked);
@@ -83,6 +94,21 @@ int ToolOptionsBar::fillOpacityPercent() const
     return ui->fillOpacitySpin->value();
 }
 
+int ToolOptionsBar::selTolerance() const
+{
+    return ui->selToleranceSpin->value();
+}
+
+bool ToolOptionsBar::selContiguous() const
+{
+    return ui->selContiguousCheck->isChecked();
+}
+
+bool ToolOptionsBar::selSampleMerged() const
+{
+    return ui->selSampleMergedCheck->isChecked();
+}
+
 Ps::GradientType ToolOptionsBar::gradientType() const
 {
     const int index = ui->gradTypeCombo->currentIndex();
@@ -110,6 +136,16 @@ bool ToolOptionsBar::gradientReverse() const
 bool ToolOptionsBar::gradientDither() const
 {
     return ui->gradDitherCheck->isChecked();
+}
+
+bool ToolOptionsBar::cloneAlign() const
+{
+    return ui->paintAlignCheck->isChecked();
+}
+
+bool ToolOptionsBar::cloneSampleMerged() const
+{
+    return ui->paintSampleMergedCheck->isChecked();
 }
 
 void ToolOptionsBar::setCurrentTool(Ps::ToolId id)
@@ -233,6 +269,28 @@ QString ToolOptionsBar::hintForTool(Ps::ToolId id)
         return QObject::tr("拖拽手绘套索；松手闭合；按下 Shift 加选 / Ctrl 减选 / 二者相交");
     case Ps::ToolId::PolygonalLasso:
         return QObject::tr("单击加点；Shift 吸附水平/垂直/垂线；双击/Enter 闭合；Backspace 撤点；Esc 取消");
+    case Ps::ToolId::MagneticLasso:
+        return QObject::tr("拖拽沿线吸附边缘；松手闭合；按下 Shift 加选 / Ctrl 减选");
+    case Ps::ToolId::MagicWand:
+        return QObject::tr("单击按颜色建选区；选项栏调容差/连续/取样；Shift 加选 / Ctrl 减选");
+    case Ps::ToolId::QuickSelect:
+        return QObject::tr("拖拽扩张选区（连通域）；选项栏调容差/取样；Ctrl 减选");
+    case Ps::ToolId::Crop:
+        return QObject::tr("拖出裁剪框；Enter/双击确认；Esc 取消；Shift 正方形");
+    case Ps::ToolId::Eyedropper:
+        return QObject::tr("单击取前景色；Alt+单击取背景色（合成取样）");
+    case Ps::ToolId::CloneStamp:
+        return QObject::tr("Alt+单击设源；拖拽仿制；选项栏调对齐/取样；大小生效");
+    case Ps::ToolId::Blur:
+        return QObject::tr("拖拽柔化像素（大小生效）");
+    case Ps::ToolId::Sharpen:
+        return QObject::tr("拖拽锐化像素（大小生效）");
+    case Ps::ToolId::Smudge:
+        return QObject::tr("拖拽涂抹像素（大小生效）");
+    case Ps::ToolId::Dodge:
+        return QObject::tr("拖拽提亮像素（大小生效）");
+    case Ps::ToolId::Sponge:
+        return QObject::tr("拖拽提高饱和度（大小生效）");
     default:
         return QObject::tr("参数为 UI 占位，逻辑尚未接入");
     }

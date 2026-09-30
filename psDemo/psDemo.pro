@@ -36,8 +36,12 @@ SOURCES += \
     engine/op/floodfillop.cpp \
     engine/op/gradientop.cpp \
     engine/op/stampdabop.cpp \
+    engine/op/clonestampdabop.cpp \
+    engine/op/focusdabop.cpp \
+    engine/op/tonedabop.cpp \
     engine/op/solidfillop.cpp \
     engine/op/selectpolygonop.cpp \
+    engine/op/selectfloodop.cpp \
     engine/op/opregistry.cpp \
     engine/op/oprunner.cpp \
     engine/op/opsinit.cpp \
@@ -54,6 +58,14 @@ SOURCES += \
     tools/marqueeselecttool.cpp \
     tools/lassotool.cpp \
     tools/polygonallassotool.cpp \
+    tools/magneticlassotool.cpp \
+    tools/magicwandtool.cpp \
+    tools/quickselecttool.cpp \
+    tools/croptool.cpp \
+    tools/eyedroppertool.cpp \
+    tools/clonestamptool.cpp \
+    tools/focustool.cpp \
+    tools/tonetool.cpp \
     ui/canvasview.cpp \
     ui/canvasworkspace.cpp \
     ui/canvasdocstatusbar.cpp \
@@ -99,6 +111,7 @@ HEADERS += \
     engine/paintselectionclip.h \
     engine/painttypes.h \
     engine/premul.h \
+    engine/magneticedgesnap.h \
     engine/op/operation.h \
     engine/op/pointop.h \
     engine/op/bufferop.h \
@@ -108,8 +121,12 @@ HEADERS += \
     engine/op/floodfillop.h \
     engine/op/gradientop.h \
     engine/op/stampdabop.h \
+    engine/op/clonestampdabop.h \
+    engine/op/focusdabop.h \
+    engine/op/tonedabop.h \
     engine/op/solidfillop.h \
     engine/op/selectpolygonop.h \
+    engine/op/selectfloodop.h \
     engine/op/oppad.h \
     engine/op/opregistry.h \
     engine/op/oprunner.h \
@@ -131,6 +148,14 @@ HEADERS += \
     tools/marqueeselecttool.h \
     tools/lassotool.h \
     tools/polygonallassotool.h \
+    tools/magneticlassotool.h \
+    tools/magicwandtool.h \
+    tools/quickselecttool.h \
+    tools/croptool.h \
+    tools/eyedroppertool.h \
+    tools/clonestamptool.h \
+    tools/focustool.h \
+    tools/tonetool.h \
     ui/canvasview.h \
     ui/canvasworkspace.h \
     ui/canvasdocstatusbar.h \

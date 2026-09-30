@@ -41,6 +41,10 @@ CanvasView::CanvasView(QWidget *parent)
             this, qOverload<>(&QWidget::update));
     connect(m_toolManager, &Ps::ToolManager::cursorChangeRequested,
             this, [this](const QCursor &cursor) { setCursor(cursor); });
+    connect(m_toolManager, &Ps::ToolManager::foregroundPicked,
+            this, &CanvasView::foregroundPicked);
+    connect(m_toolManager, &Ps::ToolManager::backgroundPicked,
+            this, &CanvasView::backgroundPicked);
 
     // 蚂蚁线相位（对照 gimp_display_shell_selection 的 marching-ants-speed）
     // 间隔略放慢，且只局部 update，减轻缩小时整窗闪烁
@@ -281,11 +285,16 @@ void CanvasView::refreshToolContext()
     m_toolContext.fillContiguous = m_fillContiguous;
     m_toolContext.fillSource = m_fillSource;
     m_toolContext.fillOpacity = m_fillOpacity;
+    m_toolContext.selTolerance = m_selTolerance;
+    m_toolContext.selContiguous = m_selContiguous;
+    m_toolContext.selSampleMerged = m_selSampleMerged;
     m_toolContext.gradientType = m_gradientType;
     m_toolContext.gradientOpacity = m_gradientOpacity;
     m_toolContext.gradientOffsetPercent = m_gradientOffsetPercent;
     m_toolContext.gradientReverse = m_gradientReverse;
     m_toolContext.gradientDither = m_gradientDither;
+    m_toolContext.cloneAlign = m_cloneAlign;
+    m_toolContext.cloneSampleMerged = m_cloneSampleMerged;
     m_toolContext.viewZoom = m_zoom;
     m_toolContext.viewOffset = m_offset;
 
@@ -346,6 +355,14 @@ void CanvasView::setFillOptions(int tolerance, bool contiguous, Ps::FillSource f
     refreshToolContext();
 }
 
+void CanvasView::setSelectionFloodOptions(int tolerance, bool contiguous, bool sampleMerged)
+{
+    m_selTolerance = qBound(0, tolerance, 255);
+    m_selContiguous = contiguous;
+    m_selSampleMerged = sampleMerged;
+    refreshToolContext();
+}
+
 void CanvasView::setGradientOptions(Ps::GradientType type, qreal opacity, int offsetPercent,
                                     bool reverse, bool dither)
 {
@@ -354,6 +371,13 @@ void CanvasView::setGradientOptions(Ps::GradientType type, qreal opacity, int of
     m_gradientOffsetPercent = qBound(0, offsetPercent, 100);
     m_gradientReverse = reverse;
     m_gradientDither = dither;
+    refreshToolContext();
+}
+
+void CanvasView::setCloneStampOptions(bool align, bool sampleMerged)
+{
+    m_cloneAlign = align;
+    m_cloneSampleMerged = sampleMerged;
     refreshToolContext();
 }
 
@@ -440,7 +464,9 @@ void CanvasView::mousePressEvent(QMouseEvent *event)
 
     // 通用平移手势（中键 / Alt+左键）优先于当前工具：由抓手工具承担。
     // 对齐 PS/GIMP：任何工具下都能临时平移。
-    if (Ps::HandTool::isPanGesture(e) || (m_spaceHeld && e.isLeft())) {
+    // 例外：仿制图章下 Alt+左键用于设源点（对照 PS），不抢给抓手。
+    const bool cloneAltSource = (currentTool() == Ps::ToolId::CloneStamp && e.isAltLeft());
+    if (!cloneAltSource && (Ps::HandTool::isPanGesture(e) || (m_spaceHeld && e.isLeft()))) {
         if (Ps::Tool *hand = m_toolManager->tool(Ps::ToolId::Hand)) {
             // 上下文按值传给工具，工具不留副本（见 Tool::markDocumentDirty 的注释）
             m_panning = hand->mousePress(e, m_toolContext, *this);

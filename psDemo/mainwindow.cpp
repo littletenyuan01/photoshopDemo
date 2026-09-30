@@ -285,6 +285,12 @@ void MainWindow::setupToolbox()
     connect(ui->toolBox, &ToolBox::backgroundColorChanged,
             this, &MainWindow::onBackgroundColorChanged);
 
+    // 吸管 → 工具箱颜色（再经既有双向同步到 ColorsPanel / 画布）
+    connect(canvas, &CanvasView::foregroundPicked,
+            ui->toolBox, &ToolBox::setForegroundColor);
+    connect(canvas, &CanvasView::backgroundPicked,
+            ui->toolBox, &ToolBox::setBackgroundColor);
+
     // 右侧颜色面板 ↔ 工具箱前/背景色（双向，避免回环靠相等短路）
     connect(ui->colorsPanel, &ColorsPanel::foregroundColorChanged,
             ui->toolBox, &ToolBox::setForegroundColor);
@@ -303,6 +309,12 @@ void MainWindow::setupToolbox()
             ui->toolOptionsBar->fillSource(),
             ui->toolOptionsBar->fillOpacityPercent() / 100.0);
     });
+    connect(ui->toolOptionsBar, &ToolOptionsBar::selectionFloodOptionsChanged, this, [this]() {
+        ui->canvasWorkspace->canvasView()->setSelectionFloodOptions(
+            ui->toolOptionsBar->selTolerance(),
+            ui->toolOptionsBar->selContiguous(),
+            ui->toolOptionsBar->selSampleMerged());
+    });
     connect(ui->toolOptionsBar, &ToolOptionsBar::gradientOptionsChanged, this, [this]() {
         ui->canvasWorkspace->canvasView()->setGradientOptions(
             ui->toolOptionsBar->gradientType(),
@@ -310,6 +322,11 @@ void MainWindow::setupToolbox()
             ui->toolOptionsBar->gradientOffsetPercent(),
             ui->toolOptionsBar->gradientReverse(),
             ui->toolOptionsBar->gradientDither());
+    });
+    connect(ui->toolOptionsBar, &ToolOptionsBar::cloneStampOptionsChanged, this, [this]() {
+        ui->canvasWorkspace->canvasView()->setCloneStampOptions(
+            ui->toolOptionsBar->cloneAlign(),
+            ui->toolOptionsBar->cloneSampleMerged());
     });
     connect(ui->toolOptionsBar, &ToolOptionsBar::homeClicked,
             this, &MainWindow::onShowHomeScreen);
@@ -327,11 +344,16 @@ void MainWindow::setupToolbox()
                            ui->toolOptionsBar->fillContiguous(),
                            ui->toolOptionsBar->fillSource(),
                            ui->toolOptionsBar->fillOpacityPercent() / 100.0);
+    canvas->setSelectionFloodOptions(ui->toolOptionsBar->selTolerance(),
+                                     ui->toolOptionsBar->selContiguous(),
+                                     ui->toolOptionsBar->selSampleMerged());
     canvas->setGradientOptions(ui->toolOptionsBar->gradientType(),
                                ui->toolOptionsBar->gradientOpacityPercent() / 100.0,
                                ui->toolOptionsBar->gradientOffsetPercent(),
                                ui->toolOptionsBar->gradientReverse(),
                                ui->toolOptionsBar->gradientDither());
+    canvas->setCloneStampOptions(ui->toolOptionsBar->cloneAlign(),
+                                 ui->toolOptionsBar->cloneSampleMerged());
 }
 
 void MainWindow::setupHomeStack()

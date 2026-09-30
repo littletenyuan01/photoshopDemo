@@ -5,14 +5,22 @@
  */
 #include "toolmanager.h"
 
+#include "clonestamptool.h"
+#include "croptool.h"
+#include "eyedroppertool.h"
+#include "focustool.h"
 #include "gradienttool.h"
 #include "handtool.h"
 #include "lassotool.h"
+#include "magicwandtool.h"
+#include "magneticlassotool.h"
 #include "marqueeselecttool.h"
 #include "movetool.h"
 #include "paintbuckettool.h"
 #include "painttool.h"
 #include "polygonallassotool.h"
+#include "quickselecttool.h"
+#include "tonetool.h"
 #include "tool.h"
 #include "zoomtool.h"
 
@@ -31,10 +39,21 @@ ToolManager::ToolManager(QObject *parent)
     registerTool(std::make_unique<MarqueeSelectTool>(MarqueeSelectTool::Shape::Ellipse));
     registerTool(std::make_unique<LassoTool>());
     registerTool(std::make_unique<PolygonalLassoTool>());
+    registerTool(std::make_unique<MagneticLassoTool>());
+    registerTool(std::make_unique<MagicWandTool>());
+    registerTool(std::make_unique<QuickSelectTool>());
+    registerTool(std::make_unique<CropTool>());
+    registerTool(std::make_unique<EyedropperTool>());
     registerTool(std::make_unique<PaintTool>(Ps::ToolId::Brush, /*eraseMode=*/false));
+    registerTool(std::make_unique<CloneStampTool>());
     registerTool(std::make_unique<PaintTool>(Ps::ToolId::Eraser, /*eraseMode=*/true));
     registerTool(std::make_unique<PaintBucketTool>());
     registerTool(std::make_unique<GradientTool>());
+    registerTool(std::make_unique<FocusTool>(Ps::ToolId::Blur, FocusMode::Blur));
+    registerTool(std::make_unique<FocusTool>(Ps::ToolId::Sharpen, FocusMode::Sharpen));
+    registerTool(std::make_unique<FocusTool>(Ps::ToolId::Smudge, FocusMode::Smudge));
+    registerTool(std::make_unique<ToneTool>(Ps::ToolId::Dodge, ToneMode::Dodge));
+    registerTool(std::make_unique<ToneTool>(Ps::ToolId::Sponge, ToneMode::Sponge));
     registerTool(std::make_unique<HandTool>());
     registerTool(std::make_unique<ZoomTool>());
 
@@ -82,6 +101,10 @@ void ToolManager::rewriteConnections()
             this, &ToolManager::repaintRequested);
     connect(m_activeTool, &Tool::cursorChangeRequested,
             this, &ToolManager::cursorChangeRequested);
+    connect(m_activeTool, &Tool::foregroundPicked,
+            this, &ToolManager::foregroundPicked);
+    connect(m_activeTool, &Tool::backgroundPicked,
+            this, &ToolManager::backgroundPicked);
 }
 
 void ToolManager::setContext(const ToolContext &ctx)

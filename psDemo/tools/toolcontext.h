@@ -54,6 +54,15 @@ struct ToolContext
     bool gradientReverse = false;      ///< ≈ gradient-reverse
     bool gradientDither = true;        ///< ≈ dither
 
+    // —— 魔棒 / 快速选择（对照 GimpRegionSelectOptions）——
+    int selTolerance = 32;             ///< ≈ threshold
+    bool selContiguous = true;         ///< 连续（魔棒）；快速选择内部强制连续
+    bool selSampleMerged = false;      ///< 对所有图层取样（合成图）
+
+    // —— 仿制图章（对照 GimpCloneOptions：align-mode / sample-merged）——
+    bool cloneAlign = true;            ///< 对齐（跨笔保留源-目标偏移）
+    bool cloneSampleMerged = false;    ///< 对所有图层取样
+
     // —— 视图变换（供工具浮层把文档坐标画到控件上；由 CanvasView 填）——
     qreal viewZoom = 1.0;              ///< 当前缩放
     QPointF viewOffset;                ///< 文档原点在控件中的位置

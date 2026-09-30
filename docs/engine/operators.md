@@ -23,7 +23,7 @@
 
 | | 路径 A：缓冲算子 | 路径 B：点算子 |
 |---|---|---|
-| 成员 | `StampDabOp` / `FloodFillOp` / `GradientOp` / `SolidFillOp` / **`SelectPolygonOp`** | `LayerModeOp` |
+| 成员 | `StampDabOp` / … / **`CloneStampDabOp`** / **`FocusDabOp`** / **`ToneDabOp`** | `LayerModeOp` |
 | 基类 | `BufferOp`（有 `prepare`/`process`/`finish` 虚函数） | `PointOp`（**无任何虚函数**） |
 | 触发者 | **用户输入**（鼠标 / 菜单） | **重绘**（`contentChanged` → 重投影） |
 | 调度器 | `OpRunner::run(OpName, OpContext&, Configure)` | `PointOpRegistry::instance(OpName)` 后直接调 |
@@ -80,6 +80,10 @@ PointOpRegistry::add({ OpName::LayerMode,
 | `OpName::Gradient` | `{Tiles}` | `new GradientOp` |
 | `OpName::SolidFill` | `{Tiles}` | `new SolidFillOp` |
 | `OpName::SelectPolygon` | `{Selection}` | `new SelectPolygonOp` |
+| `OpName::SelectFlood` | `{Selection}` | `new SelectFloodOp` |
+| `OpName::CloneStampDab` | `{Tiles}` | `new CloneStampDabOp` |
+| `OpName::FocusDab` | `{Tiles}` | `new FocusDabOp` |
+| `OpName::ToneDab` | `{Tiles}` | `new ToneDabOp` |
 | `OpName::LayerMode` | —（点算子无 pad） | `new LayerModeOp` |
 
 ---
@@ -95,7 +99,12 @@ PointOpRegistry::add({ OpName::LayerMode,
 | 渐变 | `GradientTool::mouseRelease` | `PaintEngine::fillGradient` |
 | 编辑→填充 / 清除 | `MainWindow::onFill` / `onClear` → `ImageDocument::…` | `PaintEngine::solidFill` |
 | **自由套索** | `LassoTool::mouseRelease` → `ImageDocument::selectPolygon` | `PaintEngine::selectPolygon` |
-| **多边形套索** | `PolygonalLassoTool`（双击/Enter/点起点）→ 同上 | `PaintEngine::selectPolygon` |
+| **磁性套索** | `MagneticLassoTool::mouseRelease` → 同上 | `PaintEngine::selectPolygon` |
+| **魔棒** | `MagicWandTool::mousePress` → `ImageDocument::selectFlood` | `PaintEngine::selectFlood` |
+| **快速选择** | `QuickSelectTool` 拖拽采样 → 同上 | `PaintEngine::selectFlood` |
+| **仿制图章** | `CloneStampTool` → 同上 | `PaintEngine::cloneStampDab` / `cloneStrokeSegment` |
+| **模糊/锐化/涂抹** | `FocusTool` | `PaintEngine::focusDab` / `focusStrokeSegment` |
+| **减淡/海绵** | `ToneTool` | `PaintEngine::toneDab` / `toneStrokeSegment` |
 
 `PaintEngine` 是**门面**：绘制入口组装 `OpContext::fromTiles`；选区入口组装
 `OpContext::fromSelection`，再交给 `OpRunner` 一个 `Configure` lambda：

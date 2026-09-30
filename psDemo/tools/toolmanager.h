@@ -82,6 +82,10 @@ signals:
     void repaintRequested();
     /** 活动工具请求改光标（透传）。 */
     void cursorChangeRequested(const QCursor &cursor);
+    /** 吸管取前景色（透传）。 */
+    void foregroundPicked(const QColor &color);
+    /** 吸管取背景色（透传）。 */
+    void backgroundPicked(const QColor &color);
 
 private:
     /** 注册工具，key 取自 tool->id()。 */

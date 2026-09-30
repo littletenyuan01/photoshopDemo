@@ -86,6 +86,10 @@ signals:
     void repaintRequested();
     /** 光标变了，请求画布更新光标。 */
     void cursorChangeRequested(const QCursor &cursor);
+    /** 吸管等工具取到前景色（由 ToolManager 转发到 UI）。 */
+    void foregroundPicked(const QColor &color);
+    /** 吸管 Alt+单击取到背景色。 */
+    void backgroundPicked(const QColor &color);
 
 protected:
     /**

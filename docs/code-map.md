@@ -40,6 +40,19 @@
 | `tools/marqueeselecttool.h/.cpp` | **矩形/椭圆选框**：拖拽写入 `Selection`；Shift/Ctrl 加减交 |
 | `tools/lassotool.h/.cpp` | **自由套索**：拖拽折线 → `selectPolygon` → `SelectPolygonOp` |
 | `tools/polygonallassotool.h/.cpp` | **多边形套索**：单击顶点 / 双击·Enter 闭合；共用 `SelectPolygonOp` |
+| `tools/magneticlassotool.h/.cpp` | **磁性套索**：拖拽 + 局部 Sobel 吸附 → `SelectPolygonOp` |
+| `tools/magicwandtool.h/.cpp` | **魔棒**：单击 → `SelectFloodOp`（容差/连续/取样） |
+| `tools/quickselecttool.h/.cpp` | **快速选择（精简）**：拖拽连通域扩张 → `SelectFloodOp` |
+| `tools/croptool.h/.cpp` | **裁剪**：拖框 + Enter → `ImageDocument::cropTo` |
+| `tools/eyedroppertool.h/.cpp` | **吸管**：合成取样 → 前景/背景色 |
+| `tools/clonestamptool.h/.cpp` | **仿制图章**：Alt 设源 → `PaintEngine::cloneStampDab` |
+| `engine/op/clonestampdabop.h/.cpp` | **CloneStampDabOp**：采样图 + 圆形刷盖度写入瓦片 |
+| `tools/focustool.h/.cpp` | **模糊/锐化/涂抹**：→ `PaintEngine::focusDab` |
+| `engine/op/focusdabop.h/.cpp` | **FocusDabOp**：盒模糊 / 锐化 / 沿笔画涂抹 |
+| `tools/tonetool.h/.cpp` | **减淡/海绵**：→ `PaintEngine::toneDab` |
+| `engine/op/tonedabop.h/.cpp` | **ToneDabOp**：提亮 / 提高饱和度 |
+| `engine/magneticedgesnap.h` | 邻域梯度吸附（对照 iscissors 导数图瘦身） |
+| `engine/op/selectfloodop.*` | 连通域/相似色写入选区 |
 
 **要点**：新增工具 = 加一个类 + 在 `ToolManager` 注册一行，**`CanvasView` 与 `MainWindow` 均无需改动**。
 视图变换由画布实现 `ViewPort` 提供，**锚点缩放数学只存在于 `CanvasView::zoomAt` 一处**。
@@ -75,6 +88,7 @@ UI 不得直接改 `Layer`，一律走 `setLayerVisible/Opacity/Name/BlendMode` 
 | `engine/op/stampdabop.*` | 圆形 dab（画笔/橡皮）；模式用共享 `PaintMode` |
 | `engine/op/solidfillop.*` | 实色/透明填充（清除、Shift+F5） |
 | `engine/op/selectpolygonop.*` | 多边形写入选区（套索；`OpPad::Selection`） |
+| `engine/op/selectfloodop.*` | 连通域/相似色写入选区（魔棒；`OpPad::Selection`） |
 | `engine/op/opname.*` | `OpName` 枚举 + id/title 名字表 |
 | `engine/paintselectionclip.h` | 选区裁剪参数（算子与 PaintEngine 共用） |
 | `engine/painttypes.h` | `PaintMode` / `GradientType`（UI/tools/ops 共用） |

@@ -22,6 +22,10 @@ constexpr OpNameInfo kOpNameTable[] = {
     {OpName::Gradient,             "ps:gradient",              "Gradient"},
     {OpName::SolidFill,            "ps:solid-fill",            "Solid Fill"},
     {OpName::SelectPolygon,        "ps:select-polygon",        "Select Polygon"},
+    {OpName::SelectFlood,          "ps:select-flood",          "Select Flood"},
+    {OpName::CloneStampDab,        "ps:clone-stamp-dab",       "Clone Stamp Dab"},
+    {OpName::FocusDab,             "ps:focus-dab",             "Focus Dab"},
+    {OpName::ToneDab,              "ps:tone-dab",              "Tone Dab"},
     {OpName::LayerMode,            "ps:layer-mode",            "Layer Mode"},
     {OpName::BrightnessContrast,   "ps:brightness-contrast",   "Brightness/Contrast"},
 };
