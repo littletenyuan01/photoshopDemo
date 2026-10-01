@@ -170,6 +170,13 @@ ToolOptionsBar {
   background-color: #4a4a4a;
   border-bottom: 1px solid #2a2a2a;
 }
+ToolOptionsBar QScrollArea,
+ToolOptionsBar QScrollArea > QWidget > QWidget,
+ToolOptionsBar QStackedWidget,
+ToolOptionsBar QStackedWidget > QWidget {
+  background-color: #4a4a4a;
+  border: none;
+}
 /* 每个 Tab 页的容器（全局透明 → 必须显式上色，否则页面空白处是黑的） */
 ColorsPanel QWidget#tabColor,
 ColorsPanel QWidget#tabSwatches,

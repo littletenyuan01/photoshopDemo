@@ -36,7 +36,7 @@ struct ToolEvent
     bool isRight() const { return button == Qt::RightButton; }
     bool isMiddle() const { return button == Qt::MiddleButton; }
 
-    /// Alt+左键 = 临时平移（对齐 PS/GIMP 的通用手势）
+    /// Alt+左键（图章设源、吸管背景等；不再表示临时平移）
     bool isAltLeft() const
     {
         return button == Qt::LeftButton && modifiers.testFlag(Qt::AltModifier);

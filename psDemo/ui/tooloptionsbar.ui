@@ -79,9 +79,18 @@ QWidget#ToolOptionsBar QToolButton {
 }
 QWidget#ToolOptionsBar QToolButton:hover { background-color: #4f4f4f; }
 QWidget#ToolOptionsBar QToolButton:checked { background-color: #2d5a8a; }
-/* 选项页的滚动容器：透明、无边框、细滚动条，避免出现一块浅色底 */
-QWidget#ToolOptionsBar QScrollArea { background: transparent; border: none; }
-QWidget#ToolOptionsBar QScrollArea &gt; QWidget &gt; QWidget { background: transparent; }
+/* 选项页的滚动容器：与根同色灰底（transparent 会透出窗口纯黑） */
+QWidget#ToolOptionsBar QScrollArea {
+  background-color: #4a4a4a;
+  border: none;
+}
+QWidget#ToolOptionsBar QScrollArea > QWidget > QWidget {
+  background-color: #4a4a4a;
+}
+QWidget#ToolOptionsBar QStackedWidget,
+QWidget#ToolOptionsBar QStackedWidget > QWidget {
+  background-color: #4a4a4a;
+}
 QWidget#ToolOptionsBar QScrollBar:horizontal {
   background: #3a3a3a;
   height: 8px;

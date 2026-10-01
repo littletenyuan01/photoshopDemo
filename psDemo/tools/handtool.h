@@ -1,7 +1,7 @@
 /**
  * handtool.h — 抓手工具声明（tools 层）。
  *
- * 拖拽平移画布；isPanGesture 供 CanvasView 判定中键 / Alt+左键通用手势。
+ * 拖拽平移画布；isPanGesture 供 CanvasView 判定中键临时平移。
  */
 #ifndef HANDTOOL_H
 #define HANDTOOL_H
@@ -18,7 +18,7 @@ namespace Ps {
  * 【对照 GIMP】app/tools/gimpmovetool.c 里的平移分支与 GimpDisplayShell 的滚动；
  * 本项目不依赖显示层类型，只通过 ViewPort::panBy 请求平移。
  *
- * 也负责通用的「中键拖拽 / Alt+左键拖拽」平移手势——由 ToolManager 兜底分派。
+ * 临时平移：空格（CanvasView 临时切本工具）与中键拖拽；不用 Alt+左键（留给取色/图章设源等）。
  */
 class HandTool : public Tool
 {
@@ -34,7 +34,7 @@ public:
     bool mouseRelease(const ToolEvent &event, const ToolContext &ctx, ViewPort &view) override;
     void deactivate(const ToolContext &ctx, ViewPort &view) override;
 
-    /// 供 ToolManager 复用：该事件是否属于「通用平移手势」
+    /// 供 CanvasView：是否为中键临时平移手势（不含空格，空格走临时切工具）
     static bool isPanGesture(const ToolEvent &event);
 
 private:

@@ -34,6 +34,8 @@ ToolOptionsBar::ToolOptionsBar(QWidget *parent)
     , ui(new Ui::ToolOptionsBar)
 {
     ui->setupUi(this);
+    // QWidget 默认不按样式表画背景；不加这行时，子级透明会透出窗口纯黑
+    setAttribute(Qt::WA_StyledBackground, true);
 
     // 画笔/橡皮直径
     wireIntEdit(ui->brushSizeEdit, 1, 500, 20, [this]() {

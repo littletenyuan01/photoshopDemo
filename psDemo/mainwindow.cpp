@@ -423,7 +423,11 @@ void MainWindow::createInitialDocument()
 void MainWindow::onToolChanged(Ps::ToolId id)
 {
     ui->toolOptionsBar->setCurrentTool(id);
-    ui->canvasWorkspace->canvasView()->setCurrentTool(id);
+    CanvasView *canvas = ui->canvasWorkspace->canvasView();
+    canvas->setCurrentTool(id);
+    // 点工具箱（NoFocus）后 Windows/Qt 常把键盘焦点清掉，空格到不了画布。
+    // 选工具就是为了在画布上用，焦点应回到画布。
+    canvas->setFocus(Qt::OtherFocusReason);
     const QString hint = ui->toolOptionsBar->currentHint();
     ui->infoPanel->setToolHint(hint);
     // 工具提示语显示在状态栏（选项条里只放参数，对齐 PS）

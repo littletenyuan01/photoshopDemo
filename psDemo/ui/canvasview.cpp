@@ -605,11 +605,9 @@ void CanvasView::mousePressEvent(QMouseEvent *event)
     const Ps::ToolEvent e = makeToolEvent(event);
 
     // 空格已 beginTemporaryTool(Hand) 时，活动工具就是抓手，走下方 dispatch 即可。
-    // 中键 / Alt+左键：未切工具时的通用临时平移（对照 PS/GIMP）。
-    // 例外：仿制图章下 Alt+左键设源点，不抢给抓手。
+    // 中键：未切抓手时的临时平移。Alt+左键不平移（图章设源 / 其它 Alt 手势）。
     const bool onHand = (currentTool() == Ps::ToolId::Hand);
-    const bool cloneAltSource = (!onHand && currentTool() == Ps::ToolId::CloneStamp && e.isAltLeft());
-    if (!onHand && !cloneAltSource && Ps::HandTool::isPanGesture(e)) {
+    if (!onHand && Ps::HandTool::isPanGesture(e)) {
         if (Ps::Tool *hand = m_toolManager->tool(Ps::ToolId::Hand)) {
             m_panning = hand->mousePress(e, m_toolContext, *this);
             if (m_panning) {

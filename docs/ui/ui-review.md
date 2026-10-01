@@ -44,7 +44,7 @@ tools/
 ├── tool.h/.cpp     Tool 基类：mousePress/Move/Release/cursorShape/drawOverlay
 ├── toolmanager.h/.cpp  注册表 + 活动工具 + 事件转发 + 信号转发
 ├── movetool.h/.cpp     占位（中性兜底，不消费事件）
-├── handtool.h/.cpp     平移（含中键/Alt+左键通用手势）
+├── handtool.h/.cpp     平移（含中键临时平移；空格由画布临时切工具）
 ├── zoomtool.h/.cpp     锚点缩放（左右键）
 └── painttool.h/.cpp    画笔+橡皮（同一类的两种 mode）
 ```
@@ -57,7 +57,7 @@ tools/
 - **`ToolManager` 负责信号转发**：活动工具会随用户切换而变，画布无法预先 connect；
   由管理器在切工具时 `rewriteConnections()`，向上暴露 `repaintRequested` /
   `cursorChangeRequested` 供画布一次性连接。
-- **`HandTool::isPanGesture`** 供画布优先判定通用平移手势，保证任何工具下都能中键/Alt+左键平移。
+- **`HandTool::isPanGesture`** 供画布判定中键临时平移；空格临时抓手不经此路径。
 
 **收益**：新增工具 = 加一个类 + 在 `ToolManager` 构造函数注册一行，**CanvasView 与 MainWindow 都不用改**。
 
@@ -221,7 +221,7 @@ MainWindow ──setDocument()──> AppSession ──documentChanged(doc)─�
 - [ ] 画笔：在活动层拖拽绘制流畅、不断笔、不污染其他层
 - [ ] 橡皮：擦除后棋盘格透出
 - [ ] **切换工具后再回画布，平移不会「粘住」**（旧 bug 回归点）
-- [ ] 抓手 / 中键 / Alt+左键 三种平移都可拖，且小图居中不可拖出
+- [ ] 抓手 / 空格临时抓手 / 中键平移都可拖
 - [ ] 缩放工具左键放大、右键缩小，锚点在鼠标处
 - [ ] Alt+滚轮缩放锚点正确；裸滚轮/Ctrl+滚轮平移
 - [ ] 图层面板：**画笔画一笔后，列表选中项 / 正在编辑的名字 / 滚动位置不丢失**

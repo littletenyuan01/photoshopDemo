@@ -17,8 +17,8 @@ Qt::CursorShape HandTool::cursorShape() const
 
 bool HandTool::isPanGesture(const ToolEvent &event)
 {
-    // 中键拖拽与 Alt+左键拖拽是 PS/GIMP 通用的临时平移手势，任何工具下都生效
-    return event.button == Qt::MiddleButton || event.isAltLeft();
+    // 仅中键；空格临时抓手由 CanvasView::beginTemporaryTool 处理，不用 Alt+左键
+    return event.button == Qt::MiddleButton;
 }
 
 bool HandTool::mousePress(const ToolEvent &event, const ToolContext &ctx, ViewPort &view)
