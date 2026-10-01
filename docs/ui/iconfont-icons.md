@@ -24,7 +24,7 @@
 | 填充（G） | 油漆桶 / 渐变 | `bucket.png` / `gradient.png` |
 | 聚焦 | 模糊 / 锐化 / 涂抹 | `blur.png` / `sharpen.png` / `smudge.png` |
 | 色调 | 减淡 / 海绵 | `adjust-add.png` / `sponge.png` |
-| 钢笔（P） | 钢笔 / 自由钢笔 / 添加锚点 | `pen.png` / `pen-alt.png` / `pen-add.png` |
+| 钢笔（P） | 钢笔 / 自由钢笔 / 弯度钢笔 / 添加锚点 / 删除锚点 / 转换点 | `pen.png` / `freeform-pen.png` / `curvature-pen.png` / `add-anchor.png` / `delete-anchor.png` / `convert-point.png` |
 | 文字（T） | 横排文字 / 直排文字 | `type-horizontal.png` / `type-vertical.png` |
 | 形状（U） | 矩形 / 椭圆 / 三角 / 直线 | `rectangle.png` / `ellipse.png` / `triangle.png` / `line.png` |
 | 视图 | 抓手 / 缩放 | `hand.png` / `zoom.png` |

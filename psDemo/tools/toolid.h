@@ -72,10 +72,13 @@ enum class ToolId {
     Dodge,
     Sponge,
 
-    // 钢笔组（P）
+    // 钢笔组（P）— UI 占位为主；图标见 resources/icons/tools/{pen,freeform-pen,...}.png
     Pen,
     FreeformPen,
+    CurvaturePen,
     AddAnchorPoint,
+    DeleteAnchorPoint,
+    ConvertPoint,
 
     // 文字组（T）
     Type,

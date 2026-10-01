@@ -27,8 +27,11 @@
     <file alias="tools/sponge.png">resources/icons/tools/sponge.png</file>
     <file alias="tools/adjust-add.png">resources/icons/tools/adjust-add.png</file>
     <file alias="tools/pen.png">resources/icons/tools/pen.png</file>
-    <file alias="tools/pen-alt.png">resources/icons/tools/pen-alt.png</file>
-    <file alias="tools/pen-add.png">resources/icons/tools/pen-add.png</file>
+    <file alias="tools/freeform-pen.png">resources/icons/tools/freeform-pen.png</file>
+    <file alias="tools/curvature-pen.png">resources/icons/tools/curvature-pen.png</file>
+    <file alias="tools/add-anchor.png">resources/icons/tools/add-anchor.png</file>
+    <file alias="tools/delete-anchor.png">resources/icons/tools/delete-anchor.png</file>
+    <file alias="tools/convert-point.png">resources/icons/tools/convert-point.png</file>
     <file alias="tools/type-horizontal.png">resources/icons/tools/type-horizontal.png</file>
     <file alias="tools/type-vertical.png">resources/icons/tools/type-vertical.png</file>
     <file alias="tools/rectangle.png">resources/icons/tools/rectangle.png</file>

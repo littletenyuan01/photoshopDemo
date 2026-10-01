@@ -391,10 +391,13 @@ void ToolBox::buildToolSlots()
     addSlot({{Ps::ToolId::Dodge, icon("adjust-add"), tr("减淡工具"), QString()},
              {Ps::ToolId::Sponge, icon("sponge"), tr("海绵工具"), QString()}});
 
-    // 钢笔（P）
+    // 钢笔（P）— 图标以 resources/icons/tools 英文文件名为准；逻辑多数仍为占位
     addSlot({{Ps::ToolId::Pen, icon("pen"), tr("钢笔工具"), QStringLiteral("P")},
-             {Ps::ToolId::FreeformPen, icon("pen-alt"), tr("自由钢笔工具"), QStringLiteral("P")},
-             {Ps::ToolId::AddAnchorPoint, icon("pen-add"), tr("添加锚点工具"), QStringLiteral("P")}});
+             {Ps::ToolId::FreeformPen, icon("freeform-pen"), tr("自由钢笔工具"), QStringLiteral("P")},
+             {Ps::ToolId::CurvaturePen, icon("curvature-pen"), tr("弯度钢笔工具"), QStringLiteral("P")},
+             {Ps::ToolId::AddAnchorPoint, icon("add-anchor"), tr("添加锚点工具"), QStringLiteral("P")},
+             {Ps::ToolId::DeleteAnchorPoint, icon("delete-anchor"), tr("删除锚点工具"), QStringLiteral("P")},
+             {Ps::ToolId::ConvertPoint, icon("convert-point"), tr("转换点工具"), QStringLiteral("P")}});
 
     // 文字（T）
     addSlot({{Ps::ToolId::Type, icon("type-horizontal"), tr("横排文字工具"), QStringLiteral("T")},

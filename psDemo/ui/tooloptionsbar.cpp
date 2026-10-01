@@ -349,7 +349,10 @@ QWidget *ToolOptionsBar::pageForTool(Ps::ToolId id) const
 
     case Ps::ToolId::Pen:
     case Ps::ToolId::FreeformPen:
+    case Ps::ToolId::CurvaturePen:
     case Ps::ToolId::AddAnchorPoint:
+    case Ps::ToolId::DeleteAnchorPoint:
+    case Ps::ToolId::ConvertPoint:
         return ui->pagePath;
 
     case Ps::ToolId::Type:
@@ -484,7 +487,10 @@ QString ToolOptionsBar::toolDisplayName(Ps::ToolId id)
     case Ps::ToolId::Sponge: return QObject::tr("海绵工具");
     case Ps::ToolId::Pen: return QObject::tr("钢笔工具");
     case Ps::ToolId::FreeformPen: return QObject::tr("自由钢笔工具");
+    case Ps::ToolId::CurvaturePen: return QObject::tr("弯度钢笔工具");
     case Ps::ToolId::AddAnchorPoint: return QObject::tr("添加锚点工具");
+    case Ps::ToolId::DeleteAnchorPoint: return QObject::tr("删除锚点工具");
+    case Ps::ToolId::ConvertPoint: return QObject::tr("转换点工具");
     case Ps::ToolId::Type: return QObject::tr("横排文字工具");
     case Ps::ToolId::TypeVertical: return QObject::tr("直排文字工具");
     case Ps::ToolId::ShapeRect: return QObject::tr("矩形工具");
