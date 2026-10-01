@@ -15,7 +15,7 @@ namespace Ps {
  *
  * 顺序即工具箱从上到下的顺序，按 Photoshop 的默认工具组排列。
  *
- * ⚠️ **实现状态**：目前 Move / Hand / Zoom / Brush / Pencil / Eraser / PaintBucket / Gradient /
+ * ⚠️ **实现状态**：目前 Move / FreeTransform / Hand / Zoom / Brush / Pencil / Eraser / PaintBucket / Gradient /
  * RectSelect / EllipseSelect / Lasso / PolygonalLasso / MagneticLasso /
  * MagicWand / QuickSelect / Crop / Eyedropper / CloneStamp / Blur / Sharpen / Smudge /
  * Dodge / Sponge / ShapeRect / ShapeEllipse / ShapeTriangle / ShapeLine
@@ -90,6 +90,9 @@ enum class ToolId {
     // 视图
     Hand,
     Zoom,
+
+    /** 自由变换（编辑→自由变换 / Ctrl+T；对照 GIMP Unified Transform；不占工具箱主位） */
+    FreeTransform,
 };
 
 } // namespace Ps

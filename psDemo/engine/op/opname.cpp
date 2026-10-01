@@ -27,6 +27,7 @@ constexpr OpNameInfo kOpNameTable[] = {
     {OpName::FocusDab,             "ps:focus-dab",             "Focus Dab"},
     {OpName::ToneDab,              "ps:tone-dab",              "Tone Dab"},
     {OpName::ShapeFill,            "ps:shape-fill",            "Shape Fill"},
+    {OpName::FreeTransform,        "ps:free-transform",        "Free Transform"},
     {OpName::LayerMode,            "ps:layer-mode",            "Layer Mode"},
     {OpName::BrightnessContrast,   "ps:brightness-contrast",   "Brightness/Contrast"},
 };

@@ -9,6 +9,8 @@
 #include <QRect>
 #include <QtGlobal>
 
+#include <cstring>
+
 namespace Ps {
 
 /** 透明新建：只预定 extent，不分配瓦片。 */
@@ -191,6 +193,45 @@ void Layer::replaceFromImage(const QImage &pixels)
     // 尺寸可能变化（图像大小 / 画布大小）；不在此发属性信号
     m_tiles.setFromImage(pixels);
     invalidateContentBounds();
+}
+
+QPoint Layer::expandToIncludeLocal(const QRect &localNeeded)
+{
+    if (localNeeded.isEmpty())
+        return {};
+
+    const int w = width();
+    const int h = height();
+    if (w <= 0 || h <= 0)
+        return {};
+
+    const int padL = qMax(0, -localNeeded.left());
+    const int padT = qMax(0, -localNeeded.top());
+    const int padR = qMax(0, localNeeded.right() - (w - 1));
+    const int padB = qMax(0, localNeeded.bottom() - (h - 1));
+    if (padL == 0 && padT == 0 && padR == 0 && padB == 0)
+        return {};
+
+    const int newW = w + padL + padR;
+    const int newH = h + padT + padB;
+
+    QImage neu(newW, newH, QImage::Format_ARGB32_Premultiplied);
+    neu.fill(0);
+    if (hasPixelData()) {
+        const QImage old = materialize();
+        // 旧像素贴到新缓冲的 (padL,padT)；offset 同步左上移，文档位置不变
+        for (int y = 0; y < old.height(); ++y) {
+            const QRgb *src = reinterpret_cast<const QRgb *>(old.constScanLine(y));
+            QRgb *dst = reinterpret_cast<QRgb *>(neu.scanLine(y + padT));
+            memcpy(dst + padL, src, size_t(old.width()) * sizeof(QRgb));
+        }
+    }
+    m_tiles.setFromImage(neu);
+    m_offsetX -= padL;
+    m_offsetY -= padT;
+    invalidateContentBounds();
+    notifyPropertiesChanged();
+    return QPoint(padL, padT);
 }
 
 } // namespace Ps

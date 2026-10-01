@@ -95,6 +95,12 @@ public:
     /** 工具被切走时调用（清理拖拽中间态）。 */
     virtual void deactivate(const ToolContext &ctx, ViewPort &view);
 
+    /**
+     * 工具被选中时调用（对照 GimpTool::oper_update / 变换工具 initialize）。
+     * 自由变换在此开启会话；默认空。
+     */
+    virtual void activate(const ToolContext &ctx, ViewPort &view);
+
 signals:
     /** 请求重绘画布。 */
     void repaintRequested();

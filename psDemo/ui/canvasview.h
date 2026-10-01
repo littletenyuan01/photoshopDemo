@@ -80,6 +80,12 @@ public:
     void setCurrentTool(Ps::ToolId id);
     Ps::ToolId currentTool() const;
 
+    /** 工具管理器（供 MainWindow 接线 TransformTool 等）。 */
+    Ps::ToolManager *toolManager() const { return m_toolManager; }
+
+    /** 刷新并返回当前工具上下文（选项栏提交/取消变换时用）。 */
+    Ps::ToolContext toolContext();
+
     // —— 工具参数（会同步进 ToolContext）——
     void setForegroundColor(const QColor &c);
     void setBackgroundColor(const QColor &c);

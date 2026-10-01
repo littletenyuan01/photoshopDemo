@@ -26,6 +26,8 @@
 #include "ui/propertiespanel.h"
 #include "ui/toolbox.h"
 #include "ui/tooloptionsbar.h"
+#include "tools/toolmanager.h"
+#include "tools/transformtool.h"
 
 #include <QAbstractButton>
 #include <QAction>
@@ -35,6 +37,7 @@
 #include <QFileInfo>
 #include <QImageReader>
 #include <QKeySequence>
+#include <QMenu>
 #include <QMessageBox>
 #include <QPushButton>
 #include <QAbstractSpinBox>
@@ -161,6 +164,11 @@ void MainWindow::setupMenus()
     connect(ui->actionClear, &QAction::triggered, this, &MainWindow::onClear);
     connect(ui->actionFill, &QAction::triggered, this, &MainWindow::onFill);
 
+    // 编辑→自由变换（Ctrl+T）；对照 PS Free Transform / GIMP Unified Transform
+    ui->actionFreeTransform->setEnabled(true);
+    ui->actionFreeTransform->setToolTip(tr("自由变换活动层内容：缩放/旋转/扭曲；Enter 确认，Esc 取消"));
+    connect(ui->actionFreeTransform, &QAction::triggered, this, &MainWindow::onFreeTransform);
+
     // —— 图像→调整：亮度/对比度（非破坏滤镜节点，无对话框用默认参数）——
     ui->actionAdjBrightness->setEnabled(true);
     ui->actionAdjBrightness->setToolTip(tr("给活动层追加亮度/对比度滤镜（非破坏，可重复叠加）"));
@@ -251,15 +259,30 @@ void MainWindow::flashStatusMessage(const QString &message, int ms)
 void MainWindow::updateUndoRedoActions()
 {
     Ps::ImageDocument *doc = m_session ? m_session->document() : nullptr;
-    const bool canUndo = doc && doc->history().canUndo();
-    const bool canRedo = doc && doc->history().canRedo();
+    CanvasView *cv = ui->canvasWorkspace->canvasView();
+    Ps::TransformTool *ft = nullptr;
+    if (Ps::ToolManager *tm = cv->toolManager())
+        ft = qobject_cast<Ps::TransformTool *>(tm->tool(Ps::ToolId::FreeTransform));
+    const bool ftSession = ft && ft->isSessionActive();
+
+    // 变换会话中：还原/前进只针对本次变换内的步骤，不退出会话、不动文档历史
+    const bool canUndo = ftSession ? ft->canSessionUndo()
+                                   : (doc && doc->history().canUndo());
+    const bool canRedo = ftSession ? ft->canSessionRedo()
+                                   : (doc && doc->history().canRedo());
     ui->actionUndo->setEnabled(canUndo);
     ui->actionStepForward->setEnabled(canRedo);
-    if (canUndo)
+    if (ftSession && canUndo)
+        ui->actionUndo->setText(tr("还原(&U) 变换步骤"));
+    else if (ftSession)
+        ui->actionUndo->setText(tr("还原(&U)"));
+    else if (canUndo)
         ui->actionUndo->setText(tr("还原(&U) %1").arg(doc->history().undoText()));
     else
         ui->actionUndo->setText(tr("还原(&U)"));
-    if (canRedo)
+    if (ftSession && canRedo)
+        ui->actionStepForward->setText(tr("向前一步 变换步骤"));
+    else if (canRedo && !ftSession)
         ui->actionStepForward->setText(tr("向前一步 %1").arg(doc->history().redoText()));
     else
         ui->actionStepForward->setText(tr("向前一步"));
@@ -267,12 +290,32 @@ void MainWindow::updateUndoRedoActions()
 
 void MainWindow::onUndo()
 {
+    CanvasView *cv = ui->canvasWorkspace->canvasView();
+    if (Ps::ToolManager *tm = cv->toolManager()) {
+        if (auto *ft = qobject_cast<Ps::TransformTool *>(tm->tool(Ps::ToolId::FreeTransform))) {
+            if (ft->isSessionActive()) {
+                if (ft->undoSessionStep())
+                    flashStatusMessage(tr("已还原上一步变换"));
+                return;
+            }
+        }
+    }
     if (Ps::ImageDocument *doc = m_session ? m_session->document() : nullptr)
         doc->undo();
 }
 
 void MainWindow::onRedo()
 {
+    CanvasView *cv = ui->canvasWorkspace->canvasView();
+    if (Ps::ToolManager *tm = cv->toolManager()) {
+        if (auto *ft = qobject_cast<Ps::TransformTool *>(tm->tool(Ps::ToolId::FreeTransform))) {
+            if (ft->isSessionActive()) {
+                if (ft->redoSessionStep())
+                    flashStatusMessage(tr("已重做变换步骤"));
+                return;
+            }
+        }
+    }
     if (Ps::ImageDocument *doc = m_session ? m_session->document() : nullptr)
         doc->redo();
 }
@@ -353,6 +396,71 @@ void MainWindow::setupToolbox()
             ui->toolOptionsBar->shapeCornerRadius(),
             ui->toolOptionsBar->shapeAntialias());
     });
+
+    // 自由变换：选项栏 ↔ TransformTool；右键菜单
+    if (Ps::ToolManager *tm = canvas->toolManager()) {
+        if (auto *ft = qobject_cast<Ps::TransformTool *>(tm->tool(Ps::ToolId::FreeTransform))) {
+            connect(ft, &Ps::TransformTool::paramsChanged, this, &MainWindow::syncFreeTransformOptionsBar);
+            connect(ft, &Ps::TransformTool::sessionChanged, this, [this](bool) {
+                syncFreeTransformOptionsBar();
+                updateUndoRedoActions();
+            });
+            connect(ft, &Ps::TransformTool::sessionHistoryChanged,
+                    this, &MainWindow::updateUndoRedoActions);
+            connect(ft, &Ps::TransformTool::contextMenuRequested,
+                    this, &MainWindow::onFreeTransformContextMenu);
+            // 对照 PS：Ctrl+T 是临时模式；确认/取消后回到移动工具，否则仍停在 FreeTransform，
+            // 点击画布会重新开会话，无法点选其它图层。
+            connect(ft, &Ps::TransformTool::returnToMoveRequested, this, [this]() {
+                ui->toolBox->setCurrentTool(Ps::ToolId::Move);
+            });
+        }
+    }
+    connect(ui->toolOptionsBar, &ToolOptionsBar::freeTransformParamsEdited, this,
+            [this](qreal x, qreal y, qreal w, qreal h, qreal ang, qreal sh, qreal sv) {
+                CanvasView *cv = ui->canvasWorkspace->canvasView();
+                auto *ft = qobject_cast<Ps::TransformTool *>(
+                    cv->toolManager() ? cv->toolManager()->tool(Ps::ToolId::FreeTransform) : nullptr);
+                if (ft && ft->isSessionActive())
+                    ft->applyNumericParams(x, y, w, h, ang, sh, sv);
+            });
+    connect(ui->toolOptionsBar, &ToolOptionsBar::freeTransformLinkAspectChanged, this,
+            [this](bool linked) {
+                CanvasView *cv = ui->canvasWorkspace->canvasView();
+                auto *ft = qobject_cast<Ps::TransformTool *>(
+                    cv->toolManager() ? cv->toolManager()->tool(Ps::ToolId::FreeTransform) : nullptr);
+                if (ft)
+                    ft->setLinkAspect(linked);
+            });
+    connect(ui->toolOptionsBar, &ToolOptionsBar::freeTransformInterpolationChanged, this,
+            [this](int idx) {
+                CanvasView *cv = ui->canvasWorkspace->canvasView();
+                auto *ft = qobject_cast<Ps::TransformTool *>(
+                    cv->toolManager() ? cv->toolManager()->tool(Ps::ToolId::FreeTransform) : nullptr);
+                if (!ft)
+                    return;
+                using I = Ps::TransformInterpolation;
+                ft->setInterpolation(idx <= 0 ? I::Nearest : (idx == 1 ? I::Bilinear : I::Bicubic));
+            });
+    connect(ui->toolOptionsBar, &ToolOptionsBar::freeTransformCommitClicked, this, [this]() {
+        CanvasView *cv = ui->canvasWorkspace->canvasView();
+        auto *ft = qobject_cast<Ps::TransformTool *>(
+            cv->toolManager() ? cv->toolManager()->tool(Ps::ToolId::FreeTransform) : nullptr);
+        if (ft && ft->isSessionActive()) {
+            ft->commitFromUi(cv->toolContext());
+            flashStatusMessage(tr("已应用自由变换"));
+        }
+    });
+    connect(ui->toolOptionsBar, &ToolOptionsBar::freeTransformCancelClicked, this, [this]() {
+        CanvasView *cv = ui->canvasWorkspace->canvasView();
+        auto *ft = qobject_cast<Ps::TransformTool *>(
+            cv->toolManager() ? cv->toolManager()->tool(Ps::ToolId::FreeTransform) : nullptr);
+        if (ft && ft->isSessionActive()) {
+            ft->cancelFromUi(cv->toolContext());
+            flashStatusMessage(tr("已取消自由变换"));
+        }
+    });
+
     connect(ui->toolOptionsBar, &ToolOptionsBar::homeClicked,
             this, &MainWindow::onShowHomeScreen);
 
@@ -425,7 +533,7 @@ void MainWindow::onToolChanged(Ps::ToolId id)
     ui->toolOptionsBar->setCurrentTool(id);
     CanvasView *canvas = ui->canvasWorkspace->canvasView();
     canvas->setCurrentTool(id);
-    // 点工具箱（NoFocus）后 Windows/Qt 常把键盘焦点清掉，空格到不了画布。
+    // 点工具箱（NoFocus）后 Windows/Qt 常把键盘焦点清掉，空格到不了画布；
     // 选工具就是为了在画布上用，焦点应回到画布。
     canvas->setFocus(Qt::OtherFocusReason);
     const QString hint = ui->toolOptionsBar->currentHint();
@@ -1008,6 +1116,115 @@ void MainWindow::onFill()
         return;
     if (!doc->fillActiveLayer(ui->toolBox->foregroundColor()))
         flashStatusMessage(tr("无法填充：无可见活动层"));
+}
+
+void MainWindow::onFreeTransform()
+{
+    Ps::ImageDocument *doc = m_session->document();
+    if (!doc || !doc->activeLayer() || !doc->activeLayer()->isVisible()) {
+        flashStatusMessage(tr("无法变换：无可见活动层"));
+        return;
+    }
+    if (doc->activeLayer()->contentBoundsInDocument().isEmpty()) {
+        flashStatusMessage(tr("无法变换：活动层无可见像素"));
+        return;
+    }
+    // 只走一条路径开会话，避免 toolBox→onToolChanged 与此处各 activate 一次：
+    // 第二次会先 undo 还原像素再挖空，投影/浮层容易叠成「复制一份」。
+    CanvasView *cv = ui->canvasWorkspace->canvasView();
+    if (ui->toolBox->currentTool() == Ps::ToolId::FreeTransform) {
+        ui->toolOptionsBar->setCurrentTool(Ps::ToolId::FreeTransform);
+        cv->setCurrentTool(Ps::ToolId::FreeTransform); // 已在变换：重启会话
+    } else {
+        ui->toolBox->setCurrentTool(Ps::ToolId::FreeTransform); // → onToolChanged 一次 activate
+    }
+    flashStatusMessage(tr("自由变换：右键切换模式；Ctrl+Z 还原步骤，Esc/✕ 取消，Enter/✓ 确认"), 4000);
+}
+
+void MainWindow::syncFreeTransformOptionsBar()
+{
+    CanvasView *cv = ui->canvasWorkspace->canvasView();
+    auto *ft = qobject_cast<Ps::TransformTool *>(
+        cv->toolManager() ? cv->toolManager()->tool(Ps::ToolId::FreeTransform) : nullptr);
+    if (!ft || !ft->isSessionActive())
+        return;
+    const int interp = (ft->interpolation() == Ps::TransformInterpolation::Nearest) ? 0
+                     : (ft->interpolation() == Ps::TransformInterpolation::Bilinear) ? 1 : 2;
+    ui->toolOptionsBar->setFreeTransformParams(
+        ft->paramX(), ft->paramY(), ft->paramWPercent(), ft->paramHPercent(),
+        ft->paramAngleDeg(), ft->paramSkewHDeg(), ft->paramSkewVDeg(),
+        ft->linkAspect(), interp);
+}
+
+void MainWindow::applyFreeTransformMode(int mode)
+{
+    CanvasView *cv = ui->canvasWorkspace->canvasView();
+    auto *ft = qobject_cast<Ps::TransformTool *>(
+        cv->toolManager() ? cv->toolManager()->tool(Ps::ToolId::FreeTransform) : nullptr);
+    if (!ft)
+        return;
+    ft->setMode(static_cast<Ps::TransformMode>(mode));
+    static const char *kHints[] = {
+        QT_TR_NOOP("模式：自由变换"),
+        QT_TR_NOOP("模式：缩放"),
+        QT_TR_NOOP("模式：旋转"),
+        QT_TR_NOOP("模式：斜切"),
+        QT_TR_NOOP("模式：扭曲"),
+        QT_TR_NOOP("模式：透视"),
+    };
+    const int idx = qBound(0, mode, 5);
+    flashStatusMessage(tr(kHints[idx]), 2500);
+}
+
+void MainWindow::onFreeTransformContextMenu(const QPoint &widgetPos)
+{
+    CanvasView *cv = ui->canvasWorkspace->canvasView();
+    auto *ft = qobject_cast<Ps::TransformTool *>(
+        cv->toolManager() ? cv->toolManager()->tool(Ps::ToolId::FreeTransform) : nullptr);
+    if (!ft || !ft->isSessionActive())
+        return;
+
+    QMenu menu(cv);
+    auto addMode = [&](const QString &text, Ps::TransformMode mode) {
+        QAction *a = menu.addAction(text);
+        a->setCheckable(true);
+        a->setChecked(ft->mode() == mode);
+        connect(a, &QAction::triggered, this, [this, mode]() {
+            applyFreeTransformMode(static_cast<int>(mode));
+        });
+    };
+    // 对照 PS：首项「自由变换」即综合模式
+    addMode(tr("自由变换"), Ps::TransformMode::Free);
+    menu.addSeparator();
+    addMode(tr("缩放"), Ps::TransformMode::Scale);
+    addMode(tr("旋转"), Ps::TransformMode::Rotate);
+    addMode(tr("斜切"), Ps::TransformMode::Skew);
+    addMode(tr("扭曲"), Ps::TransformMode::Distort);
+    addMode(tr("透视"), Ps::TransformMode::Perspective);
+    menu.addSeparator();
+
+    menu.addAction(tr("变形"))->setEnabled(false);
+    menu.addAction(tr("水平拆分变形"))->setEnabled(false);
+    menu.addAction(tr("垂直拆分变形"))->setEnabled(false);
+    menu.addAction(tr("交叉拆分变形"))->setEnabled(false);
+    menu.addAction(tr("移去变形拆分"))->setEnabled(false);
+    menu.addSeparator();
+    menu.addAction(tr("转换变形锚点"))->setEnabled(false);
+    menu.addSeparator();
+    menu.addAction(tr("切换参考线"))->setEnabled(false);
+    menu.addSeparator();
+    menu.addAction(tr("内容识别缩放"))->setEnabled(false);
+    menu.addAction(tr("操控变形"))->setEnabled(false);
+    menu.addSeparator();
+
+    menu.addAction(tr("旋转 180 度"), this, [ft]() { ft->rotateByDegrees(180.0); });
+    menu.addAction(tr("顺时针旋转 90 度"), this, [ft]() { ft->rotateByDegrees(90.0); });
+    menu.addAction(tr("逆时针旋转 90 度"), this, [ft]() { ft->rotateByDegrees(-90.0); });
+    menu.addSeparator();
+    menu.addAction(tr("水平翻转"), this, [ft]() { ft->flipHorizontal(); });
+    menu.addAction(tr("垂直翻转"), this, [ft]() { ft->flipVertical(); });
+
+    menu.exec(cv->mapToGlobal(widgetPos));
 }
 
 void MainWindow::onBrightnessContrast()

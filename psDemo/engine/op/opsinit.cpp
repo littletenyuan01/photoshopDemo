@@ -17,6 +17,7 @@
 #include "selectfloodop.h"
 #include "selectpolygonop.h"
 #include "shapefillop.h"
+#include "freetransformop.h"
 #include "solidfillop.h"
 #include "stampdabop.h"
 #include "tonedabop.h"
@@ -85,6 +86,12 @@ void opsInit()
         OpName::ShapeFill,
         {OpPad::Tiles},
         [] { return std::unique_ptr<BufferOp>(new ShapeFillOp); },
+    });
+
+    OpRegistry::add({
+        OpName::FreeTransform,
+        {OpPad::Tiles},
+        [] { return std::unique_ptr<BufferOp>(new FreeTransformOp); },
     });
 
     PointOpRegistry::add({

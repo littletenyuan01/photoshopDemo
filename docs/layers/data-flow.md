@@ -94,7 +94,7 @@ Tool → PaintEngine → OpRunner(OpName::StampDab) → StampDabOp
 | 新建（统一建层+可选 fill）/ 删除 / 显隐 / 改名 / 不透明度 | 已实现；面板新建固定透明填充 |
 | 新建图层时选填充类型（白/前景色…） | 未做（GIMP 对话框有） |
 | 上移 / 下移 | `LayerStack::moveLayer` 有，**UI 未接线** |
-| 图层偏移 / 自由变换 | 偏移已实现（移动工具）；自由变换未做 |
+| 图层偏移 / 自由变换 | 偏移已实现（移动工具）；自由变换 Ctrl+T 已实现（风险见 [../pending-dev.md](../pending-dev.md)） |
 | 图像大小 / 画布大小菜单 | 已实现（`.ui` 对话框 + `scaleImage` / `resizeCanvas`） |
 | 文档内持久化 PPI | 未做（对话框仅换算用） |
 | 撤销时 push 图层属性/结构 | **已做**（Phase 6：属性/结构/像素/文档几何） |

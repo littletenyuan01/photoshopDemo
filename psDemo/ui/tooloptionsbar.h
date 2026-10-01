@@ -85,6 +85,14 @@ public:
     bool shapeAntialias() const;
 
     /**
+     * 用变换工具当前参数刷新自由变换选项页（拖拽中由 MainWindow 调用）。
+     * 写入时短暂阻断信号，避免回写工具造成抖动。
+     */
+    void setFreeTransformParams(qreal x, qreal y, qreal wPercent, qreal hPercent,
+                                qreal angleDeg, qreal skewHDeg, qreal skewVDeg,
+                                bool linkAspect, int interpolationIndex);
+
+    /**
      * 当前工具的提示语（由 MainWindow 显示在状态栏）。
      * 【为什么不在选项条里】PS 的选项条只有参数，没有说明文字；放在条里既浪费宽度，
      * 又会被 Expanding 的选项区挤到最右边、离参数很远。
@@ -110,6 +118,16 @@ signals:
     void cloneStampOptionsChanged();
     /** 形状参数变化（填充/描边/粗细/圆角/抗锯齿）。 */
     void shapeOptionsChanged();
+    /** 自由变换：选项栏数值提交（失焦/回车）。 */
+    void freeTransformParamsEdited(qreal x, qreal y, qreal wPercent, qreal hPercent,
+                                   qreal angleDeg, qreal skewHDeg, qreal skewVDeg);
+    /** 自由变换：保持长宽比开关。 */
+    void freeTransformLinkAspectChanged(bool linked);
+    /** 自由变换：插值（0 邻近 / 1 两次线性 / 2 两次立方）。 */
+    void freeTransformInterpolationChanged(int index);
+    /** 自由变换：提交 / 取消（对照 PS ✓ / ✕）。 */
+    void freeTransformCommitClicked();
+    void freeTransformCancelClicked();
     /** 左端「家」按钮：请求显示主页（对齐 PS Home）。 */
     void homeClicked();
 
@@ -125,8 +143,11 @@ private:
     /** 选项栏右侧的提示语：已接入的写用法，占位的写明尚未接入。 */
     static QString hintForTool(Ps::ToolId id);
 
+    void emitFreeTransformParams();
+
     Ui::ToolOptionsBar *ui;
     QString m_hint;   ///< 当前工具提示语（状态栏用，见 currentHint()）
+    bool m_blockFtSync = false; ///< 程序写回数值时不回灌工具
 };
 
 #endif // TOOLOPTIONSBAR_H

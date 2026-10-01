@@ -6,6 +6,8 @@
 #include "tooloptionsbar.h"
 #include "ui_tooloptionsbar.h"
 
+#include <QSignalBlocker>
+
 namespace {
 
 /** 从合体控件 / 文本框读整数并钳制；解析失败用 @p fallback。 */
@@ -14,6 +16,18 @@ int editInt(const LabeledLineEdit *field, int lo, int hi, int fallback)
     bool ok = false;
     const int v = field->text().trimmed().toInt(&ok);
     return ok ? qBound(lo, v, hi) : fallback;
+}
+
+/** 解析浮点：剥掉末尾 % / ° / 空白。 */
+qreal editReal(const LabeledLineEdit *field, qreal fallback)
+{
+    QString t = field->text().trimmed();
+    if (t.endsWith(QLatin1Char('%')) || t.endsWith(QStringLiteral("°")))
+        t.chop(1);
+    t = t.trimmed();
+    bool ok = false;
+    const qreal v = t.toDouble(&ok);
+    return ok ? v : fallback;
 }
 
 /** 失焦写回合法值并回调（范围约束在此完成，不另挂 QIntValidator）。 */
@@ -34,7 +48,7 @@ ToolOptionsBar::ToolOptionsBar(QWidget *parent)
     , ui(new Ui::ToolOptionsBar)
 {
     ui->setupUi(this);
-    // QWidget 默认不按样式表画背景；不加这行时，子级透明会透出窗口纯黑
+    // QWidget 默认不按样式表画背景；不加这行时根/子级透明会透出窗口纯黑
     setAttribute(Qt::WA_StyledBackground, true);
 
     // 画笔/橡皮直径
@@ -99,6 +113,25 @@ ToolOptionsBar::ToolOptionsBar(QWidget *parent)
     wireIntEdit(ui->shapeRadiusEdit, 0, 500, 0, emitShape);
     connect(ui->shapeSmoothCheck, &QCheckBox::toggled, this, emitShape);
 
+    // 自由变换选项页（对照 PS Ctrl+T 选项条）
+    ui->ftInterpCombo->setCurrentIndex(2); // 两次立方
+    const auto emitFt = [this]() { emitFreeTransformParams(); };
+    connect(ui->ftXEdit, &LabeledLineEdit::editingFinished, this, emitFt);
+    connect(ui->ftYEdit, &LabeledLineEdit::editingFinished, this, emitFt);
+    connect(ui->ftWEdit, &LabeledLineEdit::editingFinished, this, emitFt);
+    connect(ui->ftHEdit, &LabeledLineEdit::editingFinished, this, emitFt);
+    connect(ui->ftAngleEdit, &LabeledLineEdit::editingFinished, this, emitFt);
+    connect(ui->ftSkewHEdit, &LabeledLineEdit::editingFinished, this, emitFt);
+    connect(ui->ftSkewVEdit, &LabeledLineEdit::editingFinished, this, emitFt);
+    connect(ui->ftLinkAspectButton, &QToolButton::toggled, this, [this](bool on) {
+        emit freeTransformLinkAspectChanged(on);
+    });
+    connect(ui->ftInterpCombo, &LabeledComboBox::currentIndexChanged, this, [this](int idx) {
+        emit freeTransformInterpolationChanged(idx);
+    });
+    connect(ui->ftCommitButton, &QToolButton::clicked, this, &ToolOptionsBar::freeTransformCommitClicked);
+    connect(ui->ftCancelButton, &QToolButton::clicked, this, &ToolOptionsBar::freeTransformCancelClicked);
+
     connect(ui->homeButton, &QToolButton::clicked, this, &ToolOptionsBar::homeClicked);
 
     // 选项条控件默认 StrongFocus：切工具换页时 Qt 会把焦点塞给新页的按钮/勾选框，
@@ -107,8 +140,22 @@ ToolOptionsBar::ToolOptionsBar(QWidget *parent)
         btn->setFocusPolicy(Qt::NoFocus);
     for (auto *box : findChildren<QCheckBox *>())
         box->setFocusPolicy(Qt::ClickFocus);
-    for (auto *combo : findChildren<QComboBox *>())
+    // 弹出列表是独立顶层窗，祖先 stylesheet 常不生效；直接挂在各自 QComboBox 上
+    const QString comboCss = QStringLiteral(
+        "QComboBox { background-color:#3a3a3a; color:#eee; border:1px solid #222;"
+        "  padding:1px 4px; min-height:22px; }"
+        "QComboBox::drop-down { border:none; width:16px; }"
+        "QComboBox QAbstractItemView {"
+        "  background-color:#ffffff; color:#222222;"
+        "  selection-background-color:#e5f1fb; selection-color:#222222; outline:0; }"
+        "QComboBox QAbstractItemView::item { color:#222222; min-height:22px; padding:2px 8px; }"
+        "QComboBox QAbstractItemView::item:selected,"
+        "QComboBox QAbstractItemView::item:hover {"
+        "  background-color:#e5f1fb; color:#222222; }");
+    for (auto *combo : findChildren<QComboBox *>()) {
         combo->setFocusPolicy(Qt::ClickFocus);
+        combo->setStyleSheet(comboCss);
+    }
 
     setCurrentTool(Ps::ToolId::Move);
 }
@@ -318,6 +365,9 @@ QWidget *ToolOptionsBar::pageForTool(Ps::ToolId id) const
     case Ps::ToolId::Hand:
     case Ps::ToolId::Zoom:
         return ui->pageView;
+
+    case Ps::ToolId::FreeTransform:
+        return ui->pageFreeTransform;
     }
     return ui->pageMove;
 }
@@ -345,6 +395,8 @@ QString ToolOptionsBar::hintForTool(Ps::ToolId id)
     switch (id) {
     case Ps::ToolId::Move:
         return QObject::tr("点击选中图层并拖拽移动；图层面板同步选中");
+    case Ps::ToolId::FreeTransform:
+        return QObject::tr("拖角点/边缩放，框内平移，框外旋转；右键切换模式；Enter/✓ 确认，Esc/✕ 取消");
     case Ps::ToolId::Brush:
         return QObject::tr("左键绘制（仅「大小」生效）");
     case Ps::ToolId::Pencil:
@@ -406,6 +458,7 @@ QString ToolOptionsBar::toolDisplayName(Ps::ToolId id)
 {
     switch (id) {
     case Ps::ToolId::Move: return QObject::tr("移动工具");
+    case Ps::ToolId::FreeTransform: return QObject::tr("自由变换");
     case Ps::ToolId::RectSelect: return QObject::tr("矩形选框工具");
     case Ps::ToolId::EllipseSelect: return QObject::tr("椭圆选框工具");
     case Ps::ToolId::Lasso: return QObject::tr("套索工具");
@@ -442,4 +495,45 @@ QString ToolOptionsBar::toolDisplayName(Ps::ToolId id)
     case Ps::ToolId::Zoom: return QObject::tr("缩放工具");
     }
     return QObject::tr("工具");
+}
+
+void ToolOptionsBar::emitFreeTransformParams()
+{
+    if (m_blockFtSync)
+        return;
+    emit freeTransformParamsEdited(
+        editReal(ui->ftXEdit, 0.0),
+        editReal(ui->ftYEdit, 0.0),
+        editReal(ui->ftWEdit, 100.0),
+        editReal(ui->ftHEdit, 100.0),
+        editReal(ui->ftAngleEdit, 0.0),
+        editReal(ui->ftSkewHEdit, 0.0),
+        editReal(ui->ftSkewVEdit, 0.0));
+}
+
+void ToolOptionsBar::setFreeTransformParams(qreal x, qreal y, qreal wPercent, qreal hPercent,
+                                            qreal angleDeg, qreal skewHDeg, qreal skewVDeg,
+                                            bool linkAspect, int interpolationIndex)
+{
+    m_blockFtSync = true;
+    const QSignalBlocker b1(ui->ftXEdit);
+    const QSignalBlocker b2(ui->ftYEdit);
+    const QSignalBlocker b3(ui->ftWEdit);
+    const QSignalBlocker b4(ui->ftHEdit);
+    const QSignalBlocker b5(ui->ftAngleEdit);
+    const QSignalBlocker b6(ui->ftSkewHEdit);
+    const QSignalBlocker b7(ui->ftSkewVEdit);
+    const QSignalBlocker b8(ui->ftLinkAspectButton);
+    const QSignalBlocker b9(ui->ftInterpCombo);
+
+    ui->ftXEdit->setText(QString::number(x, 'f', 2));
+    ui->ftYEdit->setText(QString::number(y, 'f', 2));
+    ui->ftWEdit->setText(QString::number(wPercent, 'f', 2) + QLatin1Char('%'));
+    ui->ftHEdit->setText(QString::number(hPercent, 'f', 2) + QLatin1Char('%'));
+    ui->ftAngleEdit->setText(QString::number(angleDeg, 'f', 2) + QStringLiteral("°"));
+    ui->ftSkewHEdit->setText(QString::number(skewHDeg, 'f', 2) + QStringLiteral("°"));
+    ui->ftSkewVEdit->setText(QString::number(skewVDeg, 'f', 2) + QStringLiteral("°"));
+    ui->ftLinkAspectButton->setChecked(linkAspect);
+    ui->ftInterpCombo->setCurrentIndex(qBound(0, interpolationIndex, 2));
+    m_blockFtSync = false;
 }

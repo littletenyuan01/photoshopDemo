@@ -23,6 +23,7 @@
 #include "shapetool.h"
 #include "tonetool.h"
 #include "tool.h"
+#include "transformtool.h"
 #include "zoomtool.h"
 
 #include <memory>
@@ -36,6 +37,7 @@ ToolManager::ToolManager(QObject *parent)
     // 新增工具只需在此加一行；CanvasView / MainWindow 无需改动。
     // 【对照 GIMP】等价于 app/tools/tools-enums.c + gimp_tool_info_new 的注册表角色。
     registerTool(std::make_unique<MoveTool>());
+    registerTool(std::make_unique<TransformTool>());
     registerTool(std::make_unique<MarqueeSelectTool>(MarqueeSelectTool::Shape::Rect));
     registerTool(std::make_unique<MarqueeSelectTool>(MarqueeSelectTool::Shape::Ellipse));
     registerTool(std::make_unique<LassoTool>());
@@ -162,8 +164,12 @@ bool ToolManager::setActiveTool(Ps::ToolId id, ViewPort &view)
         // 未接入逻辑的工具 → 兜底到 MoveTool，而不是保留上一个工具的行为
         next = m_tools.value(static_cast<int>(Ps::ToolId::Move), nullptr);
     }
-    if (next == m_activeTool)
+    if (next == m_activeTool) {
+        // 已是该工具：仍 activate（Ctrl+T 重复进入时重启自由变换会话）
+        next->activate(m_context, view);
+        emit cursorChangeRequested(activeCursor());
         return false;
+    }
 
     if (m_activeTool)
         m_activeTool->deactivate(m_context, view); // 清理拖拽中间态，避免状态「粘住」
@@ -171,6 +177,7 @@ bool ToolManager::setActiveTool(Ps::ToolId id, ViewPort &view)
     m_activeTool = next;
 
     rewriteConnections();
+    m_activeTool->activate(m_context, view);
     emit activeToolChanged(activeToolId());
     emit cursorChangeRequested(activeCursor());
     return true;

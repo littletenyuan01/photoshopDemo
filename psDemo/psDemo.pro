@@ -40,6 +40,7 @@ SOURCES += \
     engine/op/focusdabop.cpp \
     engine/op/tonedabop.cpp \
     engine/op/shapefillop.cpp \
+    engine/op/freetransformop.cpp \
     engine/op/solidfillop.cpp \
     engine/op/selectpolygonop.cpp \
     engine/op/selectfloodop.cpp \
@@ -51,6 +52,7 @@ SOURCES += \
     tools/tool.cpp \
     tools/toolmanager.cpp \
     tools/movetool.cpp \
+    tools/transformtool.cpp \
     tools/handtool.cpp \
     tools/zoomtool.cpp \
     tools/painttool.cpp \
@@ -130,6 +132,7 @@ HEADERS += \
     engine/op/focusdabop.h \
     engine/op/tonedabop.h \
     engine/op/shapefillop.h \
+    engine/op/freetransformop.h \
     engine/op/solidfillop.h \
     engine/op/selectpolygonop.h \
     engine/op/selectfloodop.h \
@@ -146,6 +149,7 @@ HEADERS += \
     tools/tool.h \
     tools/toolmanager.h \
     tools/movetool.h \
+    tools/transformtool.h \
     tools/handtool.h \
     tools/zoomtool.h \
     tools/painttool.h \

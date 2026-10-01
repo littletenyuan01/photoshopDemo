@@ -31,8 +31,9 @@
 | `io/projectio.h/.cpp` | `.pslite` 工程读写（对照 GIMP XCF 的最小子集） |
 | `io/psdio.h/.cpp` | `.psd` 子集导出（图层像素；对照 GIMP file-psd 极简） |
 | `tools/toolmanager.h/.cpp` | 注册表 + 活动工具 + 事件分发 + **信号转发**（活动工具会变，画布无法预先 connect） |
-| `tools/movetool.h/.cpp` | 占位；**中性兜底**：未接入逻辑的工具切过去不消费事件 |
-| `tools/handtool.h/.cpp` | 平移；`isPanGesture` 供画布判定中键 / Alt+左键通用手势 |
+| `tools/movetool.h/.cpp` | **移动**：点选层 + 平移 offset；变换框浮层（只显示） |
+| `tools/transformtool.h/.cpp` | **自由变换**（Ctrl+T）：四角/边/旋转；`FreeTransformOp` 提交 |
+| `tools/handtool.h/.cpp` | 平移；`isPanGesture` 供画布判定中键临时平移（空格走临时切工具） |
 | `tools/zoomtool.h/.cpp` | 锚点缩放（左键放大 / 右键缩小） |
 | `tools/painttool.h/.cpp` | 画笔 + 铅笔 + 橡皮（同一类；铅笔 hardness=1.0；只负责事件→dab，写像素在 PaintEngine） |
 | `tools/paintbuckettool.h/.cpp` | 油漆桶 |
@@ -55,6 +56,7 @@
 | `engine/op/tonedabop.h/.cpp` | **ToneDabOp**：提亮 / 提高饱和度 |
 | `tools/shapetool.h/.cpp` | **形状**：拖框 → `PaintEngine::fillShape` |
 | `engine/op/shapefillop.h/.cpp` | **ShapeFillOp**：矩形/椭圆/三角/直线栅格化 |
+| `engine/op/freetransformop.h/.cpp` | **FreeTransformOp**：四边形 `quadToQuad` 写入瓦片 |
 | `engine/magneticedgesnap.h` | 格点 Sobel（**归一化到 0..255**）+ Width **圆**搜索 + Dijkstra Livewire（f_G 幅值项 + **f_D 方向项**；对照 GIMP `find_max_gradient` / `find_optimal_path`）。标定、成因与验证见 [engine/magnetic-lasso.md](engine/magnetic-lasso.md) |
 | `engine/op/selectfloodop.*` | 连通域/相似色写入选区 |
 

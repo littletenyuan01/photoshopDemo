@@ -341,8 +341,9 @@ void ToolBox::buildToolSlots()
         return dir + QString::fromLatin1(name) + QStringLiteral(".png");
     };
 
-    // 移动（V）
-    addSlot({{Ps::ToolId::Move, icon("move"), tr("移动工具"), QStringLiteral("V")}});
+    // 移动（V）+ 自由变换（Ctrl+T，同组飞出）
+    addSlot({{Ps::ToolId::Move, icon("move"), tr("移动工具"), QStringLiteral("V")},
+             {Ps::ToolId::FreeTransform, icon("move"), tr("自由变换"), QStringLiteral("Ctrl+T")}});
 
     // 选框（M）
     addSlot({{Ps::ToolId::RectSelect, icon("rect-select"), tr("矩形选框工具"), QStringLiteral("M")},

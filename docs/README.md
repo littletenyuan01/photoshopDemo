@@ -25,6 +25,7 @@
 | [overview.md](overview.md) | 工程总览与当前能力 |
 | [architecture.md](architecture.md) | 模块结构与数据流 |
 | [features.md](features.md) | 功能清单与使用说明 |
+| [pending-dev.md](pending-dev.md) | **待开发**：已有功能的已知风险与完善方向 |
 | [code-map.md](code-map.md) | 重点代码与文件索引 |
 | [tech-notes.md](tech-notes.md) | 技术点与设计决策 |
 | [ui/ui-review.md](ui/ui-review.md) | UI 结构审查与收口 |

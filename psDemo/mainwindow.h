@@ -99,6 +99,7 @@ private slots:
     void onSelectInverse();
     void onClear();
     void onFill();
+    void onFreeTransform();
     void onBrightnessContrast();
     void onUndo();
     void onRedo();
@@ -108,6 +109,11 @@ private slots:
     void refreshDocumentPathStatus();
     /** 短暂提示后恢复路径显示（避免「已存储」一直留在状态栏）。 */
     void flashStatusMessage(const QString &message, int ms = 4000);
+
+    /** 自由变换：选项栏数值同步 / 右键菜单 / 模式。 */
+    void syncFreeTransformOptionsBar();
+    void onFreeTransformContextMenu(const QPoint &widgetPos);
+    void applyFreeTransformMode(int mode);
 
 private:
     /** 装配菜单动作连接。 */

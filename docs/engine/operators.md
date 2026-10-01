@@ -85,6 +85,7 @@ PointOpRegistry::add({ OpName::LayerMode,
 | `OpName::FocusDab` | `{Tiles}` | `new FocusDabOp` |
 | `OpName::ToneDab` | `{Tiles}` | `new ToneDabOp` |
 | `OpName::ShapeFill` | `{Tiles}` | `new ShapeFillOp` |
+| `OpName::FreeTransform` | `{Tiles}` | `new FreeTransformOp` |
 | `OpName::LayerMode` | —（点算子无 pad） | `new LayerModeOp` |
 
 ---
@@ -107,6 +108,7 @@ PointOpRegistry::add({ OpName::LayerMode,
 | **模糊/锐化/涂抹** | `FocusTool` | `PaintEngine::focusDab` / `focusStrokeSegment` |
 | **减淡/海绵** | `ToneTool` | `PaintEngine::toneDab` / `toneStrokeSegment` |
 | **形状** | `ShapeTool` | `PaintEngine::fillShape` |
+| **自由变换** | `TransformTool`（Ctrl+T） | `PaintEngine::freeTransform` |
 
 `PaintEngine` 是**门面**：绘制入口组装 `OpContext::fromTiles`；选区入口组装
 `OpContext::fromSelection`，再交给 `OpRunner` 一个 `Configure` lambda：

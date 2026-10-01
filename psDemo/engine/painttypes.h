@@ -52,6 +52,16 @@ enum class ShapeKind {
     Line,
 };
 
+/**
+ * 自由变换 / 重采样插值（对照 PS 选项栏「插值」、GIMP GeglSamplerType）。
+ * Bicubic = 双三次（PS 中文「两次立方」）。
+ */
+enum class TransformInterpolation {
+    Nearest = 0,  ///< 邻近
+    Bilinear = 1, ///< 两次线性
+    Bicubic = 2,  ///< 两次立方（双三次）
+};
+
 } // namespace Ps
 
 #endif // ENGINE_PAINTTYPES_H

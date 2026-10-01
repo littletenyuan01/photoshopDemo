@@ -72,6 +72,12 @@ void Tool::deactivate(const ToolContext &ctx, ViewPort &view)
     Q_UNUSED(view)
 }
 
+void Tool::activate(const ToolContext &ctx, ViewPort &view)
+{
+    Q_UNUSED(ctx)
+    Q_UNUSED(view)
+}
+
 void Tool::markDocumentDirty(const ToolContext &ctx, const QRect &rect)
 {
     if (ctx.document)

@@ -38,6 +38,18 @@ public:
      * @p dst 须为文档尺寸、ARGB32_Premultiplied；不匹配则返回 false。
      */
     static bool compositeRegion(QImage &dst, const ImageDocument &doc, const QRect &rect);
+
+    /**
+     * 把图层下标 [@p layerBegin, @p layerEnd) 叠到 @p dst（不先清空）。
+     * 供自由变换合成预览：下层 → 浮层预览 → 上层，避免预览盖住全部图层。
+     * @p skipLayer 若 ≥0 则跳过该层（变换中已挖空的层）。
+     */
+    static bool blendLayerRange(QImage &dst,
+                                const ImageDocument &doc,
+                                const QRect &rect,
+                                int layerBegin,
+                                int layerEnd,
+                                int skipLayer = -1);
 };
 
 } // namespace Ps

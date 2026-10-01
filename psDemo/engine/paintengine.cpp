@@ -17,6 +17,7 @@
 #include "engine/op/selectfloodop.h"
 #include "engine/op/selectpolygonop.h"
 #include "engine/op/shapefillop.h"
+#include "engine/op/freetransformop.h"
 #include "engine/op/solidfillop.h"
 #include "engine/op/stampdabop.h"
 #include "engine/op/tonedabop.h"
@@ -290,6 +291,24 @@ QRect PaintEngine::fillShape(TileBuffer &tiles,
         op.setStrokeWidth(strokeWidth);
         op.setCornerRadius(cornerRadius);
         op.setAntialias(antialias);
+    });
+}
+
+QRect PaintEngine::freeTransform(TileBuffer &tiles,
+                                 const QRect &sourceRect,
+                                 const QImage &sourcePixels,
+                                 const QPointF destCorners[4],
+                                 bool clearSource,
+                                 PaintSelectionClip clip,
+                                 TransformInterpolation interpolation)
+{
+    OpContext ctx = OpContext::fromTiles(tiles, clip);
+    return OpRunner::run(OpName::FreeTransform, ctx, [&](BufferOp &base) {
+        auto &op = static_cast<FreeTransformOp &>(base);
+        op.setSource(sourceRect, sourcePixels);
+        op.setDestQuad(destCorners);
+        op.setClearSource(clearSource);
+        op.setInterpolation(interpolation);
     });
 }
 

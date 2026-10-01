@@ -149,8 +149,33 @@ bool Compositor::compositeRegion(QImage &dst, const ImageDocument &doc, const QR
         painter.fillRect(area, Qt::transparent);
     }
 
+    return blendLayerRange(dst, doc, area, 0, doc.layers().count(), -1);
+}
+
+bool Compositor::blendLayerRange(QImage &dst,
+                                 const ImageDocument &doc,
+                                 const QRect &rect,
+                                 int layerBegin,
+                                 int layerEnd,
+                                 int skipLayer)
+{
+    if (dst.isNull()
+        || dst.width() != doc.width()
+        || dst.height() != doc.height()
+        || dst.format() != QImage::Format_ARGB32_Premultiplied) {
+        return false;
+    }
+
+    const QRect area = rect.intersected(dst.rect());
+    if (area.isEmpty())
+        return true;
+
     const LayerStack &stack = doc.layers();
-    for (int i = 0; i < stack.count(); ++i) {
+    const int lo = qMax(0, layerBegin);
+    const int hi = qMin(stack.count(), layerEnd);
+    for (int i = lo; i < hi; ++i) {
+        if (i == skipLayer)
+            continue;
         const Layer *layer = stack.layerAt(i);
         if (!layer || !layer->isVisible() || layer->opacity() <= 0.0)
             continue;
@@ -168,7 +193,6 @@ bool Compositor::compositeRegion(QImage &dst, const ImageDocument &doc, const QR
         const int layerOy = layer->offsetY();
         const qreal opacity = layer->opacity();
 
-        // Phase 8：有启用滤镜时对临时 materialize 求值，不写回层瓦片
         if (layer->filters().hasEnabled()) {
             const QImage filtered = layer->filters().apply(layer->materialize());
             if (!filtered.isNull()) {

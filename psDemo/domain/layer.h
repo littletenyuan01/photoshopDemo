@@ -12,6 +12,7 @@
 
 #include <QColor>
 #include <QImage>
+#include <QPoint>
 #include <QPointF>
 #include <QRect>
 #include <QString>
@@ -129,6 +130,13 @@ public:
      * 内部走 TileBuffer::setFromImage；不发属性信号（由文档统一 markDirty / 发信号）。
      */
     void replaceFromImage(const QImage &pixels);
+
+    /**
+     * 扩展层 extent，使 localNeeded（层内坐标，可越界）落入瓦片范围。
+     * 向左/上扩展时同步减小 offset，文档中已有像素位置不变。
+     * @return 层内坐标平移量 (padL, padT)；未扩展则为 (0,0)。
+     */
+    QPoint expandToIncludeLocal(const QRect &localNeeded);
 
     /**
      * 挂文档 owner，使属性 setter 能回调广播。

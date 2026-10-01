@@ -349,11 +349,17 @@ void CanvasView::refreshToolContext()
         m_toolManager->setContext(m_toolContext);
 }
 
+Ps::ToolContext CanvasView::toolContext()
+{
+    refreshToolContext();
+    return m_toolContext;
+}
+
 void CanvasView::setCurrentTool(Ps::ToolId id)
 {
     if (!m_toolManager)
         return;
-    // 切换动作交给管理器：它会 deactivate 旧工具（清理拖拽态）再激活新工具
+    refreshToolContext(); // activate（如自由变换开会话）需要当前文档上下文
     m_toolManager->setActiveTool(id, *this);
     updateToolCursor();
 }
@@ -501,30 +507,22 @@ void CanvasView::paintEvent(QPaintEvent *)
     }
 
     const QRectF target = imageRectInWidget();
-    // 透明区棋盘格（格子 8、白/#c8c8c8）：与面板缩略图同一套实现，见 PixmapUtils
     PixmapUtils::paintChecker(painter, target.toAlignedRect(), 8,
                               QColor(255, 255, 255), QColor(200, 200, 200));
-    // 缩小才平滑插值；放大用最近邻，才能看出「一个个像素块」（对齐 PS）
     painter.setRenderHint(QPainter::SmoothPixmapTransform, m_zoom < 1.0);
     painter.drawImage(target, m_projection.image());
 
-    // 像素网格（PS 约 ≥500% 出现）
     paintPixelGrid(painter, target);
-
-    // 选区蚂蚁线（在图像之上、工具浮层之下）
     paintSelectionOutline(painter);
 
-    // 工具浮层最后画：位于图像之上（对应 GIMP display 的 tool_items / preview_items）
     Ps::Tool *tool = m_toolManager ? m_toolManager->activeTool() : nullptr;
     if (tool && tool->hasOverlay()) {
-        // 缩放/平移可能未走 refreshToolContext，绘制前同步视图变换
         m_toolContext.viewZoom = m_zoom;
         m_toolContext.viewOffset = m_offset;
         painter.setRenderHint(QPainter::SmoothPixmapTransform, false);
         tool->drawOverlay(painter, m_toolContext);
     }
 
-    // Caps Lock：笔刷类工具的作用范围圈（磁性套索自绘搜索圈，outlineRadius=0）
     paintToolOutline(painter);
 }
 

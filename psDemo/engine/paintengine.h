@@ -147,6 +147,19 @@ public:
                            bool antialias = true,
                            PaintSelectionClip clip = PaintSelectionClip());
 
+    /**
+     * 自由变换：将源矩形像素映射到目标四边形（层内坐标，TL/TR/BR/BL）。
+     * @param clearSource true 时先清空源矩形；会话已挖空源时可 false。
+     * @param interpolation 邻近 / 两次线性 / 两次立方（双三次）。
+     */
+    static QRect freeTransform(TileBuffer &tiles,
+                               const QRect &sourceRect,
+                               const QImage &sourcePixels,
+                               const QPointF destCorners[4],
+                               bool clearSource = true,
+                               PaintSelectionClip clip = PaintSelectionClip(),
+                               TransformInterpolation interpolation = TransformInterpolation::Bicubic);
+
     /** 油漆桶洪泛；@return 层内坐标脏矩形。 */
     static QRect floodFill(TileBuffer &tiles,
                            const QPoint &seed,

@@ -56,6 +56,29 @@ QLineEdit:focus {
   background-color: #222;
 }
 QWidget#ToolOptionsBar QComboBox::drop-down { border: none; width: 16px; }
+/* 弹出列表：系统/白底时用黑字，避免继承选项栏浅色字看不清 */
+QWidget#ToolOptionsBar QComboBox QAbstractItemView,
+QWidget#ToolOptionsBar QFontComboBox QAbstractItemView {
+  background-color: #ffffff;
+  color: #222222;
+  selection-background-color: #e5f1fb;
+  selection-color: #222222;
+  outline: 0;
+  border: 1px solid #a0a0a0;
+}
+QWidget#ToolOptionsBar QComboBox QAbstractItemView::item,
+QWidget#ToolOptionsBar QFontComboBox QAbstractItemView::item {
+  min-height: 22px;
+  padding: 2px 8px;
+  color: #222222;
+}
+QWidget#ToolOptionsBar QComboBox QAbstractItemView::item:hover,
+QWidget#ToolOptionsBar QComboBox QAbstractItemView::item:selected,
+QWidget#ToolOptionsBar QFontComboBox QAbstractItemView::item:hover,
+QWidget#ToolOptionsBar QFontComboBox QAbstractItemView::item:selected {
+  background-color: #e5f1fb;
+  color: #222222;
+}
 QWidget#ToolOptionsBar QCheckBox { color: #e8e8e8; spacing: 5px; }
 /* 勾选框必须显式描边：暗色主题下全局 QWidget 背景是透明的，原生指示器会看不见 */
 QWidget#ToolOptionsBar QCheckBox::indicator {
@@ -386,6 +409,79 @@ QToolButton#homeButton:hover { background-color: #5a5a5a; border-radius: 2px; }<
      </widget>
 
      
+     <widget class="QWidget" name="pageFreeTransform">
+      <layout class="QHBoxLayout" name="pageFreeTransformLayout">
+       <property name="spacing"><number>0</number></property>
+       <property name="leftMargin"><number>0</number></property>
+       <property name="topMargin"><number>0</number></property>
+       <property name="rightMargin"><number>0</number></property>
+       <property name="bottomMargin"><number>0</number></property>
+       <item>
+        <widget class="QToolButton" name="ftRefPointButton">
+         <property name="sizePolicy"><sizepolicy hsizetype="Maximum" vsizetype="Preferred"><horstretch>0</horstretch><verstretch>0</verstretch></sizepolicy></property>
+         <property name="text"><string>⌖</string></property>
+         <property name="toolTip"><string>参考点位置（对照 PS 九宫格轴心）</string></property>
+         <property name="minimumSize"><size><width>28</width><height>24</height></size></property>
+        </widget>
+       </item>
+       <item><spacer name="pageFtGap0"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeType"><enum>QSizePolicy::Fixed</enum></property><property name="sizeHint"><size><width>8</width><height>20</height></size></property></spacer></item>
+       <item><widget class="LabeledLineEdit" name="ftXEdit"><property name="sizePolicy"><sizepolicy hsizetype="Maximum" vsizetype="Preferred"><horstretch>0</horstretch><verstretch>0</verstretch></sizepolicy></property><property name="labelText"><string>X</string></property><property name="text"><string>0.00</string></property><property name="editMaxWidth"><number>64</number></property><property name="toolTip"><string>参考点 X（像素）</string></property></widget></item>
+       <item><spacer name="pageFtGap1"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeType"><enum>QSizePolicy::Fixed</enum></property><property name="sizeHint"><size><width>8</width><height>20</height></size></property></spacer></item>
+       <item><widget class="LabeledLineEdit" name="ftYEdit"><property name="sizePolicy"><sizepolicy hsizetype="Maximum" vsizetype="Preferred"><horstretch>0</horstretch><verstretch>0</verstretch></sizepolicy></property><property name="labelText"><string>Y</string></property><property name="text"><string>0.00</string></property><property name="editMaxWidth"><number>64</number></property><property name="toolTip"><string>参考点 Y（像素）</string></property></widget></item>
+       <item><spacer name="pageFtGap2"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeType"><enum>QSizePolicy::Fixed</enum></property><property name="sizeHint"><size><width>12</width><height>20</height></size></property></spacer></item>
+       <item><widget class="LabeledLineEdit" name="ftWEdit"><property name="sizePolicy"><sizepolicy hsizetype="Maximum" vsizetype="Preferred"><horstretch>0</horstretch><verstretch>0</verstretch></sizepolicy></property><property name="labelText"><string>W</string></property><property name="text"><string>100.00%</string></property><property name="editMaxWidth"><number>72</number></property><property name="toolTip"><string>宽度（相对原始，%）</string></property></widget></item>
+       <item><spacer name="pageFtGap3"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeType"><enum>QSizePolicy::Fixed</enum></property><property name="sizeHint"><size><width>4</width><height>20</height></size></property></spacer></item>
+       <item>
+        <widget class="QToolButton" name="ftLinkAspectButton">
+         <property name="sizePolicy"><sizepolicy hsizetype="Maximum" vsizetype="Preferred"><horstretch>0</horstretch><verstretch>0</verstretch></sizepolicy></property>
+         <property name="text"><string>⛓</string></property>
+         <property name="checkable"><bool>true</bool></property>
+         <property name="checked"><bool>true</bool></property>
+         <property name="toolTip"><string>保持长宽比</string></property>
+         <property name="minimumSize"><size><width>24</width><height>24</height></size></property>
+        </widget>
+       </item>
+       <item><spacer name="pageFtGap4"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeType"><enum>QSizePolicy::Fixed</enum></property><property name="sizeHint"><size><width>4</width><height>20</height></size></property></spacer></item>
+       <item><widget class="LabeledLineEdit" name="ftHEdit"><property name="sizePolicy"><sizepolicy hsizetype="Maximum" vsizetype="Preferred"><horstretch>0</horstretch><verstretch>0</verstretch></sizepolicy></property><property name="labelText"><string>H</string></property><property name="text"><string>100.00%</string></property><property name="editMaxWidth"><number>72</number></property><property name="toolTip"><string>高度（相对原始，%）</string></property></widget></item>
+       <item><spacer name="pageFtGap5"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeType"><enum>QSizePolicy::Fixed</enum></property><property name="sizeHint"><size><width>12</width><height>20</height></size></property></spacer></item>
+       <item><widget class="LabeledLineEdit" name="ftAngleEdit"><property name="sizePolicy"><sizepolicy hsizetype="Maximum" vsizetype="Preferred"><horstretch>0</horstretch><verstretch>0</verstretch></sizepolicy></property><property name="labelText"><string>∠</string></property><property name="text"><string>0.00°</string></property><property name="editMaxWidth"><number>64</number></property><property name="toolTip"><string>旋转角度（度）</string></property></widget></item>
+       <item><spacer name="pageFtGap6"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeType"><enum>QSizePolicy::Fixed</enum></property><property name="sizeHint"><size><width>8</width><height>20</height></size></property></spacer></item>
+       <item><widget class="LabeledLineEdit" name="ftSkewHEdit"><property name="sizePolicy"><sizepolicy hsizetype="Maximum" vsizetype="Preferred"><horstretch>0</horstretch><verstretch>0</verstretch></sizepolicy></property><property name="labelText"><string>H</string></property><property name="text"><string>0.00°</string></property><property name="editMaxWidth"><number>56</number></property><property name="toolTip"><string>水平斜切（度）</string></property></widget></item>
+       <item><spacer name="pageFtGap7"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeType"><enum>QSizePolicy::Fixed</enum></property><property name="sizeHint"><size><width>8</width><height>20</height></size></property></spacer></item>
+       <item><widget class="LabeledLineEdit" name="ftSkewVEdit"><property name="sizePolicy"><sizepolicy hsizetype="Maximum" vsizetype="Preferred"><horstretch>0</horstretch><verstretch>0</verstretch></sizepolicy></property><property name="labelText"><string>V</string></property><property name="text"><string>0.00°</string></property><property name="editMaxWidth"><number>56</number></property><property name="toolTip"><string>垂直斜切（度）</string></property></widget></item>
+       <item><spacer name="pageFtGap8"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeType"><enum>QSizePolicy::Fixed</enum></property><property name="sizeHint"><size><width>12</width><height>20</height></size></property></spacer></item>
+       <item><widget class="LabeledComboBox" name="ftInterpCombo"><property name="sizePolicy"><sizepolicy hsizetype="Maximum" vsizetype="Preferred"><horstretch>0</horstretch><verstretch>0</verstretch></sizepolicy></property><property name="labelText"><string>插值</string></property><property name="toolTip"><string>对照 GIMP interpolation / PS 插值</string></property><property name="itemsText"><stringlist><string>邻近</string><string>两次线性</string><string>两次立方</string></stringlist></property></widget></item>
+       <item><spacer name="pageFtGap9"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeType"><enum>QSizePolicy::Fixed</enum></property><property name="sizeHint"><size><width>8</width><height>20</height></size></property></spacer></item>
+       <item>
+        <widget class="QToolButton" name="ftWarpButton">
+         <property name="enabled"><bool>false</bool></property>
+         <property name="sizePolicy"><sizepolicy hsizetype="Maximum" vsizetype="Preferred"><horstretch>0</horstretch><verstretch>0</verstretch></sizepolicy></property>
+         <property name="text"><string>〰</string></property>
+         <property name="toolTip"><string>变形（尚未接入）</string></property>
+         <property name="minimumSize"><size><width>28</width><height>24</height></size></property>
+        </widget>
+       </item>
+       <item><spacer name="pageFtStretch"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeType"><enum>QSizePolicy::Expanding</enum></property><property name="sizeHint"><size><width>40</width><height>20</height></size></property></spacer></item>
+       <item>
+        <widget class="QToolButton" name="ftCancelButton">
+         <property name="sizePolicy"><sizepolicy hsizetype="Maximum" vsizetype="Preferred"><horstretch>0</horstretch><verstretch>0</verstretch></sizepolicy></property>
+         <property name="text"><string>✕</string></property>
+         <property name="toolTip"><string>取消变换（Esc）</string></property>
+         <property name="minimumSize"><size><width>28</width><height>24</height></size></property>
+        </widget>
+       </item>
+       <item><spacer name="pageFtGap10"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeType"><enum>QSizePolicy::Fixed</enum></property><property name="sizeHint"><size><width>4</width><height>20</height></size></property></spacer></item>
+       <item>
+        <widget class="QToolButton" name="ftCommitButton">
+         <property name="sizePolicy"><sizepolicy hsizetype="Maximum" vsizetype="Preferred"><horstretch>0</horstretch><verstretch>0</verstretch></sizepolicy></property>
+         <property name="text"><string>✓</string></property>
+         <property name="toolTip"><string>提交变换（Enter）</string></property>
+         <property name="minimumSize"><size><width>28</width><height>24</height></size></property>
+        </widget>
+       </item>
+      </layout>
+     </widget>
+
      <widget class="QWidget" name="pageView">
       <layout class="QHBoxLayout" name="pageViewLayout">
        <property name="spacing"><number>0</number></property>
