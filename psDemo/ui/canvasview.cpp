@@ -7,6 +7,7 @@
 
 #include "domain/imagedocument.h"
 #include "domain/selection.h"
+#include "engine/premul.h"
 #include "pixmaputils.h"
 #include "tools/handtool.h"
 #include "tools/tool.h"
@@ -121,6 +122,34 @@ QSizeF CanvasView::contentSize() const
     return QSizeF(m_document->width() * m_zoom, m_document->height() * m_zoom);
 }
 
+/**
+ * pasteboard 过滚边距（对照 PS）：约为半个视口。
+ * 文档小于视口时仍能左右/上下拖；居中时滚动条落在行程中点。
+ */
+static qreal pasteboardMargin(qreal viewportSide)
+{
+    return qMax(64.0, viewportSide * 0.5);
+}
+
+void CanvasView::offsetRangeX(qreal *minOut, qreal *maxOut) const
+{
+    const QSizeF content = contentSize();
+    const qreal vw = width();
+    const qreal margin = pasteboardMargin(vw);
+    // max：图像左缘可到的最右位置；min：可到的最左位置
+    *maxOut = margin;
+    *minOut = vw - content.width() - margin;
+}
+
+void CanvasView::offsetRangeY(qreal *minOut, qreal *maxOut) const
+{
+    const QSizeF content = contentSize();
+    const qreal vh = height();
+    const qreal margin = pasteboardMargin(vh);
+    *maxOut = margin;
+    *minOut = vh - content.height() - margin;
+}
+
 void CanvasView::clampOffset()
 {
     if (!m_document) {
@@ -128,48 +157,57 @@ void CanvasView::clampOffset()
         return;
     }
 
-    const QSizeF content = contentSize();
-    const qreal vw = width();
-    const qreal vh = height();
-
-    // 小于视口：强制居中，禁止拖出窗口
-    if (content.width() <= vw)
-        m_offset.setX((vw - content.width()) * 0.5);
-    else
-        // 大于视口：左缘 ∈ [vw-contentW, 0]
-        m_offset.setX(qBound(vw - content.width(), m_offset.x(), 0.0));
-
-    if (content.height() <= vh)
-        m_offset.setY((vh - content.height()) * 0.5);
-    else
-        m_offset.setY(qBound(vh - content.height(), m_offset.y(), 0.0));
+    qreal minX = 0;
+    qreal maxX = 0;
+    qreal minY = 0;
+    qreal maxY = 0;
+    offsetRangeX(&minX, &maxX);
+    offsetRangeY(&minY, &maxY);
+    m_offset.setX(qBound(minX, m_offset.x(), maxX));
+    m_offset.setY(qBound(minY, m_offset.y(), maxY));
 }
 
 int CanvasView::scrollMaxX() const
 {
-    const qreal extra = contentSize().width() - width();
-    return extra > 0.5 ? qCeil(extra) : 0;
+    if (!m_document)
+        return 0;
+    qreal minX = 0;
+    qreal maxX = 0;
+    offsetRangeX(&minX, &maxX);
+    return qMax(0, qCeil(maxX - minX));
 }
 
 int CanvasView::scrollMaxY() const
 {
-    const qreal extra = contentSize().height() - height();
-    return extra > 0.5 ? qCeil(extra) : 0;
+    if (!m_document)
+        return 0;
+    qreal minY = 0;
+    qreal maxY = 0;
+    offsetRangeY(&minY, &maxY);
+    return qMax(0, qCeil(maxY - minY));
 }
 
 int CanvasView::scrollX() const
 {
-    if (scrollMaxX() <= 0)
+    const int mx = scrollMaxX();
+    if (mx <= 0)
         return 0;
-    // offset.x 为负或较小表示向右看了更多内容；scroll = -offset.x（左对齐时 0）
-    return qBound(0, qRound(-m_offset.x()), scrollMaxX());
+    qreal minX = 0;
+    qreal maxX = 0;
+    offsetRangeX(&minX, &maxX);
+    // scroll 0 ↔ offset=maxX；scroll max ↔ offset=minX
+    return qBound(0, qRound(maxX - m_offset.x()), mx);
 }
 
 int CanvasView::scrollY() const
 {
-    if (scrollMaxY() <= 0)
+    const int my = scrollMaxY();
+    if (my <= 0)
         return 0;
-    return qBound(0, qRound(-m_offset.y()), scrollMaxY());
+    qreal minY = 0;
+    qreal maxY = 0;
+    offsetRangeY(&minY, &maxY);
+    return qBound(0, qRound(maxY - m_offset.y()), my);
 }
 
 void CanvasView::setScrollOffset(int scrollX, int scrollY)
@@ -177,16 +215,17 @@ void CanvasView::setScrollOffset(int scrollX, int scrollY)
     if (!m_document)
         return;
 
-    const QSizeF content = contentSize();
-    if (content.width() <= width())
-        m_offset.setX((width() - content.width()) * 0.5);
-    else
-        m_offset.setX(-qreal(qBound(0, scrollX, scrollMaxX())));
+    qreal minX = 0;
+    qreal maxX = 0;
+    qreal minY = 0;
+    qreal maxY = 0;
+    offsetRangeX(&minX, &maxX);
+    offsetRangeY(&minY, &maxY);
 
-    if (content.height() <= height())
-        m_offset.setY((height() - content.height()) * 0.5);
-    else
-        m_offset.setY(-qreal(qBound(0, scrollY, scrollMaxY())));
+    const int mx = qMax(0, qCeil(maxX - minX));
+    const int my = qMax(0, qCeil(maxY - minY));
+    m_offset.setX(maxX - qreal(qBound(0, scrollX, mx)));
+    m_offset.setY(maxY - qreal(qBound(0, scrollY, my)));
 
     clampOffset();
     update();
@@ -288,6 +327,9 @@ void CanvasView::refreshToolContext()
     m_toolContext.selTolerance = m_selTolerance;
     m_toolContext.selContiguous = m_selContiguous;
     m_toolContext.selSampleMerged = m_selSampleMerged;
+    m_toolContext.magneticWidth = m_magneticWidth;
+    m_toolContext.magneticContrast = m_magneticContrast;
+    m_toolContext.magneticFrequency = m_magneticFrequency;
     m_toolContext.gradientType = m_gradientType;
     m_toolContext.gradientOpacity = m_gradientOpacity;
     m_toolContext.gradientOffsetPercent = m_gradientOffsetPercent;
@@ -368,6 +410,15 @@ void CanvasView::setSelectionFloodOptions(int tolerance, bool contiguous, bool s
     refreshToolContext();
 }
 
+void CanvasView::setMagneticLassoOptions(int width, int contrast, int frequency)
+{
+    m_magneticWidth = qBound(1, width, 256);
+    m_magneticContrast = qBound(1, contrast, 100);
+    m_magneticFrequency = qBound(1, frequency, 100);
+    refreshToolContext();
+    update(); // Caps Lock 搜索圈半径随宽度即时刷新
+}
+
 void CanvasView::setGradientOptions(Ps::GradientType type, qreal opacity, int offsetPercent,
                                     bool reverse, bool dither)
 {
@@ -397,10 +448,43 @@ void CanvasView::setShapeOptions(bool fill, bool stroke, qreal strokeWidth,
     refreshToolContext();
 }
 
+QColor CanvasView::sampleProjectionPixel(const QPointF &imagePos) const
+{
+    if (m_projection.isNull())
+        return QColor();
+    const QImage &img = m_projection.image();
+    const int x = qFloor(imagePos.x());
+    const int y = qFloor(imagePos.y());
+    if (x < 0 || y < 0 || x >= img.width() || y >= img.height())
+        return QColor();
+
+    const QRgb px = reinterpret_cast<const QRgb *>(img.constScanLine(y))[x];
+    int r = 0, g = 0, b = 0, a = 0;
+    Ps::Premul::unpremultiplyRgb(px, &r, &g, &b, &a);
+    if (a <= 0)
+        return QColor(0, 0, 0, 0);
+    return QColor(r, g, b, a);
+}
+
 void CanvasView::updateToolCursor()
 {
+    if (m_spaceHeld && !m_panning) {
+        setCursor(Qt::OpenHandCursor);
+        return;
+    }
     if (m_toolManager)
         setCursor(m_toolManager->activeCursor());
+}
+
+void CanvasView::endSpaceHandIfIdle()
+{
+    // 仍按着空格或平移拖拽未结束：保持临时抓手
+    if (m_spaceHeld || m_panning || !m_toolManager)
+        return;
+    if (m_toolManager->hasTemporaryTool())
+        m_toolManager->endTemporaryTool();
+    updateToolCursor();
+    update(); // 恢复原工具浮层（套索橡皮筋等）
 }
 
 // —— 绘制 ——
@@ -439,6 +523,9 @@ void CanvasView::paintEvent(QPaintEvent *)
         painter.setRenderHint(QPainter::SmoothPixmapTransform, false);
         tool->drawOverlay(painter, m_toolContext);
     }
+
+    // Caps Lock：笔刷类工具的作用范围圈（磁性套索自绘搜索圈，outlineRadius=0）
+    paintToolOutline(painter);
 }
 
 // —— 事件 ——
@@ -449,8 +536,47 @@ void CanvasView::wheelEvent(QWheelEvent *event)
         QWidget::wheelEvent(event);
         return;
     }
-    const qreal factor = event->angleDelta().y() > 0 ? 1.1 : (1.0 / 1.1);
-    zoomAt(event->position(), factor);
+
+    // 对照 PS：Alt+滚轮缩放；Ctrl+滚轮左右平移；裸滚轮上下平移（空格临时抓手见 keyPress）。
+    const Qt::KeyboardModifiers mods = event->modifiers();
+    const QPoint angle = event->angleDelta();
+    const QPoint pixels = event->pixelDelta();
+
+    if (mods.testFlag(Qt::AltModifier)) {
+        // 触控板常把纵向滚到 x；优先 y，否则用 x
+        const int wheel = angle.y() != 0 ? angle.y() : angle.x();
+        if (wheel == 0) {
+            event->ignore();
+            return;
+        }
+        const qreal factor = wheel > 0 ? 1.1 : (1.0 / 1.1);
+        zoomAt(event->position(), factor);
+        event->accept();
+        return;
+    }
+
+    // 平移步长：优先 pixelDelta（触控板），否则按 120°/格 折成约 48px
+    QPointF step;
+    if (!pixels.isNull()) {
+        step = QPointF(pixels);
+    } else {
+        constexpr qreal kPxPerNotch = 48.0;
+        step = QPointF(angle.x() * kPxPerNotch / 120.0,
+                       angle.y() * kPxPerNotch / 120.0);
+    }
+
+    if (mods.testFlag(Qt::ControlModifier)) {
+        // Ctrl+纵向滚轮 → 水平平移；触控板横向手势仍走 x
+        const qreal dx = step.y() != 0.0 ? step.y() : step.x();
+        if (dx != 0.0)
+            panBy(QPointF(dx, 0.0));
+    } else {
+        // 裸滚轮：纵向平移；仅有水平分量时顺带左右滑（触控板）
+        if (step.y() != 0.0)
+            panBy(QPointF(0.0, step.y()));
+        else if (step.x() != 0.0)
+            panBy(QPointF(step.x(), 0.0));
+    }
     event->accept();
 }
 
@@ -478,13 +604,13 @@ void CanvasView::mousePressEvent(QMouseEvent *event)
 
     const Ps::ToolEvent e = makeToolEvent(event);
 
-    // 通用平移手势（中键 / Alt+左键）优先于当前工具：由抓手工具承担。
-    // 对齐 PS/GIMP：任何工具下都能临时平移。
-    // 例外：仿制图章下 Alt+左键用于设源点（对照 PS），不抢给抓手。
-    const bool cloneAltSource = (currentTool() == Ps::ToolId::CloneStamp && e.isAltLeft());
-    if (!cloneAltSource && (Ps::HandTool::isPanGesture(e) || (m_spaceHeld && e.isLeft()))) {
+    // 空格已 beginTemporaryTool(Hand) 时，活动工具就是抓手，走下方 dispatch 即可。
+    // 中键 / Alt+左键：未切工具时的通用临时平移（对照 PS/GIMP）。
+    // 例外：仿制图章下 Alt+左键设源点，不抢给抓手。
+    const bool onHand = (currentTool() == Ps::ToolId::Hand);
+    const bool cloneAltSource = (!onHand && currentTool() == Ps::ToolId::CloneStamp && e.isAltLeft());
+    if (!onHand && !cloneAltSource && Ps::HandTool::isPanGesture(e)) {
         if (Ps::Tool *hand = m_toolManager->tool(Ps::ToolId::Hand)) {
-            // 上下文按值传给工具，工具不留副本（见 Tool::markDocumentDirty 的注释）
             m_panning = hand->mousePress(e, m_toolContext, *this);
             if (m_panning) {
                 event->accept();
@@ -493,8 +619,11 @@ void CanvasView::mousePressEvent(QMouseEvent *event)
         }
     }
 
-    // 其余事件交给活动工具；未消费则视为无操作（不再有工具专属 if 分支）
+    // 其余事件交给活动工具（含空格临时抓手）
     if (m_toolManager->dispatchPress(e, m_toolContext, *this)) {
+        // 抓手消费左键/中键按下 → 标记平移中，便于松空格时延后恢复原工具
+        if (onHand && (e.isLeft() || e.isMiddle()))
+            m_panning = true;
         event->accept();
         return;
     }
@@ -502,10 +631,22 @@ void CanvasView::mousePressEvent(QMouseEvent *event)
     QWidget::mousePressEvent(event);
 }
 
+void CanvasView::mouseDoubleClickEvent(QMouseEvent *event)
+{
+    // Qt 默认不把 DblClick 转成 mousePress；多边形/磁性套索靠 doubleClick 闭合
+    mousePressEvent(event);
+}
+
 void CanvasView::mouseMoveEvent(QMouseEvent *event)
 {
-    if (m_document)
-        emit cursorImagePosChanged(widgetToImage(event->position()), true);
+    if (m_document) {
+        m_pointerImagePos = widgetToImage(event->position());
+        m_pointerInside = true;
+        emit cursorImagePosChanged(m_pointerImagePos, true);
+        // Caps Lock 笔尖圈需随指针重画
+        if (Ps::Tool::capsLockOn())
+            update();
+    }
 
     if (!m_document || !m_toolManager) {
         QWidget::mouseMoveEvent(event);
@@ -546,14 +687,14 @@ void CanvasView::mouseReleaseEvent(QMouseEvent *event)
         m_panning = false;
         if (Ps::Tool *hand = m_toolManager->tool(Ps::ToolId::Hand)) {
             hand->mouseRelease(e, m_toolContext, *this);
-            // 平移结束后恢复当前工具的光标
-            updateToolCursor();
+            endSpaceHandIfIdle();
             event->accept();
             return;
         }
     }
 
     if (m_toolManager->dispatchRelease(e, m_toolContext, *this)) {
+        endSpaceHandIfIdle();
         event->accept();
         return;
     }
@@ -582,7 +723,10 @@ void CanvasView::showEvent(QShowEvent *event)
 
 void CanvasView::leaveEvent(QEvent *event)
 {
+    m_pointerInside = false;
     emit cursorImagePosChanged(QPointF(), false);
+    if (Ps::Tool::capsLockOn())
+        update();
     QWidget::leaveEvent(event);
 }
 
@@ -603,6 +747,12 @@ void CanvasView::keyPressEvent(QKeyEvent *event)
 {
     if (event->key() == Qt::Key_Space && !event->isAutoRepeat()) {
         m_spaceHeld = true;
+        // 其他工具下：临时切到抓手（不 deactivate 原工具，松键后恢复）
+        if (m_toolManager && m_document) {
+            refreshToolContext();
+            if (m_toolManager->beginTemporaryTool(Ps::ToolId::Hand))
+                update();
+        }
         if (!m_panning)
             setCursor(Qt::OpenHandCursor);
         event->accept();
@@ -619,6 +769,13 @@ void CanvasView::keyPressEvent(QKeyEvent *event)
         }
     }
 
+    // 画笔等工具不消费 Caps Lock：画布自行刷新笔尖范围圈
+    if (event->key() == Qt::Key_CapsLock && !event->isAutoRepeat()) {
+        update();
+        event->accept();
+        return;
+    }
+
     QWidget::keyPressEvent(event);
 }
 
@@ -626,8 +783,7 @@ void CanvasView::keyReleaseEvent(QKeyEvent *event)
 {
     if (event->key() == Qt::Key_Space && !event->isAutoRepeat()) {
         m_spaceHeld = false;
-        if (!m_panning)
-            updateToolCursor();
+        endSpaceHandIfIdle();
         event->accept();
         return;
     }
@@ -772,6 +928,36 @@ void CanvasView::paintPixelGrid(QPainter &painter, const QRectF &imageRectInWidg
         painter.drawLine(QPointF(left, wy), QPointF(right, wy));
     }
 
+    painter.restore();
+}
+
+void CanvasView::paintToolOutline(QPainter &painter)
+{
+    if (!m_pointerInside || !m_toolManager || !Ps::Tool::capsLockOn())
+        return;
+
+    Ps::Tool *tool = m_toolManager->activeTool();
+    if (!tool)
+        return;
+
+    refreshToolContext();
+    const qreal radiusDoc = tool->outlineRadius(m_toolContext);
+    if (radiusDoc <= 0.0 || m_zoom <= 0.0)
+        return;
+
+    const QPointF c = imageToWidget(m_pointerImagePos);
+    const qreal r = radiusDoc * m_zoom;
+    painter.save();
+    painter.setRenderHint(QPainter::Antialiasing, true);
+    QPen pen(QColor(255, 255, 255, 200));
+    pen.setCosmetic(true);
+    pen.setWidth(1);
+    painter.setPen(pen);
+    painter.setBrush(Qt::NoBrush);
+    painter.drawEllipse(c, r, r);
+    pen.setColor(QColor(0, 0, 0, 160));
+    painter.setPen(pen);
+    painter.drawEllipse(c, r + 1.0, r + 1.0);
     painter.restore();
 }
 

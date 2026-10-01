@@ -8,10 +8,6 @@
 #include "domain/imagedocument.h"
 #include "domain/layer.h"
 
-#include <QTabWidget>
-#include <QSpinBox>
-#include <QToolButton>
-
 namespace {
 
 /** 折叠分区的箭头；展开/收起各一个（对应 GIMP 展开器 GtkExpander 的三角）。 */
@@ -27,6 +23,24 @@ PropertiesPanel::PropertiesPanel(QWidget *parent)
     ui->setupUi(this);
     // 对齐图标 / ≡ 在 propertiespanel.ui
     ui->panelTabs->setCornerWidget(ui->btnPanelMenu, Qt::TopRightCorner);
+
+    // X/Y/旋转：失焦钳制；控件类型来自 ui_propertiespanel.h
+    connect(ui->editAngle, &QLineEdit::editingFinished, this, [this]() {
+        bool ok = false;
+        const double v = ui->editAngle->text().trimmed().toDouble(&ok);
+        ui->editAngle->setText(ok ? QString::number(qBound(-360.0, v, 360.0), 'f', 1)
+                                  : QStringLiteral("0.0"));
+    });
+    connect(ui->editX, &QLineEdit::editingFinished, this, [this]() {
+        bool ok = false;
+        const int v = ui->editX->text().trimmed().toInt(&ok);
+        ui->editX->setText(QString::number(ok ? qBound(-100000, v, 100000) : 0));
+    });
+    connect(ui->editY, &QLineEdit::editingFinished, this, [this]() {
+        bool ok = false;
+        const int v = ui->editY->text().trimmed().toInt(&ok);
+        ui->editY->setText(QString::number(ok ? qBound(-100000, v, 100000) : 0));
+    });
 
     bindCollapsible(ui->toggleTransform, ui->transformBody);
     bindCollapsible(ui->toggleAlign, ui->alignBody);
@@ -92,8 +106,8 @@ void PropertiesPanel::refreshFromDocument()
 {
     if (!m_document) {
         ui->labelTarget->setText(QStringLiteral("未打开文档"));
-        ui->spinW->setValue(0);
-        ui->spinH->setValue(0);
+        ui->editW->setText(QStringLiteral("0"));
+        ui->editH->setText(QStringLiteral("0"));
         return;
     }
 
@@ -103,13 +117,13 @@ void PropertiesPanel::refreshFromDocument()
                                      .arg(m_document->width())
                                      .arg(m_document->height())
                                      .arg(layer->name()));
-        ui->spinW->setValue(layer->width());
-        ui->spinH->setValue(layer->height());
+        ui->editW->setText(QString::number(layer->width()));
+        ui->editH->setText(QString::number(layer->height()));
     } else {
         ui->labelTarget->setText(QStringLiteral("文档 %1 × %2 px｜无活动图层")
                                      .arg(m_document->width())
                                      .arg(m_document->height()));
-        ui->spinW->setValue(0);
-        ui->spinH->setValue(0);
+        ui->editW->setText(QStringLiteral("0"));
+        ui->editH->setText(QStringLiteral("0"));
     }
 }

@@ -46,6 +46,8 @@ ToolManager::ToolManager(QObject *parent)
     registerTool(std::make_unique<CropTool>());
     registerTool(std::make_unique<EyedropperTool>());
     registerTool(std::make_unique<PaintTool>(Ps::ToolId::Brush, /*eraseMode=*/false));
+    registerTool(std::make_unique<PaintTool>(Ps::ToolId::Pencil, /*eraseMode=*/false,
+                                             /*hardness=*/1.0));
     registerTool(std::make_unique<CloneStampTool>());
     registerTool(std::make_unique<PaintTool>(Ps::ToolId::Eraser, /*eraseMode=*/true));
     registerTool(std::make_unique<PaintBucketTool>());
@@ -118,8 +120,43 @@ void ToolManager::setContext(const ToolContext &ctx)
     m_context = ctx;
 }
 
+bool ToolManager::beginTemporaryTool(Ps::ToolId id)
+{
+    // 不可嵌套；已是目标工具则无需切换
+    if (m_toolBeforeTemporary)
+        return false;
+    Tool *next = tool(id);
+    if (!next || next == m_activeTool)
+        return false;
+
+    m_toolBeforeTemporary = m_activeTool;
+    m_activeTool = next;
+    rewriteConnections();
+    // 故意不 emit activeToolChanged：工具箱/选项栏仍显示用户选定的原工具（对照 PS）
+    emit cursorChangeRequested(activeCursor());
+    return true;
+}
+
+void ToolManager::endTemporaryTool()
+{
+    if (!m_toolBeforeTemporary)
+        return;
+    m_activeTool = m_toolBeforeTemporary;
+    m_toolBeforeTemporary = nullptr;
+    rewriteConnections();
+    emit cursorChangeRequested(activeCursor());
+}
+
 bool ToolManager::setActiveTool(Ps::ToolId id, ViewPort &view)
 {
+    // 用户从工具箱显式切工具：取消空格临时态，再从「压栈前工具」正常切换
+    if (m_toolBeforeTemporary) {
+        if (m_activeTool && m_activeTool != m_toolBeforeTemporary)
+            m_activeTool->deactivate(m_context, view); // 清临时抓手拖拽态
+        m_activeTool = m_toolBeforeTemporary;
+        m_toolBeforeTemporary = nullptr;
+    }
+
     Tool *next = tool(id);
     if (!next) {
         // 未接入逻辑的工具 → 兜底到 MoveTool，而不是保留上一个工具的行为

@@ -46,7 +46,8 @@
 
 - 【依据】`gimp-master/app/core/gimpdrawablefilter.c`、`gimpfilterstack.c`、`app/gegl/gimpapplicator.c`、`app/operations/layer-modes/`。
 - 【本项目】只读滤镜节点栈 + 调整层；`Layer` 允许无可编辑像素。**不引入 GEGL**。
-- 【排期】`wiki/Roadmap.md` Phase 8（依赖 Phase 7）。
+- 【排期】`wiki/Roadmap.md` Phase 8（节点栈首片，依赖 Phase 7）。
+- 【滤镜库升级】**Phase 9**：在现有雏形上改造成迷你图引擎（仿 GEGL 语义）——先统一 `FilterEval`→`OpRunner`，再 `engine/graph/`，再 ROI/异步/多线程；仍不绑 GEGL。
 
 ## 技术点日志
 
@@ -467,9 +468,13 @@ return QIcon(pm);                                 // 这个 QIcon 只有一张 2
 ### 2026-09 — 画布滚动条与平移钳制
 
 - `canvasworkspace.ui` 增加水平/竖直 `QScrollBar`（对齐 PS 画布区）。
-- `CanvasView::clampOffset`：小图居中锁定；大图边缘钳制，禁止整幅拖出视口。
+- `CanvasView::clampOffset`：pasteboard 过滚（边距≈半视口）；小图可拖、滚动条居中；大图可略过边缘。
 - 滚动条与 `setScrollOffset` / `scrollX|Y` 双向同步。
-- Qt 在 `min==max` 时会禁用滚动条；完整可见时用假行程保持 AlwaysOn 外观。
+
+### 2026-10 — PS 式过滚
+
+- 去掉「文档完整可见则锁定居中 / 假行程」；`offsetRange` = `[vw-cw-margin, margin]`。
+- 居中时 `scroll ≈ max/2`，滑块在中间，可继续拖（对照用户 PS 截图）。
 
 ### 2026-09 — 标尺与画布居中
 

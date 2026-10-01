@@ -24,6 +24,7 @@ public:
     Qt::CursorShape cursorShape() const override;
     bool hasOverlay() const override;
     void drawOverlay(QPainter &painter, const ToolContext &ctx) const override;
+    qreal outlineRadius(const ToolContext &ctx) const override { return ctx.brushRadius; }
 
     bool mousePress(const ToolEvent &event, const ToolContext &ctx, ViewPort &view) override;
     bool mouseMove(const ToolEvent &event, const ToolContext &ctx, ViewPort &view) override;

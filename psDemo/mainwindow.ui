@@ -60,12 +60,11 @@
        <widget class="CanvasWorkspace" name="canvasWorkspace" native="true"/>
       </item>
       <item>
-       <!-- PS 式右侧栏：颜色/色板/渐变/图案 → 属性/调整/库 → 图层/通道/路径。
-            用 QSplitter 而不是固定布局：三段高度**可拖动调节**（PS 的面板组之间
-            也是这种拖动条），否则下面图层区会被上面两块按各自 sizeHint 挤扁。
-            不折叠(childrenCollapsible=false) + 每段的 minimumHeight 兜底，
-            拖到底也不会把某一块拖没（要隐藏请用「窗口」菜单）。
-            窄栏宽度约束放在 splitter 上，三段共用，不必写三份。 -->
+       <!-- PS 式右侧栏：信息（默认隐藏）→ 颜色 → 属性 → 图层/通道/路径。
+            用 QSplitter 而不是固定布局：段高度**可拖动调节**。
+            不折叠(childrenCollapsible=false) + 每段的 minimumHeight 兜底；
+            要隐藏请用「窗口」菜单（信息：F8）。
+            窄栏宽度约束放在 splitter 上，各段共用。 -->
        <widget class="QSplitter" name="rightSplitter">
         <property name="minimumSize">
          <size>
@@ -91,6 +90,17 @@
         <property name="opaqueResize">
          <bool>true</bool>
         </property>
+        <widget class="InfoPanel" name="infoPanel" native="true">
+         <property name="minimumSize">
+          <size>
+           <width>0</width>
+           <height>200</height>
+          </size>
+         </property>
+         <property name="visible">
+          <bool>false</bool>
+         </property>
+        </widget>
         <widget class="ColorsPanel" name="colorsPanel" native="true">
          <property name="minimumSize">
           <size>
@@ -5642,11 +5652,14 @@
    <property name="checkable">
     <bool>true</bool>
    </property>
-   <property name="enabled">
+   <property name="checked">
     <bool>false</bool>
    </property>
+   <property name="shortcut">
+    <string>F8</string>
+   </property>
    <property name="toolTip">
-    <string>UI 占位，功能尚未接入</string>
+    <string>显示或隐藏信息面板（F8）</string>
    </property>
   </action>
   <action name="actionWindowLayerComps">
@@ -5924,6 +5937,12 @@
    <class>DockPanel</class>
    <extends>QWidget</extends>
    <header>ui/dockpanel.h</header>
+   <container>1</container>
+  </customwidget>
+  <customwidget>
+   <class>InfoPanel</class>
+   <extends>QWidget</extends>
+   <header>ui/infopanel.h</header>
    <container>1</container>
   </customwidget>
   <customwidget>

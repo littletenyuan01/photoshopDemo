@@ -36,7 +36,8 @@ QT_END_NAMESPACE
  *
  * ⚠️ **现状**：已接线——「大小」（画笔/橡皮/图章）、油漆桶页的容差/连续/填充源/不透明度、
  * 渐变页的类型/不透明度/偏移/仿色/反向、**选区页魔棒项（容差/连续/取样）**、
- * **绘画页图章项（对齐/取样）**、**形状页（填充/描边/粗细/圆角/抗锯齿）**。其余控件多为 **UI 占位**；
+ * **绘画页图章项（对齐/取样）**、**形状页（填充/描边/粗细/圆角/抗锯齿）**、
+ * **选区页磁性套索项（宽度/对比度/频率）**。其余控件多为 **UI 占位**；
  * 占位工具的提示语写「逻辑尚未接入」。
  */
 class ToolOptionsBar : public QWidget
@@ -59,6 +60,11 @@ public:
     int selTolerance() const;
     bool selContiguous() const;
     bool selSampleMerged() const;
+
+    // —— 磁性套索（pageSelection 专有项；对照 PS Width/Contrast/Frequency）——
+    int magneticWidth() const;
+    int magneticContrast() const;
+    int magneticFrequency() const;
 
     // —— 渐变选项（pageGradient）——
     Ps::GradientType gradientType() const;
@@ -96,6 +102,8 @@ signals:
     void fillOptionsChanged();
     /** 魔棒/快速选择参数变化（容差/连续/取样）。 */
     void selectionFloodOptionsChanged();
+    /** 磁性套索参数变化（宽度/对比度/频率）。 */
+    void magneticLassoOptionsChanged();
     /** 渐变参数变化（类型/不透明度/偏移/仿色/反向任一变动）。 */
     void gradientOptionsChanged();
     /** 仿制图章参数变化（对齐 / 对所有图层取样）。 */

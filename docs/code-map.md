@@ -34,13 +34,13 @@
 | `tools/movetool.h/.cpp` | 占位；**中性兜底**：未接入逻辑的工具切过去不消费事件 |
 | `tools/handtool.h/.cpp` | 平移；`isPanGesture` 供画布判定中键 / Alt+左键通用手势 |
 | `tools/zoomtool.h/.cpp` | 锚点缩放（左键放大 / 右键缩小） |
-| `tools/painttool.h/.cpp` | 画笔 + 橡皮（同一类、两种 mode；只负责事件→dab，写像素在 PaintEngine） |
+| `tools/painttool.h/.cpp` | 画笔 + 铅笔 + 橡皮（同一类；铅笔 hardness=1.0；只负责事件→dab，写像素在 PaintEngine） |
 | `tools/paintbuckettool.h/.cpp` | 油漆桶 |
 | `tools/gradienttool.h/.cpp` | 渐变 |
 | `tools/marqueeselecttool.h/.cpp` | **矩形/椭圆选框**：拖拽写入 `Selection`；Shift/Ctrl 加减交 |
 | `tools/lassotool.h/.cpp` | **自由套索**：拖拽折线 → `selectPolygon` → `SelectPolygonOp` |
 | `tools/polygonallassotool.h/.cpp` | **多边形套索**：单击顶点 / 双击·Enter 闭合；共用 `SelectPolygonOp` |
-| `tools/magneticlassotool.h/.cpp` | **磁性套索**：拖拽 + 局部 Sobel 吸附 → `SelectPolygonOp` |
+| `tools/magneticlassotool.h/.cpp` | **磁性套索**：紧固点 + 圆域吸附 + Livewire 段路径；Frequency 自动紧固 → `SelectPolygonOp` |
 | `tools/magicwandtool.h/.cpp` | **魔棒**：单击 → `SelectFloodOp`（容差/连续/取样） |
 | `tools/quickselecttool.h/.cpp` | **快速选择（精简）**：拖拽连通域扩张 → `SelectFloodOp` |
 | `tools/croptool.h/.cpp` | **裁剪**：拖框 + Enter → `ImageDocument::cropTo` |
@@ -48,12 +48,14 @@
 | `tools/clonestamptool.h/.cpp` | **仿制图章**：Alt 设源 → `PaintEngine::cloneStampDab` |
 | `engine/op/clonestampdabop.h/.cpp` | **CloneStampDabOp**：采样图 + 圆形刷盖度写入瓦片 |
 | `tools/focustool.h/.cpp` | **模糊/锐化/涂抹**：→ `PaintEngine::focusDab` |
-| `engine/op/focusdabop.h/.cpp` | **FocusDabOp**：盒模糊 / 锐化 / 沿笔画涂抹 |
+| `engine/op/focusdabop.h/.cpp` | **FocusDabOp**：可分离盒模糊预计算 / 锐化 / 涂抹 |
+| `engine/op/brushcover.h` | 圆形刷盖度（dist² 早退；Focus/Tone/Clone 共用） |
+| `engine/op/tilepatch.h` | 瓦片↔矩形补丁 memcpy（Focus/Tone/FloodFill 共用） |
 | `tools/tonetool.h/.cpp` | **减淡/海绵**：→ `PaintEngine::toneDab` |
 | `engine/op/tonedabop.h/.cpp` | **ToneDabOp**：提亮 / 提高饱和度 |
 | `tools/shapetool.h/.cpp` | **形状**：拖框 → `PaintEngine::fillShape` |
 | `engine/op/shapefillop.h/.cpp` | **ShapeFillOp**：矩形/椭圆/三角/直线栅格化 |
-| `engine/magneticedgesnap.h` | 邻域梯度吸附（对照 iscissors 导数图瘦身） |
+| `engine/magneticedgesnap.h` | 格点 Sobel（**归一化到 0..255**）+ Width **圆**搜索 + Dijkstra Livewire（f_G 幅值项 + **f_D 方向项**；对照 GIMP `find_max_gradient` / `find_optimal_path`）。标定、成因与验证见 [engine/magnetic-lasso.md](engine/magnetic-lasso.md) |
 | `engine/op/selectfloodop.*` | 连通域/相似色写入选区 |
 
 **要点**：新增工具 = 加一个类 + 在 `ToolManager` 注册一行，**`CanvasView` 与 `MainWindow` 均无需改动**。
@@ -124,9 +126,12 @@ UI 不得直接改 `Layer`，一律走 `setLayerVisible/Opacity/Name/BlendMode` 
 | `ui/colorspanel.ui/.h/.cpp` | 颜色/色板/渐变/图案（对齐 PS 四页）；组内色块/方缩略图网格 |
 | `ui/hsvcolorwell.h/.cpp` | PS 式色域：重叠 FG/BG + 二维 S/V + 竖直色相 |
 | `ui/propertiespanel.ui/.h/.cpp` | 属性/调整/库停靠面板；「属性」页显示**真实**文档尺寸与活动图层名，可折叠分区 |
+| `ui/infopanel.ui/.h/.cpp` | **信息**面板（对照 PS Info）：RGB/CMYK、XY、选区 WH、文档占用、工具说明；F8 / 默认隐藏 |
 | `ui/pixmaputils.h` | 位图/图标公共工具：DPR 画布、多档图标光栅化、透明棋盘格（原先在 itemtreepanel / colorspanel / canvasview / toolbox 四处各写一份） |
 | `ui/toolbox.ui/.h/.cpp` | 左侧工具箱：17 个占位槽 / 35 个工具，按 PS 分组，右键飞出菜单（对齐 GIMP Toolbox 结构） |
-| `ui/tooloptionsbar.ui/.h/.cpp` | 工具选项栏：`QStackedWidget` 11 个工具族参数页，随工具整块切换（对照 GIMP `gimp_tool_options_gui()`）；左端「家」发 `homeClicked` |
+| `ui/tooloptionsbar.ui/.h/.cpp` | 工具选项栏：`QStackedWidget` 11 个工具族参数页，随工具整块切换（对照 GIMP `gimp_tool_options_gui()`）；左端「家」发 `homeClicked`；数值/下拉用 `LabeledLineEdit` / `LabeledComboBox` |
+| `ui/labeledlineedit.h/.cpp` | 选项栏「标签+文本框」合体（紧贴、横向不撑开） |
+| `ui/labeledcombobox.h/.cpp` | 选项栏「标签+下拉」合体（紧贴、横向不撑开） |
 | `ui/homescreen.ui/.h/.cpp` | PS 主页全页壳（新文件/打开/最近项）；对照 GIMP `welcome-dialog.c` Create 页，本项目用栈页 |
 | `ui/newdocumentdialog.ui/.h/.cpp` | PS「新建文档」对话框壳；对照 GIMP `image-new-dialog.c` + TemplateEditor |
 

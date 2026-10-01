@@ -1,11 +1,7 @@
 /**
- * magneticlassotool.h — 磁性套索选区工具（tools 层）。
+ * magneticlassotool.h — 磁性套索（tools 层）。
  *
- * 对照 GIMP Intelligent Scissors（gimpiscissorstool + tilehandler 梯度图）与
- * PS Magnetic Lasso：拖拽时把折线吸附到局部强边缘，松手闭合写入选区。
- * 提交仍走 ImageDocument::selectPolygon → SelectPolygonOp（算子框架）。
- *
- * 本 Demo 不做全图 livewire / 种子点编辑；简化为「拖拽采样 + 邻域 Sobel 吸附」。
+ * 流程：单击落首锚 → 移动圆域吸边 → 锚点到 tip 走 Livewire → Frequency 自动落锚。
  */
 #ifndef MAGNETICLASSOTOOL_H
 #define MAGNETICLASSOTOOL_H
@@ -33,19 +29,42 @@ public:
     bool mousePress(const ToolEvent &event, const ToolContext &ctx, ViewPort &view) override;
     bool mouseMove(const ToolEvent &event, const ToolContext &ctx, ViewPort &view) override;
     bool mouseRelease(const ToolEvent &event, const ToolContext &ctx, ViewPort &view) override;
+    bool keyPress(int key, Qt::KeyboardModifiers modifiers,
+                  const ToolContext &ctx, ViewPort &view) override;
+    bool wantsShortcutOverride(int key, Qt::KeyboardModifiers modifiers) const override;
     void deactivate(const ToolContext &ctx, ViewPort &view) override;
 
 private:
     static ChannelOp opFromModifiers(Qt::KeyboardModifiers modifiers);
-    /** 吸附到边缘后，距末点够远才追加。 */
-    void appendSnapped(const QPointF &imagePos);
+    void syncParamsFromContext(const ToolContext &ctx);
+    bool ensureSource(const ToolContext &ctx);
+    void trackAlongEdge(const QPointF &imagePos);
+    void addFastener(const QPointF &gridPos);
+    void rebuildLiveSegment(const QPointF &tip);
+    void undoLastFastener();
+    bool nearFirstWidget(const QPointF &widgetPos, const ToolContext &ctx) const;
+    bool commit(const ToolContext &ctx);
     void clearStroke();
 
-    bool m_dragging = false;
+    bool m_active = false;
     ChannelOp m_op = ChannelOp::Replace;
-    QImage m_source;             ///< 按下时合成图缓存（边缘采样用）
-    QVector<QPointF> m_imagePts; ///< 文档坐标折线（已吸附）
-    int m_searchRadius = 12;     ///< 边缘搜索半径（文档像素）
+    QImage m_source;
+    bool m_sourceReady = false;
+
+    QVector<QPointF> m_fasteners; ///< 已落锚点（整数格点）
+    QVector<QPointF> m_edgePath;  ///< 已提交段 + 实时贴合段
+    QPointF m_tip;
+    bool m_hasTip = false;
+
+    QPointF m_cursorImage;
+    bool m_hasCursor = false;
+
+    int m_searchRadius = 10;           ///< Width：圆半径
+    qreal m_minEdge = 48.0;            ///< Contrast
+    qreal m_anchorSpacing = 19.0;      ///< Frequency → 锚点最小间距（文档像素）
+    qreal m_travelSinceFastener = 0.0; ///< 自上一锚点起、光标累计行进距离
+    QPointF m_prevCursor;              ///< 上一次鼠标位置（算行进距离用）
+    bool m_hasPrevCursor = false;
 };
 
 } // namespace Ps

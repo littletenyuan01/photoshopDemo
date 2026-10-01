@@ -7,6 +7,13 @@
 
 #include "domain/imagedocument.h"
 
+#ifdef Q_OS_WIN
+#  ifndef WIN32_LEAN_AND_MEAN
+#    define WIN32_LEAN_AND_MEAN
+#  endif
+#  include <windows.h>
+#endif
+
 namespace Ps {
 
 Tool::Tool(Ps::ToolId id, QObject *parent)
@@ -16,6 +23,15 @@ Tool::Tool(Ps::ToolId id, QObject *parent)
 }
 
 Tool::~Tool() = default;
+
+bool Tool::capsLockOn()
+{
+#ifdef Q_OS_WIN
+    return (GetKeyState(VK_CAPITAL) & 1) != 0;
+#else
+    return false;
+#endif
+}
 
 bool Tool::mouseMove(const ToolEvent &event, const ToolContext &ctx, ViewPort &view)
 {

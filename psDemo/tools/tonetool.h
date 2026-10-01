@@ -21,6 +21,7 @@ public:
     ToneTool(Ps::ToolId id, ToneMode mode, QObject *parent = nullptr);
 
     Qt::CursorShape cursorShape() const override;
+    qreal outlineRadius(const ToolContext &ctx) const override { return ctx.brushRadius; }
 
     bool mousePress(const ToolEvent &event, const ToolContext &ctx, ViewPort &view) override;
     bool mouseMove(const ToolEvent &event, const ToolContext &ctx, ViewPort &view) override;

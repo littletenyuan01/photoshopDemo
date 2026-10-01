@@ -62,7 +62,8 @@ public:
 
     /**
      * 由滚动条设置偏移（控件坐标）。
-     * scrollX/Y：内容左/上超出视口的量（≥0），与 QScrollBar::value 同构。
+     * scrollX/Y 与 QScrollBar::value 同构：0 = 最「右/下推」极限，max = 最「左/上推」极限。
+     * 含 pasteboard 过滚（对照 PS：文档缩小时滚动条仍在中间、可继续拖）。
      */
     void setScrollOffset(int scrollX, int scrollY);
     int scrollX() const;
@@ -88,6 +89,8 @@ public:
     void setFillOptions(int tolerance, bool contiguous, Ps::FillSource fillSource, qreal opacity);
     /** 同步魔棒/快速选择选项（容差/连续/对所有图层取样）。 */
     void setSelectionFloodOptions(int tolerance, bool contiguous, bool sampleMerged);
+    /** 同步磁性套索选项（宽度/对比度/频率）。 */
+    void setMagneticLassoOptions(int width, int contrast, int frequency);
     /** 同步渐变选项（类型/不透明度/偏移/反向/仿色）。 */
     void setGradientOptions(Ps::GradientType type, qreal opacity, int offsetPercent,
                             bool reverse, bool dither);
@@ -96,6 +99,12 @@ public:
     /** 同步形状选项（填充/描边/粗细/圆角/抗锯齿）。 */
     void setShapeOptions(bool fill, bool stroke, qreal strokeWidth,
                          qreal cornerRadius, bool antialias);
+
+    /**
+     * 从当前投影缓存读取文档坐标像素（解预乘后的 RGB）。
+     * 供信息面板实时取样；越界或投影未就绪返回无效色。
+     */
+    QColor sampleProjectionPixel(const QPointF &imagePos) const;
 
     // —— Ps::ViewPort 实现（供工具请求视图操作）——
     void zoomAt(const QPointF &widgetPos, qreal factor) override;
@@ -115,6 +124,7 @@ protected:
     void paintEvent(QPaintEvent *event) override;
     void wheelEvent(QWheelEvent *event) override;
     void mousePressEvent(QMouseEvent *event) override;
+    void mouseDoubleClickEvent(QMouseEvent *event) override;
     void mouseMoveEvent(QMouseEvent *event) override;
     void mouseReleaseEvent(QMouseEvent *event) override;
     void resizeEvent(QResizeEvent *event) override;
@@ -126,8 +136,11 @@ protected:
 private:
     void syncProjection();
     void notifyViewChanged();
-    /** 将 m_offset 钳制到合法范围，保证文档不整体移出视口。 */
+    /** 将 m_offset 钳制到合法范围（含 pasteboard 过滚，对照 PS）。 */
     void clampOffset();
+    /** 水平/竖直可平移的 offset 上下限（控件坐标）。 */
+    void offsetRangeX(qreal *minOut, qreal *maxOut) const;
+    void offsetRangeY(qreal *minOut, qreal *maxOut) const;
     QPointF imageToWidget(const QPointF &imagePos) const;
     QPointF widgetToImage(const QPointF &widgetPos) const;
     QRectF imageRectInWidget() const;
@@ -149,6 +162,13 @@ private:
     void syncMarchingAntTimer();
     /** 选区变化时从 mask 重建轮廓路径（文档坐标）。 */
     void rebuildSelectionOutlinePath();
+    /** Caps Lock 开时画工具作用范围圈（对照 PS 笔尖指示；半径来自 Tool::outlineRadius）。 */
+    void paintToolOutline(QPainter &painter);
+    /**
+     * 结束空格临时抓手（松键且未在拖、或拖完松键后调用）。
+     * 恢复 beginTemporaryTool 压栈的原工具。
+     */
+    void endSpaceHandIfIdle();
 
     Ps::ImageDocument *m_document = nullptr; ///< 不拥有；由 AppSession 持有
     Ps::Projection m_projection;             ///< 只读投影缓存（对照 GimpProjection）
@@ -172,6 +192,10 @@ private:
     bool m_selContiguous = true;
     bool m_selSampleMerged = false;
 
+    int m_magneticWidth = 10;
+    int m_magneticContrast = 40;
+    int m_magneticFrequency = 57;
+
     Ps::GradientType m_gradientType = Ps::GradientType::Linear;
     qreal m_gradientOpacity = 1.0;
     int m_gradientOffsetPercent = 0;
@@ -190,6 +214,9 @@ private:
     QTimer *m_antsTimer = nullptr; ///< 蚂蚁线虚线相位动画
     qreal m_antsPhase = 0.0;
     QPainterPath m_antsPath; ///< 选区轮廓（文档像素坐标）；selectionChanged 时重建
+
+    QPointF m_pointerImagePos; ///< 最近指针文档坐标（Caps Lock 笔尖圈用）
+    bool m_pointerInside = false;
 };
 
 #endif // CANVASVIEW_H

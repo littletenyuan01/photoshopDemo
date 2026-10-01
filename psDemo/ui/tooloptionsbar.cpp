@@ -1,62 +1,112 @@
 /**
  * tooloptionsbar.cpp — 工具选项栏实现（ui 层）。
+ *
+ * 数值参数用文本框手输；控件类型由 ui_tooloptionsbar.h（自 .ui）提供，本文件不重复 include 控件头。
  */
 #include "tooloptionsbar.h"
 #include "ui_tooloptionsbar.h"
 
-#include <QCheckBox>
-#include <QComboBox>
-#include <QSpinBox>
-#include <QToolButton>
+namespace {
+
+/** 从合体控件 / 文本框读整数并钳制；解析失败用 @p fallback。 */
+int editInt(const LabeledLineEdit *field, int lo, int hi, int fallback)
+{
+    bool ok = false;
+    const int v = field->text().trimmed().toInt(&ok);
+    return ok ? qBound(lo, v, hi) : fallback;
+}
+
+/** 失焦写回合法值并回调（范围约束在此完成，不另挂 QIntValidator）。 */
+template<typename F>
+void wireIntEdit(LabeledLineEdit *field, int lo, int hi, int fallback, F onCommit)
+{
+    QObject::connect(field, &LabeledLineEdit::editingFinished, field,
+                     [field, lo, hi, fallback, onCommit]() {
+                         field->setText(QString::number(editInt(field, lo, hi, fallback)));
+                         onCommit();
+                     });
+}
+
+} // namespace
 
 ToolOptionsBar::ToolOptionsBar(QWidget *parent)
     : QWidget(parent)
     , ui(new Ui::ToolOptionsBar)
 {
     ui->setupUi(this);
-    // 图标 / iconSize / 色块样式见 tooloptionsbar.ui
 
     // 画笔/橡皮直径
-    connect(ui->brushSizeSpin, qOverload<int>(&QSpinBox::valueChanged),
-            this, &ToolOptionsBar::brushDiameterChanged);
+    wireIntEdit(ui->brushSizeEdit, 1, 500, 20, [this]() {
+        emit brushDiameterChanged(brushDiameter());
+    });
 
-    // 油漆桶：容差 / 连续 / 填充源 / 不透明度 → 汇总为 fillOptionsChanged
+    // 油漆桶
     const auto emitFill = [this]() { emit fillOptionsChanged(); };
-    connect(ui->fillToleranceSpin, qOverload<int>(&QSpinBox::valueChanged), this, emitFill);
+    wireIntEdit(ui->fillToleranceEdit, 0, 255, 32, emitFill);
+    wireIntEdit(ui->fillOpacityEdit, 0, 100, 100, emitFill);
     connect(ui->fillContiguousCheck, &QCheckBox::toggled, this, emitFill);
-    connect(ui->fillTypeCombo, qOverload<int>(&QComboBox::currentIndexChanged), this, emitFill);
-    connect(ui->fillOpacitySpin, qOverload<int>(&QSpinBox::valueChanged), this, emitFill);
+    connect(ui->fillTypeCombo, &LabeledComboBox::currentIndexChanged, this, emitFill);
 
-    // 魔棒 / 快速选择：容差 / 连续 / 对所有图层取样
+    // 魔棒 / 快速选择
     const auto emitSelFlood = [this]() { emit selectionFloodOptionsChanged(); };
-    connect(ui->selToleranceSpin, qOverload<int>(&QSpinBox::valueChanged), this, emitSelFlood);
+    wireIntEdit(ui->selToleranceEdit, 0, 255, 32, emitSelFlood);
+    wireIntEdit(ui->selFeatherEdit, 0, 250, 0, []() {}); // 羽化暂未接线，仅规范化显示
     connect(ui->selContiguousCheck, &QCheckBox::toggled, this, emitSelFlood);
     connect(ui->selSampleMergedCheck, &QCheckBox::toggled, this, emitSelFlood);
 
-    // 渐变：类型 / 不透明度 / 偏移 / 仿色 / 反向（混合模式暂未接入引擎）
+    // 磁性套索
+    const auto emitMag = [this]() { emit magneticLassoOptionsChanged(); };
+    wireIntEdit(ui->magWidthEdit, 1, 256, 10, emitMag);
+    wireIntEdit(ui->magContrastEdit, 1, 100, 40, emitMag);
+    wireIntEdit(ui->magFreqEdit, 1, 100, 57, emitMag);
+
+    // 渐变
     const auto emitGrad = [this]() { emit gradientOptionsChanged(); };
-    connect(ui->gradTypeCombo, qOverload<int>(&QComboBox::currentIndexChanged), this, emitGrad);
-    connect(ui->gradOpacitySpin, qOverload<int>(&QSpinBox::valueChanged), this, emitGrad);
-    connect(ui->gradOffsetSpin, qOverload<int>(&QSpinBox::valueChanged), this, emitGrad);
+    connect(ui->gradTypeCombo, &LabeledComboBox::currentIndexChanged, this, emitGrad);
+    wireIntEdit(ui->gradOpacityEdit, 0, 100, 100, emitGrad);
+    wireIntEdit(ui->gradOffsetEdit, 0, 100, 0, emitGrad);
     connect(ui->gradDitherCheck, &QCheckBox::toggled, this, emitGrad);
     connect(ui->gradReverseCheck, &QCheckBox::toggled, this, emitGrad);
 
-    // 仿制图章：对齐 / 对所有图层取样
+    // 仿制图章
     const auto emitClone = [this]() { emit cloneStampOptionsChanged(); };
     connect(ui->paintAlignCheck, &QCheckBox::toggled, this, emitClone);
     connect(ui->paintSampleMergedCheck, &QCheckBox::toggled, this, emitClone);
 
-    // 形状：填充默认前景色；描边默认关
+    // 绘画页占位数值（硬度/不透明度/流量/间距）——仅规范化，未全部接线
+    wireIntEdit(ui->paintHardnessEdit, 0, 100, 85, []() {});
+    wireIntEdit(ui->paintOpacityEdit, 0, 100, 100, []() {});
+    wireIntEdit(ui->paintFlowEdit, 0, 100, 100, []() {});
+    wireIntEdit(ui->paintSpacingEdit, 1, 1000, 25, []() {});
+
+    // 裁剪占位宽高
+    wireIntEdit(ui->cropWidthEdit, 0, 99999, 800, []() {});
+    wireIntEdit(ui->cropHeightEdit, 0, 99999, 600, []() {});
+
+    // 路径 / 文字占位
+    wireIntEdit(ui->pathStrokeWidthEdit, 1, 100, 2, []() {});
+    wireIntEdit(ui->textSizeEdit, 1, 999, 24, []() {});
+    wireIntEdit(ui->textLineSpacingEdit, -200, 500, 0, []() {});
+
+    // 形状
     ui->shapeFillCombo->setCurrentIndex(1);
     const auto emitShape = [this]() { emit shapeOptionsChanged(); };
-    connect(ui->shapeFillCombo, qOverload<int>(&QComboBox::currentIndexChanged), this, emitShape);
-    connect(ui->shapeStrokeCombo, qOverload<int>(&QComboBox::currentIndexChanged), this, emitShape);
-    connect(ui->shapeWidthSpin, qOverload<int>(&QSpinBox::valueChanged), this, emitShape);
-    connect(ui->shapeRadiusSpin, qOverload<int>(&QSpinBox::valueChanged), this, emitShape);
+    connect(ui->shapeFillCombo, &LabeledComboBox::currentIndexChanged, this, emitShape);
+    connect(ui->shapeStrokeCombo, &LabeledComboBox::currentIndexChanged, this, emitShape);
+    wireIntEdit(ui->shapeWidthEdit, 1, 200, 2, emitShape);
+    wireIntEdit(ui->shapeRadiusEdit, 0, 500, 0, emitShape);
     connect(ui->shapeSmoothCheck, &QCheckBox::toggled, this, emitShape);
 
-    // 「家」→ 主页（UI 阶段只发信号，由 MainWindow 切到 HomeScreen）
     connect(ui->homeButton, &QToolButton::clicked, this, &ToolOptionsBar::homeClicked);
+
+    // 选项条控件默认 StrongFocus：切工具换页时 Qt 会把焦点塞给新页的按钮/勾选框，
+    // 空格被当成「点家/勾选」而不是画布临时抓手。图标钮不接焦点；勾选/下拉仅点击聚焦。
+    for (auto *btn : findChildren<QToolButton *>())
+        btn->setFocusPolicy(Qt::NoFocus);
+    for (auto *box : findChildren<QCheckBox *>())
+        box->setFocusPolicy(Qt::ClickFocus);
+    for (auto *combo : findChildren<QComboBox *>())
+        combo->setFocusPolicy(Qt::ClickFocus);
 
     setCurrentTool(Ps::ToolId::Move);
 }
@@ -68,19 +118,18 @@ ToolOptionsBar::~ToolOptionsBar()
 
 int ToolOptionsBar::brushDiameter() const
 {
-    return ui->brushSizeSpin->value();
+    return editInt(ui->brushSizeEdit, 1, 500, 20);
 }
 
 void ToolOptionsBar::setBrushDiameter(int diameter)
 {
-    ui->brushSizeSpin->blockSignals(true);
-    ui->brushSizeSpin->setValue(qBound(1, diameter, 500));
-    ui->brushSizeSpin->blockSignals(false);
+    // 仅规范化显示；wireIntEdit 挂的是 editingFinished，setText 不会误触发提交
+    ui->brushSizeEdit->setText(QString::number(qBound(1, diameter, 500)));
 }
 
 int ToolOptionsBar::fillTolerance() const
 {
-    return ui->fillToleranceSpin->value();
+    return editInt(ui->fillToleranceEdit, 0, 255, 32);
 }
 
 bool ToolOptionsBar::fillContiguous() const
@@ -100,12 +149,12 @@ Ps::FillSource ToolOptionsBar::fillSource() const
 
 int ToolOptionsBar::fillOpacityPercent() const
 {
-    return ui->fillOpacitySpin->value();
+    return editInt(ui->fillOpacityEdit, 0, 100, 100);
 }
 
 int ToolOptionsBar::selTolerance() const
 {
-    return ui->selToleranceSpin->value();
+    return editInt(ui->selToleranceEdit, 0, 255, 32);
 }
 
 bool ToolOptionsBar::selContiguous() const
@@ -116,6 +165,21 @@ bool ToolOptionsBar::selContiguous() const
 bool ToolOptionsBar::selSampleMerged() const
 {
     return ui->selSampleMergedCheck->isChecked();
+}
+
+int ToolOptionsBar::magneticWidth() const
+{
+    return editInt(ui->magWidthEdit, 1, 256, 10);
+}
+
+int ToolOptionsBar::magneticContrast() const
+{
+    return editInt(ui->magContrastEdit, 1, 100, 40);
+}
+
+int ToolOptionsBar::magneticFrequency() const
+{
+    return editInt(ui->magFreqEdit, 1, 100, 57);
 }
 
 Ps::GradientType ToolOptionsBar::gradientType() const
@@ -129,12 +193,12 @@ Ps::GradientType ToolOptionsBar::gradientType() const
 
 int ToolOptionsBar::gradientOpacityPercent() const
 {
-    return ui->gradOpacitySpin->value();
+    return editInt(ui->gradOpacityEdit, 0, 100, 100);
 }
 
 int ToolOptionsBar::gradientOffsetPercent() const
 {
-    return ui->gradOffsetSpin->value();
+    return editInt(ui->gradOffsetEdit, 0, 100, 0);
 }
 
 bool ToolOptionsBar::gradientReverse() const
@@ -159,7 +223,6 @@ bool ToolOptionsBar::cloneSampleMerged() const
 
 bool ToolOptionsBar::shapeFill() const
 {
-    // 0=无；1=前景色；图案/渐变回退前景
     return ui->shapeFillCombo->currentIndex() != 0;
 }
 
@@ -170,12 +233,12 @@ bool ToolOptionsBar::shapeStroke() const
 
 int ToolOptionsBar::shapeStrokeWidth() const
 {
-    return ui->shapeWidthSpin->value();
+    return editInt(ui->shapeWidthEdit, 1, 200, 2);
 }
 
 int ToolOptionsBar::shapeCornerRadius() const
 {
-    return ui->shapeRadiusSpin->value();
+    return editInt(ui->shapeRadiusEdit, 0, 500, 0);
 }
 
 bool ToolOptionsBar::shapeAntialias() const
@@ -187,12 +250,10 @@ void ToolOptionsBar::setCurrentTool(Ps::ToolId id)
 {
     ui->toolNameLabel->setText(toolDisplayName(id));
 
-    // 按工具族整页切换 —— 对照 GIMP `gimp_tools_get_tool_options_gui()`
     if (QWidget *page = pageForTool(id))
         ui->optionsStack->setCurrentWidget(page);
 
     updateToolSpecificControls(id);
-    // 提示语交给 MainWindow 显示在状态栏（选项条里只放参数，对齐 PS）
     m_hint = hintForTool(id);
 }
 
@@ -202,7 +263,6 @@ QWidget *ToolOptionsBar::pageForTool(Ps::ToolId id) const
     case Ps::ToolId::Move:
         return ui->pageMove;
 
-    // 选区族（选框 / 套索 / 魔棒 / 快速选择）共用一个页面
     case Ps::ToolId::RectSelect:
     case Ps::ToolId::EllipseSelect:
     case Ps::ToolId::Lasso:
@@ -219,7 +279,6 @@ QWidget *ToolOptionsBar::pageForTool(Ps::ToolId id) const
     case Ps::ToolId::Eyedropper:
         return ui->pageEyedropper;
 
-    // 绘画族（画笔 / 铅笔 / 混合器 / 橡皮 / 图章 / 模糊锐化涂抹 / 减淡海绵）
     case Ps::ToolId::Brush:
     case Ps::ToolId::Pencil:
     case Ps::ToolId::MixerBrush:
@@ -263,16 +322,17 @@ QWidget *ToolOptionsBar::pageForTool(Ps::ToolId id) const
 
 void ToolOptionsBar::updateToolSpecificControls(Ps::ToolId id)
 {
-    // 选区页：容差/连续/对所有图层取样 只属于魔棒与快速选择
     const bool wandLike = (id == Ps::ToolId::MagicWand || id == Ps::ToolId::QuickSelect);
-    ui->selToleranceLabel->setVisible(wandLike);
-    ui->selToleranceSpin->setVisible(wandLike);
+    // 容差 = LabeledLineEdit 合体控件
+    ui->selToleranceEdit->setVisible(wandLike);
     ui->selContiguousCheck->setVisible(wandLike);
     ui->selSampleMergedCheck->setVisible(wandLike);
 
-    // 绘画页：对齐 / 对所有图层取样 只属于仿制图章
-    // （对照 GIMP：gimp_clone_options_gui 在 paint options 之上追加 clone-type /
-    //   sample-merged / align-mode，其余绘画工具没有这几项）
+    const bool magnetic = (id == Ps::ToolId::MagneticLasso);
+    ui->magWidthEdit->setVisible(magnetic);
+    ui->magContrastEdit->setVisible(magnetic);
+    ui->magFreqEdit->setVisible(magnetic);
+
     const bool cloneLike = (id == Ps::ToolId::CloneStamp);
     ui->paintAlignCheck->setVisible(cloneLike);
     ui->paintSampleMergedCheck->setVisible(cloneLike);
@@ -280,12 +340,13 @@ void ToolOptionsBar::updateToolSpecificControls(Ps::ToolId id)
 
 QString ToolOptionsBar::hintForTool(Ps::ToolId id)
 {
-    // 提示语要短（标签最大宽 320px）。已接入的写用法，其余统一说明「参数是占位」
     switch (id) {
     case Ps::ToolId::Move:
         return QObject::tr("点击选中图层并拖拽移动；图层面板同步选中");
     case Ps::ToolId::Brush:
         return QObject::tr("左键绘制（仅「大小」生效）");
+    case Ps::ToolId::Pencil:
+        return QObject::tr("左键硬边绘制（硬度 100%；仅「大小」生效）");
     case Ps::ToolId::Eraser:
         return QObject::tr("左键擦除（仅「大小」生效）");
     case Ps::ToolId::PaintBucket:
@@ -305,7 +366,7 @@ QString ToolOptionsBar::hintForTool(Ps::ToolId id)
     case Ps::ToolId::PolygonalLasso:
         return QObject::tr("单击加点；Shift 吸附水平/垂直/垂线；双击/Enter 闭合；Backspace 撤点；Esc 取消");
     case Ps::ToolId::MagneticLasso:
-        return QObject::tr("拖拽沿线吸附边缘；松手闭合；按下 Shift 加选 / Ctrl 减选");
+        return QObject::tr("单击起点；移动吸边；频率自动紧固；再单击强制锚；双击/Enter 闭合");
     case Ps::ToolId::MagicWand:
         return QObject::tr("单击按颜色建选区；选项栏调容差/连续/取样；Shift 加选 / Ctrl 减选");
     case Ps::ToolId::QuickSelect:
@@ -341,58 +402,40 @@ QString ToolOptionsBar::hintForTool(Ps::ToolId id)
 
 QString ToolOptionsBar::toolDisplayName(Ps::ToolId id)
 {
-    // 名称须与 toolbox.cpp 的 buildToolSlots() 保持一致。
-    // 【已知债】工具元数据目前分散在 toolbox.cpp / 本文件 / toolid.h 三处，
-    // 计划收敛成 ToolInfo 注册表（见 docs/code-map.md「计划中」）。
     switch (id) {
     case Ps::ToolId::Move: return QObject::tr("移动工具");
-
     case Ps::ToolId::RectSelect: return QObject::tr("矩形选框工具");
     case Ps::ToolId::EllipseSelect: return QObject::tr("椭圆选框工具");
-
     case Ps::ToolId::Lasso: return QObject::tr("套索工具");
     case Ps::ToolId::PolygonalLasso: return QObject::tr("多边形套索工具");
     case Ps::ToolId::MagneticLasso: return QObject::tr("磁性套索工具");
-
     case Ps::ToolId::QuickSelect: return QObject::tr("快速选择工具");
     case Ps::ToolId::MagicWand: return QObject::tr("魔棒工具");
-
     case Ps::ToolId::Crop: return QObject::tr("裁剪工具");
     case Ps::ToolId::PerspectiveCrop: return QObject::tr("透视裁剪工具");
-
     case Ps::ToolId::Eyedropper: return QObject::tr("吸管工具");
-
     case Ps::ToolId::Brush: return QObject::tr("画笔工具");
     case Ps::ToolId::Pencil: return QObject::tr("铅笔工具");
     case Ps::ToolId::MixerBrush: return QObject::tr("混合器画笔工具");
-
     case Ps::ToolId::CloneStamp: return QObject::tr("仿制图章工具");
-
     case Ps::ToolId::Eraser: return QObject::tr("橡皮擦工具");
     case Ps::ToolId::BackgroundEraser: return QObject::tr("背景橡皮擦工具");
-
     case Ps::ToolId::PaintBucket: return QObject::tr("油漆桶工具");
     case Ps::ToolId::Gradient: return QObject::tr("渐变工具");
-
     case Ps::ToolId::Blur: return QObject::tr("模糊工具");
     case Ps::ToolId::Sharpen: return QObject::tr("锐化工具");
     case Ps::ToolId::Smudge: return QObject::tr("涂抹工具");
-
     case Ps::ToolId::Dodge: return QObject::tr("减淡工具");
     case Ps::ToolId::Sponge: return QObject::tr("海绵工具");
-
     case Ps::ToolId::Pen: return QObject::tr("钢笔工具");
     case Ps::ToolId::FreeformPen: return QObject::tr("自由钢笔工具");
     case Ps::ToolId::AddAnchorPoint: return QObject::tr("添加锚点工具");
-
     case Ps::ToolId::Type: return QObject::tr("横排文字工具");
     case Ps::ToolId::TypeVertical: return QObject::tr("直排文字工具");
-
     case Ps::ToolId::ShapeRect: return QObject::tr("矩形工具");
     case Ps::ToolId::ShapeEllipse: return QObject::tr("椭圆工具");
     case Ps::ToolId::ShapeTriangle: return QObject::tr("三角形工具");
     case Ps::ToolId::ShapeLine: return QObject::tr("直线工具");
-
     case Ps::ToolId::Hand: return QObject::tr("抓手工具");
     case Ps::ToolId::Zoom: return QObject::tr("缩放工具");
     }

@@ -90,6 +90,84 @@
 - [x] 【硬约束】节点栈只读，不得就地改写 `Layer` 瓦片（`FilterEval` 只改临时图）
 - [x] 首个滤镜：`OpName::BrightnessContrast` + 菜单「图像→调整→亮度/对比度」（默认参数，无对话框）
 
+> **Phase 8 止于「能演示非破坏节点」**。产品级滤镜库（实时拖参、长链、大图不卡）见 **Phase 9**。
+
+## Phase 9 — 迷你图引擎（仿 GEGL 语义）+ 滤镜库
+
+> 【结论】**已有雏形，不另起炉灶**——在现有 `engine/op` + `FilterStack` 上改造成「迷你 GEGL」。  
+> 【目标】能力对齐 GEGL 的 ROI / 异步 / 多线程图求值；**仍不捆绑 GEGL 库**。  
+> 【前置】Phase 7 脏区 + Phase 8 节点栈；`OpRunner` 须先可线程安全（见 `docs/engine/operators.md` §7）。
+
+### 9.0 现有雏形（已实现，改造起点）
+
+| GEGL 概念 | 本项目现状 | 缺口 |
+|-----------|------------|------|
+| Operation | `BufferOp` / `OpName` / `opsInit` | 滤镜求值多走 `FilterEval`，未统一进 `OpRunner` |
+| 注册表 | `OpRegistry` + `PointOpRegistry` | 滤镜目录 UI 尚未消费名字表 |
+| prepare→process | `OpRunner` | 单线程常驻实例，无图调度 |
+| 节点链 | `FilterNode` + `FilterStack::apply` | **线性栈**，非整图；无边/依赖 |
+| 缓冲 | `TileBuffer` 64×64 | 滤镜仍 `materialize` **整层临时图** |
+| 脏区 | `Projection` / `dirtyRect` | 未传到滤镜节点级 ROI |
+| 异步 / 并行 | 无 | Phase 9.2 / 9.3 |
+
+对照链路（现状）：
+
+```text
+菜单加滤镜 → FilterStack.append(FilterNode)
+合成 → materialize 整层 → FilterStack::apply → FilterEval::applyNode（同步、整图）
+交互绘制 → PaintEngine → OpRunner → BufferOp（另一条路，已算子化）
+```
+
+改造目标链路：
+
+```text
+FilterStack（或升级为 FilterGraph）
+  → GraphScheduler（ROI + 缓存 + 线程池）
+    → OpRunner / BufferOp（与画笔共用注册表）
+      → 分块写回节点缓存 → Compositor 只取输出
+```
+
+### 9.0.1 改造步骤（顺序固定，避免返工）
+
+1. **统一求值入口**：`FilterEval` 改为薄封装，内部按 `node.op()` 调 `OpRunner`（或专用滤镜 `BufferOp`）；禁止滤镜与绘制两套无关算法壳。  
+2. **栈 → 图**：引入 `engine/graph/`（建议名 `PsGraph`）：`GraphNode` / `GraphEdge` / `GraphScheduler`；初期图可仍是单链，接口按图设计。  
+3. **分块 + ROI**：`FilterStack::apply(QImage)` 改为对 `TileBuffer`/分块 ROI 求值；节点输出缓存带参数指纹。  
+4. **异步**：`GraphScheduler` 投递到线程池；UI 只收完成信号；请求可取消合并。  
+5. **并行**：无依赖分块并行；先改 `OpRunner` 线程模型（加锁 **或** 每线程实例）。  
+6. **产品面**：滤镜浏览器、对话框实时预览、重排/蒙版、undo——挂在图引擎之上。
+
+- [ ] 文档化上述映射（本小节 + `docs/architecture.md` / `docs/engine/operators.md` 互链）
+- [ ] 落地 `engine/graph/` 骨架（可先空转单链，行为与 `FilterStack` 等价）
+- [ ] `FilterEval` → `OpRunner` 收口（BrightnessContrast 作样板）
+
+### 9.1 完整 ROI / 节点缓存
+
+- [ ] 滤镜节点带 **输入/输出 ROI**：参数或上游脏区变化时，只重算相交区域
+- [ ] 节点输出可缓存（按层 + 节点 id + 参数指纹）；未脏节点跳过求值
+- [ ] 合成侧消费「滤镜栈脏区 ∪ 图层脏区」，避免每次 `materialize` 整层重跑全栈
+- [ ] 对照：GIMP `gimptilehandlervalidate` / GEGL 的 ROI 传播语义（自研等价物）
+
+### 9.2 异步求值（不卡 UI）
+
+- [ ] 重滤镜 / 拖动参数时：**后台算预览**，UI 线程只投递请求与贴图
+- [ ] 请求可取消 / 合并（最新参数覆盖未完成任务，防滑条拖影排队）
+- [ ] 完成回调经 Qt 信号回主线程更新 `Projection` / 对话框预览
+- [ ] Phase 7「投影同步不算后台线程」约束**仅限投影 idle**；本阶段允许**滤镜求值线程池**
+
+### 9.3 多线程算子图
+
+- [ ] 滤镜栈升级为可调度的 **算子图**（节点 = `OpName` + 参数 + 可选蒙版 pad；边 = 数据依赖）
+- [ ] 图内独立子树 / 分块可并行（线程池）；共享 `TileBuffer` 访问有明确读写协议
+- [ ] `OpRunner`：常驻实例加锁，或改为「每线程一份实例 / 无状态算子」——二选一写进实现说明
+- [ ] 画笔类交互算子仍可走 UI 线程短路径；滤镜图与交互路径隔离，避免抢同一实例
+
+### 9.4 滤镜库产品面（与上三项配套）
+
+- [ ] 滤镜浏览器 / 分类菜单（消费 `opNameId` / `opNameTitle`）
+- [ ] 常用滤镜扩面（模糊、锐化、色阶/曲线对话框等）；参数面板可实时预览
+- [ ] 节点重排、滤镜蒙版（可后置于 9.1–9.3 跑通之后）
+- [ ] 撤销：滤镜参数/栈结构变更走专用 undo（对照 `gimpdrawablefilterundo` 精简）
+
 ## Phase 5 — 有余力再做（可选 stretch，非 v1）
 
 > 优先级低于 v1 闭环与简历打磨；**不作为完成标准**。体量大、兼容面广，仅在链路稳、代码量仍有余量时再开。
@@ -97,3 +175,4 @@
 - [ ] **PSD 导入 / 导出**：能读常见分层 PSD（至少图层像素 + 显隐/透明度）；导出尽量保留图层。不追求完整 PS 特性兼容
 - [ ] **智能对象**：图层可嵌入位图（或简化为「可再栅格化的嵌入文档」）；支持替换内容、统一变换后再栅格化参与合成
 - [ ] **插件库**：极简扩展点（如滤镜/导出钩子），进程内动态库或脚本均可；**不做** GIMP PDB / 完整插件宿主
+  - 与 Phase 9 关系：插件可注册新 `OpName` 进滤镜图；**不替代** Phase 9 的 ROI/异步/多线程基建

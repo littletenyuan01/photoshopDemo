@@ -1,5 +1,5 @@
 /**
- * painttool.cpp — 画笔/橡皮工具实现（tools 层）。
+ * painttool.cpp — 画笔/铅笔/橡皮工具实现（tools 层）。
  */
 #include "painttool.h"
 
@@ -28,11 +28,21 @@ PaintEngine::SelectionClip selectionClipFor(Layer *layer, ImageDocument *doc)
 
 } // namespace
 
-PaintTool::PaintTool(Ps::ToolId id, bool eraseMode, QObject *parent)
+PaintTool::PaintTool(Ps::ToolId id, bool eraseMode, qreal hardness, QObject *parent)
     : Tool(id, parent)
     , m_paintId(id)
     , m_erase(eraseMode)
+    , m_hardness(qBound(0.0, hardness, 1.0))
 {
+}
+
+QString PaintTool::undoLabel() const
+{
+    if (m_erase)
+        return QObject::tr("橡皮擦");
+    if (m_paintId == Ps::ToolId::Pencil)
+        return QObject::tr("铅笔");
+    return QObject::tr("画笔");
 }
 
 Qt::CursorShape PaintTool::cursorShape() const
@@ -58,14 +68,13 @@ bool PaintTool::mousePress(const ToolEvent &event, const ToolContext &ctx, ViewP
     m_lastImagePos = event.imagePos;
 
     // 对照 gimp_drawable_push_undo：改像素前推入旧缓冲；一笔一条
-    ctx.document->pushLayerPixelsUndo(ctx.document->activeLayerIndex(),
-                                      m_erase ? QObject::tr("橡皮擦") : QObject::tr("画笔"));
+    ctx.document->pushLayerPixelsUndo(ctx.document->activeLayerIndex(), undoLabel());
 
     // 瓦片是层内坐标：文档点先减 Layer offset（对照 drawable 局部坐标）
     const QPointF local = layer->toLayerLocal(event.imagePos);
     // 脏区由算子返回（已与层范围求交），工具侧不再自己推算
     const QRect dirtyLocal = PaintEngine::stampDab(
-        layer->tiles(), local, ctx.brushRadius, ctx.foreground, mode, 0.85, clip);
+        layer->tiles(), local, ctx.brushRadius, ctx.foreground, mode, m_hardness, clip);
     if (!dirtyLocal.isEmpty())
         markDocumentDirty(ctx, dirtyLocal.translated(layer->offsetX(), layer->offsetY()));
     return true;
@@ -90,10 +99,9 @@ bool PaintTool::mouseMove(const ToolEvent &event, const ToolContext &ctx, ViewPo
     const QPointF fromLocal = layer->toLayerLocal(m_lastImagePos);
     const QPointF toLocal = layer->toLayerLocal(event.imagePos);
     // 一次鼠标移动 = 一段笔画；算子返回本段扫过的**全部** dab 的并集脏区。
-    // （旧代码用「已更新过的」m_lastImagePos 当脏区起点，等于只标了末端一个 dab）
     const QRect dirtyLocal = PaintEngine::strokeSegment(
         layer->tiles(), fromLocal, toLocal,
-        ctx.brushRadius, ctx.foreground, mode, 0.85, 0.25, clip);
+        ctx.brushRadius, ctx.foreground, mode, m_hardness, 0.25, clip);
     m_lastImagePos = event.imagePos;
     if (!dirtyLocal.isEmpty())
         markDocumentDirty(ctx, dirtyLocal.translated(layer->offsetX(), layer->offsetY()));

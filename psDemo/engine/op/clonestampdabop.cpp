@@ -1,10 +1,11 @@
 /**
  * clonestampdabop.cpp — clonestampdabop.h 实现（engine/op 层）。
  *
- * 逐像素：刷盖度 × 采样像素 SourceOver 写入瓦片；有选区时子区备份回滚。
+ * 逐像素：刷盖度 × 采样像素 SourceOver 写入瓦片；BrushCover dist² 早退。
  */
 #include "clonestampdabop.h"
 
+#include "brushcover.h"
 #include "paintclip.h"
 #include "domain/tilebuffer.h"
 
@@ -14,26 +15,12 @@ namespace Ps {
 
 namespace {
 
-/** 硬/软边盖度 [0,1]：与 StampDabOp 径向渐变 stop 语义对齐。 */
-qreal brushCover(qreal dist, qreal radius, qreal hardness)
-{
-    if (radius <= 0.0 || dist >= radius)
-        return 0.0;
-    hardness = qBound(0.0, hardness, 1.0);
-    const qreal stop = qBound(0.05, hardness, 0.98) * radius;
-    if (dist <= stop)
-        return 1.0;
-    const qreal t = (dist - stop) / (radius - stop);
-    return qBound(0.0, 1.0 - t, 1.0);
-}
-
 /** 预乘 SourceOver，额外乘 cover∈[0,1]。 */
 void blendPremulCover(QRgb *dst, QRgb src, qreal cover)
 {
     if (cover <= 0.0)
         return;
     if (cover >= 1.0) {
-        // 完全覆盖且源不透明时直接替换；否则仍走混合
         if (qAlpha(src) >= 255) {
             *dst = src;
             return;
@@ -83,12 +70,10 @@ void cloneDabOnTile(QImage &tile,
         for (int lx = area.left(); lx <= area.right(); ++lx) {
             const qreal dx = lx + 0.5 - centerLayer.x();
             const qreal dy = ly + 0.5 - centerLayer.y();
-            const qreal dist = qSqrt(dx * dx + dy * dy);
-            const qreal cover = brushCover(dist, radius, hardness) * opacity;
+            const qreal cover = BrushCover::fromDist2(dx * dx + dy * dy, radius, hardness) * opacity;
             if (cover <= 0.0)
                 continue;
 
-            // 层内偏移 = 文档偏移（同源缩放）；采样点 = 源中心 + (像素 − dab 中心)
             const int sx = qFloor(sourceDoc.x() + dx);
             const int sy = qFloor(sourceDoc.y() + dy);
             if (sx < 0 || sy < 0 || sx >= sw || sy >= sh)

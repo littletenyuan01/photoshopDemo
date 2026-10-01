@@ -35,9 +35,9 @@
 |---|------|-----------|-----------|-----------|
 | ① | **推入式撤销 + 每对象一类** | **必须前置**：后补则每个改文档状态的入口都要返工，漏一处即静默不可撤销 | `gimpimage-undo-push.h` 50+ 个 `push_*` 入口；`gimpdrawableundo` / `gimplayerundo` / `gimpitemundo`… | 裁到 4 类 push；不做 GObject undo 类层次 |
 | ② | **模型与投影分离 + 脏区分块更新** | 免去全量重合成；图层/画布变大后唯一可走的路 | `gimpprojection.c`、`gimptilehandlervalidate.c`、`gimpchunkiterator.c` | 只做脏矩形 + 分块缓存；不做稀疏 tile、不做优先级线程 |
-| ③ | **节点化非破坏编辑（滤镜/调整层）** | 「滤镜是节点」而非一次栅格化；调整层的前提 | `gimpapplicator.c`、`gimpdrawablefilter.c`、`gimpfilterstack.c` | **不引入 GEGL**；只取可重排/可开关语义 |
+| ③ | **节点化非破坏编辑（滤镜/调整层）** | 「滤镜是节点」而非一次栅格化；调整层的前提 | `gimpapplicator.c`、`gimpdrawablefilter.c`、`gimpfilterstack.c` | **不引入 GEGL**；Phase 8 节点栈；**Phase 9 滤镜库**须达成 ROI 缓存 / 异步 / 多线程算子图 |
 
-**依赖关系**：③ 依赖 ② 的脏区机制在位；① 独立，但必须先于「按钮小功能批量实现」。
+**依赖关系**：③ 依赖 ② 的脏区机制在位；① 独立，但必须先于「按钮小功能批量实现」。Phase 9 依赖 Phase 8 节点语义 + `OpRunner` 可线程化改造。
 
 ## 刻意不做（v1 / 默认范围）
 

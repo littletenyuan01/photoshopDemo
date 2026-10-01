@@ -9,18 +9,11 @@
 #include "pixmaputils.h"
 
 #include <QColor>
-#include <QFrame>
 #include <QIcon>
-#include <QLineEdit>
 #include <QLinearGradient>
-#include <QListWidget>
 #include <QListWidgetItem>
 #include <QPainter>
 #include <QPixmap>
-#include <QSpinBox>
-#include <QTabWidget>
-#include <QToolButton>
-#include <QTreeWidget>
 #include <QTreeWidgetItem>
 
 namespace {
@@ -207,9 +200,9 @@ ColorsPanel::ColorsPanel(QWidget *parent)
 
     connect(ui->hsvWell, &HsvColorWell::colorChanged, this, &ColorsPanel::onWellColorChanged);
     connect(ui->hsvWell, &HsvColorWell::swatchesSwapped, this, &ColorsPanel::onWellSwatchesSwapped);
-    connect(ui->spinR, &QSpinBox::valueChanged, this, &ColorsPanel::onRgbChanged);
-    connect(ui->spinG, &QSpinBox::valueChanged, this, &ColorsPanel::onRgbChanged);
-    connect(ui->spinB, &QSpinBox::valueChanged, this, &ColorsPanel::onRgbChanged);
+    connect(ui->editR, &QLineEdit::editingFinished, this, &ColorsPanel::onRgbChanged);
+    connect(ui->editG, &QLineEdit::editingFinished, this, &ColorsPanel::onRgbChanged);
+    connect(ui->editB, &QLineEdit::editingFinished, this, &ColorsPanel::onRgbChanged);
     connect(ui->hexEdit, &QLineEdit::textEdited, this, &ColorsPanel::onHexEdited);
     connect(ui->swatchSearch, &QLineEdit::textChanged, this, &ColorsPanel::onSwatchSearchChanged);
     connect(ui->gradientSearch, &QLineEdit::textChanged, this, &ColorsPanel::onGradientSearchChanged);
@@ -429,9 +422,9 @@ void ColorsPanel::onWellColorChanged(const QColor &color)
 {
     if (!m_syncing) {
         m_syncing = true;
-        ui->spinR->setValue(color.red());
-        ui->spinG->setValue(color.green());
-        ui->spinB->setValue(color.blue());
+        ui->editR->setText(QString::number(color.red()));
+        ui->editG->setText(QString::number(color.green()));
+        ui->editB->setText(QString::number(color.blue()));
         ui->hexEdit->setText(color.name(QColor::HexRgb).toUpper());
         m_syncing = false;
     }
@@ -444,8 +437,15 @@ void ColorsPanel::onRgbChanged()
 {
     if (m_syncing)
         return;
+    auto channel = [](QLineEdit *edit) {
+        bool ok = false;
+        const int v = edit->text().trimmed().toInt(&ok);
+        const int c = ok ? qBound(0, v, 255) : 0;
+        edit->setText(QString::number(c));
+        return c;
+    };
     m_syncing = true;
-    const QColor color(ui->spinR->value(), ui->spinG->value(), ui->spinB->value());
+    const QColor color(channel(ui->editR), channel(ui->editG), channel(ui->editB));
     ui->hexEdit->setText(color.name(QColor::HexRgb).toUpper());
     ui->hsvWell->setColor(color); // → onWellColorChanged → emit
     m_syncing = false;
@@ -457,9 +457,9 @@ void ColorsPanel::onHexEdited()
     if (!color.isValid())
         return;
     m_syncing = true;
-    ui->spinR->setValue(color.red());
-    ui->spinG->setValue(color.green());
-    ui->spinB->setValue(color.blue());
+    ui->editR->setText(QString::number(color.red()));
+    ui->editG->setText(QString::number(color.green()));
+    ui->editB->setText(QString::number(color.blue()));
     ui->hsvWell->setColor(color); // → onWellColorChanged → emit
     m_syncing = false;
 }

@@ -61,6 +61,16 @@ public:
     /** 切换活动工具；会 deactivate 旧工具。返回是否真的换了。 */
     bool setActiveTool(Ps::ToolId id, ViewPort &view);
 
+    /**
+     * 临时切换活动工具（对照 PS 空格抓手）：不 deactivate 原工具、不发 activeToolChanged，
+     * 工具箱高亮保持原工具；事件与光标切到 @p id。不可嵌套。
+     * @return 是否进入了临时态（已是该工具 / 已在临时态则 false）
+     */
+    bool beginTemporaryTool(Ps::ToolId id);
+    /** 结束临时工具，恢复 begin 前的活动工具（不 deactivate）。 */
+    void endTemporaryTool();
+    bool hasTemporaryTool() const { return m_toolBeforeTemporary != nullptr; }
+
     // —— 事件分发：返回 true 表示已被工具消费 ——
     /** @param ctx 由 CanvasView 每次事件传入的最新上下文（文档/颜色/选项）。 */
     bool dispatchPress(const ToolEvent &event, const ToolContext &ctx, ViewPort &view);
@@ -96,6 +106,8 @@ private:
 
     QHash<int, Tool *> m_tools; ///< 拥有所有权（析构时统一 delete）
     Tool *m_activeTool = nullptr;
+    /** 空格等临时工具压栈：非空时 m_activeTool 为临时工具，本指针为压栈前工具。 */
+    Tool *m_toolBeforeTemporary = nullptr;
     ToolContext m_context;
 };
 

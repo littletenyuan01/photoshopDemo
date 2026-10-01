@@ -1,17 +1,18 @@
 /**
  * floodfillop.cpp — floodfillop.h 实现（engine/op 层）。
  *
- * BFS/全窗口扫色 + 三态掩码；只写命中 bbox 覆盖的瓦片，避免 setFromImage 整层回写。
+ * BFS/全窗口扫色 + 掩码；栈式 BFS（避免 QQueue 分配）；包围盒随洪泛累计；
+ * materialize 用 memcpy（对齐 TilePatch）。
  */
 #include "floodfillop.h"
 
 #include "paintclip.h"
+#include "tilepatch.h"
 #include "domain/tilebuffer.h"
 #include "engine/premul.h"
 
-#include <QPainter>
-#include <QQueue>
 #include <QtGlobal>
+#include <vector>
 
 namespace Ps {
 
@@ -29,28 +30,6 @@ bool similarToSeed(QRgb candidate, int seedR, int seedG, int seedB, int seedA, i
 
     const int maxDiff = qMax(qAbs(r - seedR), qMax(qAbs(g - seedG), qAbs(b - seedB)));
     return maxDiff <= tol;
-}
-
-/** 只物化 rect 覆盖的瓦片（未分配瓦片视为透明），而不是 materialize 整层。 */
-QImage materializeWindow(const TileBuffer &tiles, const QRect &rect)
-{
-    QImage out(rect.width(), rect.height(), QImage::Format_ARGB32_Premultiplied);
-    out.fill(Qt::transparent);
-
-    // painter 必须在 return 前结束作用域（QImage COW：提前 return 会让它悬在拷贝上）
-    {
-        QPainter p(&out);
-        p.setCompositionMode(QPainter::CompositionMode_Source);
-        tiles.forEachAllocatedTile([&](int, int, const QImage &tile, const QRect &bounds) {
-            const QRect area = bounds.intersected(rect);
-            if (area.isEmpty())
-                return;
-            p.drawImage(area.topLeft() - rect.topLeft(),
-                        tile,
-                        area.translated(-bounds.topLeft()));
-        });
-    }
-    return out;
 }
 
 } // namespace
@@ -71,7 +50,6 @@ bool FloodFillOp::prepare(OpContext &ctx)
     if (!OpPaintClip::layerPixelSelected(clip, m_seed.x(), m_seed.y()))
         return false;
 
-    // 传播类算子：窗口不按选区外接框截断（见头文件注释）
     m_window = OpPaintClip::roiWindow(ctx.roi, w, h);
     if (!m_window.contains(m_seed))
         return false;
@@ -79,7 +57,7 @@ bool FloodFillOp::prepare(OpContext &ctx)
     m_tol = qBound(0, m_tolerance, 255);
     m_fillPx = Premul::toPremultipliedRgb(m_fillColor);
 
-    m_work = materializeWindow(tiles, m_window);
+    m_work = TilePatch::extract(tiles, m_window);
     const QPoint seedLocal = m_seed - m_window.topLeft();
     const QRgb seedPx = reinterpret_cast<const QRgb *>(m_work.constScanLine(seedLocal.y()))[seedLocal.x()];
     if (seedPx == m_fillPx)
@@ -99,7 +77,6 @@ QRect FloodFillOp::process(OpContext &ctx)
     const int w = m_window.width();
     const int h = m_window.height();
 
-    // 掩码与层像素都按 scanLine 走（旧实现用 QImage::pixel()，BFS 里每次带边界检查）
     auto maskAt = [&](int x, int y) -> uchar & {
         return m_region.scanLine(y)[x];
     };
@@ -110,25 +87,36 @@ QRect FloodFillOp::process(OpContext &ctx)
         return reinterpret_cast<const QRgb *>(m_work.constScanLine(y));
     };
 
+    int minX = w, minY = h, maxX = -1, maxY = -1;
+    auto markHit = [&](int x, int y) {
+        maskAt(x, y) = 255;
+        minX = qMin(minX, x);
+        minY = qMin(minY, y);
+        maxX = qMax(maxX, x);
+        maxY = qMax(maxY, y);
+    };
+
     if (!m_contiguous) {
         for (int y = 0; y < h; ++y) {
             const QRgb *src = workLine(y);
             for (int x = 0; x < w; ++x) {
                 if (matches(src, x))
-                    maskAt(x, y) = 255;
+                    markHit(x, y);
             }
         }
     } else {
+        // 栈式 BFS：只入队已匹配像素，避免 QQueue 节点分配 + 二次 matches
         const QPoint seedLocal = m_seed - m_window.topLeft();
-        QQueue<QPoint> queue;
-        queue.enqueue(seedLocal);
-        maskAt(seedLocal.x(), seedLocal.y()) = 1;
+        std::vector<QPoint> stack;
+        stack.reserve(size_t(w + h) * 4);
+        if (matches(workLine(seedLocal.y()), seedLocal.x())) {
+            markHit(seedLocal.x(), seedLocal.y());
+            stack.push_back(seedLocal);
+        }
 
-        while (!queue.isEmpty()) {
-            const QPoint p = queue.dequeue();
-            if (!matches(workLine(p.y()), p.x()))
-                continue;
-            maskAt(p.x(), p.y()) = 255;
+        while (!stack.empty()) {
+            const QPoint p = stack.back();
+            stack.pop_back();
 
             const QPoint nbs[] = {
                 QPoint(p.x() + 1, p.y()),
@@ -141,45 +129,44 @@ QRect FloodFillOp::process(OpContext &ctx)
                     continue;
                 if (maskAt(n.x(), n.y()) != 0)
                     continue;
-                maskAt(n.x(), n.y()) = 1;
-                if (matches(workLine(n.y()), n.x()))
-                    queue.enqueue(n);
+                if (!matches(workLine(n.y()), n.x())) {
+                    maskAt(n.x(), n.y()) = 1; // 已访未命中，防重复探测
+                    continue;
+                }
+                markHit(n.x(), n.y());
+                stack.push_back(n);
             }
         }
     }
 
-    // 按选区裁：洪泛在整层上算完，命中像素才受选区约束（对照 apply_buffer + mask）
-    if (OpPaintClip::clipActive(clip)) {
+    // 按选区裁：洪泛在窗口上算完，命中像素才受选区约束
+    if (OpPaintClip::clipActive(clip) && maxX >= 0) {
+        minX = w;
+        minY = h;
+        maxX = -1;
+        maxY = -1;
         for (int y = 0; y < h; ++y) {
             uchar *mask = m_region.scanLine(y);
             for (int x = 0; x < w; ++x) {
-                if (mask[x] == 0)
+                if (mask[x] != 255)
                     continue;
-                if (!OpPaintClip::layerPixelSelected(clip, m_window.x() + x, m_window.y() + y))
+                if (!OpPaintClip::layerPixelSelected(clip, m_window.x() + x, m_window.y() + y)) {
                     mask[x] = 0;
+                    continue;
+                }
+                minX = qMin(minX, x);
+                minY = qMin(minY, y);
+                maxX = qMax(maxX, x);
+                maxY = qMax(maxY, y);
             }
         }
     }
 
-    // 命中范围（窗口局部坐标）→ 层内坐标
-    int minX = w, minY = h, maxX = -1, maxY = -1;
-    for (int y = 0; y < h; ++y) {
-        const uchar *mask = m_region.constScanLine(y);
-        for (int x = 0; x < w; ++x) {
-            if (mask[x] != 255)
-                continue;
-            minX = qMin(minX, x);
-            minY = qMin(minY, y);
-            maxX = qMax(maxX, x);
-            maxY = qMax(maxY, y);
-        }
-    }
     if (maxX < 0)
         return {};
 
     const QRect dirty = QRect(QPoint(minX, minY), QPoint(maxX, maxY)).translated(m_window.topLeft());
 
-    // 只写命中框覆盖的瓦片：不再 setFromImage（那会 reset 全部瓦片再整层重新切块）
     tiles.forEachTileInRect(dirty, true, [&](int, int, QImage &tile, const QRect &bounds) {
         const QRect area = dirty.intersected(bounds);
         if (area.isEmpty())
@@ -201,7 +188,6 @@ QRect FloodFillOp::process(OpContext &ctx)
 void FloodFillOp::finish(OpContext &ctx)
 {
     Q_UNUSED(ctx);
-    // 实例会被 OpRunner 常驻复用，临时图必须在这里释放，不能留到下次
     m_work = QImage();
     m_region = QImage();
 }

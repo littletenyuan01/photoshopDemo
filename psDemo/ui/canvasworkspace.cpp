@@ -102,18 +102,17 @@ void CanvasWorkspace::syncScrollBar(QScrollBar *bar, int maxScroll, int pageSize
     const QSignalBlocker blocker(bar);
 
     if (maxScroll <= 0) {
-        // Qt：min==max 会禁用滚动条；完整可见时用假行程保持 AlwaysOn 外观
-        bar->setRange(0, 1);
-        bar->setPageStep(1000);
+        bar->setRange(0, 0);
+        bar->setPageStep(qMax(1, pageSize));
         bar->setSingleStep(1);
         bar->setValue(0);
     } else {
         bar->setRange(0, maxScroll);
-        bar->setPageStep(pageSize);
+        bar->setPageStep(qMax(1, pageSize));
         bar->setSingleStep(qMax(1, pageSize / 20));
         bar->setValue(qBound(0, value, maxScroll));
     }
-    bar->setEnabled(true);
+    bar->setEnabled(maxScroll > 0);
     bar->show();
 }
 
@@ -148,12 +147,9 @@ void CanvasWorkspace::onCanvasMouseMoved(const QPointF &imagePos, bool inside)
 
 void CanvasWorkspace::handleScroll(QScrollBar *bar, int maxScroll, int value, bool horizontal)
 {
-    if (maxScroll <= 0) {
-        // 无行程：把滚动条归零（同样用 RAII 抑制回环）
-        const QSignalBlocker blocker(bar);
-        bar->setValue(0);
+    Q_UNUSED(bar);
+    if (maxScroll <= 0)
         return;
-    }
 
     CanvasView *canvas = ui->canvasView;
     if (horizontal)

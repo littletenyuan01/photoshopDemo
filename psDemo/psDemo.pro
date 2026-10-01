@@ -78,7 +78,10 @@ SOURCES += \
     ui/pathtreepanel.cpp \
     ui/dockpanel.cpp \
     ui/colorspanel.cpp \
+    ui/infopanel.cpp \
     ui/hsvcolorwell.cpp \
+    ui/labeledlineedit.cpp \
+    ui/labeledcombobox.cpp \
     ui/propertiespanel.cpp \
     ui/toolbox.cpp \
     ui/tooloptionsbar.cpp \
@@ -171,7 +174,10 @@ HEADERS += \
     ui/dockpanel.h \
     ui/pixmaputils.h \
     ui/colorspanel.h \
+    ui/infopanel.h \
     ui/hsvcolorwell.h \
+    ui/labeledlineedit.h \
+    ui/labeledcombobox.h \
     ui/propertiespanel.h \
     ui/toolbox.h \
     ui/tooloptionsbar.h \
@@ -190,6 +196,7 @@ FORMS += \
     ui/pathtreepanel.ui \
     ui/layerpanel.ui \
     ui/colorspanel.ui \
+    ui/infopanel.ui \
     ui/propertiespanel.ui \
     ui/toolbox.ui \
     ui/tooloptionsbar.ui \

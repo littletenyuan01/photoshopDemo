@@ -8,6 +8,7 @@
 #include "domain/imagedocument.h"
 
 #include <QPainter>
+#include <QPainterPath>
 #include <QPen>
 #include <QtMath>
 

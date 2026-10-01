@@ -1,15 +1,15 @@
 /**
  * selectfloodop.cpp — SelectFloodOp 实现（engine/op 层）。
  *
- * 洪泛逻辑对齐 FloodFillOp（相似色 + BFS / 全图扫）；目标是 Selection 而非瓦片。
+ * 洪泛对齐 FloodFillOp：栈式 BFS + 包围盒随洪泛累计。
  */
 #include "selectfloodop.h"
 
 #include "domain/selection.h"
 #include "engine/premul.h"
 
-#include <QQueue>
 #include <QtGlobal>
+#include <vector>
 
 namespace Ps {
 
@@ -75,25 +75,34 @@ QRect SelectFloodOp::process(OpContext &ctx)
         return reinterpret_cast<const QRgb *>(m_sample.constScanLine(y));
     };
 
+    int minX = w, minY = h, maxX = -1, maxY = -1;
+    auto markHit = [&](int x, int y) {
+        maskAt(x, y) = 255;
+        minX = qMin(minX, x);
+        minY = qMin(minY, y);
+        maxX = qMax(maxX, x);
+        maxY = qMax(maxY, y);
+    };
+
     if (!m_contiguous) {
-        // 对照 by_color：整图相似色
         for (int y = 0; y < h; ++y) {
             const QRgb *src = lineAt(y);
             for (int x = 0; x < w; ++x) {
                 if (matches(src, x))
-                    maskAt(x, y) = 255;
+                    markHit(x, y);
             }
         }
     } else {
-        QQueue<QPoint> queue;
-        queue.enqueue(m_seed);
-        maskAt(m_seed.x(), m_seed.y()) = 1;
+        std::vector<QPoint> stack;
+        stack.reserve(size_t(w + h) * 4);
+        if (matches(lineAt(m_seed.y()), m_seed.x())) {
+            markHit(m_seed.x(), m_seed.y());
+            stack.push_back(m_seed);
+        }
 
-        while (!queue.isEmpty()) {
-            const QPoint p = queue.dequeue();
-            if (!matches(lineAt(p.y()), p.x()))
-                continue;
-            maskAt(p.x(), p.y()) = 255;
+        while (!stack.empty()) {
+            const QPoint p = stack.back();
+            stack.pop_back();
 
             const QPoint nbs[] = {
                 QPoint(p.x() + 1, p.y()),
@@ -106,25 +115,16 @@ QRect SelectFloodOp::process(OpContext &ctx)
                     continue;
                 if (maskAt(n.x(), n.y()) != 0)
                     continue;
-                maskAt(n.x(), n.y()) = 1;
-                if (matches(lineAt(n.y()), n.x()))
-                    queue.enqueue(n);
+                if (!matches(lineAt(n.y()), n.x())) {
+                    maskAt(n.x(), n.y()) = 1;
+                    continue;
+                }
+                markHit(n.x(), n.y());
+                stack.push_back(n);
             }
         }
     }
 
-    int minX = w, minY = h, maxX = -1, maxY = -1;
-    for (int y = 0; y < h; ++y) {
-        const uchar *mask = m_region.constScanLine(y);
-        for (int x = 0; x < w; ++x) {
-            if (mask[x] != 255)
-                continue;
-            minX = qMin(minX, x);
-            minY = qMin(minY, y);
-            maxX = qMax(maxX, x);
-            maxY = qMax(maxY, y);
-        }
-    }
     if (maxX < 0) {
         if (m_op == ChannelOp::Replace)
             ctx.selection->clear();

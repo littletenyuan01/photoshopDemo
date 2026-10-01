@@ -21,6 +21,7 @@
 #include "ui/colorspanel.h"
 #include "ui/homescreen.h"
 #include "ui/imagesizedialog.h"
+#include "ui/infopanel.h"
 #include "ui/newdocumentdialog.h"
 #include "ui/propertiespanel.h"
 #include "ui/toolbox.h"
@@ -180,9 +181,10 @@ void MainWindow::setupMenus()
 
     // —— 窗口：显隐右侧面板 ——
     connect(ui->actionWindowLayers, &QAction::toggled, this, &MainWindow::onToggleDockPanel);
-    // 颜色/属性各自是一块独立面板，直接切显隐，不需要额外的槽
+    // 颜色/属性/信息各自是一块独立面板，直接切显隐
     connect(ui->actionWindowColor, &QAction::toggled, ui->colorsPanel, &QWidget::setVisible);
     connect(ui->actionWindowProperties, &QAction::toggled, ui->propertiesPanel, &QWidget::setVisible);
+    connect(ui->actionWindowInfo, &QAction::toggled, ui->infoPanel, &QWidget::setVisible);
 
     // —— 帮助 ——
     connect(ui->actionHelpAbout, &QAction::triggered, this, &MainWindow::onAbout);
@@ -194,6 +196,7 @@ void MainWindow::setupSession()
     ui->canvasWorkspace->setSession(m_session);
     ui->dockPanel->setSession(m_session);
     ui->propertiesPanel->setSession(m_session); // 「属性」页展示真实文档/图层数据
+    ui->infoPanel->setSession(m_session);
     connect(m_session, &Ps::AppSession::documentChanged,
             this, &MainWindow::onDocumentChanged);
 }
@@ -291,6 +294,14 @@ void MainWindow::setupToolbox()
     connect(canvas, &CanvasView::backgroundPicked,
             ui->toolBox, &ToolBox::setBackgroundColor);
 
+    // 信息面板：光标 XY + 投影取样（RGB/CMYK）；默认隐藏，窗口→信息 / F8
+    connect(canvas, &CanvasView::cursorImagePosChanged, this,
+            [this, canvas](const QPointF &imagePos, bool inside) {
+                const QColor sample = inside ? canvas->sampleProjectionPixel(imagePos)
+                                             : QColor();
+                ui->infoPanel->setCursorInfo(imagePos, inside, sample);
+            });
+
     // 右侧颜色面板 ↔ 工具箱前/背景色（双向，避免回环靠相等短路）
     connect(ui->colorsPanel, &ColorsPanel::foregroundColorChanged,
             ui->toolBox, &ToolBox::setForegroundColor);
@@ -314,6 +325,12 @@ void MainWindow::setupToolbox()
             ui->toolOptionsBar->selTolerance(),
             ui->toolOptionsBar->selContiguous(),
             ui->toolOptionsBar->selSampleMerged());
+    });
+    connect(ui->toolOptionsBar, &ToolOptionsBar::magneticLassoOptionsChanged, this, [this]() {
+        ui->canvasWorkspace->canvasView()->setMagneticLassoOptions(
+            ui->toolOptionsBar->magneticWidth(),
+            ui->toolOptionsBar->magneticContrast(),
+            ui->toolOptionsBar->magneticFrequency());
     });
     connect(ui->toolOptionsBar, &ToolOptionsBar::gradientOptionsChanged, this, [this]() {
         ui->canvasWorkspace->canvasView()->setGradientOptions(
@@ -355,6 +372,9 @@ void MainWindow::setupToolbox()
     canvas->setSelectionFloodOptions(ui->toolOptionsBar->selTolerance(),
                                      ui->toolOptionsBar->selContiguous(),
                                      ui->toolOptionsBar->selSampleMerged());
+    canvas->setMagneticLassoOptions(ui->toolOptionsBar->magneticWidth(),
+                                    ui->toolOptionsBar->magneticContrast(),
+                                    ui->toolOptionsBar->magneticFrequency());
     canvas->setGradientOptions(ui->toolOptionsBar->gradientType(),
                                ui->toolOptionsBar->gradientOpacityPercent() / 100.0,
                                ui->toolOptionsBar->gradientOffsetPercent(),
@@ -367,6 +387,7 @@ void MainWindow::setupToolbox()
                             ui->toolOptionsBar->shapeStrokeWidth(),
                             ui->toolOptionsBar->shapeCornerRadius(),
                             ui->toolOptionsBar->shapeAntialias());
+    ui->infoPanel->setToolHint(ui->toolOptionsBar->currentHint());
 }
 
 void MainWindow::setupHomeStack()
@@ -390,6 +411,8 @@ void MainWindow::onShowHomeScreen()
 void MainWindow::onShowWorkspace()
 {
     ui->mainStack->setCurrentIndex(0);
+    // 进入工作区后键盘应落在画布（否则焦点常在选项条「家」按钮上，空格会回主页）
+    ui->canvasWorkspace->canvasView()->setFocus(Qt::OtherFocusReason);
 }
 
 void MainWindow::createInitialDocument()
@@ -401,8 +424,10 @@ void MainWindow::onToolChanged(Ps::ToolId id)
 {
     ui->toolOptionsBar->setCurrentTool(id);
     ui->canvasWorkspace->canvasView()->setCurrentTool(id);
+    const QString hint = ui->toolOptionsBar->currentHint();
+    ui->infoPanel->setToolHint(hint);
     // 工具提示语显示在状态栏（选项条里只放参数，对齐 PS）
-    flashStatusMessage(ui->toolOptionsBar->currentHint(), 4000);
+    flashStatusMessage(hint, 4000);
 }
 
 void MainWindow::onBrushDiameterChanged(int diameter)
@@ -896,8 +921,43 @@ void MainWindow::applyDefaultRightColumnSizes()
     const int usable = splitter->height() - splitter->handleWidth() * (splitter->count() - 1);
     if (usable <= 0)
         return; // 还没拿到真实高度，下一次 resize 再说
-    // 图层区最长（PS 也是），上面两块够用即可
-    splitter->setSizes({usable * 26 / 100, usable * 24 / 100, usable * 50 / 100});
+
+    // 信息面板默认隐藏；可见段按「颜色 / 属性 / 图层」比例分配（图层最长）
+    QList<int> sizes;
+    sizes.reserve(splitter->count());
+    int visibleWeight = 0;
+    for (int i = 0; i < splitter->count(); ++i) {
+        QWidget *w = splitter->widget(i);
+        if (w && w->isVisibleTo(splitter)) {
+            if (w == ui->infoPanel)
+                visibleWeight += 22;
+            else if (w == ui->colorsPanel)
+                visibleWeight += 26;
+            else if (w == ui->propertiesPanel)
+                visibleWeight += 24;
+            else
+                visibleWeight += 50; // dockPanel
+        }
+    }
+    if (visibleWeight <= 0)
+        return;
+
+    for (int i = 0; i < splitter->count(); ++i) {
+        QWidget *w = splitter->widget(i);
+        if (!w || !w->isVisibleTo(splitter)) {
+            sizes.append(0);
+            continue;
+        }
+        int weight = 50;
+        if (w == ui->infoPanel)
+            weight = 22;
+        else if (w == ui->colorsPanel)
+            weight = 26;
+        else if (w == ui->propertiesPanel)
+            weight = 24;
+        sizes.append(usable * weight / visibleWeight);
+    }
+    splitter->setSizes(sizes);
 }
 
 void MainWindow::onAbout()

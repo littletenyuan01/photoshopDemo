@@ -19,7 +19,7 @@ QHash<int, OpRegistration> &table()
 
 } // namespace
 
-void OpRegistry::add(OpRegistration reg)
+void OpRegistry::  add(OpRegistration reg)
 {
     const int key = static_cast<int>(reg.name);
     table().insert(key, std::move(reg));

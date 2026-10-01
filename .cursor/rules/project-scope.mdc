@@ -14,5 +14,6 @@ alwaysApply: true
 - **注释**：凡写出的代码，关键处须有中文注释（见 `code-comments.mdc`）；**不得无注释提交关键逻辑**
 - **参考源分流**：纯 UI 阶段主要对齐 **Photoshop 布局**；功能编写阶段须先对照 **`gimp-master` 代码组织**（见 `gimp-reference.mdc`）
 - **交付纪律**：禁止留下「不报错但不工作」的隐患；验证要求与自查表见 `no-latent-bugs.mdc`（**强制**）
+- **修 bug**：必须定位根因并精准改动，禁止堆代码兜底规避（见 `root-cause-fix.mdc`，**强制**）
 - **图标**：找不到时优先从 [iconfont.cn](https://www.iconfont.cn/) 下载 SVG（见 `icon-sources.mdc`）；禁止用 Adobe 官方图标
 - 规划看 `wiki/`；实现说明看 `docs/`，代码变更必须同步 `docs/`

@@ -7,6 +7,7 @@
 #ifndef MAGICWANDTOOL_H
 #define MAGICWANDTOOL_H
 
+#include "domain/selection.h"
 #include "tool.h"
 
 namespace Ps {

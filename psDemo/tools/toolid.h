@@ -15,7 +15,7 @@ namespace Ps {
  *
  * 顺序即工具箱从上到下的顺序，按 Photoshop 的默认工具组排列。
  *
- * ⚠️ **实现状态**：目前 Move / Hand / Zoom / Brush / Eraser / PaintBucket / Gradient /
+ * ⚠️ **实现状态**：目前 Move / Hand / Zoom / Brush / Pencil / Eraser / PaintBucket / Gradient /
  * RectSelect / EllipseSelect / Lasso / PolygonalLasso / MagneticLasso /
  * MagicWand / QuickSelect / Crop / Eyedropper / CloneStamp / Blur / Sharpen / Smudge /
  * Dodge / Sponge / ShapeRect / ShapeEllipse / ShapeTriangle / ShapeLine

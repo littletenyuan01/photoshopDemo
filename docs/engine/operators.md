@@ -100,7 +100,7 @@ PointOpRegistry::add({ OpName::LayerMode,
 | 渐变 | `GradientTool::mouseRelease` | `PaintEngine::fillGradient` |
 | 编辑→填充 / 清除 | `MainWindow::onFill` / `onClear` → `ImageDocument::…` | `PaintEngine::solidFill` |
 | **自由套索** | `LassoTool::mouseRelease` → `ImageDocument::selectPolygon` | `PaintEngine::selectPolygon` |
-| **磁性套索** | `MagneticLassoTool::mouseRelease` → 同上 | `PaintEngine::selectPolygon` |
+| **磁性套索** | `MagneticLassoTool` 单击/移动/闭合 → 同上 | `PaintEngine::selectPolygon` |
 | **魔棒** | `MagicWandTool::mousePress` → `ImageDocument::selectFlood` | `PaintEngine::selectFlood` |
 | **快速选择** | `QuickSelectTool` 拖拽采样 → 同上 | `PaintEngine::selectFlood` |
 | **仿制图章** | `CloneStampTool` → 同上 | `PaintEngine::cloneStampDab` / `cloneStrokeSegment` |
@@ -420,7 +420,7 @@ forEachTileInRect(workRect, allocateMissing = true, …)
 | 1 | `configure` 必须把该算子的**全部**参数写一遍 | 静默沿用上一次的值（不报错、不崩溃） | 4 个算子都写全了（dab 5 个 / 洪泛 4 个 / 渐变 9 个 / 填充 1 个） |
 | 2 | `finish` 必须释放临时资源 | 临时整图跟着实例常驻到进程结束 | `FloodFillOp::finish` 放掉 `m_work` / `m_region` |
 | 3 | `finish` 不能假设 `prepare` 已成功 | 崩在空指针 / 空图上 | 均按「对空值安全」写 |
-| 4 | 实例表无锁，**只能单线程访问** | 数据竞争 | 目前全部在 UI 线程；引入渲染线程前必须先改（Roadmap 明确不做线程） |
+| 4 | 实例表无锁，**只能单线程访问** | 数据竞争 | 目前全部在 UI 线程；**Phase 9 滤镜库**引入求值线程前必须先改（加锁或每线程实例） |
 
 > 新增算子时最容易踩的是第 1 条。它属于 `no-latent-bugs` 说的「不报错、不崩溃，但就是不工作」。
 
@@ -472,6 +472,9 @@ forEachTileInRect(workRect, allocateMissing = true, …)
 | 洪泛窗口不按选区外接框截断 | 传播语义，见 §3.5 |
 | `LayerModeOp` 是纯转发壳 | 颜色算法本体在 `blend.cpp`（27 种模式共用），算子壳只负责"可命名调度 + 带 mode 参数" |
 | 渐变手写预乘 SourceOver | 逐像素独立求值，省掉「底图 + overlay」两张整层临时图（旧实现各占一个文档大小） |
+| Focus 可分离盒模糊预计算 | 旧实现每盖度像素做 5×5；现整补丁 O(WH) 一次再混合（Blur/Sharpen） |
+| 洪泛栈式 BFS + 包围盒随标 | 取代 `QQueue` 二次匹配与整窗二次扫 bbox；FloodFill/SelectFlood |
+| `BrushCover` dist² / `TilePatch` | 圆外免 sqrt；抽补丁 memcpy 共用，去掉 Focus/Tone 重复代码 |
 
 ### 10.2 仍欠（**不得视为已完成**）
 

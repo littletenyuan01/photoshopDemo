@@ -87,6 +87,11 @@ ToolBox::ToolBox(QWidget *parent)
     connect(ui->bgButton, &QPushButton::clicked, this, &ToolBox::onPickBackground);
     connect(ui->swapColorsButton, &QToolButton::clicked, this, &ToolBox::onSwapColors);
     connect(ui->defaultColorsButton, &QToolButton::clicked, this, &ToolBox::onDefaultColors);
+    // 颜色钮也不抢焦点（否则空格会点按钮）
+    ui->fgButton->setFocusPolicy(Qt::NoFocus);
+    ui->bgButton->setFocusPolicy(Qt::NoFocus);
+    ui->swapColorsButton->setFocusPolicy(Qt::NoFocus);
+    ui->defaultColorsButton->setFocusPolicy(Qt::NoFocus);
 
     setCurrentTool(Ps::ToolId::Move);
 }
@@ -306,6 +311,8 @@ void ToolBox::addSlot(const QVector<ToolItem> &items)
     auto *btn = new QToolButton(ui->toolsHost);
     btn->setCheckable(true);
     btn->setAutoRaise(true);
+    // 不抢键盘焦点，否则切工具后空格会点按钮而不是临时抓手（对照 PS）
+    btn->setFocusPolicy(Qt::NoFocus);
     // 尺寸见 toolbox.ui：QWidget#toolsHost > QToolButton
     btn->setContextMenuPolicy(Qt::CustomContextMenu);
     // 右键弹出同组工具（Photoshop 飞出菜单行为）

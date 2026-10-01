@@ -59,6 +59,11 @@ struct ToolContext
     bool selContiguous = true;         ///< 连续（魔棒）；快速选择内部强制连续
     bool selSampleMerged = false;      ///< 对所有图层取样（合成图）
 
+    // —— 磁性套索（对照 PS Width / Contrast / Frequency）——
+    int magneticWidth = 10;            ///< 边缘搜索半径（文档像素）
+    int magneticContrast = 40;         ///< 1..100 → 梯度门槛
+    int magneticFrequency = 57;        ///< 1..100 → 锚点密度（越高越密）
+
     // —— 仿制图章（对照 GimpCloneOptions：align-mode / sample-merged）——
     bool cloneAlign = true;            ///< 对齐（跨笔保留源-目标偏移）
     bool cloneSampleMerged = false;    ///< 对所有图层取样

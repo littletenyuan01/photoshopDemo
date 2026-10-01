@@ -131,9 +131,21 @@
               </widget>
              </item>
              <item>
-              <widget class="QSpinBox" name="spinR">
-               <property name="maximum">
-                <number>255</number>
+              <widget class="QLineEdit" name="editR">
+               <property name="maximumSize">
+                <size>
+                 <width>40</width>
+                 <height>16777215</height>
+                </size>
+               </property>
+               <property name="text">
+                <string>0</string>
+               </property>
+               <property name="alignment">
+                <set>Qt::AlignRight|Qt::AlignVCenter</set>
+               </property>
+               <property name="toolTip">
+                <string>红色 0..255</string>
                </property>
               </widget>
              </item>
@@ -145,9 +157,21 @@
               </widget>
              </item>
              <item>
-              <widget class="QSpinBox" name="spinG">
-               <property name="maximum">
-                <number>255</number>
+              <widget class="QLineEdit" name="editG">
+               <property name="maximumSize">
+                <size>
+                 <width>40</width>
+                 <height>16777215</height>
+                </size>
+               </property>
+               <property name="text">
+                <string>0</string>
+               </property>
+               <property name="alignment">
+                <set>Qt::AlignRight|Qt::AlignVCenter</set>
+               </property>
+               <property name="toolTip">
+                <string>绿色 0..255</string>
                </property>
               </widget>
              </item>
@@ -159,9 +183,21 @@
               </widget>
              </item>
              <item>
-              <widget class="QSpinBox" name="spinB">
-               <property name="maximum">
-                <number>255</number>
+              <widget class="QLineEdit" name="editB">
+               <property name="maximumSize">
+                <size>
+                 <width>40</width>
+                 <height>16777215</height>
+                </size>
+               </property>
+               <property name="text">
+                <string>0</string>
+               </property>
+               <property name="alignment">
+                <set>Qt::AlignRight|Qt::AlignVCenter</set>
+               </property>
+               <property name="toolTip">
+                <string>蓝色 0..255</string>
                </property>
               </widget>
              </item>

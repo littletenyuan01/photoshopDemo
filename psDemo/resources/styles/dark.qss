@@ -161,9 +161,14 @@ QSpinBox::down-arrow:disabled, QDoubleSpinBox::down-arrow:disabled {
    【第二坑】全局 QWidget 是 background: transparent，而透明区域在深色窗口里
    会露出**黑底**。所以面板根和每个 Tab 页都要显式给底色，不能指望它自己透出来。
    =========================================================================== */
-DockPanel, ColorsPanel, PropertiesPanel {
+DockPanel, ColorsPanel, PropertiesPanel, InfoPanel {
   background-color: #3a3a3a;
   border-left: 1px solid #222;
+}
+/* 选项栏根：全局 QWidget 透明会透出黑底，必须显式上色 */
+ToolOptionsBar {
+  background-color: #4a4a4a;
+  border-bottom: 1px solid #2a2a2a;
 }
 /* 每个 Tab 页的容器（全局透明 → 必须显式上色，否则页面空白处是黑的） */
 ColorsPanel QWidget#tabColor,
@@ -172,7 +177,8 @@ ColorsPanel QWidget#tabGradients,
 ColorsPanel QWidget#tabPatterns,
 PropertiesPanel QWidget#tabProperties,
 PropertiesPanel QWidget#tabAdjust,
-PropertiesPanel QWidget#tabLibraries {
+PropertiesPanel QWidget#tabLibraries,
+InfoPanel QWidget#tabInfo {
   background-color: #3a3a3a;
 }
 QTabWidget#panelTabs::pane {
@@ -217,22 +223,24 @@ QSplitter#rightSplitter::handle:vertical {
 QSplitter#rightSplitter::handle:vertical:hover {
   background-color: #4e7ba8;
 }
-/* 面板内的输入控件（色板搜索、属性数值） */
+/* 面板 / 选项栏输入框：必须用类名祖先（见上文「选择器为什么写类名」）。
+   全局 QWidget 是 transparent，不显式描边+底色时，数值会像贴在黑底上的纯文字。 */
 ColorsPanel QLineEdit,
-PropertiesPanel QLineEdit {
-  background-color: #2e2e2e;
-  color: #eee;
-  border: 1px solid #222;
-  padding: 2px 4px;
-  min-height: 20px;
+PropertiesPanel QLineEdit,
+ToolOptionsBar QLineEdit {
+  background-color: #2a2a2a;
+  color: #f0f0f0;
+  border: 1px solid #b0b0b0;
+  border-radius: 2px;
+  padding: 1px 4px;
+  min-height: 18px;
+  min-width: 32px;
 }
-/* 面板 SpinBox 仅覆写底色；上下键叠放规则见上文全局块 */
-ColorsPanel QSpinBox,
-PropertiesPanel QSpinBox,
-PropertiesPanel QDoubleSpinBox {
-  background-color: #2e2e2e;
-  padding: 1px 16px 1px 4px;
-  min-height: 20px;
+ColorsPanel QLineEdit:focus,
+PropertiesPanel QLineEdit:focus,
+ToolOptionsBar QLineEdit:focus {
+  border: 1px solid #6cb0e8;
+  background-color: #222;
 }
 ColorsPanel QTreeWidget,
 ColorsPanel QListWidget,
@@ -281,4 +289,36 @@ PropertiesPanel QLabel#labelTarget {
   color: #9a9a9a;
   padding: 2px 0;
 }
+
+/* —— 信息面板（对照 PS Info）：四宫格分割线 + 底栏文案 —— */
+InfoPanel QFrame#cellRgb,
+InfoPanel QFrame#cellXy {
+  border-right: 1px solid #2a2a2a;
+}
+InfoPanel QFrame#cellRgb,
+InfoPanel QFrame#cellCmyk {
+  border-bottom: 1px solid #2a2a2a;
+}
+InfoPanel QLabel#labelDocSize {
+  color: #c8c8c8;
+  padding: 6px 8px 2px 8px;
+}
+InfoPanel QLabel#labelToolHint {
+  color: #a8a8a8;
+  padding: 4px 8px 8px 8px;
+}
+InfoPanel QToolButton#btnRgbMode,
+InfoPanel QToolButton#btnCmykMode,
+InfoPanel QToolButton#btnXyMode,
+InfoPanel QToolButton#btnWhMode {
+  color: #b0b0b0;
+  border: none;
+  padding: 2px;
+  margin-top: 2px;
+}
+InfoPanel QFrame#cornerSep {
+  color: #555;
+  max-width: 1px;
+}
+
 /* 颜色页主区由 HsvColorWell 自绘（二维色域 + 竖直色相），不再用 QSlider#hueSlider */

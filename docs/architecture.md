@@ -400,6 +400,16 @@ psDemo/
 - 调整层对「已合成的下方结果」求值（色阶 / 曲线起步）
 - 【前置依赖】投影管线须支持节点求值 → **依赖主线 ② 的脏区机制已在位**
 
+**滤镜库后续（Phase 9，已记入 Roadmap）**：产品级滤镜库须达成——
+
+1. **完整 ROI / 节点缓存**（脏区传播，跳过未脏节点）  
+2. **异步求值**（重滤镜 / 拖参不卡 UI，可取消合并）  
+3. **多线程算子图**（依赖可并行；`OpRunner` 线程安全改造）
+
+**雏形已在**：`BufferOp`+`OpRunner`（算子）与 `FilterStack`+`FilterEval`（线性非破坏链）。Phase 9 是**改造**而非新建：先把 `FilterEval` 收进 `OpRunner`，再引入 `engine/graph/`（`PsGraph`），最后上 ROI/异步/并行。详见 `wiki/Roadmap.md` §9.0。
+
+仍自研演进，**不捆绑 GEGL**。Phase 8 的整层临时图求值是过渡形态。
+
 ### ② 模型与投影分离 + 脏区分块更新
 
 【对照 GIMP】`app/core/gimpprojection.c`（`update_region` / `priority_rect` / `iter` / `idle_id`，按 32×32 chunk 迭代）、`app/gegl/gimptilehandlervalidate.c`（603 行，脏区核心）、`app/core/gimpchunkiterator.c`。
@@ -454,7 +464,8 @@ psDemo/
 6. v1 闭环：导出 PNG/JPEG（Phase 3 收尾）
         ↓
 7. ② 投影与脏区分块（Compositor 内部升级，UI 无感）
-8. ③ 调整层 + 节点化滤镜栈（前置：第 7 步）
+8. ③ 调整层 + 节点化滤镜栈（前置：第 7 步）  
+9. Phase 9 滤镜库：ROI 缓存 / 异步求值 / 多线程算子图（前置：第 8 步）
 9. Selection + 选区工具 + 绘制约束
 10. LayerMask
 11. ProjectIO + 变换 / 裁剪（完善度 P1）
@@ -490,5 +501,6 @@ psDemo/
 | 轻量算子壳（Phase 6.5） | **已实现**：注册表 + Runner + 混合/洪泛/渐变/填充；无 GEGL |
 | 三、② 脏区分块投影（Phase 7） | **已实现**：`Projection` + `compositeRegion` + 64 块有效位 |
 | 三、③ 节点化非破坏（Phase 8） | **首片已实现**：`FilterStack` + BrightnessContrast + 合成接入；调整层 / 对话框后置 |
+| 四、滤镜库（Phase 9） | **计划中**：完整 ROI/节点缓存、异步求值、多线程算子图；仍不引入 GEGL |
 | 独立 actions/commands 层 | 未实现（当前收口在 domain 语义化 setter） |
 | 其余（Selection / IO） | Selection + RasterIo/ProjectIo/PsdIo **已实现**；蒙版仍未做 |

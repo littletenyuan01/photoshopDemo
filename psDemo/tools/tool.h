@@ -61,6 +61,20 @@ public:
         Q_UNUSED(ctx)
     }
 
+    /**
+     * Caps Lock 开启时画布显示的作用范围半径（文档像素）。
+     * ≤0 表示本工具不画通用范围圈（对照 PS 笔尖圈）。
+     * 磁性套索等自绘搜索圈的工具保持返回 0。
+     */
+    virtual qreal outlineRadius(const ToolContext &ctx) const
+    {
+        Q_UNUSED(ctx)
+        return 0.0;
+    }
+
+    /** 系统 Caps Lock 是否锁定（Windows 查 VK_CAPITAL；对照 PS 笔尖/宽度指示）。 */
+    static bool capsLockOn();
+
     // —— 事件入口：返回 true = 已消费 ——
     virtual bool mousePress(const ToolEvent &event, const ToolContext &ctx, ViewPort &view) = 0;
     virtual bool mouseMove(const ToolEvent &event, const ToolContext &ctx, ViewPort &view);
