@@ -8,6 +8,7 @@
 
 #include "blendmode.h"
 #include "filterstack.h"
+#include "layerstylestack.h"
 #include "tilebuffer.h"
 
 #include <QColor>
@@ -113,6 +114,33 @@ public:
     FilterStack &filters() { return m_filters; }
     const FilterStack &filters() const { return m_filters; }
 
+    /**
+     * 图层样式栈（非破坏 fx）。对照 GIMP drawable filters / PS 图层样式；
+     * 合成时求值，不写回 tiles。
+     */
+    LayerStyleStack &styles() { return m_styles; }
+    const LayerStyleStack &styles() const { return m_styles; }
+
+    /**
+     * 合成用外接矩形（含样式外扩：投影/描边等）。
+     * 无启用样式时等于 boundsInDocument()。
+     */
+    QRect styleBoundsInDocument() const;
+
+    /**
+     * 滤镜+样式求值后的层局部栅格（对照 GIMP drawable filter 缓冲）。
+     * 结果与 offset 无关；仅像素 / 滤镜 / 样式变更时失效。
+     * 平移图层应复用此缓存，否则每帧整层模糊会卡死交互。
+     */
+    struct CompositeRaster {
+        QImage image; ///< ARGB32_Premultiplied；可空
+        int originDx = 0;
+        int originDy = 0;
+    };
+    CompositeRaster ensureCompositeRaster() const;
+    /** 像素或 fx/滤镜变更时调用；平移 offset 不要调。 */
+    void invalidateCompositeRaster() const;
+
     /** 拼成整层临时图（缩略图 / 重采样）；无瓦片时为全透明同尺寸图。 */
     QImage materialize() const { return m_tiles.materialize(); }
 
@@ -161,10 +189,17 @@ private:
     int m_offsetY = 0; ///< 文档坐标 Y
     TileBuffer m_tiles; ///< 本层像素（懒分配瓦片；层内原点）
     FilterStack m_filters; ///< 非破坏滤镜节点（对照 drawable filter stack）
+    LayerStyleStack m_styles; ///< 非破坏图层样式（对照 PS fx / GIMP layer effects）
 
     /** 层内坐标内容包围盒缓存；与 offset 无关。 */
     mutable QRect m_contentBoundsLocal;
     mutable bool m_contentBoundsValid = false;
+
+    /** 滤镜+样式合成缓存（层局部）；与 offset 无关。 */
+    mutable QImage m_compositeRaster;
+    mutable int m_compositeOriginDx = 0;
+    mutable int m_compositeOriginDy = 0;
+    mutable bool m_compositeRasterValid = false;
 };
 
 } // namespace Ps

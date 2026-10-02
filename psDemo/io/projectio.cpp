@@ -6,9 +6,11 @@
 #include "domain/blendmode.h"
 #include "domain/imagedocument.h"
 #include "domain/layer.h"
+#include "domain/layerstyle.h"
 #include "domain/selection.h"
 
 #include <QBuffer>
+#include <QColor>
 #include <QDataStream>
 #include <QFile>
 #include <QImage>
@@ -83,9 +85,61 @@ bool isSupportedProjectVersion(ProjectFileVersion version)
     switch (version) {
     case ProjectFileVersion::V1:
     case ProjectFileVersion::V2:
+    case ProjectFileVersion::V3:
         return true;
     }
     return false;
+}
+
+bool writeLayerStyles(QDataStream &out, const LayerStyleStack &styles)
+{
+    out << qint32(styles.count());
+    for (int i = 0; i < styles.count(); ++i) {
+        const LayerStyleEffect &e = styles.at(i);
+        out << qint32(LayerStyleEffect::kindId(e.kind()));
+        out << quint8(e.isEnabled() ? 1 : 0);
+        out << double(e.opacity());
+        out << qint32(e.color().red()) << qint32(e.color().green())
+            << qint32(e.color().blue()) << qint32(e.color().alpha());
+        out << double(e.angle()) << double(e.distance())
+            << double(e.size()) << double(e.spread());
+    }
+    return out.status() == QDataStream::Ok;
+}
+
+bool readLayerStyles(QDataStream &in, LayerStyleStack *styles)
+{
+    if (!styles)
+        return false;
+    styles->clear();
+    qint32 count = 0;
+    in >> count;
+    if (in.status() != QDataStream::Ok || count < 0 || count > 64)
+        return false;
+    for (int i = 0; i < count; ++i) {
+        qint32 kindId = 0;
+        quint8 enabled = 1;
+        double opacity = 1.0;
+        qint32 r = 0, g = 0, b = 0, a = 255;
+        double angle = 120.0, distance = 5.0, size = 5.0, spread = 0.0;
+        in >> kindId >> enabled >> opacity >> r >> g >> b >> a
+           >> angle >> distance >> size >> spread;
+        if (in.status() != QDataStream::Ok)
+            return false;
+        LayerStyleKind kind = LayerStyleKind::DropShadow;
+        if (!LayerStyleEffect::kindFromId(kindId, &kind))
+            continue; // 跳过未知种类，保持向前兼容
+        LayerStyleEffect e = LayerStyleEffect::makeDefault(kind);
+        e.setEnabled(enabled != 0);
+        e.setOpacity(opacity);
+        e.setColor(QColor(r, g, b, a));
+        e.setAngle(angle);
+        e.setDistance(distance);
+        e.setSize(size);
+        e.setSpread(spread);
+        styles->append(e);
+    }
+    return true;
 }
 
 QByteArray imageToPngBytes(const QImage &image)
@@ -177,6 +231,11 @@ bool ProjectIo::save(const ImageDocument &doc, const QString &filePath,
                 *errorMessage = QObject::tr("写入图层像素失败");
             return false;
         }
+        if (!writeLayerStyles(out, layer->styles())) {
+            if (errorMessage)
+                *errorMessage = QObject::tr("写入图层样式失败");
+            return false;
+        }
     }
 
     // 选区：空则长度 0（对照 XCF 仅在非空时写 selection channel）
@@ -231,6 +290,7 @@ std::unique_ptr<ImageDocument> ProjectIo::load(const QString &filePath,
         return nullptr;
     }
     const bool legacyV1Blend = (fileVersion == ProjectFileVersion::V1);
+    const bool hasLayerStyles = (fileVersion >= ProjectFileVersion::V3);
 
     qint32 width = 0;
     qint32 height = 0;
@@ -293,6 +353,13 @@ std::unique_ptr<ImageDocument> ProjectIo::load(const QString &filePath,
         }
         layer->setBlendMode(mode);
         layer->setOffsetSilent(ox, oy);
+        if (hasLayerStyles) {
+            if (!readLayerStyles(in, &layer->styles()) || in.status() != QDataStream::Ok) {
+                if (errorMessage)
+                    *errorMessage = QObject::tr("读取图层 %1 样式失败").arg(i);
+                return nullptr;
+            }
+        }
         doc->addLayer(std::move(layer));
     }
 

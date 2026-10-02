@@ -294,16 +294,20 @@
 ### 图层面板
 
 - **说明**：右侧 `DockPanel` 壳（`layerpanel.ui`）内的 `LayerTreePanel`；列表上方为视觉上层。
-- **操作**：勾选显隐、双击改名、不透明度滑条、新建（透明空层 / 0 瓦片）、删除、**复制图层**
+- **图层行组件**：每一层 `new LayerRowWidget`（`layerrowwidget.ui`）经 `setItemWidget` 挂到列表；
+  布局为眼睛 / 缩略图 / 名称 / `fx` / 展开箭头，下方缩进「效果」组头 + 各样式子行
+  （`LayerStyleRowWidget`，眼睛开关单条效果）。对照 PS 图层面板缩进树，而非扁平勾选列表。
+- **操作**：眼睛显隐、双击名称改名、不透明度滑条、新建（透明空层 / 0 瓦片）、删除、**复制图层**
   （右键 / **图层菜单** / `ImageDocument::duplicateLayer`：深拷贝像素与属性，插到源层上方）。
 - **右键菜单**：对齐 PS 图层面板弹出项（**条目定义在 `layertreepanel.ui`**，多数灰显占位）；
-  已接线：新建、复制、删除、重命名（进行内编辑）、显示/隐藏。
+  已接线：新建、复制、删除、重命名（行内编辑）、显示/隐藏。
   对照 GIMP：`layers-actions` + `layers_duplicate_cmd_callback` / `gimp_item_duplicate`。
   ⚠️ **尚无「上移/下移」**：`LayerStack::moveLayer` 已实现但**没有 UI 接线**
   （底栏与「图层」菜单都没有对应按钮/动作），`ImageDocument` 也还没有转发入口
   —— 直接动栈会绕过 `structureChanged` 与 Phase 6 的撤销收口，所以留到接线时一起做。
 - **缩略图**：每行左侧显示该层像素的**等比缩略图 + 透明棋盘格衬底**（对齐 PS）；
   全透明层也显示棋盘格，所以「新建的空层」在列表里看得见。生成见 `ItemTreePanel::makeLayerThumbnail`。
+  **Ctrl+点缩略图** → 图层 alpha 载入选区（再点同层取消）。
 - **增量更新**：`structureChanged` 才重建列表；`activeLayerChanged` 只同步选中行；
   `layerPropertiesChanged` 只改受影响那一行 —— **画笔画一笔不会打扰面板的选中项与编辑态**。
 - **缩略图防抖**：像素改动不立即重算，而是延迟 ~250ms **只重算活动层那一行**
@@ -316,10 +320,15 @@
 - **锁定行**：PS 四种锁的**图标**（锁定透明像素 / 图像像素 / 位置 / 全部）。
   ⚠️ 当前仅为 UI，尚未接入 domain（点选不会真的限制绘制）。
 - **底栏按钮**：加大可点区域（约 30×30）；线框图标见 `resources/icons/layers/`（链接 / fx / 蒙版 / 调整 / 组 / 新建 / 删除），悬停有中文 tip。
+  - **fx / 图层样式已接线**：底栏 fx 打开样式对话框；菜单「图层 → 图层样式」可追加投影 / 内阴影 / 外发光 / 内发光 / 描边 / 颜色叠加，或清除全部。
+  - **实现**：`LayerStyleStack` 挂在 `Layer` 上（与 `FilterStack` 分离）；`LayerStyleEval` 在合成时非破坏求值（对照 GIMP DrawableFilter + PSD→`gegl:dropshadow` / `inner-glow` / `color-overlay`）。
+  - **对话框**：每效果独立参数（颜色 / 大小 / 距离 / 角度 / 扩展 / 不透明度）。
+  - **面板内效果树**：有样式时层行显示 `fx` 与展开箭头；展开后缩进列出「效果」与各效果眼睛开关（`setLayerStyleEnabled`）。
+  - **工程**：`.pslite` V3 读写样式栈；旧 V1/V2 仍可打开（无样式字段）。
+  - **未做**：斜面浮雕、渐变/图案叠加、样式预设拷贝、写入 PSD；「效果」组头一键全关。
 - **图标来源**：整套由 `resources/icons/layers/_gen_svg_icons.py` 生成的 **SVG 矢量**，运行时按显示尺寸光栅化（任意尺寸锐利）。**自绘占位**，可按 `docs/ui/iconfont-icons.md` 的关键词从 iconfont.cn 同名替换。
 - **限制**：无缩略图尺寸选项；
-  底栏除图层新建/删除外多为 UI 占位（链接/样式/蒙版/调整层/图层组、填充滑条、
-  图层筛选行都已加 `（UI 占位…）` tooltip，**点了不会有反应**）。
+  底栏链接 / 蒙版 / 调整层 / 图层组、填充滑条、图层筛选行仍为 UI 占位（**点了不会有反应**）。
 
 ### 通道面板（缩略图为 UI 推算）
 

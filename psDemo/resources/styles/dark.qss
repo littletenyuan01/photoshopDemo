@@ -1,13 +1,25 @@
 /* photoshopDemo 暗色主题 — 对齐 PS/GIMP 深色工作区，保证左侧工具栏图标可见 */
 
-QMainWindow, QDialog {
-  background-color: #2b2b2b;
-  color: #e8e8e8;
-}
-
+/* 先设通用透明：子控件透出父级底色。
+ * ⚠️ 必须写在 QDialog/QMainWindow **之前**，否则后面的 QWidget 规则会盖掉
+ *    对话框底色 → 透出系统黑底（图层样式等弹窗曾整片纯黑）。 */
 QWidget {
   color: #e8e8e8;
   background-color: transparent;
+}
+
+/* 主窗与所有弹窗：中灰底（勿用近黑 #1x/#2x，观感像黑窗） */
+QMainWindow,
+QDialog,
+QMessageBox {
+  background-color: #4a4a4a;
+  color: #e8e8e8;
+}
+
+/* 弹窗直接子控件也显式铺灰，避免个别布局容器仍透黑 */
+QDialog > QWidget,
+QMessageBox > QWidget {
+  background-color: #4a4a4a;
 }
 
 QMenuBar {

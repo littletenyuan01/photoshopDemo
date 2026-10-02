@@ -63,6 +63,10 @@
     <file alias="ui/align-bottom.svg">resources/icons/ui/align-bottom.svg</file>
     <!-- 图层面板（SVG 矢量，运行时按显示尺寸光栅化，任意尺寸锐利） -->
     <file alias="layers/link.svg">resources/icons/layers/link.svg</file>
+    <file alias="layers/eye.svg">resources/icons/layers/eye.svg</file>
+    <file alias="layers/eye-off.svg">resources/icons/layers/eye-off.svg</file>
+    <file alias="layers/chevron-up.svg">resources/icons/layers/chevron-up.svg</file>
+    <file alias="layers/chevron-down.svg">resources/icons/layers/chevron-down.svg</file>
     <file alias="layers/fx.svg">resources/icons/layers/fx.svg</file>
     <file alias="layers/mask.svg">resources/icons/layers/mask.svg</file>
     <file alias="layers/adjustment.svg">resources/icons/layers/adjustment.svg</file>

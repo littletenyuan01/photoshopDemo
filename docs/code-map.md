@@ -122,7 +122,9 @@ UI 不得直接改 `Layer`，一律走 `setLayerVisible/Opacity/Name/BlendMode` 
 | `ui/canvasdocstatusbar.ui/.h/.cpp` | 缩放% + 文档信息 + 显示菜单（PS 底栏左侧） |
 | `ui/rulerwidget.h/.cpp` | 像素标尺自绘（外层由 workspace.ui 排布） |
 | `ui/itemtreepanel.h/.cpp` | Item 树面板基类；提供 `applyToolbarIcon` 等共用能力，以及**缩略图生成**（`makeLayerThumbnail` / `makeChannelThumbnail`、`ThumbChannel`） |
-| `ui/layertreepanel.ui/.h/.cpp` | 图层树：列表/**缩略图**/显隐/透明度/增删/**复制**/右键菜单（PS 项占位）；**增量更新 + 缩略图防抖 + 滑条两段提交** |
+| `ui/layertreepanel.ui/.h/.cpp` | 图层树：每层挂 `LayerRowWidget`；透明度/增删/**复制**/右键菜单；**增量更新 + 缩略图防抖 + 滑条两段提交** |
+| `ui/layerrowwidget.ui/.h/.cpp` | 单层条目：眼睛/缩略图/名/`fx`/展开；下方缩进「效果」+ 样式子行 |
+| `ui/layerstylerowwidget.ui/.h/.cpp` | 单条图层样式子行：眼睛开关 + 名称 |
 | `ui/channeltreepanel.*` / `ui/pathtreepanel.*` | 通道树（**缩略图由合成图推算**，无 domain）/ 路径树（无 domain，无缩略图） |
 | `ui/dockpanel.h/.cpp` | 右侧三 Tab 停靠壳（图层/通道/路径）；**`.ui` 文件仍名为 `layerpanel.ui`**（类为 `DockPanel`）；订阅 session 后转发给三个树 |
 | `ui/colorspanel.ui/.h/.cpp` | 颜色/色板/渐变/图案（对齐 PS 四页）；组内色块/方缩略图网格 |

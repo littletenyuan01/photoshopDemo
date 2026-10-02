@@ -193,10 +193,16 @@ bool Compositor::blendLayerRange(QImage &dst,
         const int layerOy = layer->offsetY();
         const qreal opacity = layer->opacity();
 
-        if (layer->filters().hasEnabled()) {
-            const QImage filtered = layer->filters().apply(layer->materialize());
-            if (!filtered.isNull()) {
-                blendTileOnto(dst, filtered, layerOx, layerOy, opacity, modeOp, area);
+        const bool needMaterialize = layer->filters().hasEnabled()
+                                     || layer->styles().hasEnabled();
+        if (needMaterialize) {
+            // 复用层局部复合缓存：平移只改 offset，不再每帧整层模糊
+            const Layer::CompositeRaster raster = layer->ensureCompositeRaster();
+            if (!raster.image.isNull()) {
+                blendTileOnto(dst, raster.image,
+                              layerOx + raster.originDx,
+                              layerOy + raster.originDy,
+                              opacity, modeOp, area);
             }
             continue;
         }

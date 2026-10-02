@@ -24,7 +24,7 @@
   </property>
   <property name="styleSheet">
    <string notr="true">QDialog#NewDocumentDialog {
-  background-color: #323232;
+  background-color: #4a4a4a;
   color: #e8e8e8;
 }
 QLabel { color: #e8e8e8; background: transparent; }
@@ -38,7 +38,7 @@ QLineEdit, QComboBox {
 }
 QTabWidget::pane {
   border: none;
-  background: #2b2b2b;
+  background: #3a3a3a;
 }
 QTabBar::tab {
   background: transparent;
@@ -63,7 +63,7 @@ QFrame#presetDefault[selected="true"] {
   border: 2px solid #0d66d0;
 }
 QWidget#detailsPanel {
-  background-color: #2b2b2b;
+  background-color: #3a3a3a;
   border-left: 1px solid #1a1a1a;
 }
 QPushButton#createButton {

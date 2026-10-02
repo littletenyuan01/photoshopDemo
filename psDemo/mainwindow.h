@@ -101,6 +101,8 @@ private slots:
     void onFill();
     void onFreeTransform();
     void onBrightnessContrast();
+    void onEnsureLayerStyle(int kind);
+    void onClearLayerStyles();
     void onUndo();
     void onRedo();
     void updateUndoRedoActions();

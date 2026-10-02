@@ -257,6 +257,7 @@ int ImageDocument::addBrightnessContrastFilter(qreal brightness, qreal contrast)
     node.setBrightness(brightness);
     node.setContrast(contrast);
     const int index = layer->filters().append(node);
+    layer->invalidateCompositeRaster();
     markDirty(layer->boundsInDocument().intersected(QRect(0, 0, m_width, m_height)));
     return index;
 }
@@ -266,6 +267,7 @@ bool ImageDocument::setLayerFilterEnabled(int layerIndex, int filterIndex, bool 
     Layer *layer = m_layers.layerAt(layerIndex);
     if (!layer || !layer->filters().setEnabled(filterIndex, enabled))
         return false;
+    layer->invalidateCompositeRaster();
     markDirty(layer->boundsInDocument().intersected(QRect(0, 0, m_width, m_height)));
     return true;
 }
@@ -275,7 +277,63 @@ bool ImageDocument::removeLayerFilter(int layerIndex, int filterIndex)
     Layer *layer = m_layers.layerAt(layerIndex);
     if (!layer || !layer->filters().removeAt(filterIndex))
         return false;
+    layer->invalidateCompositeRaster();
     markDirty(layer->boundsInDocument().intersected(QRect(0, 0, m_width, m_height)));
+    return true;
+}
+
+int ImageDocument::ensureActiveLayerStyle(LayerStyleKind kind)
+{
+    Layer *layer = activeLayer();
+    if (!layer || !layer->isVisible())
+        return -1;
+
+    const QRect before = layer->styleBoundsInDocument();
+    const int index = layer->styles().ensure(kind);
+    layer->invalidateCompositeRaster();
+    const QRect after = layer->styleBoundsInDocument();
+    markDirty(before.united(after).intersected(QRect(0, 0, m_width, m_height)));
+    emit layerPropertiesChanged(activeLayerIndex());
+    return index;
+}
+
+bool ImageDocument::replaceActiveLayerStyles(const QVector<LayerStyleEffect> &effects)
+{
+    Layer *layer = activeLayer();
+    if (!layer)
+        return false;
+
+    const QRect before = layer->styleBoundsInDocument();
+    layer->styles().replaceAll(effects);
+    layer->invalidateCompositeRaster();
+    const QRect after = layer->styleBoundsInDocument();
+    markDirty(before.united(after).intersected(QRect(0, 0, m_width, m_height)));
+    emit layerPropertiesChanged(activeLayerIndex());
+    return true;
+}
+
+bool ImageDocument::clearActiveLayerStyles()
+{
+    Layer *layer = activeLayer();
+    if (!layer || layer->styles().isEmpty())
+        return false;
+
+    const QRect before = layer->styleBoundsInDocument();
+    layer->styles().clear();
+    layer->invalidateCompositeRaster();
+    markDirty(before.intersected(QRect(0, 0, m_width, m_height)));
+    emit layerPropertiesChanged(activeLayerIndex());
+    return true;
+}
+
+bool ImageDocument::setLayerStyleEnabled(int layerIndex, int styleIndex, bool enabled)
+{
+    Layer *layer = m_layers.layerAt(layerIndex);
+    if (!layer || !layer->styles().setEnabled(styleIndex, enabled))
+        return false;
+    layer->invalidateCompositeRaster();
+    markDirty(layer->styleBoundsInDocument().intersected(QRect(0, 0, m_width, m_height)));
+    emit layerPropertiesChanged(layerIndex);
     return true;
 }
 
@@ -372,7 +430,7 @@ void ImageDocument::replaceSelectionMask(const QImage &mask)
     emit selectionChanged();
 }
 
-/** 累计脏区并使活动层内容包围盒缓存失效。 */
+/** 累计脏区；像素改动时使活动层内容包围盒与复合栅格缓存失效。 */
 void ImageDocument::markDirty(const QRect &rect)
 {
     if (rect.isEmpty())
@@ -381,8 +439,10 @@ void ImageDocument::markDirty(const QRect &rect)
     m_dirty = true;
     m_dirtyRect = m_dirtyRect.isNull() ? rect : m_dirtyRect.united(rect);
 
-    if (Layer *layer = activeLayer())
+    if (Layer *layer = activeLayer()) {
         layer->invalidateContentBounds();
+        layer->invalidateCompositeRaster();
+    }
 
     emit pixelsChanged(rect);
     emit contentChanged();
@@ -446,12 +506,20 @@ void ImageDocument::translateLayer(int index, int dx, int dy)
     if (!layer)
         return;
 
+    // 含样式外扩，避免投影残影；平移不改像素，勿走 markDirty（会清复合缓存）
     const QRect docRect(0, 0, m_width, m_height);
-    const QRect oldBounds = layer->boundsInDocument().intersected(docRect);
+    const QRect oldBounds = layer->styleBoundsInDocument().intersected(docRect);
     layer->translate(dx, dy);
-    const QRect newBounds = layer->boundsInDocument().intersected(docRect);
+    const QRect newBounds = layer->styleBoundsInDocument().intersected(docRect);
     emit layerPropertiesChanged(index);
-    markDirty(oldBounds.united(newBounds));
+
+    const QRect dirty = oldBounds.united(newBounds);
+    if (dirty.isEmpty())
+        return;
+    m_dirty = true;
+    m_dirtyRect = m_dirtyRect.isNull() ? dirty : m_dirtyRect.united(dirty);
+    emit pixelsChanged(dirty);
+    emit contentChanged();
 }
 
 void ImageDocument::notifyLayerPropertiesChanged(const Layer &layer)
@@ -515,6 +583,8 @@ int ImageDocument::duplicateLayer(int index)
     copy->setOffsetSilent(src->offsetX(), src->offsetY());
     for (int i = 0; i < src->filters().count(); ++i)
         copy->filters().append(src->filters().at(i));
+    for (int i = 0; i < src->styles().count(); ++i)
+        copy->styles().append(src->styles().at(i));
 
     copy->setOwner(this);
     const int newIndex = m_layers.insertLayer(index + 1, std::move(copy));

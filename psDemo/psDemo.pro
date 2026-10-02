@@ -23,6 +23,8 @@ SOURCES += \
     domain/layerstack.cpp \
     domain/selection.cpp \
     domain/filterstack.cpp \
+    domain/layerstyle.cpp \
+    domain/layerstylestack.cpp \
     domain/imagedocument.cpp \
     io/projectio.cpp \
     io/psdio.cpp \
@@ -32,6 +34,7 @@ SOURCES += \
     engine/projection.cpp \
     engine/paintengine.cpp \
     engine/filtereval.cpp \
+    engine/layerstyleeval.cpp \
     engine/op/layermodeop.cpp \
     engine/op/floodfillop.cpp \
     engine/op/gradientop.cpp \
@@ -91,7 +94,10 @@ SOURCES += \
     ui/homescreen.cpp \
     ui/newdocumentdialog.cpp \
     ui/imagesizedialog.cpp \
-    ui/canvassizedialog.cpp
+    ui/canvassizedialog.cpp \
+    ui/layerstyledialog.cpp \
+    ui/layerrowwidget.cpp \
+    ui/layerstylerowwidget.cpp
 
 HEADERS += \
     mainwindow.h \
@@ -106,6 +112,8 @@ HEADERS += \
     domain/selection.h \
     domain/filternode.h \
     domain/filterstack.h \
+    domain/layerstyle.h \
+    domain/layerstylestack.h \
     domain/imagedocument.h \
     io/projectio.h \
     io/psdio.h \
@@ -115,6 +123,7 @@ HEADERS += \
     engine/projection.h \
     engine/paintengine.h \
     engine/filtereval.h \
+    engine/layerstyleeval.h \
     engine/paintselectionclip.h \
     engine/painttypes.h \
     engine/premul.h \
@@ -189,7 +198,10 @@ HEADERS += \
     ui/homescreen.h \
     ui/newdocumentdialog.h \
     ui/imagesizedialog.h \
-    ui/canvassizedialog.h
+    ui/canvassizedialog.h \
+    ui/layerstyledialog.h \
+    ui/layerrowwidget.h \
+    ui/layerstylerowwidget.h
 
 FORMS += \
     mainwindow.ui \
@@ -208,7 +220,10 @@ FORMS += \
     ui/homescreen.ui \
     ui/newdocumentdialog.ui \
     ui/imagesizedialog.ui \
-    ui/canvassizedialog.ui
+    ui/canvassizedialog.ui \
+    ui/layerstyledialog.ui \
+    ui/layerrowwidget.ui \
+    ui/layerstylerowwidget.ui
 
 RESOURCES += \
     resources.qrc

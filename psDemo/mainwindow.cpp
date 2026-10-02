@@ -9,6 +9,7 @@
 #include "app/recentdocuments.h"
 #include "domain/imagedocument.h"
 #include "domain/layer.h"
+#include "domain/layerstyle.h"
 // 必须早于 ui_mainwindow.h：其中 DockPanel 头文件对 CanvasView 仅有前向声明
 #include "ui/canvasview.h"
 #include "ui/canvasworkspace.h"
@@ -173,6 +174,23 @@ void MainWindow::setupMenus()
     ui->actionAdjBrightness->setEnabled(true);
     ui->actionAdjBrightness->setToolTip(tr("给活动层追加亮度/对比度滤镜（非破坏，可重复叠加）"));
     connect(ui->actionAdjBrightness, &QAction::triggered, this, &MainWindow::onBrightnessContrast);
+
+    auto enableStyleAction = [this](QAction *a, Ps::LayerStyleKind kind) {
+        a->setEnabled(true);
+        a->setToolTip(tr("给活动层追加/启用该样式（非破坏）"));
+        connect(a, &QAction::triggered, this, [this, kind]() {
+            onEnsureLayerStyle(static_cast<int>(kind));
+        });
+    };
+    enableStyleAction(ui->actionLSDropShadow, Ps::LayerStyleKind::DropShadow);
+    enableStyleAction(ui->actionLSInnerShadow, Ps::LayerStyleKind::InnerShadow);
+    enableStyleAction(ui->actionLSOuterGlow, Ps::LayerStyleKind::OuterGlow);
+    enableStyleAction(ui->actionLSInnerGlow, Ps::LayerStyleKind::InnerGlow);
+    enableStyleAction(ui->actionLSStroke, Ps::LayerStyleKind::Stroke);
+    enableStyleAction(ui->actionLSColorOverlay, Ps::LayerStyleKind::ColorOverlay);
+    ui->actionLSClear->setEnabled(true);
+    ui->actionLSClear->setToolTip(tr("清除活动层全部图层样式"));
+    connect(ui->actionLSClear, &QAction::triggered, this, &MainWindow::onClearLayerStyles);
 
     ui->actionUndo->setEnabled(false);
     ui->actionUndo->setToolTip(tr("还原"));
@@ -1236,4 +1254,26 @@ void MainWindow::onBrightnessContrast()
         flashStatusMessage(tr("无法调整：无可见活动层"));
     else
         flashStatusMessage(tr("已添加亮度/对比度滤镜（非破坏）"));
+}
+
+void MainWindow::onEnsureLayerStyle(int kind)
+{
+    Ps::ImageDocument *doc = m_session ? m_session->document() : nullptr;
+    if (!doc)
+        return;
+    if (doc->ensureActiveLayerStyle(static_cast<Ps::LayerStyleKind>(kind)) < 0)
+        flashStatusMessage(tr("无法添加图层样式：无可见活动层"));
+    else
+        flashStatusMessage(tr("已应用图层样式"), 2000);
+}
+
+void MainWindow::onClearLayerStyles()
+{
+    Ps::ImageDocument *doc = m_session ? m_session->document() : nullptr;
+    if (!doc)
+        return;
+    if (!doc->clearActiveLayerStyles())
+        flashStatusMessage(tr("当前层没有图层样式"));
+    else
+        flashStatusMessage(tr("已清除图层样式"), 2000);
 }

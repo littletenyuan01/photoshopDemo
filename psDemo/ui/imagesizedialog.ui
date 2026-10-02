@@ -18,7 +18,7 @@
   </property>
   <property name="styleSheet">
    <string notr="true">QDialog#ImageSizeDialog {
-  background-color: #323232;
+  background-color: #4a4a4a;
   color: #e8e8e8;
 }
 QLabel { color: #e8e8e8; background: transparent; }

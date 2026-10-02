@@ -25,10 +25,12 @@ class ImageDocument;
 enum class ProjectFileVersion : quint32 {
     V1 = 1,
     V2 = 2,
+    /** 每层附加图层样式栈（fx）。 */
+    V3 = 3,
 };
 
 /** 当前写入用的工程版本。 */
-inline constexpr ProjectFileVersion kCurrentProjectVersion = ProjectFileVersion::V2;
+inline constexpr ProjectFileVersion kCurrentProjectVersion = ProjectFileVersion::V3;
 
 /**
  * 工程文件读写（io 层）。
@@ -38,7 +40,7 @@ inline constexpr ProjectFileVersion kCurrentProjectVersion = ProjectFileVersion:
  *
  * 格式：单文件 `.pslite`（魔数 PSLT + QDataStream）
  * - 文档宽高、活动层
- * - 每层：名 / 显隐 / 不透明度 / 混合 / offset + PNG 像素
+ * - 每层：名 / 显隐 / 不透明度 / 混合 / offset + PNG 像素 +（V3）样式栈
  * - 选区：灰度 PNG（空选区则长度 0）
  *
  * 不做：图层组、调整层、蒙版、路径、文字层（以后按需加字段版本）。

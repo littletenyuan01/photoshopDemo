@@ -4,6 +4,7 @@
 #include "layer.h"
 
 #include "imagedocument.h"
+#include "engine/layerstyleeval.h"
 
 #include <QPointF>
 #include <QRect>
@@ -105,6 +106,56 @@ QRect Layer::boundsInDocument() const
     return QRect(m_offsetX, m_offsetY, width(), height());
 }
 
+QRect Layer::styleBoundsInDocument() const
+{
+    QRect b = boundsInDocument();
+    const int pad = m_styles.maxPadding();
+    if (pad > 0)
+        b.adjust(-pad, -pad, pad, pad);
+    return b;
+}
+
+void Layer::invalidateCompositeRaster() const
+{
+    m_compositeRasterValid = false;
+    m_compositeRaster = QImage();
+    m_compositeOriginDx = 0;
+    m_compositeOriginDy = 0;
+}
+
+Layer::CompositeRaster Layer::ensureCompositeRaster() const
+{
+    if (m_compositeRasterValid) {
+        CompositeRaster hit;
+        hit.image = m_compositeRaster;
+        hit.originDx = m_compositeOriginDx;
+        hit.originDy = m_compositeOriginDy;
+        return hit;
+    }
+
+    QImage base = materialize();
+    if (m_filters.hasEnabled())
+        base = m_filters.apply(base);
+
+    CompositeRaster out;
+    if (m_styles.hasEnabled()) {
+        const StyledLayerResult styled = LayerStyleEval::apply(base, m_styles);
+        out.image = styled.image;
+        out.originDx = styled.originDx;
+        out.originDy = styled.originDy;
+    } else {
+        out.image = base;
+        out.originDx = 0;
+        out.originDy = 0;
+    }
+
+    m_compositeRaster = out.image;
+    m_compositeOriginDx = out.originDx;
+    m_compositeOriginDy = out.originDy;
+    m_compositeRasterValid = true;
+    return out;
+}
+
 void Layer::invalidateContentBounds() const
 {
     m_contentBoundsValid = false;
@@ -186,6 +237,7 @@ void Layer::fill(const QColor &color)
     // 委托瓦片缓冲：透明 → clearTiles；实色 → 全格分配
     m_tiles.fill(color);
     invalidateContentBounds();
+    invalidateCompositeRaster();
 }
 
 void Layer::replaceFromImage(const QImage &pixels)
@@ -193,6 +245,7 @@ void Layer::replaceFromImage(const QImage &pixels)
     // 尺寸可能变化（图像大小 / 画布大小）；不在此发属性信号
     m_tiles.setFromImage(pixels);
     invalidateContentBounds();
+    invalidateCompositeRaster();
 }
 
 QPoint Layer::expandToIncludeLocal(const QRect &localNeeded)
@@ -230,6 +283,7 @@ QPoint Layer::expandToIncludeLocal(const QRect &localNeeded)
     m_offsetX -= padL;
     m_offsetY -= padT;
     invalidateContentBounds();
+    invalidateCompositeRaster();
     notifyPropertiesChanged();
     return QPoint(padL, padT);
 }

@@ -8,6 +8,7 @@
 
 #include "blendmode.h"
 #include "layerstack.h"
+#include "layerstyle.h"
 #include "selection.h"
 
 #include <QColor>
@@ -16,6 +17,7 @@
 #include <QPolygonF>
 #include <QRect>
 #include <QString>
+#include <QVector>
 #include <memory>
 
 namespace Ps {
@@ -107,6 +109,22 @@ public:
     bool setLayerFilterEnabled(int layerIndex, int filterIndex, bool enabled);
     /** 移除指定滤镜。 */
     bool removeLayerFilter(int layerIndex, int filterIndex);
+
+    /**
+     * 给活动层确保一条图层样式（无则追加默认并启用；已有则打开）。
+     * 对照 GIMP append_new_filter / PS 图层样式。
+     * @return 效果下标；失败 -1。
+     */
+    int ensureActiveLayerStyle(LayerStyleKind kind);
+    /** 用整栈替换活动层样式（对话框确认）。 */
+    bool replaceActiveLayerStyles(const QVector<LayerStyleEffect> &effects);
+    /** 清除活动层全部样式。 */
+    bool clearActiveLayerStyles();
+    /**
+     * 开关指定层的某条样式（图层面板效果子行眼睛）。
+     * @return false 若层或样式下标无效。
+     */
+    bool setLayerStyleEnabled(int layerIndex, int styleIndex, bool enabled);
 
     /**
      * 自顶向下点选图层（对照 PS 自动选择）。

@@ -729,7 +729,7 @@ QToolButton:disabled { color: #666; }</string>
          <string/>
         </property>
         <property name="toolTip">
-         <string>添加图层样式（fx）（UI 占位：尚未实现）</string>
+         <string>图层样式（fx）</string>
         </property>
         <property name="iconSize">
          <size>

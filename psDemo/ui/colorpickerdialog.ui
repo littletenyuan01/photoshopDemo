@@ -30,7 +30,7 @@
   </property>
   <property name="styleSheet">
    <string notr="true">QDialog#ColorPickerDialog {
-  background-color: #464646;
+  background-color: #4a4a4a;
   color: #eee;
 }
 QLabel {

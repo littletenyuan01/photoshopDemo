@@ -2,6 +2,7 @@
  * layertreepanel.h — 图层树面板声明（ui 层）。
  *
  * 增量更新、缩略图防抖、滑条两段提交；Ctrl+点缩略图 alpha→选区。
+ * 每个图层对应一个 LayerRowWidget（.ui），经 setItemWidget 挂到列表行。
  */
 #ifndef LAYERTREEPANEL_H
 #define LAYERTREEPANEL_H
@@ -9,6 +10,7 @@
 #include "itemtreepanel.h"
 #include "domain/blendmode.h"
 
+#include <QHash>
 #include <QListWidgetItem>
 
 QT_BEGIN_NAMESPACE
@@ -21,6 +23,7 @@ class QTimer;
 class QMouseEvent;
 class QPoint;
 class QMenu;
+class LayerRowWidget;
 
 namespace Ps {
 class Layer;
@@ -39,22 +42,19 @@ class Layer;
  * - **右键菜单**：对齐 PS 图层面板弹出项（多数灰显占位）；**复制图层**已接 domain
  *   （对照 GIMP `layers-duplicate` / `layers_duplicate_cmd_callback`）
  *
- * 【缩略图】每行左侧显示该层像素的等比缩略图 + 透明棋盘格衬底，对齐 PS 图层面板；
- * 生成逻辑见 ItemTreePanel::makeLayerThumbnail。
+ * 【图层行】每层 new 一个 LayerRowWidget（眼睛/缩略图/名/fx/展开 + 缩进样式子树），
+ * 对照 PS 图层面板缩进「效果」列表；维护时只改该 .ui / 类即可。
  *
  * 【更新策略：增量而非重建】
- * 对应 GIMP 中 GimpContainer 的 add/remove/reorder/rename 增量化 notify：
  * - structureChanged        → 重建列表（唯一需要重建的情况）
  * - activeLayerChanged      → 只同步选中行与选项控件
  * - layerPropertiesChanged  → 只更新受影响那一行
  * - contentChanged          → **防抖**刷新缩略图（见 m_thumbTimer）
- * 这样画笔写像素（pixelsChanged / contentChanged）不会打扰面板的选中与编辑态。
  *
  * 【滑条提交语义】不透明度滑条拖动中只做 UI 预览，松手（sliderReleased）
- * 或键盘操作才写入 domain，使「一次操作 = 一次状态变更」（为撤销铺路）。
+ * 或键盘操作才写入 domain。
  *
  * 列表约定：第 0 行 = 视觉最上层 = LayerStack 最大下标。
- * 外观（筛选行、填充等）参考 PS 图层面板，结构跟 GIMP。
  */
 class LayerTreePanel : public ItemTreePanel
 {
@@ -72,87 +72,61 @@ protected:
     bool eventFilter(QObject *watched, QEvent *event) override;
 
 private slots:
-    /** 底栏「新建图层」按钮：必须进 moc，保证点击一定进槽。 */
     void onBtnNewClicked();
-    /** 底栏「删除图层」按钮。 */
     void onBtnDeleteClicked();
+    void onBtnLayerStyleClicked();
     void onListSelectionChanged();
-    void onItemChanged(QListWidgetItem *item);
     void onActiveLayerChanged(int index);
     void onLayerPropertiesChanged(int stackIndex);
-    /** 拖动中：只更新百分比文字（预览）。 */
     void onOpacityValueChanged(int value);
-    /** 松手：把最终值提交给 domain。 */
     void onOpacityCommitted();
-    /** 混合模式下拉变更（点选提交）→ domain。 */
     void onBlendModeChanged(int index);
-    /** 弹出列表高亮项变化 → 画布实时预览该混合模式。 */
     void onBlendModeHighlighted(int index);
-    /** 防抖定时器到期：只重算活动层那一行（画笔通常只动活动层）。 */
     void onThumbnailTimer();
-    /** 列表右键：弹出由 .ui Action 组装的上下文菜单。 */
     void onLayerContextMenu(const QPoint &pos);
 
 private:
-    /** 用 .ui 中的 Action 组装右键菜单（QMenu 不能写进带 layout 的 .ui，uic 会失败）。 */
     void buildLayerContextMenu();
-    /** 把滑条数值提交为活动层不透明度；与当前值相同则跳过。 */
     void commitOpacity(int value);
-    /**
-     * 重建混合模式下拉（中文文案 + 分隔线 + itemData）。
-     * 之后不得用 combo 下标当 BlendMode。
-     */
     void setupBlendModeCombo();
-    /** 在已插入分隔线的 combo 里查找 mode 对应行（靠 itemData）。 */
     int comboIndexForBlendMode(Ps::BlendMode mode) const;
-    /** combo 行 → BlendMode；分隔线/越界返回 false。 */
     bool blendModeAtComboIndex(int index, Ps::BlendMode *out) const;
-    /** 开始悬停预览：记下打开前的模式。 */
     void beginBlendModePreview();
-    /** 弹出列表关闭：把图层同步回 combo 当前项（Esc 则还原）。 */
     void endBlendModePreview();
-    /** 临时/最终写入活动层混合模式（等值则跳过）。 */
     void applyBlendModeToActiveLayer(Ps::BlendMode mode);
-    /** 按 layer 追加一行（含缩略图与 UserRole 身份映射）。 */
+
+    /** 新建一层对应的行 widget，挂到列表。 */
     void appendRowForLayer(int stackIndex, Ps::Layer &layer);
-    /** 按栈下标找行（行序会变，不能用行号当身份）。 */
+    /** 按栈下标取行 widget。 */
+    LayerRowWidget *rowWidgetForStackIndex(int stackIndex) const;
     QListWidgetItem *itemForStackIndex(int stackIndex) const;
-    /** 把列表选中行与选项区（不透明度等）对齐到活动层，不重建列表。 */
+    void syncItemSize(QListWidgetItem *item, LayerRowWidget *row);
+    /** 从 layer 像素生成缩略图并写入行（建行 / 防抖共用）。 */
+    void applyLayerThumbnail(LayerRowWidget *row, const Ps::Layer &layer);
     void syncActiveRowAndOptions();
-    /** 无文档时禁用选项控件。 */
     void setOptionsEnabled(bool enabled);
 
-    /** 重算某一行的缩略图；layer 为空时按 stackIndex 从文档取。 */
     void refreshRowThumbnail(int stackIndex, const Ps::Layer *layer = nullptr);
-    /** 请求防抖刷新：短时间内多次触发只重算一次。 */
     void scheduleThumbnailRefresh();
 
     /**
      * Ctrl(+修饰) 点缩略图：图层 alpha → 选区。
-     * 纯 Ctrl 再点同一层缩略图 → 取消选区。
-     * @return true 表示已处理（勿再改列表选中/勾选）。
+     * @return true 表示已处理。
      */
-    bool tryAlphaToSelectionClick(QMouseEvent *mouse);
+    bool applyAlphaToSelection(int stackIndex, Qt::KeyboardModifiers mods);
 
-    /** 右键弹出前：按当前活动层刷新可执行项（显隐文案等）。 */
     void syncLayerContextMenuState();
 
     Ui::LayerTreePanel *ui;
-    /**
-     * 缩略图防抖定时器。
-     * contentChanged 在画笔拖动时每帧都发，若同步重建缩略图会明显拖慢绘制；
-     * 故延迟到停笔后再算一次（对齐 PS：笔迹停下时缩略图才更新）。
-     */
     QTimer *m_thumbTimer = nullptr;
-    /** 右键菜单壳：条目来自 .ui 的 Action，结构在 buildLayerContextMenu 组装一次。 */
     QMenu *m_layerContextMenu = nullptr;
 
-    /** 上次「alpha→选区」来源层；-1=无。用于纯 Ctrl 再点同层时切换取消。 */
+    /** 各层「效果」展开态（按栈下标；重建列表时尽量保留）。 */
+    QHash<int, bool> m_stylesExpanded;
+
     int m_alphaSelectSourceLayer = -1;
-    /** 本面板正在改选区时置位，避免 selectionChanged 把来源层清掉。 */
     bool m_settingAlphaSelect = false;
 
-    /** 混合模式下拉弹出中：悬停预览，勿用属性信号回写 combo 下标。 */
     bool m_blendPreviewActive = false;
     Ps::BlendMode m_blendPreviewOriginal = Ps::BlendMode::Normal;
     int m_blendPreviewLayerIndex = -1;
