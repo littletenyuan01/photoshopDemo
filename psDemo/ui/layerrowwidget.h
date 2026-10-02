@@ -56,6 +56,8 @@ protected:
     bool eventFilter(QObject *watched, QEvent *event) override;
 
 private:
+    /** 按当前展开态计算行高，并通知列表更新 sizeHint。 */
+    void applyHeight();
     void clearStyleRows();
     void rebuildStyleRows(const Ps::Layer &layer);
     /** 样式数量未变时只刷新眼睛/标题，避免整树销毁重建。 */
@@ -63,6 +65,9 @@ private:
     void updateExpandChrome(bool hasStyles);
     void updateEyeIcon(bool visible);
     void finishRename();
+
+    /** 效果区目标高度（组头 + 子行），不依赖 isVisible()（未入屏时 isVisible 恒 false）。 */
+    int stylesBlockHeight() const;
 
     Ui::LayerRowWidget *ui;
     bool m_expanded = true;

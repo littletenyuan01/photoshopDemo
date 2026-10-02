@@ -41,7 +41,8 @@ QComboBox QScrollBar::sub-page:vertical { background: #f0f0f0; }
 QListWidget {
   background-color: #323232; color: #eee; border: none; outline: none; font-size: 12px;
 }
-QListWidget::item { padding: 4px 2px; min-height: 36px; }
+/* setItemWidget 行：勿设 padding/min-height，否则会把自定义行高挤扁叠字 */
+QListWidget::item { padding: 0; margin: 0; }
 QListWidget::item:selected { background-color: #555555; }
 QListWidget::item:hover:!selected { background-color: #404040; }
 QFrame#optionsHost, QFrame#toolbarHost { background-color: #3a3a3a; border: none; }

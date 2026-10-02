@@ -33,6 +33,7 @@ LayerRowWidget::LayerRowWidget(QWidget *parent)
     connect(ui->btnExpand, &QToolButton::toggled, this, [this](bool on) {
         setExpanded(on);
     });
+    applyHeight();
 }
 
 LayerRowWidget::~LayerRowWidget()
@@ -58,8 +59,7 @@ void LayerRowWidget::syncFromLayer(const Ps::Layer &layer)
         updateExpandChrome(m_hasStyles);
         rebuildStyleRows(layer);
         ui->stylesHost->setVisible(m_hasStyles && m_expanded);
-        updateGeometry();
-        emit heightChanged();
+        applyHeight();
         return;
     }
 
@@ -74,7 +74,7 @@ void LayerRowWidget::setThumbnail(const QImage &thumb)
 
 void LayerRowWidget::setExpanded(bool on)
 {
-    if (m_expanded == on && ui->stylesHost->isVisible() == (on && m_hasStyles)) {
+    if (m_expanded == on && ui->stylesHost->isHidden() == !(on && m_hasStyles)) {
         updateExpandChrome(m_hasStyles);
         return;
     }
@@ -85,9 +85,8 @@ void LayerRowWidget::setExpanded(bool on)
     }
     updateExpandChrome(m_hasStyles);
     ui->stylesHost->setVisible(m_hasStyles && m_expanded);
-    updateGeometry();
     emit expandChanged(m_expanded);
-    emit heightChanged();
+    applyHeight();
 }
 
 void LayerRowWidget::beginRename()
@@ -119,15 +118,28 @@ void LayerRowWidget::finishRename()
     }
 }
 
+int LayerRowWidget::stylesBlockHeight() const
+{
+    if (!m_hasStyles || !m_expanded)
+        return 0;
+    // 组头 20 + 每效果行 22 + 底边距 2（与 .ui 一致）
+    const int styleCount = qMax(0, ui->stylesLayout->count() - 1);
+    return 20 + styleCount * 22 + 2;
+}
+
+void LayerRowWidget::applyHeight()
+{
+    const int h = ui->headerHost->minimumHeight() + stylesBlockHeight();
+    setFixedHeight(h);
+    updateGeometry();
+    emit heightChanged();
+}
+
 QSize LayerRowWidget::sizeHint() const
 {
-    int h = ui->headerHost->minimumHeight();
-    if (m_hasStyles && m_expanded && ui->stylesHost->isVisible()) {
-        h += ui->effectsHeaderLabel->sizeHint().height();
-        const int styleCount = ui->stylesLayout->count() - 1;
-        h += qMax(0, styleCount) * 22 + 2;
-    }
-    return QSize(280, h);
+    // 勿用 stylesHost->isVisible()：挂到 QListWidget 前祖先未显示时恒为 false，
+    // 会把展开行高算成仅 header → 效果文字全部挤叠。
+    return QSize(280, ui->headerHost->minimumHeight() + stylesBlockHeight());
 }
 
 QSize LayerRowWidget::minimumSizeHint() const

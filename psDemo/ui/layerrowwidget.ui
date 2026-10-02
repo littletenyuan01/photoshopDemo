@@ -38,7 +38,7 @@ QToolButton:checked { background: transparent; }</string>
     <number>0</number>
    </property>
    <item>
-    <widget class="QWidget" name="headerHost" native="true">
+    <widget class="QWidget" name="headerHost">
      <property name="minimumSize">
       <size>
        <width>0</width>
@@ -50,6 +50,12 @@ QToolButton:checked { background: transparent; }</string>
        <width>16777215</width>
        <height>40</height>
       </size>
+     </property>
+     <property name="sizePolicy">
+      <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
+       <horstretch>0</horstretch>
+       <verstretch>0</verstretch>
+      </sizepolicy>
      </property>
      <layout class="QHBoxLayout" name="headerLayout">
       <property name="spacing">
@@ -201,9 +207,15 @@ QToolButton:checked { background: transparent; }</string>
     </widget>
    </item>
    <item>
-    <widget class="QWidget" name="stylesHost" native="true">
+    <widget class="QWidget" name="stylesHost">
      <property name="visible">
       <bool>false</bool>
+     </property>
+     <property name="sizePolicy">
+      <sizepolicy hsizetype="Preferred" vsizetype="Minimum">
+       <horstretch>0</horstretch>
+       <verstretch>0</verstretch>
+      </sizepolicy>
      </property>
      <layout class="QVBoxLayout" name="stylesLayout">
       <property name="spacing">
@@ -223,6 +235,18 @@ QToolButton:checked { background: transparent; }</string>
       </property>
       <item>
        <widget class="QLabel" name="effectsHeaderLabel">
+        <property name="minimumSize">
+         <size>
+          <width>0</width>
+          <height>20</height>
+         </size>
+        </property>
+        <property name="maximumSize">
+         <size>
+          <width>16777215</width>
+          <height>20</height>
+         </size>
+        </property>
         <property name="text">
          <string>效果</string>
         </property>
