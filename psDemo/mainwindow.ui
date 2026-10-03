@@ -2800,7 +2800,7 @@
     <bool>false</bool>
    </property>
    <property name="toolTip">
-    <string>UI 占位，功能尚未接入</string>
+    <string>将活动层样式拷贝到样式剪贴板</string>
    </property>
   </action>
   <action name="actionLSPaste">
@@ -2811,7 +2811,7 @@
     <bool>false</bool>
    </property>
    <property name="toolTip">
-    <string>UI 占位，功能尚未接入</string>
+    <string>将样式剪贴板应用到活动层</string>
    </property>
   </action>
   <action name="actionLSClear">

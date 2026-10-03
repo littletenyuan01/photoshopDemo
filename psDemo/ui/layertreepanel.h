@@ -39,8 +39,9 @@ class Layer;
  * - 锁：GIMP 有 lock content/position/visibility/alpha；此处 UI 先占位
  * - **Ctrl+点缩略图**：图层 alpha → 选区（GIMP 为 Alt+点；本项目对齐 PS Ctrl+点）；
  *   纯 Ctrl 再点同一层 → 取消选区
- * - **右键菜单**：对齐 PS 图层面板弹出项（多数灰显占位）；**复制图层**已接 domain
- *   （对照 GIMP `layers-duplicate` / `layers_duplicate_cmd_callback`）
+ * - **右键菜单**：对齐 PS 图层面板弹出项（多数灰显占位）；**复制图层**、
+ *   **拷贝/粘贴图层样式**已接 domain（对照 GIMP `layers-duplicate` /
+ *   PS Copy/Paste Layer Style）
  *
  * 【图层行】每层 new 一个 LayerRowWidget（眼睛/缩略图/名/fx/展开 + 缩进样式子树），
  * 对照 PS 图层面板缩进「效果」列表；维护时只改该 .ui / 类即可。
@@ -84,6 +85,8 @@ private slots:
     void onBlendModeHighlighted(int index);
     void onThumbnailTimer();
     void onLayerContextMenu(const QPoint &pos);
+    void onCopyLayerStyle();
+    void onPasteLayerStyle();
 
 private:
     void buildLayerContextMenu();

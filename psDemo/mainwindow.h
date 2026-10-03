@@ -103,6 +103,8 @@ private slots:
     void onBrightnessContrast();
     void onEnsureLayerStyle(int kind);
     void onClearLayerStyles();
+    void onCopyLayerStyles();
+    void onPasteLayerStyles();
     void onUndo();
     void onRedo();
     void updateUndoRedoActions();

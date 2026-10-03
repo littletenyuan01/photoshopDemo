@@ -10,6 +10,7 @@
 #include "domain/imagedocument.h"
 #include "domain/layer.h"
 #include "domain/layerstyle.h"
+#include "domain/layerstylestack.h"
 // 必须早于 ui_mainwindow.h：其中 DockPanel 头文件对 CanvasView 仅有前向声明
 #include "ui/canvasview.h"
 #include "ui/canvasworkspace.h"
@@ -191,6 +192,13 @@ void MainWindow::setupMenus()
     ui->actionLSClear->setEnabled(true);
     ui->actionLSClear->setToolTip(tr("清除活动层全部图层样式"));
     connect(ui->actionLSClear, &QAction::triggered, this, &MainWindow::onClearLayerStyles);
+
+    ui->actionLSCopy->setEnabled(true);
+    ui->actionLSCopy->setToolTip(tr("将活动层样式拷贝到样式剪贴板"));
+    connect(ui->actionLSCopy, &QAction::triggered, this, &MainWindow::onCopyLayerStyles);
+    ui->actionLSPaste->setEnabled(true);
+    ui->actionLSPaste->setToolTip(tr("将样式剪贴板应用到活动层"));
+    connect(ui->actionLSPaste, &QAction::triggered, this, &MainWindow::onPasteLayerStyles);
 
     ui->actionUndo->setEnabled(false);
     ui->actionUndo->setToolTip(tr("还原"));
@@ -1276,4 +1284,33 @@ void MainWindow::onClearLayerStyles()
         flashStatusMessage(tr("当前层没有图层样式"));
     else
         flashStatusMessage(tr("已清除图层样式"), 2000);
+}
+
+void MainWindow::onCopyLayerStyles()
+{
+    Ps::ImageDocument *doc = m_session ? m_session->document() : nullptr;
+    Ps::Layer *layer = doc ? doc->activeLayer() : nullptr;
+    if (!layer || layer->styles().isEmpty()) {
+        flashStatusMessage(tr("当前层没有图层样式"));
+        return;
+    }
+    Ps::LayerStyleClipboard::set(layer->styles().snapshot());
+    flashStatusMessage(tr("已拷贝图层样式"), 2000);
+}
+
+void MainWindow::onPasteLayerStyles()
+{
+    Ps::ImageDocument *doc = m_session ? m_session->document() : nullptr;
+    if (!doc)
+        return;
+    if (Ps::LayerStyleClipboard::isEmpty()) {
+        flashStatusMessage(tr("样式剪贴板为空"));
+        return;
+    }
+    if (!doc->activeLayer()) {
+        flashStatusMessage(tr("无活动层"));
+        return;
+    }
+    doc->replaceActiveLayerStyles(Ps::LayerStyleClipboard::snapshot());
+    flashStatusMessage(tr("已粘贴图层样式"), 2000);
 }

@@ -65,4 +65,6 @@ int LayerStyleStack::maxPadding() const
     return pad;
 }
 
+QVector<LayerStyleEffect> LayerStyleClipboard::s_effects;
+
 } // namespace Ps

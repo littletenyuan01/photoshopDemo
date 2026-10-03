@@ -49,6 +49,22 @@ private:
     QVector<LayerStyleEffect> m_effects;
 };
 
+/**
+ * 应用内图层样式剪贴板（对照 PS「拷贝/粘贴图层样式」；非系统剪贴板）。
+ * 跨文档、跨面板共享。
+ */
+class LayerStyleClipboard
+{
+public:
+    static bool isEmpty() { return s_effects.isEmpty(); }
+    static QVector<LayerStyleEffect> snapshot() { return s_effects; }
+    static void set(const QVector<LayerStyleEffect> &effects) { s_effects = effects; }
+    static void clear() { s_effects.clear(); }
+
+private:
+    static QVector<LayerStyleEffect> s_effects;
+};
+
 } // namespace Ps
 
 #endif // DOMAIN_LAYERSTYLESTACK_H

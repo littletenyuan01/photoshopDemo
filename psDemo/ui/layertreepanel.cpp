@@ -7,6 +7,7 @@
 #include "domain/blendmode.h"
 #include "domain/imagedocument.h"
 #include "domain/layer.h"
+#include "domain/layerstylestack.h"
 #include "domain/selection.h"
 #include "ui/layerrowwidget.h"
 #include "ui/layerstyledialog.h"
@@ -100,6 +101,10 @@ LayerTreePanel::LayerTreePanel(QWidget *parent)
             return;
         d->setLayerVisible(i, !L->isVisible());
     });
+    connect(ui->actionCtxCopyLayerStyle, &QAction::triggered,
+            this, &LayerTreePanel::onCopyLayerStyle);
+    connect(ui->actionCtxPasteLayerStyle, &QAction::triggered,
+            this, &LayerTreePanel::onPasteLayerStyle);
 }
 
 LayerTreePanel::~LayerTreePanel()
@@ -463,6 +468,8 @@ void LayerTreePanel::buildLayerContextMenu()
     m_layerContextMenu->addAction(ui->actionCtxToggleVisible);
     m_layerContextMenu->addSeparator();
     m_layerContextMenu->addAction(ui->actionCtxBlendingOptions);
+    m_layerContextMenu->addAction(ui->actionCtxCopyLayerStyle);
+    m_layerContextMenu->addAction(ui->actionCtxPasteLayerStyle);
     m_layerContextMenu->addSeparator();
     m_layerContextMenu->addAction(ui->actionCtxNewGroupFromLayers);
     m_layerContextMenu->addAction(ui->actionCtxFrameFromLayer);
@@ -511,15 +518,35 @@ void LayerTreePanel::syncLayerContextMenuState()
     Ps::Layer *layer = doc ? doc->activeLayer() : nullptr;
     const bool hasLayer = layer != nullptr;
     const bool canDelete = hasLayer && doc->layers().count() > 1;
+    const bool hasStyles = hasLayer && !layer->styles().isEmpty();
 
     ui->actionCtxDuplicateLayer->setEnabled(hasLayer);
     ui->actionCtxDeleteLayer->setEnabled(canDelete);
     ui->actionCtxRenameLayer->setEnabled(hasLayer);
     ui->actionCtxToggleVisible->setEnabled(hasLayer);
+    ui->actionCtxCopyLayerStyle->setEnabled(hasStyles);
+    ui->actionCtxPasteLayerStyle->setEnabled(
+        hasLayer && !Ps::LayerStyleClipboard::isEmpty());
     if (layer) {
         ui->actionCtxToggleVisible->setText(
             layer->isVisible() ? tr("隐藏图层") : tr("显示图层"));
     }
+}
+
+void LayerTreePanel::onCopyLayerStyle()
+{
+    Ps::Layer *layer = document() ? document()->activeLayer() : nullptr;
+    if (!layer || layer->styles().isEmpty())
+        return;
+    Ps::LayerStyleClipboard::set(layer->styles().snapshot());
+}
+
+void LayerTreePanel::onPasteLayerStyle()
+{
+    Ps::ImageDocument *doc = document();
+    if (!doc || Ps::LayerStyleClipboard::isEmpty())
+        return;
+    doc->replaceActiveLayerStyles(Ps::LayerStyleClipboard::snapshot());
 }
 
 // —— 行 widget ——

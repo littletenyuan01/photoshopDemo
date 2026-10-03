@@ -1011,6 +1011,22 @@ QToolButton:disabled { color: #666; }</string>
    <string>尚未接入</string>
   </property>
  </action>
+ <action name="actionCtxCopyLayerStyle">
+  <property name="text">
+   <string>拷贝图层样式</string>
+  </property>
+  <property name="toolTip">
+   <string>将活动层样式拷贝到样式剪贴板</string>
+  </property>
+ </action>
+ <action name="actionCtxPasteLayerStyle">
+  <property name="text">
+   <string>粘贴图层样式</string>
+  </property>
+  <property name="toolTip">
+   <string>将样式剪贴板应用到活动层</string>
+  </property>
+ </action>
  <action name="actionCtxNewGroupFromLayers">
   <property name="enabled">
    <bool>false</bool>
