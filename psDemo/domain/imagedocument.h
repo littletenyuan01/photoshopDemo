@@ -87,6 +87,8 @@ public:
                      bool sampleMerged, ChannelOp op);
     /** 由指定图层 alpha 建立选区；默认 Replace。 */
     void selectLayerAlpha(int layerIndex, ChannelOp op = ChannelOp::Replace);
+    /** 由指定图层蒙版灰度建立选区；无蒙版则忽略。 */
+    void selectLayerMask(int layerIndex, ChannelOp op = ChannelOp::Replace);
 
     /**
      * 编辑→清除（Delete）：活动层可见像素擦为透明。
@@ -190,6 +192,50 @@ public:
     void setLayerBlendMode(int index, BlendMode mode, bool recordHistory = true);
     /** 平移图层 offset 并按新旧 bounds 并集 markDirty。 */
     void translateLayer(int index, int dx, int dy);
+    /**
+     * 仅平移蒙版灰度（取消链接后单独移动蒙版）；层 offset 不变。
+     * 冻结预览时只累计脏区。
+     */
+    void shiftLayerMask(int index, int dx, int dy);
+
+    /**
+     * 图层蒙版初始化方式（对照 PS 图层→图层蒙版 / GIMP layers-add-mask）。
+     * Reveal*：选区(或全层)为白=显示；Hide*：选区(或全层)为黑=隐藏。
+     */
+    enum class LayerMaskInit {
+        RevealAll = 0,        ///< 全白
+        HideAll = 1,          ///< 全黑
+        RevealSelection = 2,  ///< 选区白、外黑；无选区≈RevealAll
+        HideSelection = 3,    ///< 选区黑、外白；无选区≈HideAll
+    };
+
+    /**
+     * 给指定层添加/替换图层蒙版并 push 撤销。
+     * @return false 若层无效。
+     */
+    bool addLayerMask(int index, LayerMaskInit init = LayerMaskInit::RevealAll);
+    /** 删除指定层蒙版；无蒙版则 no-op。 */
+    bool removeLayerMask(int index);
+    /**
+     * 应用蒙版：把灰度乘进层像素 alpha 后删除蒙版（破坏性）。
+     * 对照 PS「应用图层蒙版」；一条撤销同时恢复像素与蒙版。
+     */
+    bool applyLayerMask(int index);
+    /** 启用/禁用蒙版（仍保留灰度数据）；无蒙版返回 false。 */
+    bool setLayerMaskEnabled(int index, bool enabled);
+    /** 链接/取消链接蒙版与图层；无蒙版返回 false。 */
+    bool setLayerMaskLinked(int index, bool linked);
+
+    /**
+     * 是否正在编辑活动层的图层蒙版（对照 PS 点蒙版缩略图进入蒙版绘制）。
+     * 画笔/橡皮写灰度；点图层缩略图切回像素。
+     */
+    bool isEditingLayerMask() const { return m_editingLayerMask; }
+    /**
+     * 切换蒙版编辑目标。@p on 且活动层无蒙版时返回 false。
+     * 发 editingTargetChanged + layerPropertiesChanged（刷新行高亮）。
+     */
+    bool setEditingLayerMask(bool on);
 
     /**
      * 预览冻结（对照 GIMP preview_freeze）：拖中不广播面板刷新，
@@ -241,6 +287,7 @@ signals:
     void structureChanged();                     ///< 层数/顺序/文档尺寸变更
     void activeLayerChanged(int index);          ///< 活动层切换
     void selectionChanged();                     ///< 选区 mask 变更
+    void editingTargetChanged();                 ///< 像素 ↔ 蒙版编辑目标切换
     void contentChanged();                       ///< 汇总：任意需整 UI 刷新时
 
 private:
@@ -272,6 +319,7 @@ private:
     std::unique_ptr<HistoryStack> m_history;     ///< 撤销栈
     int m_historySuppress = 0;                   ///< >0 时跳过 push 撤销
     bool m_previewFrozen = false;                ///< 拖层中冻结面板广播
+    bool m_editingLayerMask = false;             ///< 活动层是否在编辑蒙版
 };
 
 } // namespace Ps

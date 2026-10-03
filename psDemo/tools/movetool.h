@@ -43,6 +43,7 @@ private:
     void finishDrag(ImageDocument *doc);
 
     bool m_dragging = false;
+    bool m_movingMaskOnly = false; ///< 取消链接且编辑蒙版：只平移蒙版灰度
     int m_layerIndex = -1;
     QPointF m_lastImagePos;
     QRect m_blitRect;

@@ -1,11 +1,15 @@
 /**
- * projectio.cpp — ProjectIo::save/load 与 v1 混合模式兼容（io 层）。
+ * projectio.cpp — ProjectIo::save/load（io 层）。
+ *
+ * 保存始终写格式 1。头里仍是 2/3/4 的旧 demo 文件按当时字段读入，
+ * 打开后再保存即变成 1。不是产品分代。
  */
 #include "projectio.h"
 
 #include "domain/blendmode.h"
 #include "domain/imagedocument.h"
 #include "domain/layer.h"
+#include "domain/layermask.h"
 #include "domain/layerstyle.h"
 #include "domain/selection.h"
 
@@ -19,8 +23,104 @@
 namespace Ps {
 namespace {
 
+bool writeLayerStyles(QDataStream &out, const LayerStyleStack &styles)
+{
+    out << qint32(styles.count());
+    for (int i = 0; i < styles.count(); ++i) {
+        const LayerStyleEffect &e = styles.at(i);
+        out << qint32(LayerStyleEffect::kindId(e.kind()));
+        out << quint8(e.isEnabled() ? 1 : 0);
+        out << double(e.opacity());
+        out << qint32(e.color().red()) << qint32(e.color().green())
+            << qint32(e.color().blue()) << qint32(e.color().alpha());
+        out << double(e.angle()) << double(e.distance())
+            << double(e.size()) << double(e.spread());
+    }
+    return out.status() == QDataStream::Ok;
+}
+
+bool readLayerStyles(QDataStream &in, LayerStyleStack *styles)
+{
+    if (!styles)
+        return false;
+    styles->clear();
+    qint32 count = 0;
+    in >> count;
+    if (in.status() != QDataStream::Ok || count < 0 || count > 64)
+        return false;
+    for (int i = 0; i < count; ++i) {
+        qint32 kindId = 0;
+        quint8 enabled = 1;
+        double opacity = 1.0;
+        qint32 r = 0, g = 0, b = 0, a = 255;
+        double angle = 120.0, distance = 5.0, size = 5.0, spread = 0.0;
+        in >> kindId >> enabled >> opacity >> r >> g >> b >> a
+           >> angle >> distance >> size >> spread;
+        if (in.status() != QDataStream::Ok)
+            return false;
+        LayerStyleKind kind = LayerStyleKind::DropShadow;
+        if (!LayerStyleEffect::kindFromId(kindId, &kind))
+            continue;
+        LayerStyleEffect e = LayerStyleEffect::makeDefault(kind);
+        e.setEnabled(enabled != 0);
+        e.setOpacity(opacity);
+        e.setColor(QColor(r, g, b, a));
+        e.setAngle(angle);
+        e.setDistance(distance);
+        e.setSize(size);
+        e.setSpread(spread);
+        styles->append(e);
+    }
+    return true;
+}
+
+QByteArray imageToPngBytes(const QImage &image)
+{
+    QByteArray bytes;
+    QBuffer buffer(&bytes);
+    buffer.open(QIODevice::WriteOnly);
+    QImage out = image;
+    if (out.format() != QImage::Format_Grayscale8)
+        out = out.convertToFormat(QImage::Format_ARGB32);
+    if (!out.save(&buffer, "PNG"))
+        return {};
+    return bytes;
+}
+
+QImage pngBytesToImage(const QByteArray &bytes)
+{
+    QImage image;
+    if (!image.loadFromData(bytes, "PNG"))
+        return {};
+    return image;
+}
+
+bool writeBytes(QDataStream &out, const QByteArray &bytes)
+{
+    if (bytes.size() > 512 * 1024 * 1024)
+        return false;
+    out << quint32(bytes.size());
+    if (out.writeRawData(bytes.constData(), bytes.size()) != bytes.size())
+        return false;
+    return out.status() == QDataStream::Ok;
+}
+
+bool readBytes(QDataStream &in, QByteArray *bytes)
+{
+    quint32 size = 0;
+    in >> size;
+    if (in.status() != QDataStream::Ok || size > 512u * 1024u * 1024u)
+        return false;
+    bytes->resize(int(size));
+    if (size == 0)
+        return true;
+    if (in.readRawData(bytes->data(), int(size)) != int(size))
+        return false;
+    return in.status() == QDataStream::Ok;
+}
+
 /**
- * v1 文件头里存的混合模式序（仅用于读旧工程，勿再扩展）。
+ * 最早工程文件头里 10 种混合的存储序（只用于读那种旧文件）。
  * 顺序：正常、正片叠底、滤色、叠加、柔光、强光、变暗、变亮、差值、排除。
  */
 enum class LegacyBlendModeV1 {
@@ -39,7 +139,6 @@ enum class LegacyBlendModeV1 {
 inline constexpr int kLegacyBlendModeV1Count =
     static_cast<int>(LegacyBlendModeV1::Exclusion) + 1;
 
-/** v1 混合序 → 当前 `BlendMode`；非法值返回 false。 */
 bool mapLegacyV1Blend(int legacy, BlendMode *out)
 {
     if (!out || legacy < 0 || legacy >= kLegacyBlendModeV1Count)
@@ -80,218 +179,17 @@ bool mapLegacyV1Blend(int legacy, BlendMode *out)
     return false;
 }
 
-bool isSupportedProjectVersion(ProjectFileVersion version)
+struct LoadLayout {
+    bool legacyBlend = false;
+    bool hasStyles = false;
+    bool hasMasks = false;
+};
+
+std::unique_ptr<ImageDocument> loadDocumentBody(QDataStream &in,
+                                                const LoadLayout &layout,
+                                                const QString &filePath,
+                                                QString *errorMessage)
 {
-    switch (version) {
-    case ProjectFileVersion::V1:
-    case ProjectFileVersion::V2:
-    case ProjectFileVersion::V3:
-        return true;
-    }
-    return false;
-}
-
-bool writeLayerStyles(QDataStream &out, const LayerStyleStack &styles)
-{
-    out << qint32(styles.count());
-    for (int i = 0; i < styles.count(); ++i) {
-        const LayerStyleEffect &e = styles.at(i);
-        out << qint32(LayerStyleEffect::kindId(e.kind()));
-        out << quint8(e.isEnabled() ? 1 : 0);
-        out << double(e.opacity());
-        out << qint32(e.color().red()) << qint32(e.color().green())
-            << qint32(e.color().blue()) << qint32(e.color().alpha());
-        out << double(e.angle()) << double(e.distance())
-            << double(e.size()) << double(e.spread());
-    }
-    return out.status() == QDataStream::Ok;
-}
-
-bool readLayerStyles(QDataStream &in, LayerStyleStack *styles)
-{
-    if (!styles)
-        return false;
-    styles->clear();
-    qint32 count = 0;
-    in >> count;
-    if (in.status() != QDataStream::Ok || count < 0 || count > 64)
-        return false;
-    for (int i = 0; i < count; ++i) {
-        qint32 kindId = 0;
-        quint8 enabled = 1;
-        double opacity = 1.0;
-        qint32 r = 0, g = 0, b = 0, a = 255;
-        double angle = 120.0, distance = 5.0, size = 5.0, spread = 0.0;
-        in >> kindId >> enabled >> opacity >> r >> g >> b >> a
-           >> angle >> distance >> size >> spread;
-        if (in.status() != QDataStream::Ok)
-            return false;
-        LayerStyleKind kind = LayerStyleKind::DropShadow;
-        if (!LayerStyleEffect::kindFromId(kindId, &kind))
-            continue; // 跳过未知种类，保持向前兼容
-        LayerStyleEffect e = LayerStyleEffect::makeDefault(kind);
-        e.setEnabled(enabled != 0);
-        e.setOpacity(opacity);
-        e.setColor(QColor(r, g, b, a));
-        e.setAngle(angle);
-        e.setDistance(distance);
-        e.setSize(size);
-        e.setSpread(spread);
-        styles->append(e);
-    }
-    return true;
-}
-
-QByteArray imageToPngBytes(const QImage &image)
-{
-    QByteArray bytes;
-    QBuffer buffer(&bytes);
-    buffer.open(QIODevice::WriteOnly);
-    // 灰度 mask 原样；图层预乘转 ARGB32 再存，读回后 TileBuffer 再转预乘
-    QImage out = image;
-    if (out.format() != QImage::Format_Grayscale8)
-        out = out.convertToFormat(QImage::Format_ARGB32);
-    if (!out.save(&buffer, "PNG"))
-        return {};
-    return bytes;
-}
-
-QImage pngBytesToImage(const QByteArray &bytes)
-{
-    QImage image;
-    if (!image.loadFromData(bytes, "PNG"))
-        return {};
-    return image;
-}
-
-bool writeBytes(QDataStream &out, const QByteArray &bytes)
-{
-    if (bytes.size() > 512 * 1024 * 1024) // 单块硬上限，防坏文件
-        return false;
-    out << quint32(bytes.size());
-    if (out.writeRawData(bytes.constData(), bytes.size()) != bytes.size())
-        return false;
-    return out.status() == QDataStream::Ok;
-}
-
-bool readBytes(QDataStream &in, QByteArray *bytes)
-{
-    quint32 size = 0;
-    in >> size;
-    if (in.status() != QDataStream::Ok || size > 512u * 1024u * 1024u)
-        return false;
-    bytes->resize(int(size));
-    if (size == 0)
-        return true;
-    if (in.readRawData(bytes->data(), int(size)) != int(size))
-        return false;
-    return in.status() == QDataStream::Ok;
-}
-
-} // namespace
-
-bool ProjectIo::save(const ImageDocument &doc, const QString &filePath,
-                     QString *errorMessage)
-{
-    QSaveFile file(filePath);
-    if (!file.open(QIODevice::WriteOnly)) {
-        if (errorMessage)
-            *errorMessage = QObject::tr("无法写入：%1").arg(file.errorString());
-        return false;
-    }
-
-    QDataStream out(&file);
-    out.setVersion(QDataStream::Qt_6_0);
-    out << kMagic << static_cast<quint32>(kCurrentProjectVersion);
-    out << qint32(doc.width()) << qint32(doc.height());
-    out << qint32(doc.activeLayerIndex());
-    out << qint32(doc.layers().count());
-
-    for (int i = 0; i < doc.layers().count(); ++i) {
-        const Layer *layer = doc.layers().layerAt(i);
-        if (!layer) {
-            if (errorMessage)
-                *errorMessage = QObject::tr("图层 %1 无效").arg(i);
-            return false;
-        }
-        out << layer->name();
-        out << quint8(layer->isVisible() ? 1 : 0);
-        out << double(layer->opacity());
-        out << qint32(static_cast<int>(layer->blendMode()));
-        out << qint32(layer->offsetX()) << qint32(layer->offsetY());
-
-        const QByteArray png = imageToPngBytes(layer->materialize());
-        if (png.isEmpty()) {
-            if (errorMessage)
-                *errorMessage = QObject::tr("图层「%1」像素编码失败").arg(layer->name());
-            return false;
-        }
-        if (!writeBytes(out, png)) {
-            if (errorMessage)
-                *errorMessage = QObject::tr("写入图层像素失败");
-            return false;
-        }
-        if (!writeLayerStyles(out, layer->styles())) {
-            if (errorMessage)
-                *errorMessage = QObject::tr("写入图层样式失败");
-            return false;
-        }
-    }
-
-    // 选区：空则长度 0（对照 XCF 仅在非空时写 selection channel）
-    QByteArray selPng;
-    if (!doc.selection().isEmpty())
-        selPng = imageToPngBytes(doc.selection().mask());
-    if (!writeBytes(out, selPng)) {
-        if (errorMessage)
-            *errorMessage = QObject::tr("写入选区失败");
-        return false;
-    }
-
-    if (out.status() != QDataStream::Ok) {
-        if (errorMessage)
-            *errorMessage = QObject::tr("序列化失败");
-        return false;
-    }
-    if (!file.commit()) {
-        if (errorMessage)
-            *errorMessage = QObject::tr("无法提交文件：%1").arg(file.errorString());
-        return false;
-    }
-    return true;
-}
-
-std::unique_ptr<ImageDocument> ProjectIo::load(const QString &filePath,
-                                               QString *errorMessage)
-{
-    QFile file(filePath);
-    if (!file.open(QIODevice::ReadOnly)) {
-        if (errorMessage)
-            *errorMessage = QObject::tr("无法打开：%1").arg(file.errorString());
-        return nullptr;
-    }
-
-    QDataStream in(&file);
-    in.setVersion(QDataStream::Qt_6_0);
-    quint32 magic = 0;
-    quint32 versionRaw = 0;
-    in >> magic >> versionRaw;
-    if (magic != kMagic) {
-        if (errorMessage)
-            *errorMessage = QObject::tr("不是 PhotoshopLite 工程文件（魔数不匹配）");
-        return nullptr;
-    }
-    const auto fileVersion = static_cast<ProjectFileVersion>(versionRaw);
-    if (!isSupportedProjectVersion(fileVersion)) {
-        if (errorMessage)
-            *errorMessage = QObject::tr("不支持的工程版本：%1（当前为 %2）")
-                                .arg(versionRaw)
-                                .arg(static_cast<quint32>(kCurrentProjectVersion));
-        return nullptr;
-    }
-    const bool legacyV1Blend = (fileVersion == ProjectFileVersion::V1);
-    const bool hasLayerStyles = (fileVersion >= ProjectFileVersion::V3);
-
     qint32 width = 0;
     qint32 height = 0;
     qint32 activeIndex = 0;
@@ -335,9 +233,9 @@ std::unique_ptr<ImageDocument> ProjectIo::load(const QString &filePath,
                                              pixels);
         layer->setVisible(visible != 0);
         layer->setOpacity(qreal(opacity));
-        // v1：先映射旧 10 种序；v2：整数即当前枚举。越界 = 坏文件，拒绝静默退化。
+
         BlendMode mode = BlendMode::Normal;
-        if (legacyV1Blend) {
+        if (layout.legacyBlend) {
             if (!mapLegacyV1Blend(blend, &mode)) {
                 if (errorMessage)
                     *errorMessage = QObject::tr("图层 %1 的混合模式无效：%2").arg(i).arg(blend);
@@ -353,11 +251,41 @@ std::unique_ptr<ImageDocument> ProjectIo::load(const QString &filePath,
         }
         layer->setBlendMode(mode);
         layer->setOffsetSilent(ox, oy);
-        if (hasLayerStyles) {
+
+        if (layout.hasStyles) {
             if (!readLayerStyles(in, &layer->styles()) || in.status() != QDataStream::Ok) {
                 if (errorMessage)
                     *errorMessage = QObject::tr("读取图层 %1 样式失败").arg(i);
                 return nullptr;
+            }
+        }
+
+        if (layout.hasMasks) {
+            quint8 hasMask = 0;
+            in >> hasMask;
+            if (in.status() != QDataStream::Ok) {
+                if (errorMessage)
+                    *errorMessage = QObject::tr("读取图层 %1 蒙版标志失败").arg(i);
+                return nullptr;
+            }
+            if (hasMask) {
+                quint8 enabled = 1;
+                quint8 linked = 1;
+                in >> enabled >> linked;
+                QByteArray maskPng;
+                if (!readBytes(in, &maskPng) || in.status() != QDataStream::Ok) {
+                    if (errorMessage)
+                        *errorMessage = QObject::tr("读取图层 %1 蒙版失败").arg(i);
+                    return nullptr;
+                }
+                const QImage gray = pngBytesToImage(maskPng);
+                if (!gray.isNull()) {
+                    auto mask = std::make_unique<LayerMask>();
+                    mask->setFromImage(gray);
+                    mask->setEnabled(enabled != 0);
+                    mask->setLinked(linked != 0);
+                    layer->setMask(std::move(mask));
+                }
             }
         }
         doc->addLayer(std::move(layer));
@@ -381,6 +309,159 @@ std::unique_ptr<ImageDocument> ProjectIo::load(const QString &filePath,
     doc->setFilePath(filePath);
     doc->clearDirty();
     return doc;
+}
+
+} // namespace
+
+bool ProjectIo::save(const ImageDocument &doc, const QString &filePath,
+                     QString *errorMessage)
+{
+    QSaveFile file(filePath);
+    if (!file.open(QIODevice::WriteOnly)) {
+        if (errorMessage)
+            *errorMessage = QObject::tr("无法写入：%1").arg(file.errorString());
+        return false;
+    }
+
+    QDataStream out(&file);
+    out.setVersion(QDataStream::Qt_6_0);
+    out << kMagic << kProjectFormatVersion;
+    out << qint32(doc.width()) << qint32(doc.height());
+    out << qint32(doc.activeLayerIndex());
+    out << qint32(doc.layers().count());
+
+    for (int i = 0; i < doc.layers().count(); ++i) {
+        const Layer *layer = doc.layers().layerAt(i);
+        if (!layer) {
+            if (errorMessage)
+                *errorMessage = QObject::tr("图层 %1 无效").arg(i);
+            return false;
+        }
+        out << layer->name();
+        out << quint8(layer->isVisible() ? 1 : 0);
+        out << double(layer->opacity());
+        out << qint32(static_cast<int>(layer->blendMode()));
+        out << qint32(layer->offsetX()) << qint32(layer->offsetY());
+
+        const QByteArray png = imageToPngBytes(layer->materialize());
+        if (png.isEmpty()) {
+            if (errorMessage)
+                *errorMessage = QObject::tr("图层「%1」像素编码失败").arg(layer->name());
+            return false;
+        }
+        if (!writeBytes(out, png)) {
+            if (errorMessage)
+                *errorMessage = QObject::tr("写入图层像素失败");
+            return false;
+        }
+        if (!writeLayerStyles(out, layer->styles())) {
+            if (errorMessage)
+                *errorMessage = QObject::tr("写入图层样式失败");
+            return false;
+        }
+
+        const bool hasMask = layer->hasMask() && layer->mask()
+                             && !layer->mask()->isNull();
+        out << quint8(hasMask ? 1 : 0);
+        if (hasMask) {
+            out << quint8(layer->mask()->isEnabled() ? 1 : 0);
+            out << quint8(layer->mask()->isLinked() ? 1 : 0);
+            const QByteArray maskPng = imageToPngBytes(layer->mask()->image());
+            if (maskPng.isEmpty() || !writeBytes(out, maskPng)) {
+                if (errorMessage)
+                    *errorMessage = QObject::tr("写入图层蒙版失败");
+                return false;
+            }
+        }
+    }
+
+    QByteArray selPng;
+    if (!doc.selection().isEmpty())
+        selPng = imageToPngBytes(doc.selection().mask());
+    if (!writeBytes(out, selPng)) {
+        if (errorMessage)
+            *errorMessage = QObject::tr("写入选区失败");
+        return false;
+    }
+
+    if (out.status() != QDataStream::Ok) {
+        if (errorMessage)
+            *errorMessage = QObject::tr("序列化失败");
+        return false;
+    }
+    if (!file.commit()) {
+        if (errorMessage)
+            *errorMessage = QObject::tr("无法提交文件：%1").arg(file.errorString());
+        return false;
+    }
+    return true;
+}
+
+std::unique_ptr<ImageDocument> ProjectIo::load(const QString &filePath,
+                                               QString *errorMessage)
+{
+    QFile file(filePath);
+    if (!file.open(QIODevice::ReadOnly)) {
+        if (errorMessage)
+            *errorMessage = QObject::tr("无法打开：%1").arg(file.errorString());
+        return nullptr;
+    }
+
+    QDataStream in(&file);
+    in.setVersion(QDataStream::Qt_6_0);
+    quint32 magic = 0;
+    quint32 versionRaw = 0;
+    in >> magic >> versionRaw;
+    if (magic != kMagic) {
+        if (errorMessage)
+            *errorMessage = QObject::tr("不是 PhotoshopLite 工程文件（魔数不匹配）");
+        return nullptr;
+    }
+
+    LoadLayout layout;
+    if (versionRaw == 1) {
+        // 当前保存格式：完整布局（样式 + 蒙版）
+        layout.hasStyles = true;
+        layout.hasMasks = true;
+    } else if (versionRaw == 2) {
+        layout.hasStyles = false;
+        layout.hasMasks = false;
+    } else if (versionRaw == 3) {
+        layout.hasStyles = true;
+        layout.hasMasks = false;
+    } else if (versionRaw == 4) {
+        layout.hasStyles = true;
+        layout.hasMasks = true;
+    } else {
+        if (errorMessage)
+            *errorMessage = QObject::tr("无法打开此工程文件");
+        return nullptr;
+    }
+
+    const qint64 bodyPos = file.pos();
+    std::unique_ptr<ImageDocument> doc = loadDocumentBody(in, layout, filePath, errorMessage);
+    if (doc)
+        return doc;
+
+    // 头为 1 的极老文件：10 种混合、无样式/蒙版。当前布局读失败则按旧布局再读一次。
+    if (versionRaw == 1) {
+        if (!file.seek(bodyPos))
+            return nullptr;
+        QDataStream retry(&file);
+        retry.setVersion(QDataStream::Qt_6_0);
+        LoadLayout oldV1;
+        oldV1.legacyBlend = true;
+        oldV1.hasStyles = false;
+        oldV1.hasMasks = false;
+        QString ignored;
+        doc = loadDocumentBody(retry, oldV1, filePath, &ignored);
+        if (doc) {
+            if (errorMessage)
+                errorMessage->clear();
+            return doc;
+        }
+    }
+    return nullptr;
 }
 
 } // namespace Ps

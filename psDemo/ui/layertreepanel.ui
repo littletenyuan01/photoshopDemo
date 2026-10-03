@@ -757,7 +757,7 @@ QToolButton:disabled { color: #666; }</string>
          <string/>
         </property>
         <property name="toolTip">
-         <string>添加图层蒙版（UI 占位：蒙版尚未进 domain）</string>
+         <string>添加/删除图层蒙版（有选区则显示选区；再点删除）</string>
         </property>
         <property name="iconSize">
          <size>

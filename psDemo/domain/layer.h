@@ -8,6 +8,7 @@
 
 #include "blendmode.h"
 #include "filterstack.h"
+#include "layermask.h"
 #include "layerstylestack.h"
 #include "tilebuffer.h"
 
@@ -17,6 +18,7 @@
 #include <QPointF>
 #include <QRect>
 #include <QString>
+#include <memory>
 
 namespace Ps {
 
@@ -122,6 +124,16 @@ public:
     const LayerStyleStack &styles() const { return m_styles; }
 
     /**
+     * 图层蒙版（对照 GIMP GimpLayerMask）。
+     * 有蒙版且启用时，合成/点选乘灰度；白显黑藏。
+     */
+    bool hasMask() const { return m_mask != nullptr && !m_mask->isNull(); }
+    LayerMask *mask() { return m_mask.get(); }
+    const LayerMask *mask() const { return m_mask.get(); }
+    /** 设置或清除蒙版（传 nullptr 清除）；不发信号，由文档 API 统一广播。 */
+    void setMask(std::unique_ptr<LayerMask> mask);
+
+    /**
      * 合成用外接矩形（含样式外扩：投影/描边等）。
      * 无启用样式时等于 boundsInDocument()。
      */
@@ -190,6 +202,7 @@ private:
     TileBuffer m_tiles; ///< 本层像素（懒分配瓦片；层内原点）
     FilterStack m_filters; ///< 非破坏滤镜节点（对照 drawable filter stack）
     LayerStyleStack m_styles; ///< 非破坏图层样式（对照 PS fx / GIMP layer effects）
+    std::unique_ptr<LayerMask> m_mask; ///< 图层蒙版；可空
 
     /** 层内坐标内容包围盒缓存；与 offset 无关。 */
     mutable QRect m_contentBoundsLocal;

@@ -98,6 +98,14 @@ public:
                               ChannelOp op);
 
     /**
+     * 由图层蒙版灰度建立选区（对照从蒙版载入选区）。
+     * @param gray Format_Grayscale8，层局部坐标。
+     */
+    void selectFromLayerGray(const QImage &gray,
+                             int offsetX, int offsetY,
+                             ChannelOp op);
+
+    /**
      * 将同尺寸灰度形状 mask 按 ChannelOp 合并进本选区。
      * 对照 gimp_channel_combine_buffer；供 SelectPolygonOp 等选区算子调用。
      * @param shapeMask Format_Grayscale8，与文档同尺寸；形状内非 0

@@ -7,6 +7,7 @@
 #include "app/undoitem.h"
 #include "domain/filternode.h"
 #include "domain/layer.h"
+#include "domain/layermask.h"
 #include "engine/compositor.h"
 #include "engine/op/opname.h"
 #include "engine/paintengine.h"
@@ -20,6 +21,44 @@
 #include <vector>
 
 namespace Ps {
+
+namespace {
+
+/** 按 LayerMaskInit 生成与层同尺寸的灰度图（层局部坐标）。 */
+QImage makeLayerMaskGray(const Layer &layer, const Selection &sel,
+                         ImageDocument::LayerMaskInit init)
+{
+    const int w = layer.width();
+    const int h = layer.height();
+    QImage gray(w, h, QImage::Format_Grayscale8);
+    if (w <= 0 || h <= 0)
+        return gray;
+
+    const bool useSelection = (init == ImageDocument::LayerMaskInit::RevealSelection
+                               || init == ImageDocument::LayerMaskInit::HideSelection)
+                              && !sel.isEmpty();
+
+    if (!useSelection) {
+        const bool hide = (init == ImageDocument::LayerMaskInit::HideAll
+                           || init == ImageDocument::LayerMaskInit::HideSelection);
+        gray.fill(hide ? 0 : 255);
+        return gray;
+    }
+
+    const bool reveal = (init == ImageDocument::LayerMaskInit::RevealSelection);
+    const int ox = layer.offsetX();
+    const int oy = layer.offsetY();
+    for (int y = 0; y < h; ++y) {
+        uchar *line = gray.scanLine(y);
+        for (int x = 0; x < w; ++x) {
+            const quint8 v = sel.value(ox + x, oy + y);
+            line[x] = reveal ? v : quint8(255 - v);
+        }
+    }
+    return gray;
+}
+
+} // namespace
 
 /** 构造空文档：初始化选区 mask 与 HistoryStack。 */
 ImageDocument::ImageDocument(int width, int height, QObject *parent)
@@ -168,8 +207,12 @@ void ImageDocument::setActiveLayerIndex(int index)
         return;
     if (m_activeLayerIndex == index)
         return;
+    const bool wasEditingMask = m_editingLayerMask;
     m_activeLayerIndex = index;
+    m_editingLayerMask = false;
     emit activeLayerChanged(index);
+    if (wasEditingMask)
+        emit editingTargetChanged();
     emit contentChanged();
 }
 
@@ -448,6 +491,182 @@ void ImageDocument::selectLayerAlpha(int layerIndex, ChannelOp op)
     emit selectionChanged();
 }
 
+void ImageDocument::selectLayerMask(int layerIndex, ChannelOp op)
+{
+    Layer *layer = m_layers.layerAt(layerIndex);
+    if (!layer || !layer->hasMask() || !layer->mask())
+        return;
+
+    pushSelectionUndo(tr("载入蒙版为选区"));
+    m_selection.selectFromLayerGray(layer->mask()->image(),
+                                    layer->offsetX(), layer->offsetY(), op);
+    emit selectionChanged();
+}
+
+bool ImageDocument::addLayerMask(int index, LayerMaskInit init)
+{
+    Layer *layer = m_layers.layerAt(index);
+    if (!layer || layer->width() <= 0 || layer->height() <= 0)
+        return false;
+
+    pushLayerPropUndo(index, tr("添加图层蒙版"));
+    auto mask = std::make_unique<LayerMask>();
+    mask->setFromImage(makeLayerMaskGray(*layer, m_selection, init));
+    mask->setEnabled(true);
+    layer->setMask(std::move(mask));
+
+    const QRect dirty = layer->styleBoundsInDocument()
+                            .intersected(QRect(0, 0, m_width, m_height));
+    markDirty(dirty.isEmpty() ? QRect(0, 0, m_width, m_height) : dirty);
+    emit layerPropertiesChanged(index);
+    emit contentChanged();
+    return true;
+}
+
+bool ImageDocument::removeLayerMask(int index)
+{
+    Layer *layer = m_layers.layerAt(index);
+    if (!layer || !layer->hasMask())
+        return false;
+
+    pushLayerPropUndo(index, tr("删除图层蒙版"));
+    const QRect dirty = layer->styleBoundsInDocument()
+                            .intersected(QRect(0, 0, m_width, m_height));
+    layer->setMask(nullptr);
+    if (index == m_activeLayerIndex && m_editingLayerMask) {
+        m_editingLayerMask = false;
+        emit editingTargetChanged();
+    }
+    markDirty(dirty.isEmpty() ? QRect(0, 0, m_width, m_height) : dirty);
+    emit layerPropertiesChanged(index);
+    emit contentChanged();
+    return true;
+}
+
+bool ImageDocument::applyLayerMask(int index)
+{
+    Layer *layer = m_layers.layerAt(index);
+    if (!layer || !layer->hasMask() || !layer->mask())
+        return false;
+
+    LayerMask *mask = layer->mask();
+    const bool maskEnabled = mask->isEnabled();
+    const bool maskLinked = mask->isLinked();
+    const QImage maskGray = mask->image().copy();
+
+    if (shouldRecordHistory() && m_history) {
+        m_history->push(std::make_unique<LayerPixelsUndo>(
+            index, layer->materialize(), layer->offsetX(), layer->offsetY(),
+            true, maskEnabled, maskLinked, maskGray, tr("应用图层蒙版")));
+    }
+
+    // 烘焙：alpha *= mask（停用蒙版时仍按灰度烘焙，与 PS Apply 一致）
+    QImage pixels = layer->hasPixelData()
+                        ? layer->materialize()
+                        : QImage(layer->width(), layer->height(),
+                                 QImage::Format_ARGB32_Premultiplied);
+    if (pixels.isNull()) {
+        pixels = QImage(layer->width(), layer->height(),
+                        QImage::Format_ARGB32_Premultiplied);
+        pixels.fill(0);
+    }
+    if (pixels.format() != QImage::Format_ARGB32_Premultiplied)
+        pixels = pixels.convertToFormat(QImage::Format_ARGB32_Premultiplied);
+
+    const int w = qMin(pixels.width(), maskGray.width());
+    const int h = qMin(pixels.height(), maskGray.height());
+    for (int y = 0; y < h; ++y) {
+        QRgb *pline = reinterpret_cast<QRgb *>(pixels.scanLine(y));
+        const uchar *mline = (y < maskGray.height())
+                                 ? maskGray.constScanLine(y)
+                                 : nullptr;
+        for (int x = 0; x < w; ++x) {
+            const quint8 mv = mline ? mline[x] : quint8(0);
+            const QRgb p = pline[x];
+            const int a = (qAlpha(p) * int(mv) + 127) / 255;
+            if (a <= 0) {
+                pline[x] = 0;
+                continue;
+            }
+            // 预乘：rgb 也按同一比例缩
+            const int r = (qRed(p) * int(mv) + 127) / 255;
+            const int g = (qGreen(p) * int(mv) + 127) / 255;
+            const int b = (qBlue(p) * int(mv) + 127) / 255;
+            pline[x] = qRgba(r, g, b, a);
+        }
+        // 蒙版更窄时右侧 alpha 清零
+        for (int x = w; x < pixels.width(); ++x)
+            pline[x] = 0;
+    }
+    for (int y = h; y < pixels.height(); ++y) {
+        QRgb *pline = reinterpret_cast<QRgb *>(pixels.scanLine(y));
+        for (int x = 0; x < pixels.width(); ++x)
+            pline[x] = 0;
+    }
+
+    layer->replaceFromImage(pixels);
+    layer->setMask(nullptr);
+    if (index == m_activeLayerIndex && m_editingLayerMask) {
+        m_editingLayerMask = false;
+        emit editingTargetChanged();
+    }
+
+    const QRect dirty = layer->styleBoundsInDocument()
+                            .intersected(QRect(0, 0, m_width, m_height));
+    markDirty(dirty.isEmpty() ? QRect(0, 0, m_width, m_height) : dirty);
+    emit layerPropertiesChanged(index);
+    emit contentChanged();
+    return true;
+}
+
+bool ImageDocument::setEditingLayerMask(bool on)
+{
+    if (on == m_editingLayerMask)
+        return true;
+    if (on) {
+        Layer *layer = activeLayer();
+        if (!layer || !layer->hasMask() || !layer->mask())
+            return false;
+    }
+    m_editingLayerMask = on;
+    emit editingTargetChanged();
+    if (m_activeLayerIndex >= 0)
+        emit layerPropertiesChanged(m_activeLayerIndex);
+    return true;
+}
+
+bool ImageDocument::setLayerMaskEnabled(int index, bool enabled)
+{
+    Layer *layer = m_layers.layerAt(index);
+    if (!layer || !layer->mask() || layer->mask()->isNull())
+        return false;
+    if (layer->mask()->isEnabled() == enabled)
+        return true;
+
+    pushLayerPropUndo(index, enabled ? tr("启用图层蒙版") : tr("停用图层蒙版"));
+    layer->mask()->setEnabled(enabled);
+    const QRect dirty = layer->styleBoundsInDocument()
+                            .intersected(QRect(0, 0, m_width, m_height));
+    markDirty(dirty.isEmpty() ? QRect(0, 0, m_width, m_height) : dirty);
+    emit layerPropertiesChanged(index);
+    emit contentChanged();
+    return true;
+}
+
+bool ImageDocument::setLayerMaskLinked(int index, bool linked)
+{
+    Layer *layer = m_layers.layerAt(index);
+    if (!layer || !layer->mask() || layer->mask()->isNull())
+        return false;
+    if (layer->mask()->isLinked() == linked)
+        return true;
+
+    pushLayerPropUndo(index, linked ? tr("链接图层蒙版") : tr("取消链接图层蒙版"));
+    layer->mask()->setLinked(linked);
+    emit layerPropertiesChanged(index);
+    return true;
+}
+
 int ImageDocument::indexOfLayer(const Layer *layer) const
 {
     if (!layer)
@@ -550,6 +769,11 @@ void ImageDocument::translateLayer(int index, int dx, int dy)
     // 含样式外扩，避免投影残影；平移不改像素，勿走 markDirty（会清复合缓存）
     const QRect docRect(0, 0, m_width, m_height);
     const QRect oldBounds = layer->styleBoundsInDocument().intersected(docRect);
+
+    // 取消链接：层动蒙版不动 → 蒙版灰度反方向平移，文档位置不变
+    if (layer->mask() && !layer->mask()->isNull() && !layer->mask()->isLinked())
+        layer->mask()->shift(-dx, -dy, 255);
+
     layer->translate(dx, dy);
     const QRect newBounds = layer->styleBoundsInDocument().intersected(docRect);
 
@@ -563,6 +787,32 @@ void ImageDocument::translateLayer(int index, int dx, int dy)
     if (m_previewFrozen)
         return;
 
+    emit layerPropertiesChanged(index);
+    if (dirty.isEmpty())
+        return;
+    emit pixelsChanged(dirty);
+    emit contentChanged();
+}
+
+void ImageDocument::shiftLayerMask(int index, int dx, int dy)
+{
+    if (dx == 0 && dy == 0)
+        return;
+    Layer *layer = m_layers.layerAt(index);
+    if (!layer || !layer->mask() || layer->mask()->isNull())
+        return;
+
+    const QRect docRect(0, 0, m_width, m_height);
+    const QRect oldBounds = layer->styleBoundsInDocument().intersected(docRect);
+    layer->mask()->shift(dx, dy, 255);
+    const QRect newBounds = layer->styleBoundsInDocument().intersected(docRect);
+    const QRect dirty = oldBounds.united(newBounds);
+    if (!dirty.isEmpty()) {
+        m_dirty = true;
+        m_dirtyRect = m_dirtyRect.isNull() ? dirty : m_dirtyRect.united(dirty);
+    }
+    if (m_previewFrozen)
+        return;
     emit layerPropertiesChanged(index);
     if (dirty.isEmpty())
         return;
@@ -652,6 +902,10 @@ int ImageDocument::duplicateLayer(int index)
         copy->filters().append(src->filters().at(i));
     for (int i = 0; i < src->styles().count(); ++i)
         copy->styles().append(src->styles().at(i));
+    if (src->hasMask() && src->mask()) {
+        auto mask = std::make_unique<LayerMask>(src->mask()->clone());
+        copy->setMask(std::move(mask));
+    }
 
     copy->setOwner(this);
     const int newIndex = m_layers.insertLayer(index + 1, std::move(copy));
@@ -710,6 +964,17 @@ void ImageDocument::scaleImage(int newWidth, int newHeight)
         Layer *layer = m_layers.layerAt(i);
         if (!layer)
             continue;
+
+        QImage maskGray;
+        bool maskEnabled = true;
+        if (layer->hasMask() && layer->mask()) {
+            maskGray = layer->mask()->image().scaled(
+                newWidth, newHeight, Qt::IgnoreAspectRatio, Qt::FastTransformation);
+            if (maskGray.format() != QImage::Format_Grayscale8)
+                maskGray = maskGray.convertToFormat(QImage::Format_Grayscale8);
+            maskEnabled = layer->mask()->isEnabled();
+        }
+
         QImage src = layer->materialize();
         if (src.isNull()) {
             src = QImage(m_width, m_height, QImage::Format_ARGB32_Premultiplied);
@@ -722,6 +987,12 @@ void ImageDocument::scaleImage(int newWidth, int newHeight)
         layer->replaceFromImage(scaled);
         layer->setOffsetSilent(qRound(layer->offsetX() * qreal(newWidth) / m_width),
                                qRound(layer->offsetY() * qreal(newHeight) / m_height));
+        if (!maskGray.isNull()) {
+            auto mask = std::make_unique<LayerMask>();
+            mask->setFromImage(maskGray);
+            mask->setEnabled(maskEnabled);
+            layer->setMask(std::move(mask));
+        }
     }
 
     m_selection.scale(newWidth, newHeight);
@@ -756,6 +1027,13 @@ void ImageDocument::resizeCanvas(int newWidth, int newHeight,
         if (!layer)
             continue;
 
+        QImage maskGray;
+        bool maskEnabled = true;
+        if (layer->hasMask() && layer->mask() && !layer->mask()->isNull()) {
+            maskGray = layer->mask()->image();
+            maskEnabled = layer->mask()->isEnabled();
+        }
+
         QImage src = layer->materialize();
         if (src.isNull()) {
             src = QImage(m_width, m_height, QImage::Format_ARGB32_Premultiplied);
@@ -768,15 +1046,40 @@ void ImageDocument::resizeCanvas(int newWidth, int newHeight,
         else
             neu.fill(Qt::transparent);
 
+        const int placeX = offsetX + layer->offsetX();
+        const int placeY = offsetY + layer->offsetY();
+
         QPainter painter(&neu);
         painter.setCompositionMode(QPainter::CompositionMode_SourceOver);
-        painter.drawImage(offsetX + layer->offsetX(), offsetY + layer->offsetY(), src);
+        painter.drawImage(placeX, placeY, src);
         painter.end();
 
         if (neu.format() != QImage::Format_ARGB32_Premultiplied)
             neu = neu.convertToFormat(QImage::Format_ARGB32_Premultiplied);
         layer->replaceFromImage(neu);
         layer->setOffsetSilent(0, 0);
+
+        if (!maskGray.isNull()) {
+            QImage neuMask(newWidth, newHeight, QImage::Format_Grayscale8);
+            neuMask.fill(255); // 扩展区默认显示
+            for (int y = 0; y < maskGray.height(); ++y) {
+                const int dy = placeY + y;
+                if (dy < 0 || dy >= newHeight)
+                    continue;
+                const uchar *s = maskGray.constScanLine(y);
+                uchar *d = neuMask.scanLine(dy);
+                for (int x = 0; x < maskGray.width(); ++x) {
+                    const int dx = placeX + x;
+                    if (dx < 0 || dx >= newWidth)
+                        continue;
+                    d[dx] = s[x];
+                }
+            }
+            auto mask = std::make_unique<LayerMask>();
+            mask->setFromImage(neuMask);
+            mask->setEnabled(maskEnabled);
+            layer->setMask(std::move(mask));
+        }
     }
 
     m_selection.resizeCanvas(newWidth, newHeight, offsetX, offsetY);
@@ -805,6 +1108,16 @@ void ImageDocument::cropTo(const QRect &rect)
         if (!layer)
             continue;
 
+        QImage maskGray;
+        bool maskEnabled = true;
+        if (layer->hasMask() && layer->mask() && !layer->mask()->isNull()) {
+            maskGray = layer->mask()->image();
+            maskEnabled = layer->mask()->isEnabled();
+        }
+
+        const int oldOx = layer->offsetX();
+        const int oldOy = layer->offsetY();
+
         QImage src = layer->materialize();
         if (src.isNull()) {
             src = QImage(layer->width(), layer->height(), QImage::Format_ARGB32_Premultiplied);
@@ -817,7 +1130,7 @@ void ImageDocument::cropTo(const QRect &rect)
         {
             QPainter painter(&full);
             painter.setCompositionMode(QPainter::CompositionMode_Source);
-            painter.drawImage(layer->offsetX(), layer->offsetY(), src);
+            painter.drawImage(oldOx, oldOy, src);
         }
 
         QImage cropped = full.copy(r);
@@ -825,6 +1138,31 @@ void ImageDocument::cropTo(const QRect &rect)
             cropped = cropped.convertToFormat(QImage::Format_ARGB32_Premultiplied);
         layer->replaceFromImage(cropped);
         layer->setOffsetSilent(0, 0);
+
+        if (!maskGray.isNull()) {
+            QImage fullMask(m_width, m_height, QImage::Format_Grayscale8);
+            fullMask.fill(255);
+            for (int y = 0; y < maskGray.height(); ++y) {
+                const int dy = oldOy + y;
+                if (dy < 0 || dy >= m_height)
+                    continue;
+                const uchar *s = maskGray.constScanLine(y);
+                uchar *d = fullMask.scanLine(dy);
+                for (int x = 0; x < maskGray.width(); ++x) {
+                    const int dx = oldOx + x;
+                    if (dx < 0 || dx >= m_width)
+                        continue;
+                    d[dx] = s[x];
+                }
+            }
+            QImage croppedMask = fullMask.copy(r);
+            if (croppedMask.format() != QImage::Format_Grayscale8)
+                croppedMask = croppedMask.convertToFormat(QImage::Format_Grayscale8);
+            auto mask = std::make_unique<LayerMask>();
+            mask->setFromImage(croppedMask);
+            mask->setEnabled(maskEnabled);
+            layer->setMask(std::move(mask));
+        }
     }
 
     // 旧 mask 平移：新原点 = 旧 (r.x, r.y)

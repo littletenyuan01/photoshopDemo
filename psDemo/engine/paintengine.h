@@ -58,6 +58,30 @@ public:
                                PaintSelectionClip clip = PaintSelectionClip());
 
     /**
+     * 在图层蒙版灰度图上盖圆形 dab（层内坐标）。
+     * Paint：写入 @p grayValue；Erase：写入 255（露出）。
+     * Soft 边用 BrushCover 与原像素插值。
+     */
+    static QRect stampMaskDab(QImage &maskGray,
+                              const QPointF &center,
+                              qreal radius,
+                              quint8 grayValue,
+                              Mode mode,
+                              qreal hardness = 0.85,
+                              PaintSelectionClip clip = PaintSelectionClip());
+
+    /** 沿 from→to 在蒙版上插值连续 dab。 */
+    static QRect strokeMaskSegment(QImage &maskGray,
+                                   const QPointF &from,
+                                   const QPointF &to,
+                                   qreal radius,
+                                   quint8 grayValue,
+                                   Mode mode,
+                                   qreal hardness = 0.85,
+                                   qreal spacing = 0.25,
+                                   PaintSelectionClip clip = PaintSelectionClip());
+
+    /**
      * 仿制图章单次 dab。
      * @param center       目标 dab 中心（层内坐标）
      * @param sourceCenter 采样中心（文档坐标）

@@ -24,6 +24,7 @@ LayerRowWidget::LayerRowWidget(QWidget *parent)
     ui->stylesHost->setVisible(false);
     ui->nameLabel->setTextInteractionFlags(Qt::NoTextInteraction);
     ui->thumbLabel->installEventFilter(this);
+    ui->maskThumbLabel->installEventFilter(this);
     ui->nameLabel->installEventFilter(this);
 
     connect(ui->btnVisible, &QToolButton::toggled, this, [this](bool on) {
@@ -70,6 +71,30 @@ void LayerRowWidget::syncFromLayer(const Ps::Layer &layer)
 void LayerRowWidget::setThumbnail(const QImage &thumb)
 {
     ui->thumbLabel->setPixmap(QPixmap::fromImage(thumb));
+}
+
+void LayerRowWidget::setMaskThumbnail(const QImage &thumb)
+{
+    if (thumb.isNull()) {
+        ui->maskThumbLabel->clear();
+        ui->maskThumbLabel->setVisible(false);
+        return;
+    }
+    ui->maskThumbLabel->setPixmap(QPixmap::fromImage(thumb));
+    ui->maskThumbLabel->setVisible(true);
+}
+
+void LayerRowWidget::setEditTarget(int target)
+{
+    const char *active =
+        "QLabel { border: 2px solid #5a9fd4; background: #2a2a2a; }";
+    const char *idle =
+        "QLabel { border: 1px solid #666; background: transparent; }";
+    ui->thumbLabel->setStyleSheet(target == 0 ? active : idle);
+    if (ui->maskThumbLabel->isVisible())
+        ui->maskThumbLabel->setStyleSheet(target == 1 ? active : idle);
+    else
+        ui->maskThumbLabel->setStyleSheet(idle);
 }
 
 void LayerRowWidget::setExpanded(bool on)
@@ -156,14 +181,25 @@ void LayerRowWidget::mousePressEvent(QMouseEvent *event)
 bool LayerRowWidget::eventFilter(QObject *watched, QEvent *event)
 {
     if (event->type() == QEvent::MouseButtonPress
-        && (watched == ui->thumbLabel || watched == ui->nameLabel)) {
+        && (watched == ui->thumbLabel || watched == ui->maskThumbLabel
+            || watched == ui->nameLabel)) {
         auto *mouse = static_cast<QMouseEvent *>(event);
         if (mouse->button() != Qt::LeftButton)
             return false;
         emit rowPressed();
-        if (watched == ui->thumbLabel
-            && mouse->modifiers().testFlag(Qt::ControlModifier)) {
-            emit thumbnailCtrlClicked(mouse->modifiers());
+        if (watched == ui->thumbLabel) {
+            if (mouse->modifiers().testFlag(Qt::ControlModifier))
+                emit thumbnailCtrlClicked(mouse->modifiers());
+            else
+                emit layerThumbClicked();
+        }
+        if (watched == ui->maskThumbLabel) {
+            if (mouse->modifiers().testFlag(Qt::ControlModifier))
+                emit maskCtrlClicked(mouse->modifiers());
+            else if (mouse->modifiers().testFlag(Qt::AltModifier))
+                emit maskAltClicked();
+            else
+                emit maskThumbClicked();
         }
         return true; // 勿再冒泡到 mousePressEvent，避免 rowPressed 双发
     }

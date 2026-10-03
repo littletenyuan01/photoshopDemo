@@ -76,6 +76,7 @@ private slots:
     void onBtnNewClicked();
     void onBtnDeleteClicked();
     void onBtnLayerStyleClicked();
+    void onBtnLayerMaskClicked();
     void onListSelectionChanged();
     void onActiveLayerChanged(int index);
     void onLayerPropertiesChanged(int stackIndex);
@@ -117,6 +118,7 @@ private:
      * @return true 表示已处理。
      */
     bool applyAlphaToSelection(int stackIndex, Qt::KeyboardModifiers mods);
+    bool applyMaskToSelection(int stackIndex, Qt::KeyboardModifiers mods);
 
     void syncLayerContextMenuState();
 
@@ -128,6 +130,7 @@ private:
     QHash<int, bool> m_stylesExpanded;
 
     int m_alphaSelectSourceLayer = -1;
+    int m_maskSelectSourceLayer = -1;
     bool m_settingAlphaSelect = false;
 
     bool m_blendPreviewActive = false;

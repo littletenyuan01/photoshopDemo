@@ -5,6 +5,7 @@
 
 #include "domain/imagedocument.h"
 #include "domain/layer.h"
+#include "domain/layermask.h"
 #include "domain/selection.h"
 #include "engine/paintengine.h"
 
@@ -24,6 +25,12 @@ PaintEngine::SelectionClip selectionClipFor(Layer *layer, ImageDocument *doc)
     clip.layerOffsetX = layer->offsetX();
     clip.layerOffsetY = layer->offsetY();
     return clip;
+}
+
+/** 前景色亮度 → 蒙版灰度（黑藏白显）。 */
+quint8 maskGrayFromColor(const QColor &c)
+{
+    return quint8(qBound(0, qGray(c.rgba()), 255));
 }
 
 } // namespace
@@ -63,16 +70,30 @@ bool PaintTool::mousePress(const ToolEvent &event, const ToolContext &ctx, ViewP
 
     const auto mode = m_erase ? PaintEngine::Mode::Erase : PaintEngine::Mode::Paint;
     const auto clip = selectionClipFor(layer, ctx.document);
+    const QPointF local = layer->toLayerLocal(event.imagePos);
 
     m_painting = true;
     m_lastImagePos = event.imagePos;
+
+    // 蒙版编辑：写灰度；撤销走属性快照（含 maskGray）
+    if (ctx.document->isEditingLayerMask()) {
+        LayerMask *mask = layer->mask();
+        if (!mask || mask->isNull())
+            return false;
+        ctx.document->pushLayerPropertiesUndo(ctx.document->activeLayerIndex(),
+                                              undoLabel() + QObject::tr("（蒙版）"));
+        const QRect dirtyLocal = PaintEngine::stampMaskDab(
+            mask->image(), local, ctx.brushRadius,
+            maskGrayFromColor(ctx.foreground), mode, m_hardness, clip);
+        if (!dirtyLocal.isEmpty())
+            markDocumentDirty(ctx, dirtyLocal.translated(layer->offsetX(), layer->offsetY()));
+        return true;
+    }
 
     // 对照 gimp_drawable_push_undo：改像素前推入旧缓冲；一笔一条
     ctx.document->pushLayerPixelsUndo(ctx.document->activeLayerIndex(), undoLabel());
 
     // 瓦片是层内坐标：文档点先减 Layer offset（对照 drawable 局部坐标）
-    const QPointF local = layer->toLayerLocal(event.imagePos);
-    // 脏区由算子返回（已与层范围求交），工具侧不再自己推算
     const QRect dirtyLocal = PaintEngine::stampDab(
         layer->tiles(), local, ctx.brushRadius, ctx.foreground, mode, m_hardness, clip);
     if (!dirtyLocal.isEmpty())
@@ -98,11 +119,24 @@ bool PaintTool::mouseMove(const ToolEvent &event, const ToolContext &ctx, ViewPo
 
     const QPointF fromLocal = layer->toLayerLocal(m_lastImagePos);
     const QPointF toLocal = layer->toLayerLocal(event.imagePos);
+    m_lastImagePos = event.imagePos;
+
+    if (ctx.document->isEditingLayerMask()) {
+        LayerMask *mask = layer->mask();
+        if (!mask || mask->isNull())
+            return false;
+        const QRect dirtyLocal = PaintEngine::strokeMaskSegment(
+            mask->image(), fromLocal, toLocal,
+            ctx.brushRadius, maskGrayFromColor(ctx.foreground), mode, m_hardness, 0.25, clip);
+        if (!dirtyLocal.isEmpty())
+            markDocumentDirty(ctx, dirtyLocal.translated(layer->offsetX(), layer->offsetY()));
+        return true;
+    }
+
     // 一次鼠标移动 = 一段笔画；算子返回本段扫过的**全部** dab 的并集脏区。
     const QRect dirtyLocal = PaintEngine::strokeSegment(
         layer->tiles(), fromLocal, toLocal,
         ctx.brushRadius, ctx.foreground, mode, m_hardness, 0.25, clip);
-    m_lastImagePos = event.imagePos;
     if (!dirtyLocal.isEmpty())
         markDocumentDirty(ctx, dirtyLocal.translated(layer->offsetX(), layer->offsetY()));
     return true;
@@ -123,7 +157,6 @@ void PaintTool::deactivate(const ToolContext &ctx, ViewPort &view)
 {
     Q_UNUSED(ctx)
     Q_UNUSED(view)
-    // 切走工具时结束笔画，避免下次切回来续上一笔
     m_painting = false;
 }
 

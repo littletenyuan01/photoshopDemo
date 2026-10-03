@@ -5,6 +5,7 @@
 
 #include "domain/imagedocument.h"
 #include "domain/layer.h"
+#include "domain/layermask.h"
 #include "engine/compositor.h"
 
 #include <QPainter>
@@ -140,7 +141,20 @@ bool MoveTool::mousePress(const ToolEvent &event, const ToolContext &ctx, ViewPo
 
     const int index = ctx.document->activeLayerIndex();
     m_dragging = true;
+    m_movingMaskOnly = false;
     m_lastImagePos = event.imagePos;
+
+    // 取消链接 + 正在编辑蒙版 → 只移动蒙版内容（对照 PS）
+    if (ctx.document->isEditingLayerMask()
+        && layer->mask() && !layer->mask()->isNull()
+        && !layer->mask()->isLinked()) {
+        m_movingMaskOnly = true;
+        ctx.document->pushLayerPropertiesUndo(index, QObject::tr("移动蒙版"));
+        startDrag(*ctx.document, index);
+        emit repaintRequested();
+        return true;
+    }
+
     ctx.document->pushLayerOffsetUndo(index);
     startDrag(*ctx.document, index);
     emit repaintRequested();
@@ -164,6 +178,21 @@ bool MoveTool::mouseMove(const ToolEvent &event, const ToolContext &ctx, ViewPor
     const QRect docRect(0, 0, ctx.document->width(), ctx.document->height());
     const QRect before = layer ? layer->styleBoundsInDocument().intersected(docRect) : QRect();
 
+    if (m_movingMaskOnly && layer && layer->mask() && !layer->mask()->isNull()) {
+        ctx.document->shiftLayerMask(m_layerIndex, dx, dy);
+        m_lastImagePos += QPointF(dx, dy);
+        const QRect after = layer->styleBoundsInDocument().intersected(docRect);
+        const QRect dirty = before.united(after).united(m_blitRect).intersected(docRect);
+        if (!dirty.isEmpty() && !m_live.isNull()) {
+            copyRect(m_live, m_base, dirty);
+            Compositor::blendLayerRange(m_live, *ctx.document, dirty,
+                                        m_layerIndex, m_layerIndex + 1, -1);
+            m_blitRect = dirty;
+        }
+        emit repaintRequested();
+        return true;
+    }
+
     ctx.document->translateLayer(m_layerIndex, dx, dy);
     m_lastImagePos += QPointF(dx, dy);
 
@@ -185,6 +214,7 @@ bool MoveTool::mouseRelease(const ToolEvent &event, const ToolContext &ctx, View
     if (!m_dragging)
         return false;
     m_dragging = false;
+    m_movingMaskOnly = false;
     finishDrag(ctx.document);
     return event.isLeft();
 }
@@ -195,6 +225,7 @@ void MoveTool::deactivate(const ToolContext &ctx, ViewPort &view)
     if (!m_dragging)
         return;
     m_dragging = false;
+    m_movingMaskOnly = false;
     finishDrag(ctx.document);
 }
 

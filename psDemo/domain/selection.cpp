@@ -366,4 +366,44 @@ void Selection::selectFromLayerAlpha(const QImage &layerPremul,
     combineShapeMask(shape, op, area);
 }
 
+void Selection::selectFromLayerGray(const QImage &gray,
+                                    int offsetX, int offsetY,
+                                    ChannelOp op)
+{
+    if (m_mask.isNull())
+        return;
+
+    QImage src = gray;
+    if (!src.isNull() && src.format() != QImage::Format_Grayscale8)
+        src = src.convertToFormat(QImage::Format_Grayscale8);
+
+    QImage shape(m_mask.size(), QImage::Format_Grayscale8);
+    shape.fill(0);
+
+    if (src.isNull() || src.width() <= 0 || src.height() <= 0) {
+        combineShapeMask(shape, op, QRect());
+        return;
+    }
+
+    const QRect layerRect(offsetX, offsetY, src.width(), src.height());
+    const QRect area = layerRect.intersected(m_mask.rect());
+    if (area.isEmpty()) {
+        if (op == ChannelOp::Replace)
+            clear();
+        return;
+    }
+
+    for (int docY = area.top(); docY <= area.bottom(); ++docY) {
+        const int ly = docY - offsetY;
+        const uchar *line = src.constScanLine(ly);
+        uchar *dst = shape.scanLine(docY);
+        for (int docX = area.left(); docX <= area.right(); ++docX) {
+            const int lx = docX - offsetX;
+            dst[docX] = line[lx];
+        }
+    }
+
+    combineShapeMask(shape, op, area);
+}
+
 } // namespace Ps

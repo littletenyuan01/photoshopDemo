@@ -8,6 +8,7 @@
 #include "domain/blendmode.h"
 #include "domain/imagedocument.h"
 #include "domain/layer.h"
+#include "domain/layermask.h"
 #include "domain/tilebuffer.h"
 #include "engine/blend.h"
 #include "engine/op/layermodecatalog.h"
@@ -40,7 +41,10 @@ void blendTileOnto(QImage &dst,
                    int oy,
                    qreal opacity,
                    LayerModeOp *modeOp,
-                   const QRect &dirty)
+                   const QRect &dirty,
+                   const LayerMask *mask,
+                   int layerOx,
+                   int layerOy)
 {
     if (opacity <= 0.0 || src.isNull() || !modeOp)
         return;
@@ -52,6 +56,7 @@ void blendTileOnto(QImage &dst,
 
     const float opacityF = float(opacity);
     const bool dissolving = (modeOp->mode() == BlendMode::Dissolve);
+    const bool useMask = mask && mask->isEnabled() && !mask->isNull();
 
     for (int y = area.top(); y <= area.bottom(); ++y) {
         QRgb *dline = reinterpret_cast<QRgb *>(dst.scanLine(y)) + area.left();
@@ -64,6 +69,14 @@ void blendTileOnto(QImage &dst,
             Premul::unpremultiplyRgb(sp, &sr, &sg, &sb, &sa);
             if (sa == 0)
                 continue;
+
+            if (useMask) {
+                const int lx = (area.left() + x) - layerOx;
+                const int ly = y - layerOy;
+                sa = (sa * int(mask->valueAt(lx, ly)) + 127) / 255;
+                if (sa == 0)
+                    continue;
+            }
 
             const QRgb dp = dline[x];
             int dr = 0, dg = 0, db = 0, da = 0;
@@ -192,6 +205,11 @@ bool Compositor::blendLayerRange(QImage &dst,
         const int layerOx = layer->offsetX();
         const int layerOy = layer->offsetY();
         const qreal opacity = layer->opacity();
+        // 有蒙版且启用时乘到层 alpha（对照 GIMP Applicator aux / layer mask）
+        const LayerMask *mask = (layer->hasMask() && layer->mask()
+                                 && layer->mask()->isEnabled())
+                                    ? layer->mask()
+                                    : nullptr;
 
         const bool needMaterialize = layer->filters().hasEnabled()
                                      || layer->styles().hasEnabled();
@@ -202,7 +220,8 @@ bool Compositor::blendLayerRange(QImage &dst,
                 blendTileOnto(dst, raster.image,
                               layerOx + raster.originDx,
                               layerOy + raster.originDy,
-                              opacity, modeOp, area);
+                              opacity, modeOp, area,
+                              mask, layerOx, layerOy);
             }
             continue;
         }
@@ -215,7 +234,8 @@ bool Compositor::blendLayerRange(QImage &dst,
                 blendTileOnto(dst, tile,
                               bounds.x() + layerOx,
                               bounds.y() + layerOy,
-                              opacity, modeOp, area);
+                              opacity, modeOp, area,
+                              mask, layerOx, layerOy);
             });
     }
 

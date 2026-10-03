@@ -18,6 +18,8 @@
 #include <QListWidgetItem>
 #include <QMenu>
 #include <QMouseEvent>
+#include <QPainter>
+#include <QPen>
 #include <QSignalBlocker>
 #include <QTimer>
 
@@ -46,6 +48,7 @@ LayerTreePanel::LayerTreePanel(QWidget *parent)
     connect(ui->btnNew, &QToolButton::clicked, this, &LayerTreePanel::onBtnNewClicked);
     connect(ui->btnDelete, &QToolButton::clicked, this, &LayerTreePanel::onBtnDeleteClicked);
     connect(ui->btnLayerStyle, &QToolButton::clicked, this, &LayerTreePanel::onBtnLayerStyleClicked);
+    connect(ui->btnLayerMask, &QToolButton::clicked, this, &LayerTreePanel::onBtnLayerMaskClicked);
     connect(ui->itemList, &QListWidget::itemSelectionChanged,
             this, &LayerTreePanel::onListSelectionChanged);
 
@@ -128,11 +131,21 @@ void LayerTreePanel::onDocumentChanged()
             scheduleThumbnailRefresh();
         });
         connect(doc, &Ps::ImageDocument::selectionChanged, this, [this]() {
-            if (!m_settingAlphaSelect)
+            if (!m_settingAlphaSelect) {
                 m_alphaSelectSourceLayer = -1;
+                m_maskSelectSourceLayer = -1;
+            }
+        });
+        connect(doc, &Ps::ImageDocument::editingTargetChanged, this, [this]() {
+            Ps::ImageDocument *d = document();
+            if (!d)
+                return;
+            for (int i = 0; i < d->layers().count(); ++i)
+                refreshRowThumbnail(i);
         });
     }
     m_alphaSelectSourceLayer = -1;
+    m_maskSelectSourceLayer = -1;
     refreshFromDocument();
 }
 
@@ -182,6 +195,8 @@ void LayerTreePanel::onLayerPropertiesChanged(int stackIndex)
 
     // 属性变了只刷行内容；缩略图走 pixelsChanged 防抖，展开态由用户/建行决定
     row->syncFromLayer(*layer);
+
+    applyLayerThumbnail(row, *layer);
 
     if (stackIndex == doc->activeLayerIndex())
         syncActiveRowAndOptions();
@@ -380,6 +395,28 @@ void LayerTreePanel::onBtnLayerStyleClicked()
     doc->replaceActiveLayerStyles(dlg.resultEffects());
 }
 
+void LayerTreePanel::onBtnLayerMaskClicked()
+{
+    Ps::ImageDocument *doc = document();
+    if (!doc)
+        return;
+    const int index = doc->activeLayerIndex();
+    Ps::Layer *layer = doc->activeLayer();
+    if (!layer || index < 0)
+        return;
+
+    // 已有蒙版 → 删除；否则：有选区则「显示选区」，无选区则「显示全部」
+    if (layer->hasMask()) {
+        doc->removeLayerMask(index);
+        return;
+    }
+    const auto init = doc->selection().isEmpty()
+                          ? Ps::ImageDocument::LayerMaskInit::RevealAll
+                          : Ps::ImageDocument::LayerMaskInit::RevealSelection;
+    if (doc->addLayerMask(index, init))
+        doc->setEditingLayerMask(true);
+}
+
 void LayerTreePanel::onNewItem()
 {
     Ps::ImageDocument *doc = document();
@@ -444,6 +481,47 @@ bool LayerTreePanel::applyAlphaToSelection(int stackIndex, Qt::KeyboardModifiers
     doc->selectLayerAlpha(stackIndex, op);
     m_settingAlphaSelect = false;
     m_alphaSelectSourceLayer = (op == Ps::ChannelOp::Replace) ? stackIndex : -1;
+    m_maskSelectSourceLayer = -1;
+    doc->setActiveLayerIndex(stackIndex);
+    return true;
+}
+
+bool LayerTreePanel::applyMaskToSelection(int stackIndex, Qt::KeyboardModifiers mods)
+{
+    Ps::ImageDocument *doc = document();
+    if (!doc || stackIndex < 0 || stackIndex >= doc->layers().count())
+        return false;
+    Ps::Layer *layer = doc->layers().layerAt(stackIndex);
+    if (!layer || !layer->hasMask())
+        return false;
+
+    const bool shift = mods.testFlag(Qt::ShiftModifier);
+    const bool alt = mods.testFlag(Qt::AltModifier);
+
+    if (!shift && !alt
+        && !doc->selection().isEmpty()
+        && m_maskSelectSourceLayer == stackIndex) {
+        m_settingAlphaSelect = true;
+        doc->clearSelection();
+        m_settingAlphaSelect = false;
+        m_maskSelectSourceLayer = -1;
+        doc->setActiveLayerIndex(stackIndex);
+        return true;
+    }
+
+    Ps::ChannelOp op = Ps::ChannelOp::Replace;
+    if (shift && alt)
+        op = Ps::ChannelOp::Intersect;
+    else if (shift)
+        op = Ps::ChannelOp::Add;
+    else if (alt)
+        op = Ps::ChannelOp::Subtract;
+
+    m_settingAlphaSelect = true;
+    doc->selectLayerMask(stackIndex, op);
+    m_settingAlphaSelect = false;
+    m_maskSelectSourceLayer = (op == Ps::ChannelOp::Replace) ? stackIndex : -1;
+    m_alphaSelectSourceLayer = -1;
     doc->setActiveLayerIndex(stackIndex);
     return true;
 }
@@ -586,6 +664,33 @@ void LayerTreePanel::appendRowForLayer(int stackIndex, Ps::Layer &layer)
             [this, stackIndex](Qt::KeyboardModifiers mods) {
                 applyAlphaToSelection(stackIndex, mods);
             });
+    connect(row, &LayerRowWidget::layerThumbClicked, this, [this, stackIndex]() {
+        Ps::ImageDocument *doc = document();
+        if (!doc)
+            return;
+        doc->setActiveLayerIndex(stackIndex);
+        doc->setEditingLayerMask(false);
+    });
+    connect(row, &LayerRowWidget::maskCtrlClicked, this,
+            [this, stackIndex](Qt::KeyboardModifiers mods) {
+                applyMaskToSelection(stackIndex, mods);
+            });
+    connect(row, &LayerRowWidget::maskAltClicked, this, [this, stackIndex]() {
+        Ps::ImageDocument *doc = document();
+        if (!doc)
+            return;
+        Ps::Layer *layer = doc->layers().layerAt(stackIndex);
+        if (!layer || !layer->mask() || layer->mask()->isNull())
+            return;
+        doc->setLayerMaskEnabled(stackIndex, !layer->mask()->isEnabled());
+    });
+    connect(row, &LayerRowWidget::maskThumbClicked, this, [this, stackIndex]() {
+        Ps::ImageDocument *doc = document();
+        if (!doc)
+            return;
+        doc->setActiveLayerIndex(stackIndex);
+        doc->setEditingLayerMask(true);
+    });
 
     row->syncFromLayer(layer);
     applyLayerThumbnail(row, layer);
@@ -614,6 +719,28 @@ void LayerTreePanel::applyLayerThumbnail(LayerRowWidget *row, const Ps::Layer &l
     if (!layer.hasPixelData())
         forThumb.fill(Qt::transparent);
     row->setThumbnail(makeLayerThumbnail(forThumb));
+
+    if (layer.hasMask() && layer.mask() && !layer.mask()->isNull()) {
+        QImage gray = layer.mask()->image();
+        if (gray.format() != QImage::Format_ARGB32_Premultiplied)
+            gray = gray.convertToFormat(QImage::Format_ARGB32_Premultiplied);
+        QImage maskThumb = makeLayerThumbnail(gray);
+        if (!layer.mask()->isEnabled() && !maskThumb.isNull()) {
+            QPainter painter(&maskThumb);
+            painter.setRenderHint(QPainter::Antialiasing, true);
+            painter.setPen(QPen(QColor(220, 70, 70), 2));
+            painter.drawLine(3, 3, maskThumb.width() - 4, maskThumb.height() - 4);
+        }
+        row->setMaskThumbnail(maskThumb);
+    } else {
+        row->setMaskThumbnail(QImage());
+    }
+
+    Ps::ImageDocument *doc = document();
+    const bool editingMask = doc && doc->activeLayerIndex() >= 0
+                             && doc->layers().layerAt(doc->activeLayerIndex()) == &layer
+                             && doc->isEditingLayerMask();
+    row->setEditTarget(editingMask ? 1 : 0);
 }
 
 LayerRowWidget *LayerTreePanel::rowWidgetForStackIndex(int stackIndex) const

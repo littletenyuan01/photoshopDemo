@@ -23,9 +23,9 @@ namespace Ps {
  *
  * ⚠️ **枚举序 = `layertreepanel.ui` 项顺序 = PS 分组顺序**（不含分隔线）。
  * 图层面板会在运行时插入分隔线，并用 `itemData` 存枚举值 —— **不要用 combo 下标当模式**。
- * 增删/重排模式时必须三处同步：本枚举、`layertreepanel.ui` 的项、`io/psdio.cpp` 的四字符码；
- * 并且要把 `ProjectFileVersion` / `kCurrentProjectVersion` 升一档 —— 工程文件存的是 `int(枚举)`，
- * 不升版本会让旧文件 **静默解释成另一种模式**（这正是 `no-latent-bugs` 要防的那类失效）。
+ * 增删/重排模式时必须三处同步：本枚举、`layertreepanel.ui` 的项、`io/psdio.cpp` 的四字符码。
+ * 工程文件存的是 `int(枚举)`：Demo 格式固定为版本 1，**不要重排已有枚举值**（旧 `.pslite` 会解错模式）；
+ * 只能在末尾追加。真要做不兼容布局再升 `kProjectFormatVersion`。
  */
 enum class BlendMode {
     // —— 正常组 ——

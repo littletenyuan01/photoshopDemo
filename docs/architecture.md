@@ -202,7 +202,11 @@ classDiagram
   细节见 [`docs/layers/`](layers/README.md)。
 - **`ImageDocument`**：除尺寸/栈/活动层外，还有**分级信号**与**累计脏区**（`markDirty(rect)`），
   以及供 UI 使用的**语义化 setter**（`setLayerVisible/Opacity/Name/BlendMode`）。
-- 蒙版 `LayerMask`：同尺寸灰度；合成时 `alpha *= mask`
+- 蒙版 `LayerMask`：**已实现** — 层局部 `Format_Grayscale8`；合成时 `alpha *= mask`（白显黑藏）；
+  `ImageDocument::addLayerMask/removeLayerMask/setLayerMaskEnabled` + `LayerPropUndo`；
+  `setEditingLayerMask` + 画笔写蒙版（`PaintEngine::stampMaskDab`）；
+  `applyLayerMask` / `setLayerMaskLinked`；写入 `.pslite`
+  **未做**：矢量蒙版、通道面板载入蒙版
 - **选区** `Selection`：文档级一张 `Format_Grayscale8` mask（对照 `gimp_image_get_mask`）；
   矩形工具写入；蚂蚁线由 `CanvasView` 根据 bounds 绘制；
   **绘制约束已接**：空选区不裁剪；非空时笔刷/橡皮/油漆桶/渐变只改 mask>0（对照 `gimp_item_mask_intersect`）
@@ -243,7 +247,7 @@ sequenceDiagram
 
 **与 GIMP 的对应**：`ToolManager` + `PaintTool` ≈ `app/tools`（管事件），
 `PaintEngine` ≈ `app/paint/GimpPaintCore`（写缓冲），`Compositor` ≈ projection（只读合成）。
-【本项目简化】无 GEGL、无笔刷资源库；选区约束已接（空选区=不裁），图层蒙版相交尚未实现。
+【本项目简化】无 GEGL、无笔刷资源库；选区约束已接（空选区=不裁）；图层蒙版乘算已接（无在蒙版上涂画）。
 
 ### 5.2 图层合成（预览 / 导出共用）
 
@@ -311,7 +315,7 @@ psDemo/
   domain/
     imagedocument.*                  [x] 分级信号 + 语义化 setter + 累计脏区
     layer.* / layerstack.*           [x] 图层；Layer 持 owner 回指
-    layermask.*                      [ ] 蒙版
+    layermask.*                      [x] 灰度蒙版；合成乘 alpha；选区生成
     selection.*                      [x] 文档级 mask；矩形写入；绘制∩选区已接
     adjustmentlayer.*                [ ] 调整层
   tools/
@@ -506,4 +510,4 @@ psDemo/
 | 三、③ 节点化非破坏（Phase 8） | **首片已实现**：`FilterStack` + BrightnessContrast + 合成接入；调整层 / 对话框后置 |
 | 四、滤镜库（Phase 9） | **计划中**：完整 ROI/节点缓存、异步求值、多线程算子图；仍不引入 GEGL |
 | 独立 actions/commands 层 | **不做**（对照 GIMP：无 GoF Command；收口在 domain 语义化 API） |
-| 其余（Selection / IO） | Selection + RasterIo/ProjectIo/PsdIo **已实现**；蒙版仍未做 |
+| 其余（Selection / IO / Mask） | Selection + RasterIo/ProjectIo/PsdIo + **LayerMask** **已实现** |

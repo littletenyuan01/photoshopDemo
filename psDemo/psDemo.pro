@@ -19,6 +19,7 @@ SOURCES += \
     app/historystack.cpp \
     app/undoitem.cpp \
     domain/layer.cpp \
+    domain/layermask.cpp \
     domain/tilebuffer.cpp \
     domain/layerstack.cpp \
     domain/selection.cpp \
@@ -107,6 +108,7 @@ HEADERS += \
     app/undoitem.h \
     domain/blendmode.h \
     domain/layer.h \
+    domain/layermask.h \
     domain/tilebuffer.h \
     domain/layerstack.h \
     domain/selection.h \

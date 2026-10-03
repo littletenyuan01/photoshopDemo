@@ -15,35 +15,21 @@ namespace Ps {
 class ImageDocument;
 
 /**
- * `.pslite` 文件格式版本（写入文件头的整数 = 枚举值）。
- *
- * - V1：初版；混合模式 10 种、旧枚举序
- * - V2：`BlendMode` 扩到 PS 27 种且重排；存当前枚举整数
- *
- * 读：接受 V1（映射混合）与 V2；保存始终写 `kCurrentProjectVersion`。
+ * 保存时写入的格式号，Demo 固定为 1。
+ * 旧文件头里可能仍是 2/3/4（开发期涨号留下的），打开时按当时字段读，再保存即为 1。
  */
-enum class ProjectFileVersion : quint32 {
-    V1 = 1,
-    V2 = 2,
-    /** 每层附加图层样式栈（fx）。 */
-    V3 = 3,
-};
-
-/** 当前写入用的工程版本。 */
-inline constexpr ProjectFileVersion kCurrentProjectVersion = ProjectFileVersion::V3;
+inline constexpr quint32 kProjectFormatVersion = 1;
 
 /**
  * 工程文件读写（io 层）。
  *
- * 【对照 GIMP】`app/xcf/xcf-save.c` / `xcf-load.c` 的瘦身版：
- * GIMP 用 XCF 持久化图层/选区/路径等；本项目先做最小可编辑子集。
+ * 【对照 GIMP】`app/xcf/xcf-save.c` / `xcf-load.c` 的瘦身版。
  *
  * 格式：单文件 `.pslite`（魔数 PSLT + QDataStream）
- * - 文档宽高、活动层
- * - 每层：名 / 显隐 / 不透明度 / 混合 / offset + PNG 像素 +（V3）样式栈
+ * - 魔数、格式版本（固定 1）、文档宽高、活动层
+ * - 每层：名 / 显隐 / 不透明度 / 混合 / offset + PNG 像素
+ *   + 样式栈 + 可选蒙版（enabled / linked + 灰度 PNG）
  * - 选区：灰度 PNG（空选区则长度 0）
- *
- * 不做：图层组、调整层、蒙版、路径、文字层（以后按需加字段版本）。
  */
 class ProjectIo
 {

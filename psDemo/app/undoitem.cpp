@@ -5,6 +5,7 @@
 
 #include "domain/imagedocument.h"
 #include "domain/layer.h"
+#include "domain/layermask.h"
 
 #include <utility>
 
@@ -21,6 +22,12 @@ LayerPropSnapshot captureLayerProps(const Layer &layer)
     s.offsetY = layer.offsetY();
     s.styles = layer.styles().snapshot();
     s.filters = layer.filters().snapshot();
+    if (layer.hasMask() && layer.mask()) {
+        s.hasMask = true;
+        s.maskEnabled = layer.mask()->isEnabled();
+        s.maskLinked = layer.mask()->isLinked();
+        s.maskGray = layer.mask()->image().copy();
+    }
     return s;
 }
 
@@ -33,6 +40,15 @@ void applyLayerProps(Layer &layer, const LayerPropSnapshot &s)
     layer.setOffsetSilent(s.offsetX, s.offsetY);
     layer.styles().replaceAll(s.styles);
     layer.filters().replaceAll(s.filters);
+    if (s.hasMask && !s.maskGray.isNull()) {
+        auto mask = std::make_unique<LayerMask>();
+        mask->setFromImage(s.maskGray);
+        mask->setEnabled(s.maskEnabled);
+        mask->setLinked(s.maskLinked);
+        layer.setMask(std::move(mask));
+    } else {
+        layer.setMask(nullptr);
+    }
     layer.invalidateCompositeRaster();
 }
 
@@ -46,9 +62,25 @@ LayerPixelsUndo::LayerPixelsUndo(int layerIndex, QImage pixels, int offsetX, int
 {
 }
 
+LayerPixelsUndo::LayerPixelsUndo(int layerIndex, QImage pixels, int offsetX, int offsetY,
+                                 bool hasMask, bool maskEnabled, bool maskLinked, QImage maskGray,
+                                 const QString &label)
+    : m_layerIndex(layerIndex)
+    , m_offsetX(offsetX)
+    , m_offsetY(offsetY)
+    , m_pixels(std::move(pixels))
+    , m_trackMask(true)
+    , m_hasMask(hasMask)
+    , m_maskEnabled(maskEnabled)
+    , m_maskLinked(maskLinked)
+    , m_maskGray(std::move(maskGray))
+    , m_label(label)
+{
+}
+
 quint64 LayerPixelsUndo::byteSize() const
 {
-    return quint64(m_pixels.sizeInBytes()) + 64;
+    return quint64(m_pixels.sizeInBytes()) + quint64(m_maskGray.sizeInBytes()) + 64;
 }
 
 void LayerPixelsUndo::pop(ImageDocument &doc)
@@ -59,8 +91,39 @@ void LayerPixelsUndo::pop(ImageDocument &doc)
     QImage current = layer->materialize();
     const int curOx = layer->offsetX();
     const int curOy = layer->offsetY();
+
+    bool curHasMask = false;
+    bool curMaskEnabled = true;
+    bool curMaskLinked = true;
+    QImage curMaskGray;
+    if (m_trackMask) {
+        if (layer->hasMask() && layer->mask()) {
+            curHasMask = true;
+            curMaskEnabled = layer->mask()->isEnabled();
+            curMaskLinked = layer->mask()->isLinked();
+            curMaskGray = layer->mask()->image().copy();
+        }
+    }
+
     layer->replaceFromImage(m_pixels);
     layer->setOffsetSilent(m_offsetX, m_offsetY);
+
+    if (m_trackMask) {
+        if (m_hasMask && !m_maskGray.isNull()) {
+            auto mask = std::make_unique<LayerMask>();
+            mask->setFromImage(m_maskGray);
+            mask->setEnabled(m_maskEnabled);
+            mask->setLinked(m_maskLinked);
+            layer->setMask(std::move(mask));
+        } else {
+            layer->setMask(nullptr);
+        }
+        m_hasMask = curHasMask;
+        m_maskEnabled = curMaskEnabled;
+        m_maskLinked = curMaskLinked;
+        m_maskGray = std::move(curMaskGray);
+    }
+
     m_pixels = std::move(current);
     m_offsetX = curOx;
     m_offsetY = curOy;
@@ -80,6 +143,7 @@ quint64 LayerPropUndo::byteSize() const
     quint64 n = sizeof(*this) + quint64(m_snap.name.size()) * 2 + 64;
     n += quint64(m_snap.styles.size()) * sizeof(LayerStyleEffect);
     n += quint64(m_snap.filters.size()) * sizeof(FilterNode);
+    n += quint64(m_snap.maskGray.sizeInBytes());
     return n;
 }
 

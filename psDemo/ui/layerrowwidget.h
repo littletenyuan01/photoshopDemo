@@ -35,6 +35,13 @@ public:
     void syncFromLayer(const Ps::Layer &layer);
     /** 只换缩略图（画笔防抖 / 建行路径）。 */
     void setThumbnail(const QImage &thumb);
+    /** 图层蒙版缩略图；空图则隐藏。 */
+    void setMaskThumbnail(const QImage &thumb);
+    /**
+     * 编辑目标高亮：0=像素，1=蒙版（对照 PS 缩略图白边）。
+     * 无蒙版时 mask 高亮忽略。
+     */
+    void setEditTarget(int target);
     void setExpanded(bool on);
     /** 右键「重命名」入口。 */
     void beginRename();
@@ -50,6 +57,13 @@ signals:
     void heightChanged();
     void rowPressed();
     void thumbnailCtrlClicked(Qt::KeyboardModifiers mods);
+    /** 单击图层缩略图：切到像素编辑。 */
+    void layerThumbClicked();
+    void maskCtrlClicked(Qt::KeyboardModifiers mods);
+    /** Alt 点蒙版缩略图：启用/停用（对照 PS）。 */
+    void maskAltClicked();
+    /** 单击蒙版缩略图：切到蒙版编辑。 */
+    void maskThumbClicked();
 
 protected:
     void mousePressEvent(QMouseEvent *event) override;

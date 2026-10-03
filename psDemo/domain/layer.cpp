@@ -227,9 +227,15 @@ qreal Layer::opacityAtDocumentPos(int docX, int docY) const
     if (px < 0 || py < 0 || px >= tile->width() || py >= tile->height())
         return 0.0;
 
-    const int a = qAlpha(tile->pixel(px, py));
-    // 层不透明度乘到取样结果上（点选时隐藏/半透明层更「难点中」）
+    int a = qAlpha(tile->pixel(px, py));
+    if (m_mask && m_mask->isEnabled() && !m_mask->isNull())
+        a = (a * int(m_mask->valueAt(lx, ly)) + 127) / 255;
     return (a / 255.0) * m_opacity;
+}
+
+void Layer::setMask(std::unique_ptr<LayerMask> mask)
+{
+    m_mask = std::move(mask);
 }
 
 void Layer::fill(const QColor &color)
@@ -243,7 +249,15 @@ void Layer::fill(const QColor &color)
 void Layer::replaceFromImage(const QImage &pixels)
 {
     // 尺寸可能变化（图像大小 / 画布大小）；不在此发属性信号
+    const int oldW = width();
+    const int oldH = height();
     m_tiles.setFromImage(pixels);
+    if (m_mask && (m_mask->width() != width() || m_mask->height() != height())) {
+        // 尺寸变了：蒙版跟到新尺寸，缺省全白（避免错位）；undo 会整栈恢复
+        m_mask = std::make_unique<LayerMask>(width(), height(), 255);
+    }
+    Q_UNUSED(oldW);
+    Q_UNUSED(oldH);
     invalidateContentBounds();
     invalidateCompositeRaster();
 }
@@ -280,6 +294,8 @@ QPoint Layer::expandToIncludeLocal(const QRect &localNeeded)
         }
     }
     m_tiles.setFromImage(neu);
+    if (m_mask)
+        m_mask->expand(padL, padT, padR, padB, 255);
     m_offsetX -= padL;
     m_offsetY -= padT;
     invalidateContentBounds();

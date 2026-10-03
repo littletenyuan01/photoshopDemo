@@ -9,6 +9,7 @@
 #include "app/recentdocuments.h"
 #include "domain/imagedocument.h"
 #include "domain/layer.h"
+#include "domain/layermask.h"
 #include "domain/layerstyle.h"
 #include "domain/layerstylestack.h"
 // 必须早于 ui_mainwindow.h：其中 DockPanel 头文件对 CanvasView 仅有前向声明
@@ -109,6 +110,62 @@ void MainWindow::setupMenus()
     ui->actionLayerDelete->setEnabled(true);
     ui->actionLayerDelete->setToolTip(tr("删除当前图层（至少保留一层）"));
     connect(ui->actionLayerDelete, &QAction::triggered, this, &MainWindow::onDeleteLayer);
+
+    // 图层→图层蒙版（对照 PS Layer → Layer Mask / GIMP layers-add-mask）
+    auto enableMaskAction = [this](QAction *a, Ps::ImageDocument::LayerMaskInit init) {
+        a->setEnabled(true);
+        a->setToolTip(tr("为活动层添加图层蒙版"));
+        connect(a, &QAction::triggered, this, [this, init]() {
+            Ps::ImageDocument *doc = m_session ? m_session->document() : nullptr;
+            if (!doc || doc->activeLayerIndex() < 0)
+                return;
+            doc->addLayerMask(doc->activeLayerIndex(), init);
+        });
+    };
+    enableMaskAction(ui->actionMaskRevealAll, Ps::ImageDocument::LayerMaskInit::RevealAll);
+    enableMaskAction(ui->actionMaskHideAll, Ps::ImageDocument::LayerMaskInit::HideAll);
+    enableMaskAction(ui->actionMaskRevealSelection,
+                     Ps::ImageDocument::LayerMaskInit::RevealSelection);
+    enableMaskAction(ui->actionMaskHideSelection,
+                     Ps::ImageDocument::LayerMaskInit::HideSelection);
+    ui->actionMaskDelete->setEnabled(true);
+    ui->actionMaskDelete->setToolTip(tr("删除活动层的图层蒙版"));
+    connect(ui->actionMaskDelete, &QAction::triggered, this, [this]() {
+        Ps::ImageDocument *doc = m_session ? m_session->document() : nullptr;
+        if (!doc || doc->activeLayerIndex() < 0)
+            return;
+        doc->removeLayerMask(doc->activeLayerIndex());
+    });
+    ui->actionMaskDisable->setEnabled(true);
+    ui->actionMaskDisable->setToolTip(tr("启用/停用活动层蒙版（不删除灰度数据）"));
+    connect(ui->actionMaskDisable, &QAction::triggered, this, [this]() {
+        Ps::ImageDocument *doc = m_session ? m_session->document() : nullptr;
+        if (!doc)
+            return;
+        Ps::Layer *layer = doc->activeLayer();
+        if (!layer || !layer->mask() || layer->mask()->isNull())
+            return;
+        doc->setLayerMaskEnabled(doc->activeLayerIndex(), !layer->mask()->isEnabled());
+    });
+    ui->actionMaskApply->setEnabled(true);
+    ui->actionMaskApply->setToolTip(tr("将蒙版乘进像素后删除蒙版"));
+    connect(ui->actionMaskApply, &QAction::triggered, this, [this]() {
+        Ps::ImageDocument *doc = m_session ? m_session->document() : nullptr;
+        if (!doc || doc->activeLayerIndex() < 0)
+            return;
+        doc->applyLayerMask(doc->activeLayerIndex());
+    });
+    ui->actionMaskLinkUnlink->setEnabled(true);
+    ui->actionMaskLinkUnlink->setToolTip(tr("链接/取消链接蒙版与图层（取消后可单独移动）"));
+    connect(ui->actionMaskLinkUnlink, &QAction::triggered, this, [this]() {
+        Ps::ImageDocument *doc = m_session ? m_session->document() : nullptr;
+        if (!doc)
+            return;
+        Ps::Layer *layer = doc->activeLayer();
+        if (!layer || !layer->mask() || layer->mask()->isNull())
+            return;
+        doc->setLayerMaskLinked(doc->activeLayerIndex(), !layer->mask()->isLinked());
+    });
 
     ui->actionExportAs->setShortcut(QKeySequence(QStringLiteral("Ctrl+Alt+Shift+W")));
     ui->actionStepForward->setShortcuts({

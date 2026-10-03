@@ -68,13 +68,14 @@
 | 文件 | 职责 |
 |------|------|
 | `domain/blendmode.h` | 混合模式枚举：**PS 的 27 种**，顺序 = PS 分组顺序 = `.ui` 项顺序；面板用 `itemData`（含分隔线） |
-| `domain/layer.h/.cpp` | 单层属性 + `TileBuffer` + `FilterStack`；**持 owner 回指，setter 内部自动广播** |
+| `domain/layer.h/.cpp` | 单层属性 + `TileBuffer` + `FilterStack` + 可选 `LayerMask`；**持 owner 回指，setter 内部自动广播** |
+| `domain/layermask.h/.cpp` | 图层蒙版灰度（白显黑藏）；`valueAt` / `expand` / `clone` |
 | `domain/tilebuffer.h/.cpp` | 64×64 瓦片；新建层统一 `Layer(extent)`，透明不分配、fill/画笔才 `ensureTile` |
 | `domain/layerstack.h/.cpp` | 图层列表（`std::vector<unique_ptr>`） |
 | `domain/selection.h/.cpp` | **文档级选区 mask**（对照 `GimpSelection`）；`ChannelOp` 加/减/替/交 |
 | `domain/filternode.h` | 滤镜节点（`OpName` + 开关 + 参数；对照 drawable filter） |
 | `domain/filterstack.h/.cpp` | 图层滤镜栈：增/删/开关；`apply` 对临时图求值，不写瓦片 |
-| `domain/imagedocument.h/.cpp` | 文档：尺寸、栈、活动层、**选区**、**duplicateLayer**、分级信号 + 语义化 setter + 累计脏区 |
+| `domain/imagedocument.h/.cpp` | 文档：尺寸、栈、活动层、**选区**、**蒙版 API**、**duplicateLayer**、分级信号 + 语义化 setter + 累计脏区 |
 
 **要点**：`ImageDocument` 的信号**刻意分级**，让订阅方增量更新而不是整表重建 ——
 `pixelsChanged(QRect)` / `layerPropertiesChanged(int)` / `structureChanged()` /
@@ -156,10 +157,8 @@ UI 不得直接改 `Layer`，一律走 `setLayerVisible/Opacity/Name/BlendMode` 
 
 | 计划类型 | 预期职责 |
 |----------|----------|
-| `Selection` | 文档级选区 mask |
-| `LayerMask` / `AdjustmentLayer` | 蒙版与调整层 |
-| `HistoryStack` / `app/commands` | 撤销 / 重做（收口点已在 domain 语义化 setter） |
-| `RasterIO` / `ProjectIO` | 导出与工程文件 |
+| `AdjustmentLayer` | 调整层 |
+| 矢量蒙版 / 通道面板蒙版 | 路径蒙版；从通道面板管理 |
 | `ToolInfo` 注册表 | 统一工具元数据（现分散在 toolid/toolbox/tooloptionsbar 三处） |
 
 ## 摘录约定

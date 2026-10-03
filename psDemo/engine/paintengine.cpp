@@ -7,6 +7,7 @@
 #include "paintengine.h"
 
 #include "domain/tilebuffer.h"
+#include "engine/op/brushcover.h"
 #include "engine/op/clonestampdabop.h"
 #include "engine/op/floodfillop.h"
 #include "engine/op/focusdabop.h"
@@ -87,6 +88,94 @@ QRect PaintEngine::strokeSegment(TileBuffer &tiles,
     // 末段不足一个 spacing 时补一个 dab，保证笔画末端不缺口
     if ((last - to).manhattanLength() > 0.5)
         dirty = unitedDirty(dirty, stampDab(tiles, to, radius, color, mode, hardness, clip));
+    return dirty;
+}
+
+QRect PaintEngine::stampMaskDab(QImage &maskGray,
+                                const QPointF &center,
+                                qreal radius,
+                                quint8 grayValue,
+                                Mode mode,
+                                qreal hardness,
+                                PaintSelectionClip clip)
+{
+    if (maskGray.isNull() || radius <= 0.0)
+        return {};
+    if (maskGray.format() != QImage::Format_Grayscale8)
+        maskGray = maskGray.convertToFormat(QImage::Format_Grayscale8);
+
+    const int rCeil = qCeil(radius) + 1;
+    QRect dabRect(qFloor(center.x()) - rCeil,
+                  qFloor(center.y()) - rCeil,
+                  rCeil * 2 + 1,
+                  rCeil * 2 + 1);
+    dabRect = dabRect.intersected(maskGray.rect());
+    if (dabRect.isEmpty())
+        return {};
+
+    if (clip.selection && !clip.selection->isEmpty()) {
+        const QRect selDoc = clip.selection->bounds();
+        const QRect selLocal = selDoc.translated(-clip.layerOffsetX, -clip.layerOffsetY);
+        dabRect = dabRect.intersected(selLocal);
+        if (dabRect.isEmpty())
+            return {};
+    }
+
+    const quint8 target = (mode == Mode::Erase) ? quint8(255) : grayValue;
+    for (int y = dabRect.top(); y <= dabRect.bottom(); ++y) {
+        uchar *line = maskGray.scanLine(y);
+        for (int x = dabRect.left(); x <= dabRect.right(); ++x) {
+            if (clip.selection && !clip.selection->isEmpty()) {
+                const int docX = x + clip.layerOffsetX;
+                const int docY = y + clip.layerOffsetY;
+                if (!clip.selection->isSelected(docX, docY))
+                    continue;
+            }
+            const qreal dx = x + 0.5 - center.x();
+            const qreal dy = y + 0.5 - center.y();
+            const qreal cover = BrushCover::fromDist2(dx * dx + dy * dy, radius, hardness);
+            if (cover <= 0.0)
+                continue;
+            const int oldV = line[x];
+            line[x] = uchar(qRound(oldV + (int(target) - oldV) * cover));
+        }
+    }
+    return dabRect;
+}
+
+QRect PaintEngine::strokeMaskSegment(QImage &maskGray,
+                                     const QPointF &from,
+                                     const QPointF &to,
+                                     qreal radius,
+                                     quint8 grayValue,
+                                     Mode mode,
+                                     qreal hardness,
+                                     qreal spacing,
+                                     PaintSelectionClip clip)
+{
+    const QPointF delta = to - from;
+    const qreal len = qSqrt(delta.x() * delta.x() + delta.y() * delta.y());
+    const qreal step = qMax(0.5, radius * 2.0 * qBound(0.05, spacing, 1.0));
+
+    if (len < 1e-6)
+        return stampMaskDab(maskGray, to, radius, grayValue, mode, hardness, clip);
+
+    QRect dirty;
+    qreal d = 0.0;
+    QPointF last = from;
+    while (d < len) {
+        d += step;
+        const qreal t = qMin(1.0, d / len);
+        const QPointF p = from + delta * t;
+        dirty = unitedDirty(dirty,
+                            stampMaskDab(maskGray, p, radius, grayValue, mode, hardness, clip));
+        last = p;
+        if (t >= 1.0)
+            break;
+    }
+    if ((last - to).manhattanLength() > 0.01)
+        dirty = unitedDirty(dirty,
+                            stampMaskDab(maskGray, to, radius, grayValue, mode, hardness, clip));
     return dirty;
 }
 

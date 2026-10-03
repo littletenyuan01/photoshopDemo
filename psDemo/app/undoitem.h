@@ -52,6 +52,10 @@ struct LayerPropSnapshot {
     int offsetY = 0;
     QVector<LayerStyleEffect> styles;
     QVector<FilterNode> filters;
+    bool hasMask = false;
+    bool maskEnabled = true;
+    bool maskLinked = true;
+    QImage maskGray; ///< Format_Grayscale8；hasMask 时有效
 };
 
 /** 从 Layer 读取当前属性到快照。 */
@@ -68,6 +72,13 @@ class LayerPixelsUndo final : public UndoItem
 public:
     LayerPixelsUndo(int layerIndex, QImage pixels, int offsetX, int offsetY,
                     const QString &label);
+    /**
+     * 像素 + 蒙版一体快照（应用蒙版：烘焙后删除蒙版，撤销需同时恢复）。
+     */
+    LayerPixelsUndo(int layerIndex, QImage pixels, int offsetX, int offsetY,
+                    bool hasMask, bool maskEnabled, bool maskLinked, QImage maskGray,
+                    const QString &label);
+
     QString name() const override { return m_label; }
     quint64 byteSize() const override;
     void pop(ImageDocument &doc) override;
@@ -77,6 +88,11 @@ private:
     int m_offsetX = 0;
     int m_offsetY = 0;
     QImage m_pixels;
+    bool m_trackMask = false;
+    bool m_hasMask = false;
+    bool m_maskEnabled = true;
+    bool m_maskLinked = true;
+    QImage m_maskGray;
     QString m_label;
 };
 
