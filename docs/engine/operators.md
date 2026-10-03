@@ -486,7 +486,7 @@ forEachTileInRect(workRect, allocateMissing = true, …)
 | 2 | `OpPad` 是空转的抽象 | 4 个算子都只声明 `{Tiles}`，而 `BufferOp::prepare` 默认实现已在查同一件事；`OpPad::Selection` 的 `padSatisfied` 直接 `return true` | Phase 7/8 做成真 pad（具名 + buffer 绑定），或删掉 |
 | 3 | `OpContext::roi` 无上层注入方 | 算子已会消费，但目前没人设它 → 实际总是整层 | Phase 7 脏区驱动重算落地时由上层注入 |
 | 4 | `opname.*` 名字表 / 各算子 `id()/name()` 无调用点 | 约 100 行 + 5 处 override 目前不产生行为 | Phase 8 滤镜列表会消费（对照 GEGL 的 `name`/`title` 键） |
-| 5 | 算子与撤销没有接缝 | `OpRunner` 不知道撤销；每个调用点各自记得 `pushLayerPixelsUndo`（漏了就是静默不可撤销） | Roadmap Phase 6「命令层收口」 |
+| 5 | 算子与撤销没有接缝 | `OpRunner` 不知道撤销；绘制门面仍由调用点 `pushLayerPixelsUndo`（与 GIMP paint core 自 push 同类） | **已对齐 GIMP 口径**：不另做 Command 总线；漏 push = bug |
 | 6 | 油漆桶空脏区时不取消选区 | 同一个"什么都没变"的点击，选区命运与成功填充时不同（`PaintBucketTool::mousePress` 的早返回跳过了 `clearSelection`） | 待定；属分支顺序问题，非算子问题 |
 
 ### 10.3 图例

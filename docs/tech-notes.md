@@ -31,10 +31,10 @@
 ### 撤销：采用 GIMP 式「推入式 + 每对象一类」
 
 - 【结论】放弃原先「命令模式 vs 图层快照」的二选一，改为 GIMP 的 **push 语义**：**改动之前**先把旧状态推入栈。
-- 【理由】命令模式是「事后记录做了什么」，每加一个功能就要设计一个逆操作，且新增入口容易漏记；push 模式把「改状态」这一动作本身强制经过 push 入口，**改文档状态而不 push 即为 bug**。
-- 【依据】`gimp-master/app/core/gimpimage-undo-push.c`（46 KB）与 `gimpimage-undo-push.h` 的 50+ 个 `gimp_image_undo_push_*`；每类对象一个 undo 子类。
-- 【本项目裁剪】起步 4 类：`pushDrawablePixels` / `pushLayerProp` / `pushLayerStructure` / `pushDocumentProp`。不做 GObject undo 类层次规模。
-- 【排期】见 `wiki/Roadmap.md` Phase 6，**前置于按钮功能批量实现**。
+- 【理由】GoF Command 是「事后记录做了什么」；GIMP 实际是 core mutate API 内 `push_undo`，**无独立 Command 总线**。本项目对齐此口径：改文档走 `ImageDocument` 语义化 API，API 内（或绘制前）push。
+- 【依据】`gimpimage-undo-push.*` 的 typed `push_*` + setter 的 `push_undo` 参数。
+- 【本项目】`LayerPixelsUndo`（含 offset）/ `LayerPropUndo`（含样式·滤镜）/ `LayerStructureUndo` / `DocumentGeomUndo` / `SelectionUndo`。不做 GObject undo 类层次。
+- 【排期】`wiki/Roadmap.md` Phase 6 **已完成**（覆盖收口；非 Command 层）。
 
 ### 投影/合成：保持只读，未来按脏区分块
 

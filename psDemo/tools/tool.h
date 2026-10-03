@@ -11,6 +11,7 @@
 #include "toolid.h"
 
 #include <QCursor>
+#include <QImage>
 #include <QObject>
 #include <QPainter>
 #include <QString>
@@ -60,6 +61,12 @@ public:
         Q_UNUSED(painter)
         Q_UNUSED(ctx)
     }
+
+    /**
+     * 拖拽中的整文档 live 投影（对照 GIMP 拖层时不做同步全栈 flush）。
+     * 非空时 CanvasView 用它替代 Projection 缓冲绘制。
+     */
+    virtual const QImage *liveProjection() const { return nullptr; }
 
     /**
      * Caps Lock 开启时画布显示的作用范围半径（文档像素）。

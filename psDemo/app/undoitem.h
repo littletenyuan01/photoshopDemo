@@ -2,14 +2,18 @@
  * undoitem.h — 撤销条目类型与图层/文档快照（app 层）。
  *
  * 各 UndoItem 子类通过 pop() 与 undo/redo 对称交换状态；由 HistoryStack 调度。
+ * 对照 GIMP：核心 mutate API 内 push（非独立 Command 总线）。
  */
 #ifndef UNDOITEM_H
 #define UNDOITEM_H
 
 #include "domain/blendmode.h"
+#include "domain/filternode.h"
+#include "domain/layerstyle.h"
 
 #include <QImage>
 #include <QString>
+#include <QVector>
 #include <QtGlobal>
 #include <memory>
 #include <vector>
@@ -35,14 +39,19 @@ public:
     virtual void pop(ImageDocument &doc) = 0;
 };
 
-/** 图层属性快照（不含像素）；用于属性 undo 与 DocumentGeomUndo。 */
+/**
+ * 图层属性快照（含样式/滤镜栈；不含像素）。
+ * 用于属性 undo 与 DocumentGeomUndo。
+ */
 struct LayerPropSnapshot {
     QString name;
     bool visible = true;
     qreal opacity = 1.0;
     BlendMode blendMode = BlendMode::Normal;
-    int offsetX = 0; ///< 文档坐标偏移
+    int offsetX = 0;
     int offsetY = 0;
+    QVector<LayerStyleEffect> styles;
+    QVector<FilterNode> filters;
 };
 
 /** 从 Layer 读取当前属性到快照。 */
@@ -50,33 +59,39 @@ LayerPropSnapshot captureLayerProps(const Layer &layer);
 /** 将快照写回 Layer（不触发 undo）。 */
 void applyLayerProps(Layer &layer, const LayerPropSnapshot &s);
 
-/** 图层像素 undo：pop 时与当前 materialize 结果交换。 */
+/**
+ * 图层像素 undo：pop 时与当前 materialize / offset 交换。
+ * 存 offset：自由变换扩层后撤销能恢复几何。
+ */
 class LayerPixelsUndo final : public UndoItem
 {
 public:
-    LayerPixelsUndo(int layerIndex, QImage pixels, const QString &label);
+    LayerPixelsUndo(int layerIndex, QImage pixels, int offsetX, int offsetY,
+                    const QString &label);
     QString name() const override { return m_label; }
     quint64 byteSize() const override;
     void pop(ImageDocument &doc) override;
 
 private:
-    int m_layerIndex = -1; ///< 目标层在 LayerStack 中的索引
-    QImage m_pixels;       ///< 交换用像素缓冲（文档尺寸）
+    int m_layerIndex = -1;
+    int m_offsetX = 0;
+    int m_offsetY = 0;
+    QImage m_pixels;
     QString m_label;
 };
 
-/** 图层属性 undo：pop 时与当前属性交换。 */
+/** 图层属性 undo：pop 时与当前属性（含样式/滤镜）交换。 */
 class LayerPropUndo final : public UndoItem
 {
 public:
     LayerPropUndo(int layerIndex, LayerPropSnapshot before, const QString &label);
     QString name() const override { return m_label; }
-    quint64 byteSize() const override { return sizeof(*this) + quint64(m_snap.name.size()) * 2; }
+    quint64 byteSize() const override;
     void pop(ImageDocument &doc) override;
 
 private:
     int m_layerIndex = -1;
-    LayerPropSnapshot m_snap; ///< pop 前保存的旧属性
+    LayerPropSnapshot m_snap;
     QString m_label;
 };
 
@@ -89,9 +104,7 @@ class LayerStructureUndo final : public UndoItem
 public:
     enum class Kind { Added, Removed };
 
-    /** 新建层后的 undo 条目（pop = 删除该层）。 */
     static std::unique_ptr<LayerStructureUndo> forAdded(int index, const QString &label);
-    /** 删除层前的 undo 条目（pop = 还原该层）。 */
     static std::unique_ptr<LayerStructureUndo> forRemoved(int index,
                                                          std::unique_ptr<Layer> layer,
                                                          int activeIndexAfter,
@@ -105,9 +118,26 @@ private:
     LayerStructureUndo() = default;
 
     Kind m_kind = Kind::Added;
-    int m_index = -1;                    ///< 层在栈中的索引
-    int m_activeIndex = -1;              ///< Removed 时记录的活动层
-    std::unique_ptr<Layer> m_layer;      ///< Removed 时持有的被删层
+    int m_index = -1;
+    int m_activeIndex = -1;
+    std::unique_ptr<Layer> m_layer;
+    QString m_label;
+};
+
+/**
+ * 选区 mask undo（对照 GIMP channel/selection undo 精简）。
+ * pop 时与当前选区 mask 交换。
+ */
+class SelectionUndo final : public UndoItem
+{
+public:
+    SelectionUndo(QImage mask, const QString &label);
+    QString name() const override { return m_label; }
+    quint64 byteSize() const override;
+    void pop(ImageDocument &doc) override;
+
+private:
+    QImage m_mask;
     QString m_label;
 };
 
@@ -118,7 +148,6 @@ private:
 class DocumentGeomUndo final : public UndoItem
 {
 public:
-    /** 单层完整快照（属性 + 像素 + 层尺寸）。 */
     struct LayerState {
         LayerPropSnapshot props;
         QImage pixels;
@@ -135,11 +164,11 @@ public:
     void pop(ImageDocument &doc) override;
 
 private:
-    int m_width = 0;                       ///< 文档宽
-    int m_height = 0;                      ///< 文档高
-    int m_activeIndex = -1;                ///< 活动层索引
-    QImage m_selectionMask;                ///< 选区灰度 mask
-    std::vector<LayerState> m_layers;      ///< 各层快照（顺序与 LayerStack 一致）
+    int m_width = 0;
+    int m_height = 0;
+    int m_activeIndex = -1;
+    QImage m_selectionMask;
+    std::vector<LayerState> m_layers;
     QString m_label;
 };
 

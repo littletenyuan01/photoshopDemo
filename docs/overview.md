@@ -47,7 +47,7 @@ photoshopDemo/
 | 图层面板 | 已实现 | 新建/删/复制/显隐/透明度/混合/重命名 |
 | 打开位图 | 已实现 | PNG/JPEG/BMP/WebP → 单层文档 |
 | 工程 / PSD | 已实现 | `.pslite` 读写；PSD 子集写出 |
-| 撤销 / 重做 | 已实现 | 四类 UndoItem；Ctrl+Z / Ctrl+Y |
+| 撤销 / 重做 | 已实现 | 像素/属性(含样式·滤镜)/结构/几何/选区；Ctrl+Z / Ctrl+Y |
 | 导出 | 已实现 | PNG / JPEG 合成结果 |
 
 ## 技术栈

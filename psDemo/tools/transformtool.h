@@ -169,6 +169,11 @@ private:
     QRect m_srcLocal;       ///< 源矩形（层内）
     QImage m_srcPixels;     ///< 会话快照（预览与提交共用；拖拽只改四角/矩阵）
     QImage m_srcPixelsOriginal; ///< 提起时的原始源（取消时写回层；翻转不改它）
+    /** 进入会话前整层像素+偏移+源矩形（取消/提交前还原扩层几何）。 */
+    QImage m_preSessionPixels;
+    int m_preSessionOx = 0;
+    int m_preSessionOy = 0;
+    QRect m_preSrcLocal;
     QRect m_previewDirtyLocal; ///< 层内：上次实时预览脏区（取消/重绘前要清）
     qreal m_baseW = 1.0;    ///< 会话开始时宽（文档像素）
     qreal m_baseH = 1.0;

@@ -348,10 +348,19 @@ bool TransformTool::beginSession(const ToolContext &ctx)
         return false;
 
     m_layerIndex = ctx.document->activeLayerIndex();
+    // 扩层前整层快照：取消/提交都先回到此状态，避免 expand 泄漏
+    m_preSessionPixels = layer->materialize();
+    m_preSessionOx = layer->offsetX();
+    m_preSessionOy = layer->offsetY();
+
     m_srcLocal = contentDoc.translated(-layer->offsetX(), -layer->offsetY());
+    m_preSrcLocal = m_srcLocal;
     m_srcPixels = TilePatch::extract(layer->tiles(), m_srcLocal);
-    if (m_srcPixels.isNull() || m_srcPixels.size().isEmpty())
+    if (m_srcPixels.isNull() || m_srcPixels.size().isEmpty()) {
+        m_preSessionPixels = QImage();
+        m_preSrcLocal = QRect();
         return false;
+    }
     m_srcPixelsOriginal = m_srcPixels;
 
     m_baseW = qMax(1.0, qreal(contentDoc.width()));
@@ -493,18 +502,27 @@ void TransformTool::cancelSession(const ToolContext &ctx, bool userExit)
     m_drag = Handle::None;
     if (ctx.document) {
         if (Layer *layer = ctx.document->layers().layerAt(m_layerIndex)) {
-            // 先清掉实时预览脏区，再把源矩形写回
-            const QRect clearR = m_previewDirtyLocal.united(m_srcLocal);
-            clearLayerRect(layer, clearR);
-            if (m_lifted)
-                putSourceBackToLayer(layer);
+            // 整层还原到进会话前（含扩层导致的尺寸/偏移）
+            if (!m_preSessionPixels.isNull()) {
+                layer->replaceFromImage(m_preSessionPixels);
+                layer->setOffsetSilent(m_preSessionOx, m_preSessionOy);
+                layer->invalidateContentBounds();
+            } else {
+                const QRect clearR = m_previewDirtyLocal.united(m_srcLocal);
+                clearLayerRect(layer, clearR);
+                if (m_lifted)
+                    putSourceBackToLayer(layer);
+            }
             ctx.document->markDirty();
+            emit ctx.document->layerPropertiesChanged(m_layerIndex);
         }
     }
     m_lifted = false;
     m_previewDirtyLocal = QRect();
     m_srcPixels = QImage();
     m_srcPixelsOriginal = QImage();
+    m_preSessionPixels = QImage();
+    m_preSrcLocal = QRect();
     m_doc = nullptr;
     clearSessionHistory();
     emit sessionChanged(false);
@@ -521,17 +539,23 @@ bool TransformTool::commitSession(const ToolContext &ctx)
     if (!layer)
         return false;
 
-    // 清预览 → 还原变换前像素 → 扩层（若四角越界）→ push 撤销 → 正式栅格化
-    const QRect clearR = m_previewDirtyLocal.united(m_srcLocal);
-    clearLayerRect(layer, clearR);
-    if (m_lifted)
-        putSourceBackToLayer(layer);
+    // 还原进会话前几何 → push → 再扩层 + 正式栅格化
+    if (!m_preSessionPixels.isNull()) {
+        layer->replaceFromImage(m_preSessionPixels);
+        layer->setOffsetSilent(m_preSessionOx, m_preSessionOy);
+        layer->invalidateContentBounds();
+        m_srcLocal = m_preSrcLocal;
+    } else {
+        const QRect clearR = m_previewDirtyLocal.united(m_srcLocal);
+        clearLayerRect(layer, clearR);
+        if (m_lifted)
+            putSourceBackToLayer(layer);
+    }
     m_lifted = false;
     m_previewDirtyLocal = QRect();
 
-    ensureLayerFitsCorners(layer);
-
     ctx.document->pushLayerPixelsUndo(m_layerIndex, QObject::tr("自由变换"));
+    ensureLayerFitsCorners(layer);
 
     QPointF destLocal[4];
     for (int i = 0; i < 4; ++i) {
@@ -560,6 +584,8 @@ bool TransformTool::commitSession(const ToolContext &ctx)
     m_session = false;
     m_srcPixels = QImage();
     m_srcPixelsOriginal = QImage();
+    m_preSessionPixels = QImage();
+    m_preSrcLocal = QRect();
     m_doc = nullptr;
     m_drag = Handle::None;
     clearSessionHistory();

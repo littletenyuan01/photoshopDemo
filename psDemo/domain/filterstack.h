@@ -38,6 +38,10 @@ public:
     /** 是否存在至少一个已启用节点（合成快速路径用）。 */
     bool hasEnabled() const;
 
+    /** 整栈快照 / 替换（对话框确认、属性 undo）。 */
+    QVector<FilterNode> snapshot() const { return m_nodes; }
+    void replaceAll(const QVector<FilterNode> &nodes) { m_nodes = nodes; }
+
 private:
     QVector<FilterNode> m_nodes; ///< 自底向顶滤镜节点列表
 };

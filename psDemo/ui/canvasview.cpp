@@ -510,12 +510,18 @@ void CanvasView::paintEvent(QPaintEvent *)
     PixmapUtils::paintChecker(painter, target.toAlignedRect(), 8,
                               QColor(255, 255, 255), QColor(200, 200, 200));
     painter.setRenderHint(QPainter::SmoothPixmapTransform, m_zoom < 1.0);
-    painter.drawImage(target, m_projection.image());
+
+    // 移动工具拖拽中优先画 live 预览（对照 GIMP：拖中不全量同步投影）
+    Ps::Tool *tool = m_toolManager ? m_toolManager->activeTool() : nullptr;
+    const QImage *live = tool ? tool->liveProjection() : nullptr;
+    if (live && !live->isNull())
+        painter.drawImage(target, *live);
+    else
+        painter.drawImage(target, m_projection.image());
 
     paintPixelGrid(painter, target);
     paintSelectionOutline(painter);
 
-    Ps::Tool *tool = m_toolManager ? m_toolManager->activeTool() : nullptr;
     if (tool && tool->hasOverlay()) {
         m_toolContext.viewZoom = m_zoom;
         m_toolContext.viewOffset = m_offset;

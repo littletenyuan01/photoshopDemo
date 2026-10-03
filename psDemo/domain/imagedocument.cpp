@@ -82,12 +82,19 @@ void ImageDocument::pushLayerPixelsUndo(int layerIndex, const QString &label)
     if (!layer)
         return;
     m_history->push(std::make_unique<LayerPixelsUndo>(
-        layerIndex, layer->materialize(), label));
+        layerIndex, layer->materialize(), layer->offsetX(), layer->offsetY(), label));
 }
 
 void ImageDocument::pushLayerOffsetUndo(int layerIndex)
 {
     pushLayerPropUndo(layerIndex, tr("移动图层"));
+}
+
+void ImageDocument::pushSelectionUndo(const QString &label)
+{
+    if (!shouldRecordHistory())
+        return;
+    m_history->push(std::make_unique<SelectionUndo>(m_selection.mask().copy(), label));
 }
 
 void ImageDocument::pushLayerPropUndo(int index, const QString &label)
@@ -191,6 +198,9 @@ int ImageDocument::pickLayerAt(int docX, int docY) const
 
 void ImageDocument::clearSelection()
 {
+    if (m_selection.isEmpty())
+        return;
+    pushSelectionUndo(tr("取消选择"));
     m_selection.clear();
     emit selectionChanged();
 }
@@ -253,6 +263,7 @@ int ImageDocument::addBrightnessContrastFilter(qreal brightness, qreal contrast)
     if (!layer || !layer->isVisible())
         return -1;
 
+    pushLayerPropUndo(m_activeLayerIndex, tr("亮度/对比度"));
     FilterNode node(OpName::BrightnessContrast);
     node.setBrightness(brightness);
     node.setContrast(contrast);
@@ -265,7 +276,13 @@ int ImageDocument::addBrightnessContrastFilter(qreal brightness, qreal contrast)
 bool ImageDocument::setLayerFilterEnabled(int layerIndex, int filterIndex, bool enabled)
 {
     Layer *layer = m_layers.layerAt(layerIndex);
-    if (!layer || !layer->filters().setEnabled(filterIndex, enabled))
+    if (!layer || filterIndex < 0 || filterIndex >= layer->filters().count())
+        return false;
+    if (layer->filters().at(filterIndex).isEnabled() == enabled)
+        return false;
+
+    pushLayerPropUndo(layerIndex, tr("滤镜可见性"));
+    if (!layer->filters().setEnabled(filterIndex, enabled))
         return false;
     layer->invalidateCompositeRaster();
     markDirty(layer->boundsInDocument().intersected(QRect(0, 0, m_width, m_height)));
@@ -275,7 +292,11 @@ bool ImageDocument::setLayerFilterEnabled(int layerIndex, int filterIndex, bool 
 bool ImageDocument::removeLayerFilter(int layerIndex, int filterIndex)
 {
     Layer *layer = m_layers.layerAt(layerIndex);
-    if (!layer || !layer->filters().removeAt(filterIndex))
+    if (!layer || filterIndex < 0 || filterIndex >= layer->filters().count())
+        return false;
+
+    pushLayerPropUndo(layerIndex, tr("删除滤镜"));
+    if (!layer->filters().removeAt(filterIndex))
         return false;
     layer->invalidateCompositeRaster();
     markDirty(layer->boundsInDocument().intersected(QRect(0, 0, m_width, m_height)));
@@ -288,6 +309,11 @@ int ImageDocument::ensureActiveLayerStyle(LayerStyleKind kind)
     if (!layer || !layer->isVisible())
         return -1;
 
+    const int existing = layer->styles().indexOfKind(kind);
+    if (existing >= 0 && layer->styles().at(existing).isEnabled())
+        return existing;
+
+    pushLayerPropUndo(m_activeLayerIndex, tr("图层样式"));
     const QRect before = layer->styleBoundsInDocument();
     const int index = layer->styles().ensure(kind);
     layer->invalidateCompositeRaster();
@@ -303,6 +329,7 @@ bool ImageDocument::replaceActiveLayerStyles(const QVector<LayerStyleEffect> &ef
     if (!layer)
         return false;
 
+    pushLayerPropUndo(m_activeLayerIndex, tr("图层样式"));
     const QRect before = layer->styleBoundsInDocument();
     layer->styles().replaceAll(effects);
     layer->invalidateCompositeRaster();
@@ -318,6 +345,7 @@ bool ImageDocument::clearActiveLayerStyles()
     if (!layer || layer->styles().isEmpty())
         return false;
 
+    pushLayerPropUndo(m_activeLayerIndex, tr("清除图层样式"));
     const QRect before = layer->styleBoundsInDocument();
     layer->styles().clear();
     layer->invalidateCompositeRaster();
@@ -329,7 +357,13 @@ bool ImageDocument::clearActiveLayerStyles()
 bool ImageDocument::setLayerStyleEnabled(int layerIndex, int styleIndex, bool enabled)
 {
     Layer *layer = m_layers.layerAt(layerIndex);
-    if (!layer || !layer->styles().setEnabled(styleIndex, enabled))
+    if (!layer || styleIndex < 0 || styleIndex >= layer->styles().count())
+        return false;
+    if (layer->styles().at(styleIndex).isEnabled() == enabled)
+        return false;
+
+    pushLayerPropUndo(layerIndex, tr("图层样式可见性"));
+    if (!layer->styles().setEnabled(styleIndex, enabled))
         return false;
     layer->invalidateCompositeRaster();
     markDirty(layer->styleBoundsInDocument().intersected(QRect(0, 0, m_width, m_height)));
@@ -339,24 +373,28 @@ bool ImageDocument::setLayerStyleEnabled(int layerIndex, int styleIndex, bool en
 
 void ImageDocument::selectAll()
 {
+    pushSelectionUndo(tr("全部选择"));
     m_selection.selectAll();
     emit selectionChanged();
 }
 
 void ImageDocument::invertSelection()
 {
+    pushSelectionUndo(tr("反向选择"));
     m_selection.invert();
     emit selectionChanged();
 }
 
 void ImageDocument::selectRectangle(const QRect &rect, ChannelOp op)
 {
+    pushSelectionUndo(tr("矩形选区"));
     m_selection.selectRectangle(rect, op);
     emit selectionChanged();
 }
 
 void ImageDocument::selectEllipse(const QRect &rect, ChannelOp op)
 {
+    pushSelectionUndo(tr("椭圆选区"));
     m_selection.selectEllipse(rect, op);
     emit selectionChanged();
 }
@@ -364,6 +402,7 @@ void ImageDocument::selectEllipse(const QRect &rect, ChannelOp op)
 void ImageDocument::selectPolygon(const QPolygonF &points, ChannelOp op)
 {
     // 经 OpRunner → SelectPolygonOp（对照 gimp_channel_select_polygon）
+    pushSelectionUndo(tr("套索选区"));
     PaintEngine::selectPolygon(m_selection, points, op);
     emit selectionChanged();
 }
@@ -390,6 +429,7 @@ void ImageDocument::selectFlood(const QPoint &seedDoc, int tolerance, bool conti
     if (sample.format() != QImage::Format_ARGB32_Premultiplied)
         sample = sample.convertToFormat(QImage::Format_ARGB32_Premultiplied);
 
+    pushSelectionUndo(tr("魔棒选区"));
     PaintEngine::selectFlood(m_selection, sample, seedDoc, tolerance, contiguous, op);
     emit selectionChanged();
 }
@@ -400,6 +440,7 @@ void ImageDocument::selectLayerAlpha(int layerIndex, ChannelOp op)
     if (!layer)
         return;
 
+    pushSelectionUndo(tr("载入选区"));
     QImage pixels;
     if (layer->hasPixelData())
         pixels = layer->materialize();
@@ -511,15 +552,41 @@ void ImageDocument::translateLayer(int index, int dx, int dy)
     const QRect oldBounds = layer->styleBoundsInDocument().intersected(docRect);
     layer->translate(dx, dy);
     const QRect newBounds = layer->styleBoundsInDocument().intersected(docRect);
-    emit layerPropertiesChanged(index);
 
     const QRect dirty = oldBounds.united(newBounds);
+    if (!dirty.isEmpty()) {
+        m_dirty = true;
+        m_dirtyRect = m_dirtyRect.isNull() ? dirty : m_dirtyRect.united(dirty);
+    }
+
+    // 冻结中：只改 offset / 累计脏区，由工具画 live 预览
+    if (m_previewFrozen)
+        return;
+
+    emit layerPropertiesChanged(index);
     if (dirty.isEmpty())
         return;
-    m_dirty = true;
-    m_dirtyRect = m_dirtyRect.isNull() ? dirty : m_dirtyRect.united(dirty);
     emit pixelsChanged(dirty);
     emit contentChanged();
+}
+
+void ImageDocument::beginPreviewFreeze()
+{
+    m_previewFrozen = true;
+}
+
+void ImageDocument::endPreviewFreeze()
+{
+    if (!m_previewFrozen)
+        return;
+    m_previewFrozen = false;
+
+    if (m_activeLayerIndex >= 0)
+        emit layerPropertiesChanged(m_activeLayerIndex);
+    if (!m_dirtyRect.isEmpty()) {
+        emit pixelsChanged(m_dirtyRect);
+        emit contentChanged();
+    }
 }
 
 void ImageDocument::notifyLayerPropertiesChanged(const Layer &layer)

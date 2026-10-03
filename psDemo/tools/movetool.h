@@ -1,31 +1,25 @@
 /**
  * movetool.h — 移动工具声明（tools 层）。
  *
- * 点选活动层、拖拽平移 offset、绘制变换控件浮层（只显示不交互）。
+ * 点选、拖 offset、变换框浮层；拖中 live 预览（底图+单层），松手再投影。
  */
 #ifndef MOVETOOL_H
 #define MOVETOOL_H
 
 #include "tool.h"
 
+#include <QImage>
 #include <QPointF>
+#include <QRect>
 
 namespace Ps {
+
+class ImageDocument;
 
 /**
  * 移动工具（tools 层）。
  *
- * 【功能】
- * 1. 按下时按像素点选最上层非透明层并设为活动层（图层面板经 activeLayerChanged 同步）；
- * 2. 拖拽平移该层的文档偏移（改 Layer offset，不搬瓦片像素）；
- * 3. 浮层：活动层非透明像素最小外接矩形 + 8 锚点（对照 PS Move「显示变换控件」）。
- *    本阶段只绘制，不响应缩放/旋转拖拽。
- *
- * 【对照 GIMP】
- * - `gimpmovetool.c` + `gimp_image_pick_layer`（!move_current 时点选）
- * - `gimp_item_translate` / `gimp_layer_real_translate`
- *
- * 本项目瘦身：无「仅移动当前层」开关（等价始终可点选）、无选区/路径移动。
+ * 【对照 GIMP】gimpmovetool + preview_freeze；拖中不全栈 syncProjection。
  */
 class MoveTool : public Tool
 {
@@ -37,6 +31,7 @@ public:
     Qt::CursorShape cursorShape() const override;
     bool hasOverlay() const override { return true; }
     void drawOverlay(QPainter &painter, const ToolContext &ctx) const override;
+    const QImage *liveProjection() const override;
 
     bool mousePress(const ToolEvent &event, const ToolContext &ctx, ViewPort &view) override;
     bool mouseMove(const ToolEvent &event, const ToolContext &ctx, ViewPort &view) override;
@@ -44,8 +39,15 @@ public:
     void deactivate(const ToolContext &ctx, ViewPort &view) override;
 
 private:
+    void startDrag(ImageDocument &doc, int layerIndex);
+    void finishDrag(ImageDocument *doc);
+
     bool m_dragging = false;
-    QPointF m_lastImagePos; ///< 上一帧图像坐标，用于算整数 dx/dy
+    int m_layerIndex = -1;
+    QPointF m_lastImagePos;
+    QRect m_blitRect;
+    QImage m_base;  ///< 跳过被拖层的底图
+    QImage m_live;  ///< 底图 + 被拖层
 };
 
 } // namespace Ps

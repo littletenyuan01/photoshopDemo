@@ -160,6 +160,8 @@ public:
     void pushLayerPixelsUndo(int layerIndex, const QString &label);
     /** 移动拖拽开始前：offset 属性快照。 */
     void pushLayerOffsetUndo(int layerIndex);
+    /** 选区变更前：mask 快照。 */
+    void pushSelectionUndo(const QString &label);
     /** 图像/画布大小前：整文档几何快照。 */
     void pushDocumentGeomUndo(const QString &label);
 
@@ -188,6 +190,14 @@ public:
     void setLayerBlendMode(int index, BlendMode mode, bool recordHistory = true);
     /** 平移图层 offset 并按新旧 bounds 并集 markDirty。 */
     void translateLayer(int index, int dx, int dy);
+
+    /**
+     * 预览冻结（对照 GIMP preview_freeze）：拖中不广播面板刷新，
+     * 解冻时一次性 flush 脏区。
+     */
+    void beginPreviewFreeze();
+    void endPreviewFreeze();
+    bool isPreviewFrozen() const { return m_previewFrozen; }
 
     /** 属性类改动前手动 push（混合模式预览 begin 用）。 */
     void pushLayerPropertiesUndo(int index, const QString &label);
@@ -239,6 +249,7 @@ private:
     friend class LayerPropUndo;
     friend class LayerStructureUndo;
     friend class DocumentGeomUndo;
+    friend class SelectionUndo;
 
     /** 是否应 push 撤销（未抑制且非 redo/undo 回放中）。 */
     bool shouldRecordHistory() const;
@@ -260,6 +271,7 @@ private:
     QRect m_dirtyRect;                           ///< 累计脏区（文档坐标）
     std::unique_ptr<HistoryStack> m_history;     ///< 撤销栈
     int m_historySuppress = 0;                   ///< >0 时跳过 push 撤销
+    bool m_previewFrozen = false;                ///< 拖层中冻结面板广播
 };
 
 } // namespace Ps

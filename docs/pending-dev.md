@@ -13,6 +13,23 @@
 
 ---
 
+## 移动工具拖图层 — 已缓解（2026-10）
+
+**对照 GIMP**
+
+- `gimp_viewable_preview_freeze` / `thaw`：拖中冻结缩略图等面板刷新
+- `gimpeditselectiontool` live translate + `gimp_projection_flush`（异步分块，非每帧同步全合成）
+
+**本项目落地**
+
+- `ImageDocument::beginPreviewFreeze/endPreviewFreeze`：拖中抑制 `contentChanged` / `layerPropertiesChanged`，松手一次性 flush
+- `MoveTool`：按下合成一次「跳过被拖层」底图；每帧只把该层叠回旧∪新区（`liveProjection`）
+- `CanvasView`：拖中优先绘制 `Tool::liveProjection()`，避免每帧 `syncProjection` 全栈重合成
+
+**相关代码**：`tools/movetool.*`、`domain/imagedocument.*`、`ui/canvasview.cpp`、`engine/compositor.cpp`（`blendLayerRange` + `skipLayer`）
+
+---
+
 ## 自由变换（Ctrl+T）— 已实现
 
 **现状（已实现）**
@@ -34,6 +51,13 @@
 - 大图、已分配瓦片多时，**每次**越界扩层都相当于整层「拆开再重装」→ 拖拽明显卡顿
 - 卡顿主因是整层拷贝与重建，**不是**「多申请几块 64×64」本身
 
+**已缓解（正确性，2026-10）**
+
+- 进入 Ctrl+T 时快照整层像素+offset；**取消**时 `replaceFromImage` 整层还原（不再只 blit 源矩形）
+- **提交**前先还原到进会话状态再 `pushLayerPixelsUndo`（含 offset）再扩层+栅格化，避免预览期 expand 泄漏进永久几何
+
+**仍可能卡顿（性能）**：预览期每次越界仍可能 `expandToIncludeLocal`→整层重建；完善方向见下。
+
 **出现问题后怎么完善（建议）**
 
 参考 GIMP：变换在独立缓冲 / 图节点上算，预览改矩阵，确认再一次定稿；避免拖拽中反复整层 `materialize`。
@@ -47,10 +71,11 @@
 
 **相关代码**
 
-- `tools/transformtool.cpp`：`ensureLayerFitsCorners` / `updateLayerPreview` / `commitSession`
+- `tools/transformtool.cpp`：`ensureLayerFitsCorners` / `updateLayerPreview` / `commitSession` / `cancelSession`（`m_preSessionPixels`）
 - `domain/layer.cpp`：`expandToIncludeLocal`
 - `domain/tilebuffer.cpp`：`materialize` / `setFromImage`
 - `engine/op/freetransformop.cpp`：栅格化算子（卡顿主因一般不在此处采样循环，而在扩层重建）
+- `app/undoitem.cpp`：`LayerPixelsUndo` 现含 offset
 
 ---
 

@@ -19,6 +19,8 @@ LayerPropSnapshot captureLayerProps(const Layer &layer)
     s.blendMode = layer.blendMode();
     s.offsetX = layer.offsetX();
     s.offsetY = layer.offsetY();
+    s.styles = layer.styles().snapshot();
+    s.filters = layer.filters().snapshot();
     return s;
 }
 
@@ -28,11 +30,17 @@ void applyLayerProps(Layer &layer, const LayerPropSnapshot &s)
     layer.setVisible(s.visible);
     layer.setOpacity(s.opacity);
     layer.setBlendMode(s.blendMode);
-    layer.setOffset(s.offsetX, s.offsetY);
+    layer.setOffsetSilent(s.offsetX, s.offsetY);
+    layer.styles().replaceAll(s.styles);
+    layer.filters().replaceAll(s.filters);
+    layer.invalidateCompositeRaster();
 }
 
-LayerPixelsUndo::LayerPixelsUndo(int layerIndex, QImage pixels, const QString &label)
+LayerPixelsUndo::LayerPixelsUndo(int layerIndex, QImage pixels, int offsetX, int offsetY,
+                                 const QString &label)
     : m_layerIndex(layerIndex)
+    , m_offsetX(offsetX)
+    , m_offsetY(offsetY)
     , m_pixels(std::move(pixels))
     , m_label(label)
 {
@@ -49,9 +57,15 @@ void LayerPixelsUndo::pop(ImageDocument &doc)
     if (!layer)
         return;
     QImage current = layer->materialize();
+    const int curOx = layer->offsetX();
+    const int curOy = layer->offsetY();
     layer->replaceFromImage(m_pixels);
+    layer->setOffsetSilent(m_offsetX, m_offsetY);
     m_pixels = std::move(current);
+    m_offsetX = curOx;
+    m_offsetY = curOy;
     doc.markDirty();
+    emit doc.layerPropertiesChanged(m_layerIndex);
 }
 
 LayerPropUndo::LayerPropUndo(int layerIndex, LayerPropSnapshot before, const QString &label)
@@ -61,18 +75,27 @@ LayerPropUndo::LayerPropUndo(int layerIndex, LayerPropSnapshot before, const QSt
 {
 }
 
+quint64 LayerPropUndo::byteSize() const
+{
+    quint64 n = sizeof(*this) + quint64(m_snap.name.size()) * 2 + 64;
+    n += quint64(m_snap.styles.size()) * sizeof(LayerStyleEffect);
+    n += quint64(m_snap.filters.size()) * sizeof(FilterNode);
+    return n;
+}
+
 void LayerPropUndo::pop(ImageDocument &doc)
 {
     Layer *layer = doc.m_layers.layerAt(m_layerIndex);
     if (!layer)
         return;
     const QRect docRect(0, 0, doc.m_width, doc.m_height);
-    const QRect oldBounds = layer->boundsInDocument().intersected(docRect);
+    const QRect oldBounds = layer->styleBoundsInDocument().intersected(docRect);
     LayerPropSnapshot live = captureLayerProps(*layer);
     applyLayerProps(*layer, m_snap);
     m_snap = std::move(live);
-    const QRect newBounds = layer->boundsInDocument().intersected(docRect);
+    const QRect newBounds = layer->styleBoundsInDocument().intersected(docRect);
     doc.markDirty(oldBounds.united(newBounds));
+    emit doc.layerPropertiesChanged(m_layerIndex);
 }
 
 std::unique_ptr<LayerStructureUndo> LayerStructureUndo::forAdded(int index, const QString &label)
@@ -142,6 +165,25 @@ void LayerStructureUndo::pop(ImageDocument &doc)
     emit doc.structureChanged();
     emit doc.activeLayerChanged(doc.m_activeLayerIndex);
     emit doc.contentChanged();
+}
+
+SelectionUndo::SelectionUndo(QImage mask, const QString &label)
+    : m_mask(std::move(mask))
+    , m_label(label)
+{
+}
+
+quint64 SelectionUndo::byteSize() const
+{
+    return quint64(m_mask.sizeInBytes()) + 64;
+}
+
+void SelectionUndo::pop(ImageDocument &doc)
+{
+    QImage live = doc.m_selection.mask().copy();
+    doc.m_selection.replaceFromImage(m_mask);
+    m_mask = std::move(live);
+    emit doc.selectionChanged();
 }
 
 DocumentGeomUndo::DocumentGeomUndo(int width, int height, QImage selectionMask,

@@ -264,29 +264,31 @@ flowchart LR
 ### 5.3 撤销
 
 > **决策已定**（见 `docs/tech-notes.md`「撤销」一节）：采用 GIMP 的**推入式（push）+ 每对象一类**，
-> 放弃早先「命令模式 vs 瓦片快照」的二选一。Phase 6 核心已落地（`HistoryStack` + 四类 UndoItem）；
-> 统一命令层入口仍为可选收口。
+> 放弃早先「命令模式 vs 瓦片快照」的二选一。Phase 6 已落地。
+>
+> **对照 GIMP**：无独立 Command 总线；改状态走核心 mutate API，API 内 `push_undo`。
+> 本项目等价做法：UI/工具只调 `ImageDocument` 语义化方法，**push 写在这些方法里**（或绘制类在写像素前调 `pushLayerPixelsUndo`）。
 
-**语义**：**改动之前**先把旧状态推入栈，而不是事后记录"做了什么"。
+**语义**：**改动之前**先把旧状态推入栈，而不是事后记录「做了什么」。
 
-| 入口（起步 4 类） | 覆盖 | 落点 |
+| 入口 | 覆盖 | 落点 |
 |------|------|------|
-| `pushDrawablePixels` | 像素改动（画笔 / 橡皮 / 滤镜） | `tools/PaintTool` 写像素前 |
-| `pushLayerProp` | 显隐 / 不透明度 / 名称 / 混合模式 | `ImageDocument::setLayer*` 内 |
-| `pushLayerStructure` | 新建 / 删除 / 上移 / 下移 / 合并 | `ImageDocument::addTransparentLayer` / `removeLayer` 内 |
-| `pushDocumentProp` | 尺寸 / 分辨率 / 活动层 | `ImageDocument::setActiveLayerIndex` 内 |
+| `pushLayerPixelsUndo` | 像素（含 offset，变换扩层可逆） | 绘制工具 stroke 前 / 清除填充 / 变换提交 |
+| `pushLayerPropUndo` | 显隐/不透明度/名/混合/偏移/**样式**/**滤镜** | `setLayer*`、`ensure/replace/clear` 样式、滤镜 API 内 |
+| `LayerStructureUndo` | 新建 / 删除 / 复制 | `addLayer` / `removeLayer` / `duplicateLayer` 内 |
+| `pushDocumentGeomUndo` | 图像/画布大小、裁剪 | `scaleImage` / `resizeCanvas` / `cropTo` 内 |
+| `pushSelectionUndo` | 选区 mask | `select*` / `clearSelection` / `invertSelection` 内 |
 
 ```text
 HistoryStack: undoStack / redoStack（含内存上限，超限丢最老）
 ```
 
-**收口点已就位**：UI 已不直接改 `Layer`（实测 0 处），一律走 `ImageDocument` 的语义化 setter，
-因此 push 只需加在少数几个方法内 —— 这是 Phase 6 能低成本落地的前提。
-另：不透明度滑条已改「松手才提交」，避免撤销栈被滑条淹没。
+**收口点已就位**：UI 已不直接改 `Layer`，一律走 `ImageDocument`；
+因此 push 集中在少数 domain API —— 这是 Phase 6 低成本落地的前提。
+不透明度滑条「松手才提交」，避免撤销栈被滑条淹没。
 
-> 【对照 GIMP】`app/core/gimpimage-undo.h`：`gimp_image_get_undo_stack` /
-> `gimp_image_undo_group_start` / `gimp_image_undo_group_end`（把一次用户操作内的多次 push
-> 合成一个撤销单元），配合 `gimpimage-undo-push.h` 的 50+ 个 `push_*` 入口。
+> 【对照 GIMP】`gimpimage-undo-push.h` 的 typed `push_*` + setter 内 `push_undo`；
+> `gimp_image_undo_group_start/end` 把多步合成一步（本项目暂未做 group，多步仍可能多条）。
 > 本项目取其**推入式**语义与**分组**思路（如一次笔画 = 一个撤销单元），
 > 不做 `GimpUndoStack` / `GimpUndo` 的 GObject 层次规模。
 > 注意：`contentChanged` 之类**信号不是撤销**，不要指望靠信号重放实现撤销。
@@ -432,16 +434,17 @@ psDemo/
 
 **GIMP 的洞见**：撤销是「**改动之前，先把旧状态推入栈**」，而非「改动之后记录做了什么」；且每个对象类型有自己的逆操作语义。这套 push 入口构成一份**「一个图像编辑器有哪些状态必须可撤销」的现成清单**。
 
-**本项目落地方式**：裁到 4 类 push 入口起步：
+**本项目落地方式**（对照 GIMP core mutate + push，非 Command 层）：
 
 | 入口 | 覆盖 |
 |------|------|
-| `pushDrawablePixels` | 像素改动（画笔 / 橡皮 / 滤镜），按脏矩形存快照 |
-| `pushLayerProp` | 显隐 / 不透明度 / 名称 / 混合模式 |
-| `pushLayerStructure` | 新建 / 删除 / 上移 / 下移 / 合并 |
-| `pushDocumentProp` | 尺寸 / 分辨率 / 活动层 |
+| `pushLayerPixelsUndo` | 像素 + offset（画笔 / 变换提交等） |
+| `pushLayerPropUndo` | 显隐 / 不透明度 / 名 / 混合 / 偏移 / **样式** / **滤镜** |
+| `LayerStructureUndo` | 新建 / 删除 / 复制 |
+| `pushDocumentGeomUndo` | 图像大小 / 画布大小 / 裁剪 |
+| `pushSelectionUndo` | 选区 mask |
 
-【约束】**改文档状态而不 push = bug**。这是纪律，编译器帮不上忙，靠评审与约定守。
+【约束】**改文档状态而不 push = bug**。纪律靠评审；编译器帮不上忙。
 
 ---
 
@@ -459,11 +462,11 @@ psDemo/
 1. domain 最小文档 + Compositor + CanvasView        （已完成）
 2. 图层面板 + 图层命令                                （已完成）
 3. 画笔 / 橡皮 + PaintEngine                          （已完成）
-4. ① 推入式撤销 + 命令层        ← 下一步，勿拖到最后
+4. ① 推入式撤销（domain API 内 push；无独立 Command 层）  ✅
 5. 其余 UI 按钮小功能（逐个补，每个天然带撤销）
-6. v1 闭环：导出 PNG/JPEG（Phase 3 收尾）
+6. v1 闭环：导出 PNG/JPEG（Phase 3 收尾）  ✅
         ↓
-7. ② 投影与脏区分块（Compositor 内部升级，UI 无感）
+7. ② 投影与脏区分块（Compositor 内部升级，UI 无感）  ✅
 8. ③ 调整层 + 节点化滤镜栈（前置：第 7 步）  
 9. Phase 9 滤镜库：ROI 缓存 / 异步求值 / 多线程算子图（前置：第 8 步）
 9. Selection + 选区工具 + 绘制约束
@@ -497,10 +500,10 @@ psDemo/
 | tools/ToolManager + Tool 基类 + 4 个工具 | **已实现**（本文 §2 早先规划的 `tools` 层） |
 | LayerPanel → DockPanel + 三个 tree panel | **已实现** |
 | 信号分级 + 语义化 setter + 累计脏区 | **已实现**（撤销与分块重合成的接口就位） |
-| 三、① 推入式撤销（Phase 6） | **已实现**最小闭环（手动 push；无独立 commands 层） |
+| 三、① 推入式撤销（Phase 6） | **已实现**（GIMP 式：domain API 内 push；含样式/滤镜/选区；无独立 commands 层） |
 | 轻量算子壳（Phase 6.5） | **已实现**：注册表 + Runner + 混合/洪泛/渐变/填充；无 GEGL |
 | 三、② 脏区分块投影（Phase 7） | **已实现**：`Projection` + `compositeRegion` + 64 块有效位 |
 | 三、③ 节点化非破坏（Phase 8） | **首片已实现**：`FilterStack` + BrightnessContrast + 合成接入；调整层 / 对话框后置 |
 | 四、滤镜库（Phase 9） | **计划中**：完整 ROI/节点缓存、异步求值、多线程算子图；仍不引入 GEGL |
-| 独立 actions/commands 层 | 未实现（当前收口在 domain 语义化 setter） |
+| 独立 actions/commands 层 | **不做**（对照 GIMP：无 GoF Command；收口在 domain 语义化 API） |
 | 其余（Selection / IO） | Selection + RasterIo/ProjectIo/PsdIo **已实现**；蒙版仍未做 |

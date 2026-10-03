@@ -62,6 +62,8 @@
   切过去不消费事件，而不是意外继承上一个工具的行为。
 - **移动（V）**：按下时按像素点选最上层非透明内容并激活该层（图层面板同步）；
   拖拽平移其文档偏移（`Layer::offsetX/Y`），不搬瓦片像素。
+  拖中走 live 预览（底图 + 单层叠回，`previewFreeze`），松手再正式投影；
+  对照 GIMP `preview_freeze` + live translate，见 [pending-dev.md](pending-dev.md)。
   对照 `gimpmovetool.c` + `gimp_image_pick_layer` → `gimp_item_translate`。
   未做：选区/路径移动、对齐、「仅移动当前层」开关。
 - **自由变换（Ctrl+T）**：编辑→自由变换 / 移动组飞出；选项栏与右键模式（含斜切/扭曲/透视）；

@@ -61,7 +61,9 @@
   - [x] `pushLayerStructure` — 新建 / 删除 / 复制
   - [x] `pushDocumentProp` — 图像大小 / 画布大小（`DocumentGeomUndo`）
 - [x] `HistoryStack`：undo/redo 双栈 + 内存上限（超限丢最老）
-- [ ] **命令层收口**：所有改文档状态的 UI 动作统一走命令入口，入口内自动 push（目前各入口手动 push）
+- [x] **撤销覆盖收口（GIMP 式，非 Command 总线）**：改文档走 `ImageDocument` 语义化 API，API 内自动 push
+  - 属性 undo 含图层样式 / 滤镜栈；新增 `SelectionUndo`；像素 undo 含 offset（变换扩层可逆）
+  - **不做**独立 commands 层（对照 GIMP：core mutate + `push_undo`，无 GoF Command）
 - [x] 菜单/快捷键接线：Ctrl+Z / Ctrl+Y，`编辑` 撤销/重做/清除/填充已解除灰色
 - [x] 【约束】代码评审口径：**改文档状态而不 push = bug**
 
