@@ -86,6 +86,7 @@ private:
     Ui::LayerRowWidget *ui;
     bool m_expanded = true;
     bool m_hasStyles = false;
+    QString m_layerName; ///< 真实层名（不含「链接」后缀）
     QLineEdit *m_renameEdit = nullptr;
 };
 

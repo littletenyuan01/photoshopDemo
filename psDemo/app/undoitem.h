@@ -56,6 +56,7 @@ struct LayerPropSnapshot {
     bool maskEnabled = true;
     bool maskLinked = true;
     QImage maskGray; ///< Format_Grayscale8；hasMask 时有效
+    QString linkPath; ///< 非空=链接层（对照 GimpLink 路径）
 };
 
 /** 从 Layer 读取当前属性到快照。 */

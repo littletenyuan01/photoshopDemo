@@ -28,6 +28,7 @@ LayerPropSnapshot captureLayerProps(const Layer &layer)
         s.maskLinked = layer.mask()->isLinked();
         s.maskGray = layer.mask()->image().copy();
     }
+    s.linkPath = layer.linkPath();
     return s;
 }
 
@@ -49,6 +50,7 @@ void applyLayerProps(Layer &layer, const LayerPropSnapshot &s)
     } else {
         layer.setMask(nullptr);
     }
+    layer.setLinkPathSilent(s.linkPath);
     layer.invalidateCompositeRaster();
 }
 

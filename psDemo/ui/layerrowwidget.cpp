@@ -13,6 +13,7 @@
 #include <QMouseEvent>
 #include <QPixmap>
 #include <QSignalBlocker>
+#include <QString>
 
 LayerRowWidget::LayerRowWidget(QWidget *parent)
     : QWidget(parent)
@@ -49,7 +50,17 @@ void LayerRowWidget::syncFromLayer(const Ps::Layer &layer)
         ui->btnVisible->setChecked(layer.isVisible());
         updateEyeIcon(layer.isVisible());
     }
-    ui->nameLabel->setText(layer.name());
+    m_layerName = layer.name();
+    if (layer.isLinkedLayer()) {
+        const QString mark = layer.isLinkBroken()
+                                 ? QObject::tr("（破链）")
+                                 : QObject::tr("（链接）");
+        ui->nameLabel->setText(m_layerName + mark);
+        ui->nameLabel->setToolTip(layer.linkPath());
+    } else {
+        ui->nameLabel->setText(m_layerName);
+        ui->nameLabel->setToolTip(QString());
+    }
 
     const bool hasStyles = !layer.styles().isEmpty();
     const int styleCount = layer.styles().count();
@@ -119,7 +130,8 @@ void LayerRowWidget::beginRename()
     if (m_renameEdit)
         return;
 
-    m_renameEdit = new QLineEdit(ui->nameLabel->text(), ui->headerHost);
+    m_renameEdit = new QLineEdit(m_layerName.isEmpty() ? ui->nameLabel->text() : m_layerName,
+                                 ui->headerHost);
     m_renameEdit->setGeometry(ui->nameLabel->geometry());
     m_renameEdit->show();
     m_renameEdit->setFocus(Qt::OtherFocusReason);
@@ -137,7 +149,8 @@ void LayerRowWidget::finishRename()
     m_renameEdit->deleteLater();
     m_renameEdit = nullptr;
     ui->nameLabel->setVisible(true);
-    if (!text.isEmpty() && text != ui->nameLabel->text()) {
+    if (!text.isEmpty() && text != m_layerName) {
+        m_layerName = text;
         ui->nameLabel->setText(text);
         emit nameCommitted(text);
     }

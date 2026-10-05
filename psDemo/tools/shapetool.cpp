@@ -198,6 +198,8 @@ bool ShapeTool::mouseRelease(const ToolEvent &event, const ToolContext &ctx, Vie
     Layer *layer = ctx.document ? ctx.document->activeLayer() : nullptr;
     if (!layer || !layer->isVisible())
         return true;
+    if (layer->isLinkedLayer())
+        return true;
 
     const QPointF endImg = constrainedEnd(m_startImage, m_endImage, m_kind, m_constrain);
     QRectF imageRect;

@@ -12,7 +12,9 @@
 #include "engine/op/opname.h"
 #include "engine/paintengine.h"
 
+#include <QFileInfo>
 #include <QImage>
+#include <QImageReader>
 #include <QPainter>
 #include <QtGlobal>
 
@@ -182,7 +184,7 @@ std::unique_ptr<ImageDocument> ImageDocument::createBlank(int width, int height,
 }
 
 /** 入栈唯一入口：挂 owner、结构撤销、广播 structureChanged。 */
-int ImageDocument::addLayer(std::unique_ptr<Layer> layer)
+int ImageDocument::addLayer(std::unique_ptr<Layer> layer, const QString &undoLabel)
 {
     if (!layer)
         return -1;
@@ -191,7 +193,8 @@ int ImageDocument::addLayer(std::unique_ptr<Layer> layer)
     const int index = m_layers.addLayer(std::move(layer));
 
     if (shouldRecordHistory()) {
-        m_history->push(LayerStructureUndo::forAdded(index, tr("新建图层")));
+        m_history->push(LayerStructureUndo::forAdded(
+            index, undoLabel.isEmpty() ? tr("新建图层") : undoLabel));
     }
 
     m_dirty = true;
@@ -199,6 +202,126 @@ int ImageDocument::addLayer(std::unique_ptr<Layer> layer)
     emit structureChanged();
     emit contentChanged();
     return index;
+}
+
+/**
+ * 对照 GIMP：
+ * - file_open_layers：先解码成临时图，再把层 convert 进 dest_image
+ * - gimp_image_add_layers(x,y,w,h)：在给定矩形内居中放置
+ * 本项目瘦身：单层位图、文档矩形 = 整幅画布、直接建 Layer 入栈（无临时 GimpImage）。
+ */
+int ImageDocument::placeImageAsLayer(const QImage &image, const QString &name)
+{
+    if (image.isNull() || m_width <= 0 || m_height <= 0)
+        return -1;
+
+    const QString layerName = name.isEmpty()
+                                  ? QStringLiteral("图层 %1").arg(m_layers.count() + 1)
+                                  : name;
+    auto layer = std::make_unique<Layer>(layerName, image);
+    // 居中：offset = (doc - layer) / 2（对照 gimp_image_add_layers 的居中公式）
+    const int ox = (m_width - layer->width()) / 2;
+    const int oy = (m_height - layer->height()) / 2;
+    layer->setOffsetSilent(ox, oy);
+
+    const int index = addLayer(std::move(layer), tr("置入图层"));
+    if (index < 0)
+        return -1;
+
+    setActiveLayerIndex(index);
+    return index;
+}
+
+namespace {
+
+/** 读链接源位图（尊重 EXIF）；失败返回空图。 */
+QImage loadLinkedRaster(const QString &absolutePath, QString *errorOut)
+{
+    QImageReader reader(absolutePath);
+    reader.setAutoTransform(true);
+    QImage image = reader.read();
+    if (image.isNull() && errorOut)
+        *errorOut = reader.errorString();
+    return image;
+}
+
+} // namespace
+
+/**
+ * 对照 GIMP：
+ * - file_open_link_image / gimp_link_layer_new：层挂 GimpLink，缓冲来自外部文件
+ * - 本项目瘦身：普通 Layer + linkPath + 缓存像素；无文件监视器、无矩阵变换栈
+ */
+int ImageDocument::placeLinkedImageAsLayer(const QString &absolutePath, const QString &name)
+{
+    if (absolutePath.isEmpty() || m_width <= 0 || m_height <= 0)
+        return -1;
+
+    const QString abs = QFileInfo(absolutePath).absoluteFilePath();
+    QString err;
+    const QImage image = loadLinkedRaster(abs, &err);
+    if (image.isNull())
+        return -1;
+
+    const QString layerName = name.isEmpty()
+                                  ? QFileInfo(abs).completeBaseName()
+                                  : name;
+    auto layer = std::make_unique<Layer>(layerName, image);
+    layer->setLinkPathSilent(abs);
+    const int ox = (m_width - layer->width()) / 2;
+    const int oy = (m_height - layer->height()) / 2;
+    layer->setOffsetSilent(ox, oy);
+
+    const int index = addLayer(std::move(layer), tr("置入链接图层"));
+    if (index < 0)
+        return -1;
+
+    setActiveLayerIndex(index);
+    return index;
+}
+
+bool ImageDocument::updateLinkedLayer(int index)
+{
+    Layer *layer = m_layers.layerAt(index);
+    if (!layer || !layer->isLinkedLayer())
+        return false;
+
+    const QString path = layer->linkPath();
+    QString err;
+    const QImage image = loadLinkedRaster(path, &err);
+    if (image.isNull())
+        return false;
+
+    // 像素 + 属性（含 linkPath）一体可逆：尺寸可能变
+    pushLayerPixelsUndo(index, tr("更新链接"));
+    const int ox = layer->offsetX();
+    const int oy = layer->offsetY();
+    layer->replaceFromImage(image);
+    layer->setOffsetSilent(ox, oy);
+    layer->setLinkPathSilent(path);
+    layer->invalidateContentBounds();
+    layer->invalidateCompositeRaster();
+
+    const QRect dirty = layer->styleBoundsInDocument()
+                            .intersected(QRect(0, 0, m_width, m_height));
+    markDirty(dirty.isEmpty() ? QRect(0, 0, m_width, m_height) : dirty);
+    emit layerPropertiesChanged(index);
+    emit contentChanged();
+    return true;
+}
+
+bool ImageDocument::rasterizeLinkedLayer(int index)
+{
+    Layer *layer = m_layers.layerAt(index);
+    if (!layer || !layer->isLinkedLayer())
+        return false;
+
+    // 对照 GimpRasterizable：栅格化后不再跟源文件
+    pushLayerPropUndo(index, tr("栅格化链接图层"));
+    layer->setLinkPathSilent(QString());
+    emit layerPropertiesChanged(index);
+    emit contentChanged();
+    return true;
 }
 
 void ImageDocument::setActiveLayerIndex(int index)
@@ -253,6 +376,8 @@ bool ImageDocument::clearActiveLayerPixels()
     Layer *layer = activeLayer();
     if (!layer || !layer->isVisible())
         return false;
+    if (layer->isLinkedLayer())
+        return false; // 先栅格化再清除
 
     const int ox = layer->offsetX();
     const int oy = layer->offsetY();
@@ -278,6 +403,8 @@ bool ImageDocument::fillActiveLayer(const QColor &color)
 {
     Layer *layer = activeLayer();
     if (!layer || !layer->isVisible())
+        return false;
+    if (layer->isLinkedLayer())
         return false;
 
     const int ox = layer->offsetX();
@@ -921,6 +1048,7 @@ int ImageDocument::duplicateLayer(int index)
         auto mask = std::make_unique<LayerMask>(src->mask()->clone());
         copy->setMask(std::move(mask));
     }
+    copy->setLinkPathSilent(src->linkPath());
 
     copy->setOwner(this);
     const int newIndex = m_layers.insertLayer(index + 1, std::move(copy));

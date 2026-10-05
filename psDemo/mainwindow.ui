@@ -913,11 +913,8 @@
    <property name="text">
     <string>打开为智能对象...</string>
    </property>
-   <property name="enabled">
-    <bool>false</bool>
-   </property>
    <property name="toolTip">
-    <string>UI 占位，功能尚未接入</string>
+    <string>新建文档并以链接层打开（对照 GIMP 打开为链接图层 / PS 打开为智能对象）</string>
    </property>
   </action>
   <action name="actionRecentPlaceholder">
@@ -1093,22 +1090,22 @@
    <property name="text">
     <string>置入嵌入的对象...</string>
    </property>
-   <property name="enabled">
-    <bool>false</bool>
+   <property name="shortcut">
+    <string>Ctrl+Shift+P</string>
    </property>
    <property name="toolTip">
-    <string>UI 占位，功能尚未接入</string>
+    <string>将图像置入当前文档为新图层（对照 GIMP：文件→打开为图层）</string>
    </property>
   </action>
   <action name="actionPlaceLinked">
    <property name="text">
     <string>置入链接的对象...</string>
    </property>
-   <property name="enabled">
-    <bool>false</bool>
+   <property name="shortcut">
+    <string>Ctrl+Alt+Shift+P</string>
    </property>
    <property name="toolTip">
-    <string>UI 占位，功能尚未接入</string>
+    <string>置入链接图层（对照 GIMP 打开为链接图层）；改源文件后可更新链接</string>
    </property>
   </action>
   <action name="actionPackage">
@@ -3291,11 +3288,8 @@
    <property name="text">
     <string>智能对象</string>
    </property>
-   <property name="enabled">
-    <bool>false</bool>
-   </property>
    <property name="toolTip">
-    <string>UI 占位，功能尚未接入</string>
+    <string>栅格化活动链接图层（清除链接路径，保留像素）</string>
    </property>
   </action>
   <action name="actionRasterizeVideo">

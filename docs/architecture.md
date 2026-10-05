@@ -314,7 +314,7 @@ psDemo/
     appsession.*                     [x] 当前文档持有者 + 广播中心
     commands/                        [ ] 具体 Command 类
   domain/
-    imagedocument.*                  [x] 分级信号 + 语义化 setter + 累计脏区
+    imagedocument.*                  [x] 分级信号 + 语义化 setter + 累计脏区 + placeImageAsLayer
     layer.* / layerstack.*           [x] 图层；Layer 持 owner 回指
     layermask.*                      [x] 灰度蒙版；合成乘 alpha；选区生成
     selection.*                      [x] 文档级 mask；矩形写入；绘制∩选区已接
@@ -511,4 +511,4 @@ psDemo/
 | 三、③ 节点化非破坏（Phase 8） | **首片已实现**：`FilterStack` + BrightnessContrast + 合成接入；调整层 / 对话框后置 |
 | 四、滤镜库（Phase 9） | **计划中**：完整 ROI/节点缓存、异步求值、多线程算子图；仍不引入 GEGL |
 | 独立 actions/commands 层 | **不做**（对照 GIMP：无 GoF Command；收口在 domain 语义化 API） |
-| 其余（Selection / IO / Mask） | Selection + RasterIo/ProjectIo/PsdIo + **LayerMask** **已实现** |
+| 其余（Selection / IO / Mask） | Selection + RasterIo/ProjectIo/PsdIo + **LayerMask** + **置入为图层** **已实现** |

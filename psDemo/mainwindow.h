@@ -73,6 +73,16 @@ private slots:
     // —— 文件 / 编辑 / 图层 / 图像 / 视图 / 窗口 / 帮助（菜单 action 槽）——
     void onNewDocument();
     void onOpenDocument();
+    /** 打开为智能对象：新建文档 + 链接层（对照 GIMP 打开为链接图层）。 */
+    void onOpenAsSmartObject();
+    /** 置入嵌入对象（对照 GIMP 打开为图层）。 */
+    void onPlaceEmbedded();
+    /** 置入链接对象（对照 GIMP 打开为链接图层）。 */
+    void onPlaceLinked();
+    /** 从磁盘刷新活动链接层像素。 */
+    void onUpdateLinkedLayer();
+    /** 栅格化活动链接层。 */
+    void onRasterizeLinkedLayer();
     void onSaveDocument();
     void onSaveDocumentAs();
     void onExportPng();
@@ -136,6 +146,24 @@ private:
      * @return 是否打开成功
      */
     bool openPath(const QString &path);
+    /**
+     * 始终新建文档，并以链接层打开位图（对照 PS「打开为智能对象」/
+     * GIMP「打开为链接图层」）。
+     */
+    bool openAsSmartObjectPath(const QString &path);
+    /**
+     * 置入路径到当前文档为新图层；无文档时回退为 openPath（对照 GIMP
+     * open-as-layers：无 image 时先打开成新文档）。
+     */
+    bool placePath(const QString &path);
+    /**
+     * 置入为链接图层；无文档时回退为 openAsSmartObjectPath。
+     */
+    bool placeLinkedPath(const QString &path);
+    /** 读取常见位图；失败返回空图，errorOut 可选。 */
+    static QImage readRasterImage(const QString &path, QString *errorOut = nullptr);
+    /** 画布拖放：有文档→逐个置入；无文档→打开第一个。 */
+    void onCanvasFilesDropped(const QStringList &paths);
     /** 把当前文档合成图写入最近项缩略图缓存。 */
     void rememberRecent(const QString &path);
     /** 按 RecentDocuments 重建「打开最近的文件」子菜单。 */

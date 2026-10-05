@@ -254,11 +254,35 @@ public:
 
     /**
      * 入栈唯一入口：挂 owner、可选结构撤销、发 structureChanged。
+     * @param undoLabel 空则用「新建图层」
      * @return 新层下标；-1 失败。
      */
-    int addLayer(std::unique_ptr<Layer> layer);
+    int addLayer(std::unique_ptr<Layer> layer, const QString &undoLabel = QString());
     /** 新建透明层并设为活动层。 */
     int addTransparentLayer(const QString &name = QString());
+    /**
+     * 把位图置入为新图层（对照 GIMP file_open_layers + gimp_image_add_layers）。
+     * 文档尺寸不变；图层按文档中心对齐 offset；设为活动层。
+     * @param name 层名（建议用文件名）；空则自动编号
+     * @return 新层下标；-1 失败（空图 / 无文档尺寸）
+     */
+    int placeImageAsLayer(const QImage &image, const QString &name = QString());
+    /**
+     * 置入链接图层（对照 GIMP file_open_layers(..., as_link) + GimpLinkLayer）。
+     * 读 @p absolutePath 为缓存像素，层记录路径；文档尺寸不变、居中。
+     * @return 新层下标；-1 失败
+     */
+    int placeLinkedImageAsLayer(const QString &absolutePath, const QString &name = QString());
+    /**
+     * 从链接路径重读像素（对照 gimp_link_layer 刷新 buffer）。
+     * 保持当前 offset；尺寸变化时左上角不动。
+     */
+    bool updateLinkedLayer(int index);
+    /**
+     * 栅格化链接层：清除路径，保留当前像素（对照 GimpRasterizable）。
+     * 之后可正常绘制。
+     */
+    bool rasterizeLinkedLayer(int index);
     /** 复制指定层并插入其上方，设为活动层。 */
     int duplicateLayer(int index);
     /** 删除层（至少保留一层）；发 structureChanged。 */

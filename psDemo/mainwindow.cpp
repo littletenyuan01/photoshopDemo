@@ -86,6 +86,26 @@ void MainWindow::setupMenus()
     // —— 文件（已实现）——
     connect(ui->actionNew, &QAction::triggered, this, &MainWindow::onNewDocument);
     connect(ui->actionOpen, &QAction::triggered, this, &MainWindow::onOpenDocument);
+    // 打开为智能对象 ≈ GIMP「打开为链接图层」：始终新建文档 + 链接层
+    ui->actionOpenAsSmartObject->setEnabled(true);
+    connect(ui->actionOpenAsSmartObject, &QAction::triggered,
+            this, &MainWindow::onOpenAsSmartObject);
+    // 置入 ≈ GIMP「打开为图层」：当前文档加层；无文档时 placePath 回退到打开
+    ui->actionPlaceEmbedded->setEnabled(true);
+    connect(ui->actionPlaceEmbedded, &QAction::triggered, this, &MainWindow::onPlaceEmbedded);
+    // 链接层 ≈ GIMP「打开为链接图层」
+    ui->actionPlaceLinked->setEnabled(true);
+    connect(ui->actionPlaceLinked, &QAction::triggered, this, &MainWindow::onPlaceLinked);
+    ui->actionRasterizeSmartObject->setEnabled(true);
+    connect(ui->actionRasterizeSmartObject, &QAction::triggered,
+            this, &MainWindow::onRasterizeLinkedLayer);
+    {
+        auto *updateLinked = new QAction(tr("更新链接"), this);
+        updateLinked->setToolTip(
+            tr("从源文件重新读入活动链接层像素（对照 GIMP 刷新 Link Layer）"));
+        ui->menuLayer->insertAction(ui->actionSmartObjects, updateLinked);
+        connect(updateLinked, &QAction::triggered, this, &MainWindow::onUpdateLinkedLayer);
+    }
     ui->actionSave->setEnabled(true);
     ui->actionSave->setToolTip(tr("存储为 PhotoshopLite 工程（.pslite）"));
     ui->actionSaveAs->setEnabled(true);
@@ -420,6 +440,10 @@ void MainWindow::setupToolbox()
     connect(canvas, &CanvasView::backgroundPicked,
             ui->toolBox, &ToolBox::setBackgroundColor);
 
+    // 拖放文件：对照 GIMP gimpdisplayshell-dnd（有文档→置入图层）
+    connect(canvas, &CanvasView::filesDropped,
+            this, &MainWindow::onCanvasFilesDropped);
+
     // 信息面板：光标 XY + 投影取样（RGB/CMYK）；默认隐藏，窗口→信息 / F8
     connect(canvas, &CanvasView::cursorImagePosChanged, this,
             [this, canvas](const QPointF &imagePos, bool inside) {
@@ -667,6 +691,219 @@ void MainWindow::onOpenDocument()
     openPath(path);
 }
 
+void MainWindow::onOpenAsSmartObject()
+{
+    // 对照 PS「打开为智能对象」/ GIMP「打开为链接图层」：新文档 + 链接层
+    const QString path = QFileDialog::getOpenFileName(
+        this,
+        tr("打开为智能对象"),
+        QString(),
+        tr("图像文件 (*.png *.jpg *.jpeg *.bmp *.webp);;"
+           "所有文件 (*.*)"));
+    if (path.isEmpty())
+        return;
+    openAsSmartObjectPath(path);
+}
+
+void MainWindow::onPlaceEmbedded()
+{
+    // 对照 GIMP「打开为图层」/ PS「置入嵌入的对象」：解码位图 → 当前文档新层
+    const QString path = QFileDialog::getOpenFileName(
+        this,
+        tr("置入嵌入的对象"),
+        QString(),
+        tr("图像文件 (*.png *.jpg *.jpeg *.bmp *.webp);;"
+           "所有文件 (*.*)"));
+    if (path.isEmpty())
+        return;
+    placePath(path);
+}
+
+void MainWindow::onPlaceLinked()
+{
+    // 对照 GIMP「打开为链接图层」/ PS「置入链接的对象」
+    const QString path = QFileDialog::getOpenFileName(
+        this,
+        tr("置入链接的对象"),
+        QString(),
+        tr("图像文件 (*.png *.jpg *.jpeg *.bmp *.webp);;"
+           "所有文件 (*.*)"));
+    if (path.isEmpty())
+        return;
+    placeLinkedPath(path);
+}
+
+void MainWindow::onUpdateLinkedLayer()
+{
+    Ps::ImageDocument *doc = m_session ? m_session->document() : nullptr;
+    if (!doc)
+        return;
+    Ps::Layer *layer = doc->activeLayer();
+    if (!layer || !layer->isLinkedLayer()) {
+        flashStatusMessage(tr("当前层不是链接图层"), 3000);
+        return;
+    }
+    if (!doc->updateLinkedLayer(doc->activeLayerIndex())) {
+        QMessageBox::warning(
+            this, tr("更新链接"),
+            tr("无法从源文件读取：\n%1").arg(layer->linkPath()));
+        return;
+    }
+    flashStatusMessage(tr("已更新链接：%1").arg(layer->linkPath()), 4000);
+}
+
+void MainWindow::onRasterizeLinkedLayer()
+{
+    Ps::ImageDocument *doc = m_session ? m_session->document() : nullptr;
+    if (!doc)
+        return;
+    Ps::Layer *layer = doc->activeLayer();
+    if (!layer || !layer->isLinkedLayer()) {
+        flashStatusMessage(tr("当前层不是链接图层"), 3000);
+        return;
+    }
+    if (doc->rasterizeLinkedLayer(doc->activeLayerIndex()))
+        flashStatusMessage(tr("已栅格化链接图层"), 3000);
+}
+
+QImage MainWindow::readRasterImage(const QString &path, QString *errorOut)
+{
+    QImageReader reader(path);
+    reader.setAutoTransform(true); // 尊重 EXIF 方向
+    QImage image = reader.read();
+    if (image.isNull() && errorOut)
+        *errorOut = reader.errorString();
+    return image;
+}
+
+bool MainWindow::placePath(const QString &path)
+{
+    if (path.isEmpty())
+        return false;
+
+    // 无文档时与 GIMP 一致：先按「打开」建文档（file_open_dialog 无 image 分支）
+    Ps::ImageDocument *doc = m_session ? m_session->document() : nullptr;
+    if (!doc)
+        return openPath(path);
+
+    if (path.endsWith(QStringLiteral(".pslite"), Qt::CaseInsensitive)) {
+        QMessageBox::information(
+            this, tr("置入"),
+            tr("工程文件请用「打开」；置入仅支持位图（对照 GIMP 打开为图层）。"));
+        return false;
+    }
+
+    QString err;
+    const QImage image = readRasterImage(path, &err);
+    if (image.isNull()) {
+        QMessageBox::warning(this, tr("置入失败"),
+                             tr("无法读取：%1\n%2").arg(path, err));
+        return false;
+    }
+
+    onShowWorkspace();
+    const QString layerName = QFileInfo(path).completeBaseName();
+    const int index = doc->placeImageAsLayer(image, layerName);
+    if (index < 0) {
+        QMessageBox::warning(this, tr("置入失败"), tr("无法将图像加入当前文档。"));
+        return false;
+    }
+
+    flashStatusMessage(tr("已置入图层「%1」").arg(layerName), 4000);
+    return true;
+}
+
+bool MainWindow::openAsSmartObjectPath(const QString &path)
+{
+    if (path.isEmpty())
+        return false;
+
+    if (path.endsWith(QStringLiteral(".pslite"), Qt::CaseInsensitive)) {
+        QMessageBox::information(
+            this, tr("打开为智能对象"),
+            tr("工程文件请用「打开」；智能对象仅支持位图。"));
+        return false;
+    }
+
+    QString err;
+    const QImage image = readRasterImage(path, &err);
+    if (image.isNull()) {
+        QMessageBox::warning(this, tr("打开失败"),
+                             tr("无法读取：%1\n%2").arg(path, err));
+        return false;
+    }
+
+    // 始终新建文档（对照 PS Open as Smart Object；不追加到当前文档）
+    const QString abs = QFileInfo(path).absoluteFilePath();
+    auto newDoc = std::make_unique<Ps::ImageDocument>(image.width(), image.height());
+    {
+        Ps::ImageDocument::HistorySuppress suppress(*newDoc);
+        auto layer = std::make_unique<Ps::Layer>(
+            QFileInfo(path).completeBaseName(), image);
+        layer->setLinkPathSilent(abs);
+        const int index = newDoc->addLayer(std::move(layer));
+        newDoc->setActiveLayerIndex(index);
+    }
+    newDoc->setFilePath(QString()); // 链接源 ≠ 工程路径
+    newDoc->clearDirty();
+    m_session->setDocument(std::move(newDoc));
+    onShowWorkspace();
+    flashStatusMessage(tr("已打开为智能对象：%1").arg(abs), 4000);
+    return true;
+}
+
+bool MainWindow::placeLinkedPath(const QString &path)
+{
+    if (path.isEmpty())
+        return false;
+
+    if (path.endsWith(QStringLiteral(".pslite"), Qt::CaseInsensitive)) {
+        QMessageBox::information(
+            this, tr("置入链接"),
+            tr("工程文件请用「打开」；链接置入仅支持位图。"));
+        return false;
+    }
+
+    // 无文档：与「打开为智能对象」相同
+    Ps::ImageDocument *doc = m_session ? m_session->document() : nullptr;
+    if (!doc)
+        return openAsSmartObjectPath(path);
+
+    onShowWorkspace();
+    const QString layerName = QFileInfo(path).completeBaseName();
+    const int index = doc->placeLinkedImageAsLayer(
+        QFileInfo(path).absoluteFilePath(), layerName);
+    if (index < 0) {
+        QMessageBox::warning(this, tr("置入链接失败"),
+                             tr("无法读取：%1").arg(path));
+        return false;
+    }
+
+    flashStatusMessage(tr("已置入链接图层「%1」").arg(layerName), 4000);
+    return true;
+}
+
+void MainWindow::onCanvasFilesDropped(const QStringList &paths)
+{
+    if (paths.isEmpty())
+        return;
+
+    // 对照 GIMP：空显示→打开；已有文档→逐个打开为图层
+    Ps::ImageDocument *doc = m_session ? m_session->document() : nullptr;
+    if (!doc) {
+        openPath(paths.first());
+        return;
+    }
+
+    int ok = 0;
+    for (const QString &path : paths) {
+        if (placePath(path))
+            ++ok;
+    }
+    if (ok > 1)
+        flashStatusMessage(tr("已置入 %1 个文件为图层").arg(ok), 4000);
+}
+
 bool MainWindow::openPath(const QString &path)
 {
     if (path.isEmpty())
@@ -689,19 +926,18 @@ bool MainWindow::openPath(const QString &path)
         return true;
     }
 
-    QImageReader reader(path);
-    reader.setAutoTransform(true); // 尊重 EXIF 方向
-    QImage image = reader.read();
+    QString err;
+    QImage image = readRasterImage(path, &err);
     if (image.isNull()) {
         QMessageBox::warning(this, tr("打开失败"),
-                             tr("无法读取：%1\n%2").arg(path, reader.errorString()));
+                             tr("无法读取：%1\n%2").arg(path, err));
         Ps::RecentDocuments::remove(path);
         rebuildRecentMenu();
         ui->homeScreen->refreshRecent();
         return false;
     }
 
-    // 栅格打开 = 单「背景」层（不可再编辑图层结构于原文件；请另存 .pslite）
+    // 栅格打开 = 单「背景」层（对照 GIMP file_open_image + 插件建 Background）
     auto doc = std::make_unique<Ps::ImageDocument>(image.width(), image.height());
     {
         Ps::ImageDocument::HistorySuppress suppress(*doc);

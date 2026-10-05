@@ -104,6 +104,8 @@ bool GradientTool::mouseRelease(const ToolEvent &event, const ToolContext &ctx, 
     // 对照梯度工具：隐藏层不可改（GIMP 另有 edit_non_visible）
     if (!layer || !layer->isVisible())
         return true;
+    if (layer->isLinkedLayer())
+        return true;
 
     ctx.document->pushLayerPixelsUndo(ctx.document->activeLayerIndex(),
                                       QObject::tr("渐变"));

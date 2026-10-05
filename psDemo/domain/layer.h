@@ -153,6 +153,21 @@ public:
     /** 像素或 fx/滤镜变更时调用；平移 offset 不要调。 */
     void invalidateCompositeRaster() const;
 
+    /**
+     * 链接图层（对照 GIMP GimpLinkLayer / GimpLink 瘦身版）。
+     * 非空路径 = 链接层：像素是源文件的栅格化缓存；改源文件后可「更新链接」。
+     * 空路径 = 普通像素层。破链时仍显示缓存像素。
+     */
+    bool isLinkedLayer() const { return !m_linkPath.isEmpty(); }
+    QString linkPath() const { return m_linkPath; }
+    /** 链接源是否不可读（仅 isLinkedLayer 时有意义）。 */
+    bool isLinkBroken() const;
+    /**
+     * 设置链接路径（不读盘）；空串=解除链接。
+     * 不发信号：由文档 API（置入/更新/栅格化）统一广播。
+     */
+    void setLinkPathSilent(const QString &path);
+
     /** 拼成整层临时图（缩略图 / 重采样）；无瓦片时为全透明同尺寸图。 */
     QImage materialize() const { return m_tiles.materialize(); }
 
@@ -203,6 +218,7 @@ private:
     FilterStack m_filters; ///< 非破坏滤镜节点（对照 drawable filter stack）
     LayerStyleStack m_styles; ///< 非破坏图层样式（对照 PS fx / GIMP layer effects）
     std::unique_ptr<LayerMask> m_mask; ///< 图层蒙版；可空
+    QString m_linkPath; ///< 链接源绝对路径；空=普通层（对照 GimpLink 文件）
 
     /** 层内坐标内容包围盒缓存；与 offset 无关。 */
     mutable QRect m_contentBoundsLocal;

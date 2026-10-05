@@ -18,7 +18,12 @@ class ImageDocument;
  * 保存时写入的格式号，Demo 固定为 1。
  * 旧文件头里可能仍是 2/3/4（开发期涨号留下的），打开时按当时字段读，再保存即为 1。
  */
-inline constexpr quint32 kProjectFormatVersion = 1;
+/**
+ * 保存时写入的格式号。
+ * v5：在蒙版后增加链接路径（对照 XCF 存 GimpLink）。
+ * 旧文件头 1–4 仍可打开；再保存即为 5。
+ */
+inline constexpr quint32 kProjectFormatVersion = 5;
 
 /**
  * 工程文件读写（io 层）。
@@ -29,6 +34,7 @@ inline constexpr quint32 kProjectFormatVersion = 1;
  * - 魔数、格式版本（固定 1）、文档宽高、活动层
  * - 每层：名 / 显隐 / 不透明度 / 混合 / offset + PNG 像素
  *   + 样式栈 + 可选蒙版（enabled / linked + 灰度 PNG）
+ *   + 链接路径（v5；空串=普通层）
  * - 选区：灰度 PNG（空选区则长度 0）
  */
 class ProjectIo

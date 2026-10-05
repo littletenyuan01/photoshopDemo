@@ -6,6 +6,7 @@
 #include "imagedocument.h"
 #include "engine/layerstyleeval.h"
 
+#include <QFileInfo>
 #include <QPointF>
 #include <QRect>
 #include <QtGlobal>
@@ -236,6 +237,19 @@ qreal Layer::opacityAtDocumentPos(int docX, int docY) const
 void Layer::setMask(std::unique_ptr<LayerMask> mask)
 {
     m_mask = std::move(mask);
+}
+
+bool Layer::isLinkBroken() const
+{
+    // 对照 gimp_link_is_broken：源文件不可读
+    if (m_linkPath.isEmpty())
+        return false;
+    return !QFileInfo::exists(m_linkPath);
+}
+
+void Layer::setLinkPathSilent(const QString &path)
+{
+    m_linkPath = path;
 }
 
 void Layer::fill(const QColor &color)

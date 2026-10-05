@@ -114,6 +114,8 @@ bool CloneStampTool::mousePress(const ToolEvent &event, const ToolContext &ctx, 
     Layer *layer = ctx.document->activeLayer();
     if (!layer || !layer->isVisible())
         return false;
+    if (layer->isLinkedLayer())
+        return false;
 
     m_sample = buildSample(ctx);
     if (m_sample.isNull())

@@ -17,6 +17,10 @@
 #include <QTimer>
 #include <QWidget>
 
+class QDragEnterEvent;
+class QDragMoveEvent;
+class QDropEvent;
+
 namespace Ps {
 class ImageDocument;
 class ToolManager;
@@ -124,9 +128,17 @@ signals:
     void foregroundPicked(const QColor &color);
     /** 吸管取背景色。 */
     void backgroundPicked(const QColor &color);
+    /**
+     * 外部文件拖放到画布（对照 GIMP gimpdisplayshell-dnd：
+     * 有文档→打开为图层；无文档→打开）。
+     */
+    void filesDropped(const QStringList &paths);
 
 protected:
     bool event(QEvent *event) override;
+    void dragEnterEvent(QDragEnterEvent *event) override;
+    void dragMoveEvent(QDragMoveEvent *event) override;
+    void dropEvent(QDropEvent *event) override;
     void paintEvent(QPaintEvent *event) override;
     void wheelEvent(QWheelEvent *event) override;
     void mousePressEvent(QMouseEvent *event) override;

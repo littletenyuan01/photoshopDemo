@@ -45,6 +45,8 @@ bool ToneTool::mousePress(const ToolEvent &event, const ToolContext &ctx, ViewPo
     Layer *layer = ctx.document ? ctx.document->activeLayer() : nullptr;
     if (!layer || !layer->isVisible())
         return false;
+    if (layer->isLinkedLayer())
+        return false;
 
     m_painting = true;
     m_lastImagePos = event.imagePos;

@@ -75,7 +75,8 @@
 | `domain/selection.h/.cpp` | **文档级选区 mask**（对照 `GimpSelection`）；`ChannelOp` 加/减/替/交 |
 | `domain/filternode.h` | 滤镜节点（`OpName` + 开关 + 参数；对照 drawable filter） |
 | `domain/filterstack.h/.cpp` | 图层滤镜栈：增/删/开关；`apply` 对临时图求值，不写瓦片 |
-| `domain/imagedocument.h/.cpp` | 文档：尺寸、栈、活动层、**选区**、**蒙版 API**、**duplicateLayer**、分级信号 + 语义化 setter + 累计脏区 |
+| `domain/imagedocument.h/.cpp` | 文档：尺寸、栈、活动层、**选区**、**蒙版 API**、**placeImageAsLayer / placeLinkedImageAsLayer**、**duplicateLayer**、分级信号 + 语义化 setter + 累计脏区 |
+| `domain/layer.h/.cpp` | 图层：瓦片 + 样式/滤镜/蒙版 + **linkPath（链接层）** |
 
 **要点**：`ImageDocument` 的信号**刻意分级**，让订阅方增量更新而不是整表重建 ——
 `pixelsChanged(QRect)` / `layerPropertiesChanged(int)` / `structureChanged()` /

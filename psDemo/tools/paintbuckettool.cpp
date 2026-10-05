@@ -35,6 +35,8 @@ bool PaintBucketTool::mousePress(const ToolEvent &event, const ToolContext &ctx,
     Layer *layer = ctx.document ? ctx.document->activeLayer() : nullptr;
     if (!layer || !layer->isVisible())
         return false;
+    if (layer->isLinkedLayer())
+        return false;
 
     const QPointF local = layer->toLayerLocal(event.imagePos);
     const QPoint seed(qFloor(local.x()), qFloor(local.y()));

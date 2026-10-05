@@ -1,8 +1,8 @@
 /**
  * projectio.cpp — ProjectIo::save/load（io 层）。
  *
- * 保存始终写格式 1。头里仍是 2/3/4 的旧 demo 文件按当时字段读入，
- * 打开后再保存即变成 1。不是产品分代。
+ * 保存始终写格式 5（含链接路径）。头里仍是 1–4 的旧文件按当时字段读入，
+ * 打开后再保存即变成 5。
  */
 #include "projectio.h"
 
@@ -18,6 +18,7 @@
 #include <QDataStream>
 #include <QFile>
 #include <QImage>
+#include <QImageReader>
 #include <QSaveFile>
 
 namespace Ps {
@@ -183,6 +184,7 @@ struct LoadLayout {
     bool legacyBlend = false;
     bool hasStyles = false;
     bool hasMasks = false;
+    bool hasLinks = false; ///< v5：每层末尾 QString linkPath
 };
 
 std::unique_ptr<ImageDocument> loadDocumentBody(QDataStream &in,
@@ -288,6 +290,29 @@ std::unique_ptr<ImageDocument> loadDocumentBody(QDataStream &in,
                 }
             }
         }
+
+        if (layout.hasLinks) {
+            QString linkPath;
+            in >> linkPath;
+            if (in.status() != QDataStream::Ok) {
+                if (errorMessage)
+                    *errorMessage = QObject::tr("读取图层 %1 链接路径失败").arg(i);
+                return nullptr;
+            }
+            if (!linkPath.isEmpty()) {
+                layer->setLinkPathSilent(linkPath);
+                // 对照 GIMP 打开 XCF 后刷新可监视链接：源还在则用磁盘最新像素覆盖缓存
+                QImageReader reader(linkPath);
+                reader.setAutoTransform(true);
+                const QImage fresh = reader.read();
+                if (!fresh.isNull()) {
+                    const int oxKeep = layer->offsetX();
+                    const int oyKeep = layer->offsetY();
+                    layer->replaceFromImage(fresh);
+                    layer->setOffsetSilent(oxKeep, oyKeep);
+                }
+            }
+        }
         doc->addLayer(std::move(layer));
     }
 
@@ -373,6 +398,9 @@ bool ProjectIo::save(const ImageDocument &doc, const QString &filePath,
                 return false;
             }
         }
+
+        // v5：链接路径（空=普通层）
+        out << layer->linkPath();
     }
 
     QByteArray selPng;
@@ -419,8 +447,12 @@ std::unique_ptr<ImageDocument> ProjectIo::load(const QString &filePath,
     }
 
     LoadLayout layout;
-    if (versionRaw == 1) {
-        // 当前保存格式：完整布局（样式 + 蒙版）
+    if (versionRaw == 5) {
+        layout.hasStyles = true;
+        layout.hasMasks = true;
+        layout.hasLinks = true;
+    } else if (versionRaw == 1) {
+        // 旧「当前」格式：样式 + 蒙版，无链接
         layout.hasStyles = true;
         layout.hasMasks = true;
     } else if (versionRaw == 2) {

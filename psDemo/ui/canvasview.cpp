@@ -16,13 +16,18 @@
 #include "tools/toolmanager.h"
 
 #include <QEvent>
+#include <QDragEnterEvent>
+#include <QDragMoveEvent>
+#include <QDropEvent>
 #include <QKeyEvent>
+#include <QMimeData>
 #include <QMouseEvent>
 #include <QPainter>
 #include <QPainterPath>
 #include <QPen>
 #include <QShowEvent>
 #include <QTimer>
+#include <QUrl>
 #include <QWheelEvent>
 #include <QtMath>
 
@@ -33,6 +38,7 @@ CanvasView::CanvasView(QWidget *parent)
 {
     setMouseTracking(true);
     setFocusPolicy(Qt::StrongFocus);
+    setAcceptDrops(true);
     // minimumSize 由 canvasworkspace.ui 声明
     setBackgroundRole(QPalette::Dark);
     setAutoFillBackground(true);
@@ -494,6 +500,37 @@ void CanvasView::endSpaceHandIfIdle()
 }
 
 // —— 绘制 ——
+
+void CanvasView::dragEnterEvent(QDragEnterEvent *event)
+{
+    // 对照 GIMP gimpdisplayshell-dnd：只接受本地文件 URL
+    if (event->mimeData() && event->mimeData()->hasUrls())
+        event->acceptProposedAction();
+}
+
+void CanvasView::dragMoveEvent(QDragMoveEvent *event)
+{
+    if (event->mimeData() && event->mimeData()->hasUrls())
+        event->acceptProposedAction();
+}
+
+void CanvasView::dropEvent(QDropEvent *event)
+{
+    if (!event->mimeData() || !event->mimeData()->hasUrls())
+        return;
+
+    QStringList paths;
+    const QList<QUrl> urls = event->mimeData()->urls();
+    for (const QUrl &url : urls) {
+        if (url.isLocalFile())
+            paths.append(url.toLocalFile());
+    }
+    if (paths.isEmpty())
+        return;
+
+    event->acceptProposedAction();
+    emit filesDropped(paths);
+}
 
 void CanvasView::paintEvent(QPaintEvent *)
 {
