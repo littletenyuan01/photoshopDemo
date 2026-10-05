@@ -509,15 +509,30 @@ bool ImageDocument::addLayerMask(int index, LayerMaskInit init)
     if (!layer || layer->width() <= 0 || layer->height() <= 0)
         return false;
 
+    // 先按当前选区生成灰度，再取消选区：否则选区会继续裁剪蒙版画笔，
+    // 「隐藏全部 / 显示选区」后的黑区永远涂不上白（看起来像蒙版没反应）。
     pushLayerPropUndo(index, tr("添加图层蒙版"));
     auto mask = std::make_unique<LayerMask>();
     mask->setFromImage(makeLayerMaskGray(*layer, m_selection, init));
     mask->setEnabled(true);
     layer->setMask(std::move(mask));
 
+    if (!m_selection.isEmpty()) {
+        m_selection.clear();
+        emit selectionChanged();
+    }
+
+    // 对照 PS：添加蒙版后编辑目标切到蒙版；否则画笔仍写像素，
+    // 黑蒙版下画布不变、蒙版缩略图也不变。
+    const bool switchToMaskEdit = (index == m_activeLayerIndex);
+    if (switchToMaskEdit)
+        m_editingLayerMask = true;
+
     const QRect dirty = layer->styleBoundsInDocument()
                             .intersected(QRect(0, 0, m_width, m_height));
     markDirty(dirty.isEmpty() ? QRect(0, 0, m_width, m_height) : dirty);
+    if (switchToMaskEdit)
+        emit editingTargetChanged();
     emit layerPropertiesChanged(index);
     emit contentChanged();
     return true;

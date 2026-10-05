@@ -28,13 +28,9 @@
   <property name="styleSheet">
    <string notr="true">/* 工具栏用中灰，避免过黑；与画布深灰区分开 */
 QWidget#ToolBox,
-QWidget#toolsHost,
-QScrollArea#toolsScroll {
+QWidget#toolsHost {
   background-color: #5a5a5a;
   border: none;
-}
-QScrollArea#toolsScroll > QWidget > QWidget {
-  background-color: #5a5a5a;
 }
 QWidget#colorArea {
   background-color: #5a5a5a;
@@ -88,57 +84,38 @@ QToolButton#swapColorsButton, QToolButton#defaultColorsButton {
     <number>4</number>
    </property>
    <item>
-    <widget class="QScrollArea" name="toolsScroll">
-     <property name="frameShape">
-      <enum>QFrame::Shape::NoFrame</enum>
-     </property>
-     <property name="horizontalScrollBarPolicy">
-      <enum>Qt::ScrollBarPolicy::ScrollBarAlwaysOff</enum>
-     </property>
-     <property name="widgetResizable">
-      <bool>true</bool>
-     </property>
-     <widget class="QWidget" name="toolsHost">
-      <property name="geometry">
-       <rect>
-        <x>0</x>
-        <y>0</y>
-        <width>36</width>
-        <height>480</height>
-       </rect>
+    <widget class="QWidget" name="toolsHost">
+     <layout class="QVBoxLayout" name="toolsLayout">
+      <property name="spacing">
+       <number>2</number>
       </property>
-      <layout class="QVBoxLayout" name="toolsLayout">
-       <property name="spacing">
-        <number>2</number>
-       </property>
-       <property name="leftMargin">
-        <number>0</number>
-       </property>
-       <property name="topMargin">
-        <number>0</number>
-       </property>
-       <property name="rightMargin">
-        <number>0</number>
-       </property>
-       <property name="bottomMargin">
-        <number>0</number>
-       </property>
-       <!-- 按钮在 C++ 里按 ToolId 动态创建并加入 buttonGroup，便于与 GIMP tool_info 列表对应 -->
-       <item>
-        <spacer name="toolsSpacer">
-         <property name="orientation">
-          <enum>Qt::Orientation::Vertical</enum>
-         </property>
-         <property name="sizeHint" stdset="0">
-          <size>
-           <width>20</width>
-           <height>40</height>
-          </size>
-         </property>
-        </spacer>
-       </item>
-      </layout>
-     </widget>
+      <property name="leftMargin">
+       <number>0</number>
+      </property>
+      <property name="topMargin">
+       <number>0</number>
+      </property>
+      <property name="rightMargin">
+       <number>0</number>
+      </property>
+      <property name="bottomMargin">
+       <number>0</number>
+      </property>
+      <!-- 按钮在 C++ 里按 ToolId 动态创建并加入 buttonGroup，便于与 GIMP tool_info 列表对应 -->
+      <item>
+       <spacer name="toolsSpacer">
+        <property name="orientation">
+         <enum>Qt::Orientation::Vertical</enum>
+        </property>
+        <property name="sizeHint" stdset="0">
+         <size>
+          <width>20</width>
+          <height>40</height>
+         </size>
+        </property>
+       </spacer>
+      </item>
+     </layout>
     </widget>
    </item>
    <item>

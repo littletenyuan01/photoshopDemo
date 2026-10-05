@@ -205,6 +205,7 @@ classDiagram
 - 蒙版 `LayerMask`：**已实现** — 层局部 `Format_Grayscale8`；合成时 `alpha *= mask`（白显黑藏）；
   `ImageDocument::addLayerMask/removeLayerMask/setLayerMaskEnabled` + `LayerPropUndo`；
   `setEditingLayerMask` + 画笔写蒙版（`PaintEngine::stampMaskDab`）；
+  添加蒙版后自动进入蒙版编辑，并取消选区以免继续裁剪蒙版绘制；
   `applyLayerMask` / `setLayerMaskLinked`；写入 `.pslite`
   **未做**：矢量蒙版、通道面板载入蒙版
 - **选区** `Selection`：文档级一张 `Format_Grayscale8` mask（对照 `gimp_image_get_mask`）；

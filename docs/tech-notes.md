@@ -357,7 +357,7 @@ return QIcon(pm);                                 // 这个 QIcon 只有一张 2
   （移动/选框/套索/快速选择/裁剪/吸管/画笔/图章/橡皮擦/填充/聚焦/色调/钢笔/文字/形状/抓手/缩放）。
 - `resources.qrc` 登记的工具图标从 18 → **35**；`toolid.h` 枚举同步扩到 35 项；
   `tooloptionsbar.cpp::toolDisplayName` 必须**逐个补 case**（该 switch 没有 `default`，漏写会触发 `-Wswitch` 警告）。
-- 工具箱外层本就有 `QScrollArea`（`toolsScroll`），按钮变多可滚动，未挤爆布局。
+- 工具箱曾用 `QScrollArea`（`toolsScroll`）容纳多按钮；后去掉滚动条，按钮直接放在 `toolsHost`（对齐 PS 左栏无滑动条）。
 - ⚠️ **只有 5 个工具有逻辑**（移动/抓手/缩放/画笔/橡皮）。其余 30 个是 UI 占位：
   选中后 `ToolManager::setActiveTool` 找不到注册项 → 回退到中性 `MoveTool`（不消费事件），
   选项栏显示「该工具逻辑尚未接入」。**这是刻意设计：界面完整可演示，但不假装有功能。**

@@ -213,6 +213,10 @@ public:
      * 给指定层添加/替换图层蒙版并 push 撤销。
      * @return false 若层无效。
      */
+    /**
+     * 为图层添加蒙版。成功后：活动层自动进入蒙版编辑；若当时有选区则取消选区
+     * （避免选区继续裁剪蒙版绘制，导致黑区涂不上）。
+     */
     bool addLayerMask(int index, LayerMaskInit init = LayerMaskInit::RevealAll);
     /** 删除指定层蒙版；无蒙版则 no-op。 */
     bool removeLayerMask(int index);
