@@ -318,7 +318,7 @@ psDemo/
     layer.* / layerstack.*           [x] 图层；Layer 持 owner 回指
     layermask.*                      [x] 灰度蒙版；合成乘 alpha；选区生成
     selection.*                      [x] 文档级 mask；矩形写入；绘制∩选区已接
-    adjustmentlayer.*                [ ] 调整层
+    adjustmentlayer.*                [x] 调整层（LayerKind::Adjustment MVP）
   tools/
     toolid.h / toolevent.h           [x] 工具枚举 + 规范化事件
     toolcontext.h                    [x] ToolContext + ViewPort
@@ -423,15 +423,15 @@ psDemo/
 
 **GIMP 的洞见**：① 文档是真相、投影是缓存，二者接口解耦；② 存储稀疏，只为写过的块分配内存；③ 更新按**脏区 + 优先级**，而非重算全图。
 
-**本项目落地方式**：暂**不分块稀疏存储、不做优先级渲染线程**，只做「**脏矩形集合 + 分块缓存 + 按需重算**」：
+**本项目落地方式**：「**脏矩形 + 64 分块缓存 + 视口优先 + 空闲渐进**」：
 
 - 文档级脏区信令：`dirty(QRect)` / `structureChanged()` / `activeLayerChanged()`
-- `Compositor` 由「全量合成」升级为「按脏矩形 + 分块（如 64×64）缓存重算」
-- 取消各处散落的 `update()`，统一由脏区驱动
-- 【现状】**管线已通**：`engine/projection.*` 是上层调度（对照 `GimpProjection`）——
-  `Projection::sync()` 取 `ImageDocument::dirtyRect()`、对齐 64 chunk，脏区小于全图时走
-  `Compositor::compositeRegion()` 就地重算。仍欠：分块有效位图、优先级渲染线程。
-  算子侧如何把脏区报上来，见 [engine/operators.md](engine/operators.md) §3.6
+- `Compositor` 按脏矩形 / chunk 就地重算（`compositeRegion`）
+- 【现状】**管线已通**：`engine/projection.*` 对照 `GimpProjection`——
+  `sync()` 吸入 `dirtyRect`、视口内块立即合成；挂起块由 `CanvasView` 空闲定时器
+  调 `processPendingChunks()`（对照 `chunk_render_*` + `set_priority_rect`）。
+  算子侧脏区上报见 [engine/operators.md](engine/operators.md) §3.6
+  尚未做：多线程算子图 / 独立渲染线程（属 Phase 9）。
 
 ### ① 推入式撤销 + 每对象一类
 
@@ -508,7 +508,7 @@ psDemo/
 | 三、① 推入式撤销（Phase 6） | **已实现**（GIMP 式：domain API 内 push；含样式/滤镜/选区；无独立 commands 层） |
 | 轻量算子壳（Phase 6.5） | **已实现**：注册表 + Runner + 混合/洪泛/渐变/填充；无 GEGL |
 | 三、② 脏区分块投影（Phase 7） | **已实现**：`Projection` + `compositeRegion` + 64 块有效位 |
-| 三、③ 节点化非破坏（Phase 8） | **首片已实现**：`FilterStack` + BrightnessContrast + 合成接入；调整层 / 对话框后置 |
+| 三、③ 节点化非破坏（Phase 8） | **MVP 已实现**：`FilterStack` + BrightnessContrast；**调整层**对下方合成求值；参数对话框后置 |
 | 四、滤镜库（Phase 9） | **计划中**：完整 ROI/节点缓存、异步求值、多线程算子图；仍不引入 GEGL |
 | 独立 actions/commands 层 | **不做**（对照 GIMP：无 GoF Command；收口在 domain 语义化 API） |
 | 其余（Selection / IO / Mask） | Selection + RasterIo/ProjectIo/PsdIo + **LayerMask** + **置入为图层** **已实现** |

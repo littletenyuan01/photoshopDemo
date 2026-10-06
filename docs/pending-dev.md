@@ -13,20 +13,26 @@
 
 ---
 
-## 移动工具拖图层 — 已缓解（2026-10）
+## 移动工具拖图层 — 已对齐 GIMP Move（2026-10）
 
-**对照 GIMP**
+**对照 GIMP**（`gimpmovetool` → `gimpeditselectiontool`）
 
-- `gimp_viewable_preview_freeze` / `thaw`：拖中冻结缩略图等面板刷新
-- `gimpeditselectiontool` live translate + `gimp_projection_flush`（异步分块，非每帧同步全合成）
+- motion：`gimp_image_item_list_translate`（真改 offset）→ `gimp_projection_flush`（脏区 + idle 分块）
+- `gimp_viewable_preview_freeze` / `thaw`：**只冻缩略图**，不冻画布投影
+- release：`gimp_image_flush` + thaw
 
-**本项目落地**
+**曾踩的坑（已改掉）**
 
-- `ImageDocument::beginPreviewFreeze/endPreviewFreeze`：拖中抑制 `contentChanged` / `layerPropertiesChanged`，松手一次性 flush
-- `MoveTool`：按下合成一次「跳过被拖层」底图；每帧只把该层叠回旧∪新区（`liveProjection`）
-- `CanvasView`：拖中优先绘制 `Tool::liveProjection()`，避免每帧 `syncProjection` 全栈重合成
+- 把 `preview_freeze` 误做成「拖中不发 `contentChanged`、工具自建 `liveProjection` 底图+单层 blend」  
+  → 那是**另一条捷径**，不是 GIMP Move；再叠加脏区沿轨迹累加，大图必卡。
 
-**相关代码**：`tools/movetool.*`、`domain/imagedocument.*`、`ui/canvasview.cpp`、`engine/compositor.cpp`（`blendLayerRange` + `skipLayer`）
+**当前落地**
+
+- `translateLayer`：旧∪新 bounds 记脏；冻住时仍发 `contentChanged` 驱动投影，抑制 `pixelsChanged`（缩略图）
+- `MoveTool`：只 translate / shiftMask + freeze；无自建 live 缓冲
+- `CanvasView`：`contentChanged` → `Projection::sync`（视口优先）+ idle chunk
+
+**相关代码**：`tools/movetool.*`、`domain/imagedocument.*`、`ui/canvasview.cpp`、`engine/projection.*`
 
 ---
 

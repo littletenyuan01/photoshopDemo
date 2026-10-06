@@ -28,7 +28,7 @@
 | `tools/toolcontext.h` | `ToolContext`（文档/前景/背景/笔刷半径）+ `ViewPort` 接口 |
 | `tools/tool.h/.cpp` | Tool 基类：`mousePress/Move/Release`、`cursor`/`cursorShape`、`drawOverlay`、`deactivate` |
 | `tools/toolcursor.h` | 工具图标光标 / 渐变风格光标辅助 |
-| `io/projectio.h/.cpp` | `.pslite` 工程读写（对照 GIMP XCF 的最小子集） |
+| `io/projectio.h/.cpp` | `.pslite` 工程读写（`ProjectFormat::Current`；对照 GIMP XCF 最小子集） |
 | `io/psdio.h/.cpp` | `.psd` 子集导出（图层像素；对照 GIMP file-psd 极简） |
 | `tools/toolmanager.h/.cpp` | 注册表 + 活动工具 + 事件分发 + **信号转发**（活动工具会变，画布无法预先 connect） |
 | `tools/movetool.h/.cpp` | **移动**：点选层 + 平移 offset；变换框浮层（只显示） |
@@ -102,7 +102,7 @@ UI 不得直接改 `Layer`，一律走 `setLayerVisible/Opacity/Name/BlendMode` 
 | `engine/painttypes.h` | `PaintMode` / `GradientType`（UI/tools/ops 共用） |
 | `engine/premul.h` | 预乘/解预乘（compositor 与缓冲算子共用） |
 | `engine/compositor.h/.cpp` | 图层遍历 + Alpha `composite_union`；`compositeRegion` 脏区就地更新；颜色经注册表取 `LayerModeOp`；启用滤镜层走临时求值 |
-| `engine/projection.h/.cpp` | 文档投影缓存（对照 GimpProjection）；64 块有效位图 + 增量 `sync` |
+| `engine/projection.h/.cpp` | 文档投影缓存（对照 GimpProjection）；64 块 + 视口优先 + 空闲分块渐进 `sync` / `processPendingChunks` |
 | `engine/paintengine.h/.cpp` | 门面：`OpRunner::run(OpName, …)`；笔画插值仍在此 |
 | `engine/filtereval.h/.cpp` | 滤镜节点求值（亮度/对比度等）；只改临时图 |
 
@@ -158,7 +158,7 @@ UI 不得直接改 `Layer`，一律走 `setLayerVisible/Opacity/Name/BlendMode` 
 
 | 计划类型 | 预期职责 |
 |----------|----------|
-| `AdjustmentLayer` | 调整层 |
+| `AdjustmentLayer` | 调整层（`LayerKind::Adjustment`，无独立类文件） |
 | 矢量蒙版 / 通道面板蒙版 | 路径蒙版；从通道面板管理 |
 | `ToolInfo` 注册表 | 统一工具元数据（现分散在 toolid/toolbox/tooloptionsbar 三处） |
 
