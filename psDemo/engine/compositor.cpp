@@ -192,6 +192,71 @@ bool Compositor::blendLayerRange(QImage &dst,
         const Layer *layer = stack.layerAt(i);
         if (!layer || !layer->isVisible() || layer->opacity() <= 0.0)
             continue;
+
+        // 调整层：滤镜作用在下方阶段性合成（dst）上，再按不透明度/蒙版写回
+        // 对照 PS 调整图层；GIMP 原生无此层种（drawable filter 只改本层像素）
+        if (layer->isAdjustmentLayer()) {
+            if (!layer->filters().hasEnabled())
+                continue;
+
+            QImage filtered = layer->filters().apply(dst.copy(area));
+            if (filtered.isNull())
+                continue;
+
+            const LayerMask *mask = (layer->hasMask() && layer->mask()
+                                     && layer->mask()->isEnabled())
+                                        ? layer->mask()
+                                        : nullptr;
+            const qreal opacity = layer->opacity();
+            const int layerOx = layer->offsetX();
+            const int layerOy = layer->offsetY();
+
+            // opacity≈1 且无蒙版：整区替换；否则预乘插值（保留下方透出）
+            if (opacity >= 0.999 && !mask) {
+                QPainter painter(&dst);
+                painter.setCompositionMode(QPainter::CompositionMode_Source);
+                painter.drawImage(area.topLeft(), filtered);
+            } else {
+                for (int y = area.top(); y <= area.bottom(); ++y) {
+                    QRgb *dline = reinterpret_cast<QRgb *>(dst.scanLine(y))
+                                  + area.left();
+                    const QRgb *fline =
+                        reinterpret_cast<const QRgb *>(filtered.constScanLine(y - area.top()))
+                        + 0;
+                    for (int x = 0; x < area.width(); ++x) {
+                        qreal t = opacity;
+                        if (mask) {
+                            const int lx = (area.left() + x) - layerOx;
+                            const int ly = y - layerOy;
+                            t *= mask->valueAt(lx, ly) / 255.0;
+                        }
+                        if (t <= 0.0)
+                            continue;
+                        if (t >= 0.999) {
+                            dline[x] = fline[x];
+                            continue;
+                        }
+                        const QRgb d = dline[x];
+                        const QRgb f = fline[x];
+                        const int dr = qRed(d);
+                        const int dg = qGreen(d);
+                        const int db = qBlue(d);
+                        const int da = qAlpha(d);
+                        const int fr = qRed(f);
+                        const int fg = qGreen(f);
+                        const int fb = qBlue(f);
+                        const int fa = qAlpha(f);
+                        const int or_ = qBound(0, int(dr + (fr - dr) * t + 0.5), 255);
+                        const int og = qBound(0, int(dg + (fg - dg) * t + 0.5), 255);
+                        const int ob = qBound(0, int(db + (fb - db) * t + 0.5), 255);
+                        const int oa = qBound(0, int(da + (fa - da) * t + 0.5), 255);
+                        dline[x] = qRgba(or_, og, ob, oa);
+                    }
+                }
+            }
+            continue;
+        }
+
         if (!layer->hasPixelData())
             continue;
 

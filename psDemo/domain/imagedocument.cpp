@@ -11,10 +11,10 @@
 #include "engine/compositor.h"
 #include "engine/op/opname.h"
 #include "engine/paintengine.h"
+#include "io/rasterio.h"
 
 #include <QFileInfo>
 #include <QImage>
-#include <QImageReader>
 #include <QPainter>
 #include <QtGlobal>
 
@@ -232,21 +232,6 @@ int ImageDocument::placeImageAsLayer(const QImage &image, const QString &name)
     return index;
 }
 
-namespace {
-
-/** 读链接源位图（尊重 EXIF）；失败返回空图。 */
-QImage loadLinkedRaster(const QString &absolutePath, QString *errorOut)
-{
-    QImageReader reader(absolutePath);
-    reader.setAutoTransform(true);
-    QImage image = reader.read();
-    if (image.isNull() && errorOut)
-        *errorOut = reader.errorString();
-    return image;
-}
-
-} // namespace
-
 /**
  * 对照 GIMP：
  * - file_open_link_image / gimp_link_layer_new：层挂 GimpLink，缓冲来自外部文件
@@ -259,7 +244,7 @@ int ImageDocument::placeLinkedImageAsLayer(const QString &absolutePath, const QS
 
     const QString abs = QFileInfo(absolutePath).absoluteFilePath();
     QString err;
-    const QImage image = loadLinkedRaster(abs, &err);
+    const QImage image = RasterIo::readFile(abs, &err);
     if (image.isNull())
         return -1;
 
@@ -288,7 +273,7 @@ bool ImageDocument::updateLinkedLayer(int index)
 
     const QString path = layer->linkPath();
     QString err;
-    const QImage image = loadLinkedRaster(path, &err);
+    const QImage image = RasterIo::readFile(path, &err);
     if (image.isNull())
         return false;
 
@@ -376,7 +361,7 @@ bool ImageDocument::clearActiveLayerPixels()
     Layer *layer = activeLayer();
     if (!layer || !layer->isVisible())
         return false;
-    if (layer->isLinkedLayer())
+    if (!layer->allowsPixelEdit())
         return false; // 先栅格化再清除
 
     const int ox = layer->offsetX();
@@ -404,7 +389,7 @@ bool ImageDocument::fillActiveLayer(const QColor &color)
     Layer *layer = activeLayer();
     if (!layer || !layer->isVisible())
         return false;
-    if (layer->isLinkedLayer())
+    if (!layer->allowsPixelEdit())
         return false;
 
     const int ox = layer->offsetX();
@@ -440,6 +425,26 @@ int ImageDocument::addBrightnessContrastFilter(qreal brightness, qreal contrast)
     const int index = layer->filters().append(node);
     layer->invalidateCompositeRaster();
     markDirty(layer->boundsInDocument().intersected(QRect(0, 0, m_width, m_height)));
+    return index;
+}
+
+int ImageDocument::addBrightnessContrastAdjustmentLayer(qreal brightness, qreal contrast)
+{
+    if (m_width <= 0 || m_height <= 0)
+        return -1;
+
+    // 全画布 extent：蒙版可盖住整幅；无瓦片（hasPixelData=false）
+    auto layer = std::make_unique<Layer>(tr("亮度/对比度"), m_width, m_height);
+    layer->setKindSilent(LayerKind::Adjustment);
+    FilterNode node(OpName::BrightnessContrast);
+    node.setBrightness(brightness);
+    node.setContrast(contrast);
+    layer->filters().append(node);
+
+    const int index = addLayer(std::move(layer), tr("新建调整图层"));
+    if (index < 0)
+        return -1;
+    setActiveLayerIndex(index);
     return index;
 }
 
@@ -920,19 +925,18 @@ void ImageDocument::translateLayer(int index, int dx, int dy)
     const QRect newBounds = layer->styleBoundsInDocument().intersected(docRect);
 
     const QRect dirty = oldBounds.united(newBounds);
-    if (!dirty.isEmpty()) {
-        m_dirty = true;
-        m_dirtyRect = m_dirtyRect.isNull() ? dirty : m_dirtyRect.united(dirty);
-    }
-
-    // 冻结中：只改 offset / 累计脏区，由工具画 live 预览
-    if (m_previewFrozen)
-        return;
-
-    emit layerPropertiesChanged(index);
     if (dirty.isEmpty())
         return;
-    emit pixelsChanged(dirty);
+
+    m_dirty = true;
+    m_dirtyRect = m_dirtyRect.isNull() ? dirty : m_dirtyRect.united(dirty);
+
+    // 对照 GIMP：拖中仍 gimp_projection_flush；preview_freeze 只冻缩略图
+    // → 发 contentChanged 驱动投影；冻住时不发 pixelsChanged（面板缩略图）
+    if (!m_previewFrozen)
+        emit layerPropertiesChanged(index);
+    if (!m_previewFrozen)
+        emit pixelsChanged(dirty);
     emit contentChanged();
 }
 
@@ -949,16 +953,16 @@ void ImageDocument::shiftLayerMask(int index, int dx, int dy)
     layer->mask()->shift(dx, dy, 255);
     const QRect newBounds = layer->styleBoundsInDocument().intersected(docRect);
     const QRect dirty = oldBounds.united(newBounds);
-    if (!dirty.isEmpty()) {
-        m_dirty = true;
-        m_dirtyRect = m_dirtyRect.isNull() ? dirty : m_dirtyRect.united(dirty);
-    }
-    if (m_previewFrozen)
-        return;
-    emit layerPropertiesChanged(index);
     if (dirty.isEmpty())
         return;
-    emit pixelsChanged(dirty);
+
+    m_dirty = true;
+    m_dirtyRect = m_dirtyRect.isNull() ? dirty : m_dirtyRect.united(dirty);
+
+    if (!m_previewFrozen)
+        emit layerPropertiesChanged(index);
+    if (!m_previewFrozen)
+        emit pixelsChanged(dirty);
     emit contentChanged();
 }
 
@@ -973,12 +977,14 @@ void ImageDocument::endPreviewFreeze()
         return;
     m_previewFrozen = false;
 
+    // 对照 GIMP preview_thaw：补缩略图（拖中跳过了 pixelsChanged）
     if (m_activeLayerIndex >= 0)
         emit layerPropertiesChanged(m_activeLayerIndex);
-    if (!m_dirtyRect.isEmpty()) {
-        emit pixelsChanged(m_dirtyRect);
-        emit contentChanged();
-    }
+    const QRect thumbDirty = m_dirtyRect.isEmpty()
+                                 ? QRect(0, 0, m_width, m_height)
+                                 : m_dirtyRect;
+    emit pixelsChanged(thumbDirty);
+    emit contentChanged();
 }
 
 void ImageDocument::notifyLayerPropertiesChanged(const Layer &layer)
@@ -1049,6 +1055,7 @@ int ImageDocument::duplicateLayer(int index)
         copy->setMask(std::move(mask));
     }
     copy->setLinkPathSilent(src->linkPath());
+    copy->setKindSilent(src->kind());
 
     copy->setOwner(this);
     const int newIndex = m_layers.insertLayer(index + 1, std::move(copy));
@@ -1091,6 +1098,62 @@ bool ImageDocument::removeLayer(int index)
     emit activeLayerChanged(m_activeLayerIndex);
     emit contentChanged();
     return true;
+}
+
+bool ImageDocument::moveLayer(int from, int to)
+{
+    if (from == to)
+        return false;
+    if (from < 0 || from >= m_layers.count() || to < 0 || to >= m_layers.count())
+        return false;
+
+    if (shouldRecordHistory())
+        m_history->push(std::make_unique<LayerMoveUndo>(from, to, tr("移动图层")));
+
+    applyMoveLayer(from, to);
+    return true;
+}
+
+void ImageDocument::applyMoveLayer(int from, int to)
+{
+    if (from == to)
+        return;
+    if (from < 0 || from >= m_layers.count() || to < 0 || to >= m_layers.count())
+        return;
+
+    // 对照 GIMP gimp_drawable_stack_reorder：只脏被移层的包围盒，不整幅重合成。
+    // 层文档位置不变，仅 z 序变；ROI 外其它层相对顺序不变。
+    const QRect docRect(0, 0, m_width, m_height);
+    QRect dirty;
+    if (const Layer *moved = m_layers.layerAt(from))
+        dirty = moved->styleBoundsInDocument().intersected(docRect);
+
+    m_layers.moveLayer(from, to);
+
+    // 活动层跟随被拖层；其余下标按区间平移（对照容器 reorder）
+    if (m_activeLayerIndex == from) {
+        m_activeLayerIndex = to;
+    } else if (from < to) {
+        if (m_activeLayerIndex > from && m_activeLayerIndex <= to)
+            --m_activeLayerIndex;
+    } else {
+        if (m_activeLayerIndex >= to && m_activeLayerIndex < from)
+            ++m_activeLayerIndex;
+    }
+
+    m_dirty = true;
+    if (dirty.isEmpty()) {
+        // 空层 / 越界：退回整幅（与 add/remove 一致，保证可见）
+        m_dirtyRect = docRect;
+        dirty = docRect;
+    } else {
+        m_dirtyRect = m_dirtyRect.isNull() ? dirty : m_dirtyRect.united(dirty);
+    }
+
+    emit structureChanged();
+    emit activeLayerChanged(m_activeLayerIndex);
+    emit pixelsChanged(dirty);
+    emit contentChanged();
 }
 
 /** 图像大小：各层 Smooth 重采样，选区最近邻缩放。 */

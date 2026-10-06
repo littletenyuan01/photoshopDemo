@@ -29,6 +29,7 @@ LayerPropSnapshot captureLayerProps(const Layer &layer)
         s.maskGray = layer.mask()->image().copy();
     }
     s.linkPath = layer.linkPath();
+    s.kind = layer.kind();
     return s;
 }
 
@@ -39,6 +40,7 @@ void applyLayerProps(Layer &layer, const LayerPropSnapshot &s)
     layer.setOpacity(s.opacity);
     layer.setBlendMode(s.blendMode);
     layer.setOffsetSilent(s.offsetX, s.offsetY);
+    layer.setKindSilent(s.kind);
     layer.styles().replaceAll(s.styles);
     layer.filters().replaceAll(s.filters);
     if (s.hasMask && !s.maskGray.isNull()) {
@@ -231,6 +233,22 @@ void LayerStructureUndo::pop(ImageDocument &doc)
     emit doc.structureChanged();
     emit doc.activeLayerChanged(doc.m_activeLayerIndex);
     emit doc.contentChanged();
+}
+
+LayerMoveUndo::LayerMoveUndo(int from, int to, const QString &label)
+    : m_from(from)
+    , m_to(to)
+    , m_label(label)
+{
+}
+
+void LayerMoveUndo::pop(ImageDocument &doc)
+{
+    // 正向 from→to 后，反向 to→from；再交换记录供 redo
+    doc.applyMoveLayer(m_to, m_from);
+    const int tmp = m_from;
+    m_from = m_to;
+    m_to = tmp;
 }
 
 SelectionUndo::SelectionUndo(QImage mask, const QString &label)

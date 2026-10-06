@@ -38,7 +38,6 @@
 #include <QDir>
 #include <QFileDialog>
 #include <QFileInfo>
-#include <QImageReader>
 #include <QKeySequence>
 #include <QMenu>
 #include <QMessageBox>
@@ -252,6 +251,13 @@ void MainWindow::setupMenus()
     ui->actionAdjBrightness->setEnabled(true);
     ui->actionAdjBrightness->setToolTip(tr("给活动层追加亮度/对比度滤镜（非破坏，可重复叠加）"));
     connect(ui->actionAdjBrightness, &QAction::triggered, this, &MainWindow::onBrightnessContrast);
+
+    // —— 图层→新建调整图层→亮度/对比度（PS 式：作用于下方合成）——
+    ui->actionNewAdjBrightness->setEnabled(true);
+    ui->actionNewAdjBrightness->setToolTip(
+        tr("新建亮度/对比度调整图层（滤镜作用于下方全部可见层的合成结果）"));
+    connect(ui->actionNewAdjBrightness, &QAction::triggered, this,
+            &MainWindow::onNewAdjBrightness);
 
     auto enableStyleAction = [this](QAction *a, Ps::LayerStyleKind kind) {
         a->setEnabled(true);
@@ -766,16 +772,6 @@ void MainWindow::onRasterizeLinkedLayer()
         flashStatusMessage(tr("已栅格化链接图层"), 3000);
 }
 
-QImage MainWindow::readRasterImage(const QString &path, QString *errorOut)
-{
-    QImageReader reader(path);
-    reader.setAutoTransform(true); // 尊重 EXIF 方向
-    QImage image = reader.read();
-    if (image.isNull() && errorOut)
-        *errorOut = reader.errorString();
-    return image;
-}
-
 bool MainWindow::placePath(const QString &path)
 {
     if (path.isEmpty())
@@ -794,7 +790,7 @@ bool MainWindow::placePath(const QString &path)
     }
 
     QString err;
-    const QImage image = readRasterImage(path, &err);
+    const QImage image = Ps::RasterIo::readFile(path, &err);
     if (image.isNull()) {
         QMessageBox::warning(this, tr("置入失败"),
                              tr("无法读取：%1\n%2").arg(path, err));
@@ -826,7 +822,7 @@ bool MainWindow::openAsSmartObjectPath(const QString &path)
     }
 
     QString err;
-    const QImage image = readRasterImage(path, &err);
+    const QImage image = Ps::RasterIo::readFile(path, &err);
     if (image.isNull()) {
         QMessageBox::warning(this, tr("打开失败"),
                              tr("无法读取：%1\n%2").arg(path, err));
@@ -927,7 +923,7 @@ bool MainWindow::openPath(const QString &path)
     }
 
     QString err;
-    QImage image = readRasterImage(path, &err);
+    QImage image = Ps::RasterIo::readFile(path, &err);
     if (image.isNull()) {
         QMessageBox::warning(this, tr("打开失败"),
                              tr("无法读取：%1\n%2").arg(path, err));
@@ -1555,6 +1551,17 @@ void MainWindow::onBrightnessContrast()
         flashStatusMessage(tr("无法调整：无可见活动层"));
     else
         flashStatusMessage(tr("已添加亮度/对比度滤镜（非破坏）"));
+}
+
+void MainWindow::onNewAdjBrightness()
+{
+    Ps::ImageDocument *doc = m_session ? m_session->document() : nullptr;
+    if (!doc)
+        return;
+    if (doc->addBrightnessContrastAdjustmentLayer() < 0)
+        flashStatusMessage(tr("无法新建调整图层"));
+    else
+        flashStatusMessage(tr("已新建亮度/对比度调整图层"), 2000);
 }
 
 void MainWindow::onEnsureLayerStyle(int kind)

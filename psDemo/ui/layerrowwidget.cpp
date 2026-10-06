@@ -7,9 +7,12 @@
 #include "domain/layer.h"
 #include "ui/layerstylerowwidget.h"
 
+#include <QApplication>
+#include <QDrag>
 #include <QEvent>
 #include <QIcon>
 #include <QLineEdit>
+#include <QMimeData>
 #include <QMouseEvent>
 #include <QPixmap>
 #include <QSignalBlocker>
@@ -57,6 +60,9 @@ void LayerRowWidget::syncFromLayer(const Ps::Layer &layer)
                                  : QObject::tr("（链接）");
         ui->nameLabel->setText(m_layerName + mark);
         ui->nameLabel->setToolTip(layer.linkPath());
+    } else if (layer.isAdjustmentLayer()) {
+        ui->nameLabel->setText(m_layerName + QObject::tr("（调整）"));
+        ui->nameLabel->setToolTip(QObject::tr("调整图层：滤镜作用于下方合成结果"));
     } else {
         ui->nameLabel->setText(m_layerName);
         ui->nameLabel->setToolTip(QString());
@@ -188,7 +194,51 @@ QSize LayerRowWidget::minimumSizeHint() const
 void LayerRowWidget::mousePressEvent(QMouseEvent *event)
 {
     emit rowPressed();
+    if (event->button() == Qt::LeftButton && !m_renameEdit)
+        armDrag(event->pos());
     QWidget::mousePressEvent(event);
+}
+
+void LayerRowWidget::mouseMoveEvent(QMouseEvent *event)
+{
+    maybeStartDrag(event->pos());
+    QWidget::mouseMoveEvent(event);
+}
+
+void LayerRowWidget::mouseReleaseEvent(QMouseEvent *event)
+{
+    m_dragArmed = false;
+    QWidget::mouseReleaseEvent(event);
+}
+
+void LayerRowWidget::armDrag(const QPoint &pos)
+{
+    m_dragArmed = (m_stackIndex >= 0);
+    m_pressPos = pos;
+}
+
+void LayerRowWidget::maybeStartDrag(const QPoint &pos)
+{
+    if (!m_dragArmed || m_stackIndex < 0 || m_renameEdit)
+        return;
+    if ((pos - m_pressPos).manhattanLength() < QApplication::startDragDistance())
+        return;
+
+    m_dragArmed = false;
+    auto *mime = new QMimeData;
+    mime->setData(QString::fromLatin1(kLayerDragMime),
+                  QByteArray::number(m_stackIndex));
+
+    auto *drag = new QDrag(this);
+    drag->setMimeData(mime);
+    // 拖影：优先抓 header，失败则整行
+    const QPixmap preview = ui->headerHost->grab();
+    if (!preview.isNull()) {
+        drag->setPixmap(preview);
+        drag->setHotSpot(QPoint(qMin(24, preview.width() / 2),
+                                qMin(12, preview.height() / 2)));
+    }
+    drag->exec(Qt::MoveAction);
 }
 
 bool LayerRowWidget::eventFilter(QObject *watched, QEvent *event)
@@ -200,6 +250,14 @@ bool LayerRowWidget::eventFilter(QObject *watched, QEvent *event)
         if (mouse->button() != Qt::LeftButton)
             return false;
         emit rowPressed();
+        // Ctrl/Alt 点缩略图不进入拖拽（留给选区快捷）
+        const bool specialThumb = (watched == ui->thumbLabel || watched == ui->maskThumbLabel)
+                                  && mouse->modifiers().testFlag(Qt::ControlModifier);
+        const bool altMask = watched == ui->maskThumbLabel
+                             && mouse->modifiers().testFlag(Qt::AltModifier);
+        if (!specialThumb && !altMask)
+            armDrag(mapFromGlobal(mouse->globalPosition().toPoint()));
+
         if (watched == ui->thumbLabel) {
             if (mouse->modifiers().testFlag(Qt::ControlModifier))
                 emit thumbnailCtrlClicked(mouse->modifiers());
@@ -215,6 +273,19 @@ bool LayerRowWidget::eventFilter(QObject *watched, QEvent *event)
                 emit maskThumbClicked();
         }
         return true; // 勿再冒泡到 mousePressEvent，避免 rowPressed 双发
+    }
+    if (event->type() == QEvent::MouseMove
+        && (watched == ui->thumbLabel || watched == ui->maskThumbLabel
+            || watched == ui->nameLabel)) {
+        auto *mouse = static_cast<QMouseEvent *>(event);
+        maybeStartDrag(mapFromGlobal(mouse->globalPosition().toPoint()));
+        return false;
+    }
+    if (event->type() == QEvent::MouseButtonRelease
+        && (watched == ui->thumbLabel || watched == ui->maskThumbLabel
+            || watched == ui->nameLabel)) {
+        m_dragArmed = false;
+        return false;
     }
     if (watched == ui->nameLabel && event->type() == QEvent::MouseButtonDblClick) {
         beginRename();

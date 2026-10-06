@@ -24,6 +24,12 @@ namespace Ps {
 
 class ImageDocument;
 
+/** 图层类型：普通像素层 / 调整层（吃下方阶段性合成）。 */
+enum class LayerKind : quint8 {
+    Raster = 0,     ///< 普通可绘制像素层
+    Adjustment = 1, ///< 调整层：无自有像素，滤镜作用在下方合成结果上
+};
+
 /**
  * 单图层（domain 层）。
  *
@@ -159,6 +165,19 @@ public:
      * 空路径 = 普通像素层。破链时仍显示缓存像素。
      */
     bool isLinkedLayer() const { return !m_linkPath.isEmpty(); }
+    /** 调整层（无自有可绘像素；滤镜作用在下方阶段性合成上）。 */
+    bool isAdjustmentLayer() const { return m_kind == LayerKind::Adjustment; }
+    LayerKind kind() const { return m_kind; }
+    /** 不发信号；由文档 API 设置。 */
+    void setKindSilent(LayerKind kind) { m_kind = kind; }
+    /**
+     * 是否允许直接改像素（画笔/填充/变换等）。
+     * 链接层须先栅格化；调整层无像素可绘。
+     */
+    bool allowsPixelEdit() const
+    {
+        return !isLinkedLayer() && !isAdjustmentLayer();
+    }
     QString linkPath() const { return m_linkPath; }
     /** 链接源是否不可读（仅 isLinkedLayer 时有意义）。 */
     bool isLinkBroken() const;
@@ -212,6 +231,7 @@ private:
     bool m_visible = true;   ///< 是否参与合成
     qreal m_opacity = 1.0; ///< [0,1]
     BlendMode m_blendMode = BlendMode::Normal;
+    LayerKind m_kind = LayerKind::Raster; ///< 像素层 / 调整层
     int m_offsetX = 0; ///< 文档坐标 X（对照 GimpItem offset）
     int m_offsetY = 0; ///< 文档坐标 Y
     TileBuffer m_tiles; ///< 本层像素（懒分配瓦片；层内原点）

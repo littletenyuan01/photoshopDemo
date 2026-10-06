@@ -14,9 +14,13 @@
 
 #include <QAbstractItemView>
 #include <QComboBox>
+#include <QDragEnterEvent>
+#include <QDragMoveEvent>
+#include <QDropEvent>
 #include <QEvent>
 #include <QListWidgetItem>
 #include <QMenu>
+#include <QMimeData>
 #include <QMouseEvent>
 #include <QPainter>
 #include <QPen>
@@ -49,8 +53,17 @@ LayerTreePanel::LayerTreePanel(QWidget *parent)
     connect(ui->btnDelete, &QToolButton::clicked, this, &LayerTreePanel::onBtnDeleteClicked);
     connect(ui->btnLayerStyle, &QToolButton::clicked, this, &LayerTreePanel::onBtnLayerStyleClicked);
     connect(ui->btnLayerMask, &QToolButton::clicked, this, &LayerTreePanel::onBtnLayerMaskClicked);
+    connect(ui->btnAdjustment, &QToolButton::clicked, this, &LayerTreePanel::onBtnAdjustmentClicked);
     connect(ui->itemList, &QListWidget::itemSelectionChanged,
             this, &LayerTreePanel::onListSelectionChanged);
+
+    // 图层拖放重排：行 widget 发起 QDrag，列表 viewport 接放
+    ui->itemList->setDragDropMode(QAbstractItemView::DropOnly);
+    ui->itemList->setDefaultDropAction(Qt::MoveAction);
+    ui->itemList->setDropIndicatorShown(true);
+    ui->itemList->setAcceptDrops(true);
+    ui->itemList->viewport()->setAcceptDrops(true);
+    ui->itemList->viewport()->installEventFilter(this);
 
     m_thumbTimer = new QTimer(this);
     m_thumbTimer->setSingleShot(true);
@@ -417,6 +430,15 @@ void LayerTreePanel::onBtnLayerMaskClicked()
         doc->setEditingLayerMask(true);
 }
 
+void LayerTreePanel::onBtnAdjustmentClicked()
+{
+    Ps::ImageDocument *doc = document();
+    if (!doc)
+        return;
+    if (doc->addBrightnessContrastAdjustmentLayer() < 0)
+        return;
+}
+
 void LayerTreePanel::onNewItem()
 {
     Ps::ImageDocument *doc = document();
@@ -441,12 +463,85 @@ void LayerTreePanel::onDeleteItem()
 
 bool LayerTreePanel::eventFilter(QObject *watched, QEvent *event)
 {
+    if (watched == ui->itemList->viewport() && handleLayerListDrag(event))
+        return true;
+
     if (m_blendPreviewActive && event->type() == QEvent::Hide) {
         QAbstractItemView *view = ui->blendModeCombo->view();
         if (watched == view || (view && watched == view->window()))
             endBlendModePreview();
     }
     return ItemTreePanel::eventFilter(watched, event);
+}
+
+bool LayerTreePanel::handleLayerListDrag(QEvent *event)
+{
+    const auto mimeOk = [](const QMimeData *mime) {
+        return mime && mime->hasFormat(QString::fromLatin1(LayerRowWidget::kLayerDragMime));
+    };
+
+    switch (event->type()) {
+    case QEvent::DragEnter: {
+        auto *e = static_cast<QDragEnterEvent *>(event);
+        if (!mimeOk(e->mimeData()))
+            return false;
+        e->acceptProposedAction();
+        return true;
+    }
+    case QEvent::DragMove: {
+        auto *e = static_cast<QDragMoveEvent *>(event);
+        if (!mimeOk(e->mimeData()))
+            return false;
+        e->acceptProposedAction();
+        return true;
+    }
+    case QEvent::Drop: {
+        auto *e = static_cast<QDropEvent *>(event);
+        if (!mimeOk(e->mimeData()))
+            return false;
+
+        Ps::ImageDocument *doc = document();
+        if (!doc || doc->layers().count() <= 1) {
+            e->ignore();
+            return true;
+        }
+
+        bool ok = false;
+        const int fromStack = e->mimeData()
+                                  ->data(QString::fromLatin1(LayerRowWidget::kLayerDragMime))
+                                  .toInt(&ok);
+        const int n = doc->layers().count();
+        if (!ok || fromStack < 0 || fromStack >= n) {
+            e->ignore();
+            return true;
+        }
+
+        // 视觉行 0 = 栈顶；对照 GIMP：BEFORE/AFTER → insert-before 下标
+        const QPoint pos = e->position().toPoint();
+        int insertBeforeVis = ui->itemList->count(); // 默认插到列表底（栈底）
+        if (QListWidgetItem *hit = ui->itemList->itemAt(pos)) {
+            const int row = ui->itemList->row(hit);
+            const QRect r = ui->itemList->visualItemRect(hit);
+            insertBeforeVis = (pos.y() < r.center().y()) ? row : (row + 1);
+        }
+
+        const int fromVis = n - 1 - fromStack;
+        int toVis = insertBeforeVis;
+        if (fromVis < toVis)
+            --toVis; // 移除源行后目标下移（对照 GIMP src<dest 时 dest--）
+        if (toVis < 0 || toVis >= n || fromVis == toVis) {
+            e->acceptProposedAction();
+            return true;
+        }
+
+        const int toStack = n - 1 - toVis;
+        doc->moveLayer(fromStack, toStack); // structureChanged → 列表重建 + 画布刷新
+        e->acceptProposedAction();
+        return true;
+    }
+    default:
+        return false;
+    }
 }
 
 bool LayerTreePanel::applyAlphaToSelection(int stackIndex, Qt::KeyboardModifiers mods)
@@ -632,10 +727,11 @@ void LayerTreePanel::onPasteLayerStyle()
 void LayerTreePanel::appendRowForLayer(int stackIndex, Ps::Layer &layer)
 {
     auto *item = new QListWidgetItem(ui->itemList);
-    item->setFlags(Qt::ItemIsEnabled | Qt::ItemIsSelectable);
+    item->setFlags(Qt::ItemIsEnabled | Qt::ItemIsSelectable | Qt::ItemIsDropEnabled);
     item->setData(kRoleStackIndex, stackIndex);
 
     auto *row = new LayerRowWidget(ui->itemList);
+    row->setStackIndex(stackIndex);
 
     // 先接线再 sync，这样 heightChanged 能落到 sizeHint
     connect(row, &LayerRowWidget::rowPressed, this, [this, item]() {
@@ -811,6 +907,10 @@ void LayerTreePanel::refreshRowThumbnail(int stackIndex, const Ps::Layer *layer)
 
 void LayerTreePanel::scheduleThumbnailRefresh()
 {
+    // 对照 GIMP preview_freeze：拖层中不重算缩略图
+    Ps::ImageDocument *doc = document();
+    if (doc && doc->isPreviewFrozen())
+        return;
     if (m_thumbTimer)
         m_thumbTimer->start();
 }

@@ -7,6 +7,7 @@
 #ifndef LAYERROWWIDGET_H
 #define LAYERROWWIDGET_H
 
+#include <QPoint>
 #include <QWidget>
 
 QT_BEGIN_NAMESPACE
@@ -28,6 +29,9 @@ class LayerRowWidget : public QWidget
     Q_OBJECT
 
 public:
+    /** 图层面板拖拽 mime（栈下标）。 */
+    static constexpr const char *kLayerDragMime = "application/x-pslite-layer-stack-index";
+
     explicit LayerRowWidget(QWidget *parent = nullptr);
     ~LayerRowWidget() override;
 
@@ -45,6 +49,10 @@ public:
     void setExpanded(bool on);
     /** 右键「重命名」入口。 */
     void beginRename();
+
+    /** 栈下标（拖拽 mime 用）；列表重建时由面板写入。 */
+    void setStackIndex(int index) { m_stackIndex = index; }
+    int stackIndex() const { return m_stackIndex; }
 
     QSize sizeHint() const override;
     QSize minimumSizeHint() const override;
@@ -67,6 +75,8 @@ signals:
 
 protected:
     void mousePressEvent(QMouseEvent *event) override;
+    void mouseMoveEvent(QMouseEvent *event) override;
+    void mouseReleaseEvent(QMouseEvent *event) override;
     bool eventFilter(QObject *watched, QEvent *event) override;
 
 private:
@@ -79,6 +89,9 @@ private:
     void updateExpandChrome(bool hasStyles);
     void updateEyeIcon(bool visible);
     void finishRename();
+    /** 超过拖拽阈值后启动 QDrag（对照 GIMP item tree DnD）。 */
+    void maybeStartDrag(const QPoint &pos);
+    void armDrag(const QPoint &pos);
 
     /** 效果区目标高度（组头 + 子行），不依赖 isVisible()（未入屏时 isVisible 恒 false）。 */
     int stylesBlockHeight() const;
@@ -88,6 +101,9 @@ private:
     bool m_hasStyles = false;
     QString m_layerName; ///< 真实层名（不含「链接」后缀）
     QLineEdit *m_renameEdit = nullptr;
+    int m_stackIndex = -1;
+    bool m_dragArmed = false;
+    QPoint m_pressPos;
 };
 
 #endif // LAYERROWWIDGET_H

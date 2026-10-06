@@ -111,6 +111,7 @@ private slots:
     void onFill();
     void onFreeTransform();
     void onBrightnessContrast();
+    void onNewAdjBrightness();
     void onEnsureLayerStyle(int kind);
     void onClearLayerStyles();
     void onCopyLayerStyles();
@@ -160,8 +161,6 @@ private:
      * 置入为链接图层；无文档时回退为 openAsSmartObjectPath。
      */
     bool placeLinkedPath(const QString &path);
-    /** 读取常见位图；失败返回空图，errorOut 可选。 */
-    static QImage readRasterImage(const QString &path, QString *errorOut = nullptr);
     /** 画布拖放：有文档→逐个置入；无文档→打开第一个。 */
     void onCanvasFilesDropped(const QStringList &paths);
     /** 把当前文档合成图写入最近项缩略图缓存。 */

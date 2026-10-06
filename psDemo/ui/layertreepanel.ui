@@ -784,7 +784,7 @@ QToolButton:disabled { color: #666; }</string>
          <string/>
         </property>
         <property name="toolTip">
-         <string>创建填充或调整图层（UI 占位：调整层尚未实现）</string>
+         <string>新建亮度/对比度调整图层</string>
         </property>
         <property name="iconSize">
          <size>

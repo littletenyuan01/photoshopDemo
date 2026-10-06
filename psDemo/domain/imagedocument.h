@@ -27,6 +27,7 @@ class Layer;
 class LayerPixelsUndo;
 class LayerPropUndo;
 class LayerStructureUndo;
+class LayerMoveUndo;
 class DocumentGeomUndo;
 
 /**
@@ -107,6 +108,13 @@ public:
      * @return 滤镜下标；失败 -1。
      */
     int addBrightnessContrastFilter(qreal brightness = 0.12, qreal contrast = 0.18);
+    /**
+     * 新建亮度/对比度调整层（对照 PS 调整图层 / 吃下方阶段性合成）。
+     * GIMP 原生无此层种，等价物是 drawable filter；本 Demo 按 PS 语义做独立层。
+     * @return 新层下标；失败 -1。
+     */
+    int addBrightnessContrastAdjustmentLayer(qreal brightness = 0.12,
+                                             qreal contrast = 0.18);
     /** 开关指定滤镜；index 越界返回 false。 */
     bool setLayerFilterEnabled(int layerIndex, int filterIndex, bool enabled);
     /** 移除指定滤镜。 */
@@ -242,8 +250,9 @@ public:
     bool setEditingLayerMask(bool on);
 
     /**
-     * 预览冻结（对照 GIMP preview_freeze）：拖中不广播面板刷新，
-     * 解冻时一次性 flush 脏区。
+     * 预览冻结（对照 GIMP `gimp_viewable_preview_freeze`）：
+     * 只抑制图层面板缩略图刷新；**不**阻止投影合成（拖层仍走脏区 + idle）。
+     * 解冻时补发一次缩略图相关信号。
      */
     void beginPreviewFreeze();
     void endPreviewFreeze();
@@ -287,6 +296,12 @@ public:
     int duplicateLayer(int index);
     /** 删除层（至少保留一层）；发 structureChanged。 */
     bool removeLayer(int index);
+    /**
+     * 重排图层（对照 GIMP gimp_image_reorder_item）。
+     * @param from 原栈下标；@param to 移动后的最终下标（0=底 … count-1=顶）
+     * @return 是否发生了移动
+     */
+    bool moveLayer(int from, int to);
 
     /** 图像大小：重采样各层像素与选区 mask。 */
     void scaleImage(int newWidth, int newHeight);
@@ -323,6 +338,7 @@ private:
     friend class LayerPixelsUndo;
     friend class LayerPropUndo;
     friend class LayerStructureUndo;
+    friend class LayerMoveUndo;
     friend class DocumentGeomUndo;
     friend class SelectionUndo;
 
@@ -335,6 +351,8 @@ private:
     /** UndoItem::pop 专用（friend），可改 LayerStack。 */
     std::unique_ptr<Layer> takeLayerForUndo(int index);
     void insertLayerForUndo(int index, std::unique_ptr<Layer> layer);
+    /** 执行重排并广播（不 push 历史；供 moveLayer / LayerMoveUndo 共用）。 */
+    void applyMoveLayer(int from, int to);
 
     int m_width = 0;                             ///< 文档宽度（像素）
     int m_height = 0;                            ///< 文档高度（像素）

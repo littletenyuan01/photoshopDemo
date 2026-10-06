@@ -9,6 +9,7 @@
 
 #include "domain/blendmode.h"
 #include "domain/filternode.h"
+#include "domain/layer.h"
 #include "domain/layerstyle.h"
 
 #include <QImage>
@@ -57,6 +58,7 @@ struct LayerPropSnapshot {
     bool maskLinked = true;
     QImage maskGray; ///< Format_Grayscale8；hasMask 时有效
     QString linkPath; ///< 非空=链接层（对照 GimpLink 路径）
+    LayerKind kind = LayerKind::Raster; ///< 像素层 / 调整层
 };
 
 /** 从 Layer 读取当前属性到快照。 */
@@ -138,6 +140,24 @@ private:
     int m_index = -1;
     int m_activeIndex = -1;
     std::unique_ptr<Layer> m_layer;
+    QString m_label;
+};
+
+/**
+ * 图层重排 undo（对照 GIMP gimp_image_reorder_item）。
+ * pop 时把 from↔to 对调再 move 一次即可。
+ */
+class LayerMoveUndo final : public UndoItem
+{
+public:
+    LayerMoveUndo(int from, int to, const QString &label);
+    QString name() const override { return m_label; }
+    quint64 byteSize() const override { return 64; }
+    void pop(ImageDocument &doc) override;
+
+private:
+    int m_from = -1;
+    int m_to = -1;
     QString m_label;
 };
 

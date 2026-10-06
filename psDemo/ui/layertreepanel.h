@@ -56,6 +56,7 @@ class Layer;
  * 或键盘操作才写入 domain。
  *
  * 列表约定：第 0 行 = 视觉最上层 = LayerStack 最大下标。
+ * 拖拽重排：对照 GIMP GimpItemTreeView DnD → gimp_image_reorder_item。
  */
 class LayerTreePanel : public ItemTreePanel
 {
@@ -77,6 +78,7 @@ private slots:
     void onBtnDeleteClicked();
     void onBtnLayerStyleClicked();
     void onBtnLayerMaskClicked();
+    void onBtnAdjustmentClicked();
     void onListSelectionChanged();
     void onActiveLayerChanged(int index);
     void onLayerPropertiesChanged(int stackIndex);
@@ -121,6 +123,12 @@ private:
     bool applyMaskToSelection(int stackIndex, Qt::KeyboardModifiers mods);
 
     void syncLayerContextMenuState();
+
+    /**
+     * 处理图层行拖放到列表（对照 GIMP get_drop_index + reorder_item）。
+     * @return true 已消费该拖放事件。
+     */
+    bool handleLayerListDrag(QEvent *event);
 
     Ui::LayerTreePanel *ui;
     QTimer *m_thumbTimer = nullptr;
