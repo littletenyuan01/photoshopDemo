@@ -339,11 +339,8 @@ bool TransformTool::beginSession(const ToolContext &ctx)
 
     if (!ctx.document)
         return false;
-    Layer *layer = ctx.document->activeLayer();
-    if (!layer || !layer->isVisible())
-        return false;
-    // 链接层不可自由变换像素（先栅格化）；对照 GIMP Rasterizable
-    if (layer->isLinkedLayer())
+    Layer *layer = editableActiveLayer(ctx);
+    if (!layer)
         return false;
 
     const QRect contentDoc = layer->contentBoundsInDocument();

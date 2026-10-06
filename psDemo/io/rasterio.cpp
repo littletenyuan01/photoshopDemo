@@ -1,17 +1,33 @@
 /**
- * rasterio.cpp — RasterIo::exportFile 实现（io 层）。
+ * rasterio.cpp — RasterIo 读入 / 导出实现（io 层）。
  */
 #include "rasterio.h"
 
 #include "domain/imagedocument.h"
 #include "engine/compositor.h"
 
-#include <QImage>
+#include <QImageReader>
 #include <QImageWriter>
 #include <QPainter>
 #include <QFileInfo>
 
 namespace Ps {
+
+QImage RasterIo::readFile(const QString &filePath, QString *errorMessage)
+{
+    if (filePath.isEmpty()) {
+        if (errorMessage)
+            *errorMessage = QObject::tr("路径为空。");
+        return {};
+    }
+
+    QImageReader reader(filePath);
+    reader.setAutoTransform(true); // 尊重 EXIF 方向
+    QImage image = reader.read();
+    if (image.isNull() && errorMessage)
+        *errorMessage = reader.errorString();
+    return image;
+}
 
 bool RasterIo::exportFile(const ImageDocument &doc, const QString &filePath,
                           QString *errorMessage)

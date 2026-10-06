@@ -54,7 +54,7 @@ private:
     int insertLayer(int index, std::unique_ptr<Layer> layer);
     /** 取出并移除；调用方获得所有权。越界返回 nullptr。 */
     std::unique_ptr<Layer> takeLayer(int index);
-    /** 重新排序。目前无人调用，等「上移/下移」接线时用。 */
+    /** 重新排序：from 层移动后落到下标 to（最终下标语义）。 */
     void moveLayer(int from, int to);
 
     /** 自底向顶；unique_ptr 独占每层所有权。 */
