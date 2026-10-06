@@ -1,7 +1,8 @@
 /**
  * projection.cpp — projection.h 实现（engine 层）。
  *
- * sync() 读文档 dirtyRect，小脏区走 Compositor::compositeRegion，否则全量重合成。
+ * sync() 吸入 dirtyRect；小脏区立即 patch，大脏区视口优先 + 空闲分块渐进。
+ * 对照 GIMP gimp_projection_add_update_area / chunk_render_* / set_priority_rect。
  */
 #include "projection.h"
 
@@ -15,7 +16,6 @@ namespace Ps {
 
 namespace {
 
-/** 将脏矩形对齐到 chunk 网格并裁剪到 bounds。 */
 QRect alignToChunks(const QRect &rect, int chunk, const QRect &bounds)
 {
     if (rect.isEmpty() || chunk <= 0)
@@ -48,6 +48,11 @@ void Projection::invalidate()
     m_chunkValid.clear();
     m_chunkCols = 0;
     m_chunkRows = 0;
+}
+
+void Projection::setPriorityRect(const QRect &docRect)
+{
+    m_priorityRect = docRect;
 }
 
 void Projection::resetChunkGrid(const QSize &pixelSize)
@@ -85,6 +90,104 @@ void Projection::markChunksValid(const QRect &pixelRect)
     }
 }
 
+bool Projection::ensureBuffer(const QSize &pixelSize)
+{
+    static_assert(kChunkSize == TileBuffer::kTileSize,
+                  "Projection chunk size should match layer tile size");
+
+    const bool sizeOk = !m_buffer.isNull()
+                        && m_buffer.size() == pixelSize
+                        && m_buffer.format() == QImage::Format_ARGB32_Premultiplied
+                        && m_chunkCols > 0
+                        && m_chunkValid.size() == m_chunkCols * m_chunkRows;
+    if (sizeOk)
+        return true;
+
+    // 尺寸变更：先建空缓冲，全部标无效，由 sync/idle 渐进填
+    m_buffer = QImage(pixelSize, QImage::Format_ARGB32_Premultiplied);
+    m_buffer.fill(Qt::transparent);
+    resetChunkGrid(pixelSize);
+    return false;
+}
+
+QRect Projection::chunkRectAt(int col, int row, const QRect &full) const
+{
+    return QRect(col * kChunkSize, row * kChunkSize, kChunkSize, kChunkSize)
+        .intersected(full);
+}
+
+int Projection::invalidChunkCount() const
+{
+    int n = 0;
+    for (int i = 0; i < m_chunkValid.size(); ++i) {
+        if (!m_chunkValid.testBit(i))
+            ++n;
+    }
+    return n;
+}
+
+bool Projection::hasPendingChunks() const
+{
+    if (m_chunkValid.isEmpty())
+        return false;
+    for (int i = 0; i < m_chunkValid.size(); ++i) {
+        if (!m_chunkValid.testBit(i))
+            return true;
+    }
+    return false;
+}
+
+QRect Projection::recomposeInvalidChunks(bool priorityFirst, int maxChunks)
+{
+    if (!m_document || m_chunkValid.isEmpty() || m_buffer.isNull())
+        return {};
+
+    const QRect full(0, 0, m_document->width(), m_document->height());
+    if (full.isEmpty())
+        return {};
+
+    const QRect priority = m_priorityRect.intersected(full);
+    QRect painted;
+    int done = 0;
+
+    auto tryChunk = [&](int col, int row) -> bool {
+        const int idx = row * m_chunkCols + col;
+        if (m_chunkValid.testBit(idx))
+            return false;
+        const QRect piece = chunkRectAt(col, row, full);
+        if (piece.isEmpty()) {
+            m_chunkValid.setBit(idx);
+            return false;
+        }
+        if (!Compositor::compositeRegion(m_buffer, *m_document, piece))
+            return false;
+        m_chunkValid.setBit(idx);
+        painted = painted.isNull() ? piece : painted.united(piece);
+        ++done;
+        return true;
+    };
+
+    auto scan = [&](bool onlyPriority) {
+        for (int row = 0; row < m_chunkRows; ++row) {
+            for (int col = 0; col < m_chunkCols; ++col) {
+                if (maxChunks > 0 && done >= maxChunks)
+                    return;
+                if (onlyPriority) {
+                    const QRect piece = chunkRectAt(col, row, full);
+                    if (priority.isEmpty() || !piece.intersects(priority))
+                        continue;
+                }
+                tryChunk(col, row);
+            }
+        }
+    };
+
+    if (priorityFirst)
+        scan(true);
+    scan(false);
+    return painted;
+}
+
 QRect Projection::sync()
 {
     if (!m_document) {
@@ -100,49 +203,46 @@ QRect Projection::sync()
     }
 
     const QRect full(0, 0, w, h);
-    QRect dirty = m_document->dirtyRect().intersected(full);
     const QSize fullSize(w, h);
+    QRect dirty = m_document->dirtyRect().intersected(full);
 
-    const bool bufferOk = !m_buffer.isNull()
-                          && m_buffer.size() == fullSize
-                          && m_buffer.format() == QImage::Format_ARGB32_Premultiplied
-                          && m_chunkCols > 0
-                          && m_chunkValid.size() == m_chunkCols * m_chunkRows;
-
-    if (bufferOk && dirty.isEmpty())
+    const bool bufferWasOk = ensureBuffer(fullSize);
+    if (!bufferWasOk) {
+        // 新建缓冲：整幅无效；优先视口，其余 idle
+        dirty = full;
+    } else if (dirty.isEmpty()) {
+        // 无新脏区：若仍有挂起块（例如刚改了 priority），不在此强刷
         return {};
-
-    static_assert(kChunkSize == TileBuffer::kTileSize,
-                  "Projection chunk size should match layer tile size");
+    }
 
     if (!dirty.isEmpty() && dirty != full)
         dirty = alignToChunks(dirty, kChunkSize, full);
-
-    const bool patch = bufferOk
-                       && !dirty.isEmpty()
-                       && dirty != full
-                       && (qint64(dirty.width()) * dirty.height()
-                           < qint64(full.width()) * full.height());
-
-    if (patch) {
+    if (!dirty.isEmpty())
         invalidateChunks(dirty);
-        if (!Compositor::compositeRegion(m_buffer, *m_document, dirty)) {
-            m_buffer = Compositor::composite(*m_document);
-            resetChunkGrid(fullSize);
-            m_chunkValid.fill(true);
-            dirty = full;
-        } else {
-            markChunksValid(dirty);
-        }
-    } else {
-        m_buffer = Compositor::composite(*m_document);
-        resetChunkGrid(fullSize);
-        m_chunkValid.fill(true);
-        dirty = full;
-    }
 
     m_document->clearDirtyRect();
-    return dirty;
+
+    // 1) 视口内无效块全部立即合成（交互可见区不能拖沓）
+    QRect painted = recomposeInvalidChunks(/*priorityFirst=*/true, /*maxChunks=*/-1);
+
+    // 2) 剩余不多则一次做完；否则留给 idle（对照 GIMP chunk iterator）
+    const int left = invalidChunkCount();
+    if (left > 0 && left <= kSyncChunkBudget) {
+        painted = painted.united(recomposeInvalidChunks(false, -1));
+    } else if (left > 0) {
+        painted = painted.united(
+            recomposeInvalidChunks(false, kSyncChunkBudget));
+    }
+
+    return painted;
+}
+
+QRect Projection::processPendingChunks(int maxChunks)
+{
+    if (!hasPendingChunks())
+        return {};
+    // 空闲时仍视口优先，平移/缩放后先补洞
+    return recomposeInvalidChunks(/*priorityFirst=*/true, maxChunks);
 }
 
 } // namespace Ps

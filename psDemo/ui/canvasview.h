@@ -152,7 +152,12 @@ protected:
     void keyReleaseEvent(QKeyEvent *event) override;
 
 private:
-    void syncProjection();
+    /** 吸入文档脏区并视口优先合成；返回本轮重算的文档矩形。对照 gimp_projection_flush。 */
+    QRect syncProjection();
+    /** 把当前视口映成文档矩形，交给 Projection 优先合成。 */
+    void updateProjectionPriorityRect();
+    /** 空闲分块：继续合成挂起块并局部重画。 */
+    void onProjectionIdle();
     void notifyViewChanged();
     /** 将 m_offset 钳制到合法范围（含 pasteboard 过滚，对照 PS）。 */
     void clampOffset();
@@ -230,6 +235,7 @@ private:
     bool m_shapeAntialias = true;
 
     QTimer *m_antsTimer = nullptr; ///< 蚂蚁线虚线相位动画
+    QTimer *m_projIdleTimer = nullptr; ///< 投影空闲分块（对照 GIMP projection idle）
     qreal m_antsPhase = 0.0;
     QPainterPath m_antsPath; ///< 选区轮廓（文档像素坐标）；selectionChanged 时重建
 

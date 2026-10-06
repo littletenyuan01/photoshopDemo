@@ -35,6 +35,7 @@ CanvasView::CanvasView(QWidget *parent)
     : QWidget(parent)
     , m_toolManager(new Ps::ToolManager(this))
     , m_antsTimer(new QTimer(this))
+    , m_projIdleTimer(new QTimer(this))
 {
     setMouseTracking(true);
     setFocusPolicy(Qt::StrongFocus);
@@ -67,6 +68,10 @@ CanvasView::CanvasView(QWidget *parent)
             update();
     });
 
+    // 投影空闲分块（对照 GIMP GIMP_PRIORITY_PROJECTION_IDLE）
+    m_projIdleTimer->setInterval(0);
+    connect(m_projIdleTimer, &QTimer::timeout, this, &CanvasView::onProjectionIdle);
+
     refreshToolContext();
     updateToolCursor();
 }
@@ -88,8 +93,16 @@ void CanvasView::setDocument(Ps::ImageDocument *document)
         // 图层属性变化（显隐/透明度）也走 contentChanged，画布需重投影，
         // 合成细节在 Projection / Compositor，画布不必区分。
         connect(m_document, &Ps::ImageDocument::contentChanged, this, [this]() {
-            syncProjection();
-            update();
+            // 对照 GIMP projection_flush：吸入脏区，视口优先，其余 idle
+            const QRect painted = syncProjection();
+            if (!painted.isEmpty()) {
+                const QRectF wr(imageToWidget(painted.topLeft()),
+                                imageToWidget(QPointF(painted.right() + 1,
+                                                      painted.bottom() + 1)));
+                update(wr.normalized().toAlignedRect().adjusted(-1, -1, 1, 1));
+            } else {
+                update();
+            }
         });
         // 选区单独订阅：只重画蚂蚁线，不重合成
         connect(m_document, &Ps::ImageDocument::selectionChanged, this, [this]() {
@@ -108,6 +121,7 @@ void CanvasView::setDocument(Ps::ImageDocument *document)
         else
             m_pendingFit = true;
     } else {
+        m_projIdleTimer->stop();
         m_projection.bind(nullptr);
         m_antsPath = QPainterPath();
         m_pendingFit = false;
@@ -831,13 +845,67 @@ void CanvasView::keyReleaseEvent(QKeyEvent *event)
 
 // —— 内部工具 ——
 
-void CanvasView::syncProjection()
+QRect CanvasView::syncProjection()
 {
-    m_projection.sync();
+    updateProjectionPriorityRect();
+    const QRect painted = m_projection.sync();
+    if (m_projection.hasPendingChunks()) {
+        if (!m_projIdleTimer->isActive())
+            m_projIdleTimer->start();
+    } else {
+        m_projIdleTimer->stop();
+    }
+    return painted;
+}
+
+void CanvasView::updateProjectionPriorityRect()
+{
+    if (!m_document) {
+        m_projection.setPriorityRect({});
+        return;
+    }
+    // 对照 gimp_display_shell_update_priority_rect：视口 → 文档坐标
+    const QPointF topLeft = widgetToImage(QPointF(0, 0));
+    const QPointF bottomRight = widgetToImage(QPointF(width(), height()));
+    QRect vis = QRectF(topLeft, bottomRight).normalized().toAlignedRect();
+    vis = vis.intersected(QRect(0, 0, m_document->width(), m_document->height()));
+    // 略外扩一块，滚动时边缘少露洞
+    vis = vis.adjusted(-Ps::Projection::kChunkSize, -Ps::Projection::kChunkSize,
+                       Ps::Projection::kChunkSize, Ps::Projection::kChunkSize);
+    vis = vis.intersected(QRect(0, 0, m_document->width(), m_document->height()));
+    m_projection.setPriorityRect(vis);
+}
+
+void CanvasView::onProjectionIdle()
+{
+    if (!m_document) {
+        m_projIdleTimer->stop();
+        return;
+    }
+    updateProjectionPriorityRect();
+    const QRect painted = m_projection.processPendingChunks();
+    if (!painted.isEmpty()) {
+        // 文档矩形 → 控件局部更新
+        const QRectF widgetRect(imageToWidget(painted.topLeft()),
+                                imageToWidget(painted.bottomRight()));
+        update(widgetRect.normalized().toAlignedRect().adjusted(-1, -1, 1, 1));
+    }
+    if (!m_projection.hasPendingChunks())
+        m_projIdleTimer->stop();
 }
 
 void CanvasView::notifyViewChanged()
 {
+    updateProjectionPriorityRect();
+    // 平移/缩放后视口变了：若有挂起块，立刻优先补视口
+    if (m_projection.hasPendingChunks()) {
+        const QRect painted = m_projection.processPendingChunks(
+            Ps::Projection::kSyncChunkBudget);
+        if (!painted.isEmpty())
+            update();
+        if (m_projection.hasPendingChunks() && !m_projIdleTimer->isActive())
+            m_projIdleTimer->start();
+    }
     emit viewChanged();
 }
 
