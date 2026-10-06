@@ -1,18 +1,19 @@
 /**
  * movetool.cpp — 移动工具实现（tools 层）。
+ *
+ * 对照 GIMP gimpeditselectiontool_update_motion：
+ * translate live_items → gimp_projection_flush（非 image_flush）。
+ * preview_freeze 只抑制缩略图，画布走 Projection 脏区 + idle。
  */
 #include "movetool.h"
 
 #include "domain/imagedocument.h"
 #include "domain/layer.h"
 #include "domain/layermask.h"
-#include "engine/compositor.h"
 
 #include <QPainter>
 #include <QPen>
 #include <QtMath>
-
-#include <cstring>
 
 namespace Ps {
 
@@ -20,18 +21,6 @@ namespace {
 
 const QColor kTransformBlue(26, 159, 255);
 constexpr qreal kHandleSize = 7.0;
-
-void copyRect(QImage &dst, const QImage &src, const QRect &rect)
-{
-    const QRect area = rect.intersected(dst.rect()).intersected(src.rect());
-    if (area.isEmpty())
-        return;
-    for (int y = area.top(); y <= area.bottom(); ++y) {
-        const auto *s = reinterpret_cast<const QRgb *>(src.constScanLine(y)) + area.left();
-        auto *d = reinterpret_cast<QRgb *>(dst.scanLine(y)) + area.left();
-        std::memcpy(d, s, size_t(area.width()) * sizeof(QRgb));
-    }
-}
 
 } // namespace
 
@@ -45,39 +34,11 @@ Qt::CursorShape MoveTool::cursorShape() const
     return Qt::SizeAllCursor;
 }
 
-const QImage *MoveTool::liveProjection() const
-{
-    return (m_dragging && !m_live.isNull()) ? &m_live : nullptr;
-}
-
-void MoveTool::startDrag(ImageDocument &doc, int layerIndex)
-{
-    const QRect full(0, 0, doc.width(), doc.height());
-    if (full.isEmpty() || layerIndex < 0)
-        return;
-
-    m_layerIndex = layerIndex;
-    m_base = QImage(full.size(), QImage::Format_ARGB32_Premultiplied);
-    m_base.fill(Qt::transparent);
-    Compositor::blendLayerRange(m_base, doc, full, 0, doc.layers().count(), layerIndex);
-
-    m_live = m_base.copy();
-    Layer *layer = doc.layers().layerAt(layerIndex);
-    m_blitRect = layer ? layer->styleBoundsInDocument().intersected(full) : QRect();
-    if (!m_blitRect.isEmpty())
-        Compositor::blendLayerRange(m_live, doc, m_blitRect, layerIndex, layerIndex + 1, -1);
-
-    doc.beginPreviewFreeze();
-}
-
 void MoveTool::finishDrag(ImageDocument *doc)
 {
     if (doc && doc->isPreviewFrozen())
         doc->endPreviewFreeze();
     m_layerIndex = -1;
-    m_blitRect = {};
-    m_base = {};
-    m_live = {};
 }
 
 void MoveTool::drawOverlay(QPainter &painter, const ToolContext &ctx) const
@@ -142,7 +103,11 @@ bool MoveTool::mousePress(const ToolEvent &event, const ToolContext &ctx, ViewPo
     const int index = ctx.document->activeLayerIndex();
     m_dragging = true;
     m_movingMaskOnly = false;
+    m_layerIndex = index;
     m_lastImagePos = event.imagePos;
+
+    // 对照 GIMP：gimp_viewable_preview_freeze — 只冻缩略图
+    ctx.document->beginPreviewFreeze();
 
     // 取消链接 + 正在编辑蒙版 → 只移动蒙版内容（对照 PS）
     if (ctx.document->isEditingLayerMask()
@@ -150,13 +115,12 @@ bool MoveTool::mousePress(const ToolEvent &event, const ToolContext &ctx, ViewPo
         && !layer->mask()->isLinked()) {
         m_movingMaskOnly = true;
         ctx.document->pushLayerPropertiesUndo(index, QObject::tr("移动蒙版"));
-        startDrag(*ctx.document, index);
         emit repaintRequested();
         return true;
     }
 
+    // 对照 GIMP first_move：undo 在 press 入组，后续 motion 只改 offset
     ctx.document->pushLayerOffsetUndo(index);
-    startDrag(*ctx.document, index);
     emit repaintRequested();
     return true;
 }
@@ -174,36 +138,14 @@ bool MoveTool::mouseMove(const ToolEvent &event, const ToolContext &ctx, ViewPor
     if (dx == 0 && dy == 0)
         return true;
 
-    Layer *layer = ctx.document->layers().layerAt(m_layerIndex);
-    const QRect docRect(0, 0, ctx.document->width(), ctx.document->height());
-    const QRect before = layer ? layer->styleBoundsInDocument().intersected(docRect) : QRect();
-
-    if (m_movingMaskOnly && layer && layer->mask() && !layer->mask()->isNull()) {
+    // 对照 GIMP update_motion：gimp_image_item_list_translate + projection_flush
+    if (m_movingMaskOnly)
         ctx.document->shiftLayerMask(m_layerIndex, dx, dy);
-        m_lastImagePos += QPointF(dx, dy);
-        const QRect after = layer->styleBoundsInDocument().intersected(docRect);
-        const QRect dirty = before.united(after).united(m_blitRect).intersected(docRect);
-        if (!dirty.isEmpty() && !m_live.isNull()) {
-            copyRect(m_live, m_base, dirty);
-            Compositor::blendLayerRange(m_live, *ctx.document, dirty,
-                                        m_layerIndex, m_layerIndex + 1, -1);
-            m_blitRect = dirty;
-        }
-        emit repaintRequested();
-        return true;
-    }
+    else
+        ctx.document->translateLayer(m_layerIndex, dx, dy);
 
-    ctx.document->translateLayer(m_layerIndex, dx, dy);
     m_lastImagePos += QPointF(dx, dy);
-
-    const QRect after = layer ? layer->styleBoundsInDocument().intersected(docRect) : QRect();
-    const QRect dirty = before.united(after).united(m_blitRect).intersected(docRect);
-    if (!dirty.isEmpty() && !m_live.isNull()) {
-        copyRect(m_live, m_base, dirty);
-        Compositor::blendLayerRange(m_live, *ctx.document, dirty,
-                                    m_layerIndex, m_layerIndex + 1, -1);
-        m_blitRect = dirty;
-    }
+    // 变换框浮层随 offset 更新（像素已由 contentChanged → 投影刷新）
     emit repaintRequested();
     return true;
 }
@@ -215,7 +157,9 @@ bool MoveTool::mouseRelease(const ToolEvent &event, const ToolContext &ctx, View
         return false;
     m_dragging = false;
     m_movingMaskOnly = false;
+    // 对照 GIMP：thaw + gimp_image_flush
     finishDrag(ctx.document);
+    emit repaintRequested();
     return event.isLeft();
 }
 

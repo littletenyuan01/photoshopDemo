@@ -1,16 +1,15 @@
 /**
  * movetool.h — 移动工具声明（tools 层）。
  *
- * 点选、拖 offset、变换框浮层；拖中 live 预览（底图+单层），松手再投影。
+ * 对照 GIMP：gimpmovetool → gimp_edit_selection_tool（TRANSLATE_MODE_LAYER）。
+ * 拖中真实改 offset + 投影脏区；preview_freeze 只冻缩略图，不自建 live 缓冲。
  */
 #ifndef MOVETOOL_H
 #define MOVETOOL_H
 
 #include "tool.h"
 
-#include <QImage>
 #include <QPointF>
-#include <QRect>
 
 namespace Ps {
 
@@ -19,7 +18,11 @@ class ImageDocument;
 /**
  * 移动工具（tools 层）。
  *
- * 【对照 GIMP】gimpmovetool + preview_freeze；拖中不全栈 syncProjection。
+ * 【对照 GIMP】`gimpmovetool.c` + `gimpeditselectiontool.c`：
+ * - press：undo + preview_freeze（冻缩略图）
+ * - motion：translate → projection_flush（本项目 contentChanged → sync/idle）
+ * - release：preview_thaw + 完整 flush
+ * 不做底图+stamp（那是变换工具预览思路，不是 Move）。
  */
 class MoveTool : public Tool
 {
@@ -31,7 +34,6 @@ public:
     Qt::CursorShape cursorShape() const override;
     bool hasOverlay() const override { return true; }
     void drawOverlay(QPainter &painter, const ToolContext &ctx) const override;
-    const QImage *liveProjection() const override;
 
     bool mousePress(const ToolEvent &event, const ToolContext &ctx, ViewPort &view) override;
     bool mouseMove(const ToolEvent &event, const ToolContext &ctx, ViewPort &view) override;
@@ -39,16 +41,12 @@ public:
     void deactivate(const ToolContext &ctx, ViewPort &view) override;
 
 private:
-    void startDrag(ImageDocument &doc, int layerIndex);
     void finishDrag(ImageDocument *doc);
 
     bool m_dragging = false;
     bool m_movingMaskOnly = false; ///< 取消链接且编辑蒙版：只平移蒙版灰度
     int m_layerIndex = -1;
     QPointF m_lastImagePos;
-    QRect m_blitRect;
-    QImage m_base;  ///< 跳过被拖层的底图
-    QImage m_live;  ///< 底图 + 被拖层
 };
 
 } // namespace Ps
