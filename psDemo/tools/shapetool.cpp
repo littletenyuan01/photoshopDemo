@@ -195,10 +195,8 @@ bool ShapeTool::mouseRelease(const ToolEvent &event, const ToolContext &ctx, Vie
     m_dragging = false;
     emit repaintRequested();
 
-    Layer *layer = ctx.document ? ctx.document->activeLayer() : nullptr;
-    if (!layer || !layer->isVisible())
-        return true;
-    if (layer->isLinkedLayer())
+    Layer *layer = editableActiveLayer(ctx);
+    if (!layer)
         return true;
 
     const QPointF endImg = constrainedEnd(m_startImage, m_endImage, m_kind, m_constrain);

@@ -18,6 +18,8 @@
 
 namespace Ps {
 
+class Layer;
+
 /**
  * 工具基类（tools 层）。
  *
@@ -126,6 +128,12 @@ protected:
      * 分发时按值给出，直接透传即可。
      */
     void markDocumentDirty(const ToolContext &ctx, const QRect &rect);
+
+    /**
+     * 活动层且可见、允许像素编辑时返回该层，否则 nullptr。
+     * 统一「隐藏层 / 链接层不可改像素」检查，避免各工具复制粘贴。
+     */
+    static Layer *editableActiveLayer(const ToolContext &ctx);
 
 private:
     Ps::ToolId m_id;

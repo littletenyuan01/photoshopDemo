@@ -6,6 +6,7 @@
 #include "tool.h"
 
 #include "domain/imagedocument.h"
+#include "domain/layer.h"
 
 #ifdef Q_OS_WIN
 #  ifndef WIN32_LEAN_AND_MEAN
@@ -83,6 +84,14 @@ void Tool::markDocumentDirty(const ToolContext &ctx, const QRect &rect)
     if (ctx.document)
         ctx.document->markDirty(rect);
     emit repaintRequested();
+}
+
+Layer *Tool::editableActiveLayer(const ToolContext &ctx)
+{
+    Layer *layer = ctx.document ? ctx.document->activeLayer() : nullptr;
+    if (!layer || !layer->isVisible() || !layer->allowsPixelEdit())
+        return nullptr;
+    return layer;
 }
 
 } // namespace Ps

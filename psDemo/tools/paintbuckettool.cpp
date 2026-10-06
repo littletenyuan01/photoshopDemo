@@ -31,11 +31,9 @@ bool PaintBucketTool::mousePress(const ToolEvent &event, const ToolContext &ctx,
     if (!event.isLeft())
         return false;
 
-    // 对照 gimp_bucket_fill_tool_button_press：隐藏层不可改（GIMP 另有 edit_non_visible 配置，此处固定拒绝）
-    Layer *layer = ctx.document ? ctx.document->activeLayer() : nullptr;
-    if (!layer || !layer->isVisible())
-        return false;
-    if (layer->isLinkedLayer())
+    // 对照 gimp_bucket_fill_tool_button_press：隐藏层 / 链接层不可改
+    Layer *layer = editableActiveLayer(ctx);
+    if (!layer)
         return false;
 
     const QPointF local = layer->toLayerLocal(event.imagePos);

@@ -63,12 +63,8 @@ bool PaintTool::mousePress(const ToolEvent &event, const ToolContext &ctx, ViewP
     if (!event.isLeft())
         return false;
 
-    Layer *layer = ctx.document ? ctx.document->activeLayer() : nullptr;
-    // 隐藏层不可绘制（与 GIMP 一致：不可见目标不接受绘制）
-    if (!layer || !layer->isVisible())
-        return false;
-    // 链接层不可直接绘（对照 GIMP：须先栅格化 Rasterizable）
-    if (layer->isLinkedLayer())
+    Layer *layer = editableActiveLayer(ctx);
+    if (!layer)
         return false;
 
     const auto mode = m_erase ? PaintEngine::Mode::Erase : PaintEngine::Mode::Paint;

@@ -42,10 +42,8 @@ bool ToneTool::mousePress(const ToolEvent &event, const ToolContext &ctx, ViewPo
     if (!event.isLeft())
         return false;
 
-    Layer *layer = ctx.document ? ctx.document->activeLayer() : nullptr;
-    if (!layer || !layer->isVisible())
-        return false;
-    if (layer->isLinkedLayer())
+    Layer *layer = editableActiveLayer(ctx);
+    if (!layer)
         return false;
 
     m_painting = true;

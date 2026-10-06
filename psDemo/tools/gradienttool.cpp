@@ -100,11 +100,9 @@ bool GradientTool::mouseRelease(const ToolEvent &event, const ToolContext &ctx, 
     m_dragging = false;
     emit repaintRequested(); // 清掉浮层
 
-    Layer *layer = ctx.document ? ctx.document->activeLayer() : nullptr;
-    // 对照梯度工具：隐藏层不可改（GIMP 另有 edit_non_visible）
-    if (!layer || !layer->isVisible())
-        return true;
-    if (layer->isLinkedLayer())
+    Layer *layer = editableActiveLayer(ctx);
+    // 对照梯度工具：隐藏层 / 链接层不可改（拖拽已消费）
+    if (!layer)
         return true;
 
     ctx.document->pushLayerPixelsUndo(ctx.document->activeLayerIndex(),
