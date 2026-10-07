@@ -124,6 +124,24 @@ void Layer::invalidateCompositeRaster() const
     m_compositeOriginDy = 0;
 }
 
+void Layer::setCompositePreview(const QImage &image, int docX, int docY)
+{
+    m_compositePreview = image;
+    m_compositePreviewDocX = docX;
+    m_compositePreviewDocY = docY;
+    invalidateCompositeRaster();
+}
+
+void Layer::clearCompositePreview()
+{
+    if (m_compositePreview.isNull())
+        return;
+    m_compositePreview = QImage();
+    m_compositePreviewDocX = 0;
+    m_compositePreviewDocY = 0;
+    invalidateCompositeRaster();
+}
+
 Layer::CompositeRaster Layer::ensureCompositeRaster() const
 {
     if (m_compositeRasterValid) {

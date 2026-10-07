@@ -1,0 +1,154 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>AdjBlackAndWhite</class>
+ <widget class="QWidget" name="AdjBlackAndWhite">
+  <property name="geometry">
+   <rect><x>0</x><y>0</y><width>260</width><height>160</height></rect>
+  </property>
+  <layout class="QVBoxLayout" name="rootLayout">
+   <property name="spacing"><number>4</number></property>
+   <property name="leftMargin"><number>0</number></property>
+   <property name="topMargin"><number>0</number></property>
+   <property name="rightMargin"><number>0</number></property>
+   <property name="bottomMargin"><number>0</number></property>
+           <item>
+            <widget class="QLabel" name="labelTitle">
+             <property name="text"><string>黑白</string></property>
+            </widget>
+           </item>
+           <item>
+            <layout class="QGridLayout" name="grid">
+             <property name="horizontalSpacing"><number>6</number></property>
+             <property name="verticalSpacing"><number>4</number></property>
+              <item row="0" column="0">
+               <widget class="QLabel" name="label_reds">
+                <property name="text"><string>红色</string></property>
+               </widget>
+              </item>
+              <item row="0" column="1">
+               <widget class="QSlider" name="slider_reds">
+                <property name="orientation"><enum>Qt::Orientation::Horizontal</enum></property>
+                <property name="minimum"><number>-200</number></property>
+                <property name="maximum"><number>300</number></property>
+                <property name="value"><number>40</number></property>
+               </widget>
+              </item>
+              <item row="0" column="2">
+               <widget class="QSpinBox" name="spin_reds">
+                <property name="minimum"><number>-200</number></property>
+                <property name="maximum"><number>300</number></property>
+                <property name="value"><number>40</number></property>
+               </widget>
+              </item>
+              <item row="1" column="0">
+               <widget class="QLabel" name="label_yellows">
+                <property name="text"><string>黄色</string></property>
+               </widget>
+              </item>
+              <item row="1" column="1">
+               <widget class="QSlider" name="slider_yellows">
+                <property name="orientation"><enum>Qt::Orientation::Horizontal</enum></property>
+                <property name="minimum"><number>-200</number></property>
+                <property name="maximum"><number>300</number></property>
+                <property name="value"><number>60</number></property>
+               </widget>
+              </item>
+              <item row="1" column="2">
+               <widget class="QSpinBox" name="spin_yellows">
+                <property name="minimum"><number>-200</number></property>
+                <property name="maximum"><number>300</number></property>
+                <property name="value"><number>60</number></property>
+               </widget>
+              </item>
+              <item row="2" column="0">
+               <widget class="QLabel" name="label_greens">
+                <property name="text"><string>绿色</string></property>
+               </widget>
+              </item>
+              <item row="2" column="1">
+               <widget class="QSlider" name="slider_greens">
+                <property name="orientation"><enum>Qt::Orientation::Horizontal</enum></property>
+                <property name="minimum"><number>-200</number></property>
+                <property name="maximum"><number>300</number></property>
+                <property name="value"><number>40</number></property>
+               </widget>
+              </item>
+              <item row="2" column="2">
+               <widget class="QSpinBox" name="spin_greens">
+                <property name="minimum"><number>-200</number></property>
+                <property name="maximum"><number>300</number></property>
+                <property name="value"><number>40</number></property>
+               </widget>
+              </item>
+              <item row="3" column="0">
+               <widget class="QLabel" name="label_cyans">
+                <property name="text"><string>青色</string></property>
+               </widget>
+              </item>
+              <item row="3" column="1">
+               <widget class="QSlider" name="slider_cyans">
+                <property name="orientation"><enum>Qt::Orientation::Horizontal</enum></property>
+                <property name="minimum"><number>-200</number></property>
+                <property name="maximum"><number>300</number></property>
+                <property name="value"><number>60</number></property>
+               </widget>
+              </item>
+              <item row="3" column="2">
+               <widget class="QSpinBox" name="spin_cyans">
+                <property name="minimum"><number>-200</number></property>
+                <property name="maximum"><number>300</number></property>
+                <property name="value"><number>60</number></property>
+               </widget>
+              </item>
+              <item row="4" column="0">
+               <widget class="QLabel" name="label_blues">
+                <property name="text"><string>蓝色</string></property>
+               </widget>
+              </item>
+              <item row="4" column="1">
+               <widget class="QSlider" name="slider_blues">
+                <property name="orientation"><enum>Qt::Orientation::Horizontal</enum></property>
+                <property name="minimum"><number>-200</number></property>
+                <property name="maximum"><number>300</number></property>
+                <property name="value"><number>20</number></property>
+               </widget>
+              </item>
+              <item row="4" column="2">
+               <widget class="QSpinBox" name="spin_blues">
+                <property name="minimum"><number>-200</number></property>
+                <property name="maximum"><number>300</number></property>
+                <property name="value"><number>20</number></property>
+               </widget>
+              </item>
+              <item row="5" column="0">
+               <widget class="QLabel" name="label_magentas">
+                <property name="text"><string>洋红</string></property>
+               </widget>
+              </item>
+              <item row="5" column="1">
+               <widget class="QSlider" name="slider_magentas">
+                <property name="orientation"><enum>Qt::Orientation::Horizontal</enum></property>
+                <property name="minimum"><number>-200</number></property>
+                <property name="maximum"><number>300</number></property>
+                <property name="value"><number>80</number></property>
+               </widget>
+              </item>
+              <item row="5" column="2">
+               <widget class="QSpinBox" name="spin_magentas">
+                <property name="minimum"><number>-200</number></property>
+                <property name="maximum"><number>300</number></property>
+                <property name="value"><number>80</number></property>
+               </widget>
+              </item>
+            </layout>
+           </item>   <item>
+    <spacer name="vSpacer">
+     <property name="orientation"><enum>Qt::Orientation::Vertical</enum></property>
+     <property name="sizeHint" stdset="0"><size><width>20</width><height>1</height></size></property>
+    </spacer>
+   </item>
+  </layout>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>

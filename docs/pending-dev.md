@@ -41,53 +41,52 @@
 **现状（已实现）**
 
 - 入口：编辑→自由变换 / Ctrl+T；选项栏；右键模式（自由/缩放/旋转/斜切/扭曲/透视）
-- 交互态维护四角；预览写回同一图层瓦片（正常投影，z 序不变）
+- 交互态维护四角；**拖中预览写入 `Layer::compositePreview` 工作缓冲**（不写瓦片、不扩层）；确认再一次 expand + 栅格化
 - 确认走 `PaintEngine::freeTransform` → `FreeTransformOp`（`quadToQuad` 逆映射采样）
 - 插值：邻近 / 两次线性 / 两次立方；水平/垂直翻转；会话内逐步撤销
-- 目标四角超出层 extent 时：`Layer::expandToIncludeLocal` 扩层，避免角被裁切
+- Compositor：有预览覆盖时叠「挖空后的瓦片 + 预览图」，z 序不变
 
-**对照**：交互偏 PS Ctrl+T；结构要点对照 GIMP Unified Transform（四角/确认再提交）。非完整对齐 GIMP（约束、GEGL 预览选项、路径/选区变换、clip 策略等见下「未排期对齐项」）。
+**对照**：交互偏 PS Ctrl+T；预览语义对齐 GIMP composited preview 精简版（独立缓冲参与合成，确认再写 drawable）。未做：预览透明度选项、同步/异步开关、约束键等。
 
-### 已知风险：大层拖拽扩层可能卡顿
+### 已缓解：大层拖拽扩层卡顿（2026-10，第 1 档）
 
-**可能出现什么问题**
+**曾有问题**：预览每帧写回本层 → `expandToIncludeLocal` → 整层 `materialize`/`setFromImage`，大图拖角卡顿。
 
-- 旋转或拖大后，四角超出当前层宽高 → 触发扩层
-- 扩层当前实现：`materialize()` 把**整层**已有瓦片拼成一张大图 → 贴进更大图 → `setFromImage`（`reset` 旧瓦片表再按新图重切）
-- 大图、已分配瓦片多时，**每次**越界扩层都相当于整层「拆开再重装」→ 拖拽明显卡顿
-- 卡顿主因是整层拷贝与重建，**不是**「多申请几块 64×64」本身
+#### 逻辑优化对照（改前 → 改后）
 
-**已缓解（正确性，2026-10）**
+| 维度 | 改前（写回本层预览） | 改后（会话工作缓冲） |
+|------|----------------------|----------------------|
+| **预览落点** | 每帧 `freeTransform` 直接写 `layer->tiles()` | 写临时 `TileBuffer`，结果挂 `Layer::compositePreview` |
+| **层 extent** | 每帧 `ensureLayerFitsCorners` → 可能 `expandToIncludeLocal`（整层重分配） | 拖中**从不扩层**；仅 `commitSession` 扩一次 |
+| **擦除旧预览** | 每帧 `clearLayerRect` 清旧脏∪源∪新目标，再重写瓦片 | 替换预览 QImage 即可；层瓦片在会话内保持「挖空后的真相」 |
+| **文档真相** | 拖中瓦片已被改写；取消依赖整层快照回滚（含多次扩层后的尺寸） | 拖中瓦片不动（除进会话时一次挖空）；预览是合成覆盖 |
+| **合成路径** | 与平常一样读瓦片（预览已在瓦片里） | Compositor：有预览时叠「瓦片（含挖空）+ 预览图」，z / 不透明度 / 混合不变 |
+| **确认** | 再 `ensureLayerFitsCorners` + 正式 `freeTransform`（瓦片上已有预览痕迹，需先还原快照） | 清预览 → 还原进会话快照 → undo → **一次** expand → `freeTransform` |
+| **取消** | 整层 `replaceFromImage` 回滚（可能已多次扩层） | `clearCompositePreview` + 还原进会话快照（extent 未被动过） |
+| **代价模型** | O(扩层 materialize) × 拖拽帧数，大图拖出边界时爆炸 | O(目标包围盒栅格化 + 挂一张预览图) × 帧数；扩层成本摊到确认一次 |
 
-- 进入 Ctrl+T 时快照整层像素+offset；**取消**时 `replaceFromImage` 整层还原（不再只 blit 源矩形）
-- **提交**前先还原到进会话状态再 `pushLayerPixelsUndo`（含 offset）再扩层+栅格化，避免预览期 expand 泄漏进永久几何
+**核心语义变化**：拖动阶段从「改 drawable 再靠 undo/快照假装可逆」改为「drawable 冻结 + composited preview」，对齐 GIMP「独立缓冲参与合成、确认再写 drawable」的精简版。
 
-**仍可能卡顿（性能）**：预览期每次越界仍可能 `expandToIncludeLocal`→整层重建；完善方向见下。
+**当前做法（落地步骤）**
 
-**出现问题后怎么完善（建议）**
+1. **会话工作缓冲**：`updateLayerPreview` 在临时 `TileBuffer` 上栅格化，结果挂 `setCompositePreview`；拖中不碰层 extent。
+2. **确认一次定稿**：还原进会话快照 → undo → `expandToIncludeLocal` 一次 → `freeTransform` 写瓦片。
+3. **取消**：`clearCompositePreview` + 整层还原进会话快照。
 
-参考 GIMP：变换在独立缓冲 / 图节点上算，预览改矩阵，确认再一次定稿；避免拖拽中反复整层 `materialize`。
-
-可落在本工程的改法（任选或组合，单独开一轮）：
-
-1. **会话工作缓冲**：进入 Ctrl+T 时按「最大可能包围盒」或按需扩一次工作 `TileBuffer`/`QImage`，拖拽只往工作缓冲写预览；确认再写回层（或替换层缓冲）。拖拽中不再 `setFromImage` 整层重建。
-2. **轻量扩层 API**：扩 extent 时按瓦片格子平移/拷贝（只动边缘格），不要整层拼图再重切。
-3. **拖拽节流**：预览用较快插值 + 限频；扩层合并到「松手 / 确认」再做（松手前可用临时画布预览越界部分）。
-4. **观测**：大文档（如 4K 层）下对 `expandToIncludeLocal` / `updateLayerPreview` 打点，确认卡在 materialize 再改，避免过早优化。
+**仍可后置（收益递减）**：轻量扩层 API、拖拽节流、预览选项 UI。
 
 **相关代码**
 
-- `tools/transformtool.cpp`：`ensureLayerFitsCorners` / `updateLayerPreview` / `commitSession` / `cancelSession`（`m_preSessionPixels`）
-- `domain/layer.cpp`：`expandToIncludeLocal`
-- `domain/tilebuffer.cpp`：`materialize` / `setFromImage`
-- `engine/op/freetransformop.cpp`：栅格化算子（卡顿主因一般不在此处采样循环，而在扩层重建）
-- `app/undoitem.cpp`：`LayerPixelsUndo` 现含 offset
+- `tools/transformtool.cpp`：`updateLayerPreview` / `commitSession` / `cancelSession`（已删拖中 `ensureLayerFitsCorners`）
+- `domain/layer.*`：`setCompositePreview` / `clearCompositePreview`
+- `engine/compositor.cpp`：预览覆盖叠层
+- `engine/op/freetransformop.cpp`：栅格化算子
 
 ---
 
 ## 未排期：进一步对齐 GIMP 时可按模块补
 
-若要以 GIMP Unified Transform 为齐，建议分轮，不必与上面卡顿优化绑在一起：
+若要以 GIMP Unified Transform 为齐，建议分轮，不必与上面绑在一起：
 
 1. **约束** — Shift/修饰键与手柄约束（等比、沿边斜切、透视约束等）
 2. **预览选项** — 是否显示预览、合成预览、同步、透明度等

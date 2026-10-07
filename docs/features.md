@@ -24,7 +24,8 @@
   - **Ctrl+S / 存储**：始终写 **`.pslite`** 工程（无路径时弹出「存储为」）。
   - **存储为**：可选 `.pslite`（完整工程）或 `.psd`（子集，供 PS 打开）。
   - **`.pslite`**（`io/projectio.*`）：画布尺寸、活动层、图层（像素/样式/蒙版/链接/kind/滤镜）、选区。
-    单一 `ProjectFormat::Current`；布局变更不保证旧档可开。
+    单一 `ProjectFormat::Current`（现为 2）。滤镜参数为**固定 512B 块 + 尾部预留**，
+    后续加字段占预留、勿无长度追加；预留用尽再改 `Current`。更早布局旧档不保证可开。
   - **`.psd`**（`io/psdio.*`）：RGB 8-bit 分层子集——图层名/可见/不透明度/位置/像素 + 合成预览。对照 GIMP `file-psd` 导出的极简版。
   - **PSD 未写**：选区、组、蒙版、调整层、样式、路径、文字。完整再编辑请用 `.pslite`。
   - 打开：`.pslite` + 常见栅格图（PSD 打开未做）。
@@ -77,10 +78,11 @@
   未做：选区/路径移动、对齐、「仅移动当前层」开关。
 - **自由变换（Ctrl+T）**：编辑→自由变换 / 移动组飞出；选项栏与右键模式（含斜切/扭曲/透视）；
   拖角·边缩放、框内平移、框外旋转；Enter 提交、Esc 取消；会话内逐步撤销；翻转。
-  预览写回同一图层（z 序不变）；提交走 `FreeTransformOp`（`quadToQuad`）。
-  超出层 extent 时 `expandToIncludeLocal` 扩层防裁切。
-  对照 GIMP Unified Transform 骨架（四角→确认再写）；UI 偏 PS。
-  **已知风险 / 完善方向**（大层拖拽扩层卡顿等）：见 [pending-dev.md](pending-dev.md)。
+  **预览**：挂 `Layer::compositePreview`（临时缓冲参与合成，**不写瓦片、拖中不扩层**）；
+  **确认**：一次 `expandToIncludeLocal` + `FreeTransformOp`（`quadToQuad`）写瓦片。
+  相对旧实现的逻辑优化（写回本层 → 工作缓冲）见 [pending-dev.md](pending-dev.md)「逻辑优化对照」。
+  对照 GIMP Unified Transform 骨架 + composited preview 精简版；UI 偏 PS。
+  **完善方向**（约束键、预览选项等）：见 [pending-dev.md](pending-dev.md)。
   未做：变形（Warp）、完整 GIMP 约束/clip 选项、选区与路径变换。
 - **视图操作**：画布实现 `ViewPort`，工具经 `zoomAt` / `panBy` 请求缩放平移 ——
   锚点缩放数学只存在于 `CanvasView::zoomAt` 一处。
@@ -257,12 +259,17 @@
   **累计脏区** `dirtyRect()`，以及供 UI 使用的**语义化 setter**。
 - **约定**：UI **不得**直接改 `Layer`，一律走 `ImageDocument::setLayerVisible/Opacity/Name/BlendMode`；
   像素写入走 `tiles()`，之后必须 `markDirty(rect)`。
-- **调整图层（MVP）**：`addBrightnessContrastAdjustmentLayer`；合成时对下方阶段性结果应用滤镜
-  （对照 PS；GIMP 原生无此层种）。入口：图层→新建调整图层、图层面板底栏半圆按钮；行名后缀「（调整）」。
-  写入 `.pslite`（kind + 滤镜栈）。色阶/曲线类型与参数对话框后置。
-- **限制**：新建层时尚无「选填充类型」对话框（固定透明）；面板已可操作图层。
+- **调整图层（对齐 PS 菜单）**：底栏半圆按钮弹出类型菜单（亮度/对比度、色阶、曲线、曝光、
+  自然饱和度、色相/饱和度、色彩平衡、黑白、照片滤镜、通道混合器、颜色查找、反相、
+  色调分离、阈值、渐变映射、可选颜色；纯色/渐变/图案填充灰显后置）。
+  `addAdjustmentLayer(OpName)`：**自动白蒙版**；选中后**属性面板切换为该类型参数页**
+  （`ui/adj/*.ui` + `AdjustmentPropsHost`）。合成吃下方阶段性结果 + 蒙版；`FilterEval` 求值。
+  曲线为**主通道 5 点**精简版（非完整贝塞尔编辑器）；颜色查找为内置 1D LUT 预设。
+  写入 `.pslite`（kind + 滤镜参数）。
+  对照：PS 调整图层；GIMP 原生无此层种，等价物为 drawable filter（GEGL 算子图），非常驻属性页。
+- **限制**：新建像素层时尚无「选填充类型」对话框（固定透明）；面板已可操作图层。
 - **图层蒙版**：`LayerMask` 灰度挂在 `Layer`；合成时 `alpha *= mask`；
-  面板底栏 / 菜单可添加、删除、停用、应用、链接；可涂画；写入 `.pslite`。
+  调整层创建时自动挂白蒙版；面板底栏 / 菜单可添加、删除、停用、应用、链接；可涂画；写入 `.pslite`。
 
 ### 合成预览
 
@@ -353,12 +360,12 @@
   - **实现**：`LayerStyleStack` 挂在 `Layer` 上（与 `FilterStack` 分离）；`LayerStyleEval` 在合成时非破坏求值（对照 GIMP DrawableFilter + PSD→`gegl:dropshadow` / `inner-glow` / `color-overlay`）。
   - **对话框**：每效果独立参数（颜色 / 大小 / 距离 / 角度 / 扩展 / 不透明度）。
   - **面板内效果树**：有样式时层行显示 `fx` 与展开箭头；展开后缩进列出「效果」与各效果眼睛开关（`setLayerStyleEnabled`）。
-  - **工程**：`.pslite` 读写样式栈与图层蒙版；旧版本文件仍可打开（缺字段则按无样式/无蒙版处理）。
+  - **工程**：`.pslite` 读写样式栈与图层蒙版；缺字段按无样式/无蒙版。滤镜块见上「固定预留」口径。
   - **未做**：斜面浮雕、渐变/图案叠加、样式预设拷贝、写入 PSD；「效果」组头一键全关。
 - **图标来源**：整套由 `resources/icons/layers/_gen_svg_icons.py` 生成的 **SVG 矢量**，运行时按显示尺寸光栅化（任意尺寸锐利）。**自绘占位**，可按 `docs/ui/iconfont-icons.md` 的关键词从 iconfont.cn 同名替换。
 - **限制**：无缩略图尺寸选项；
   底栏链接 / 图层组、填充滑条、图层筛选行仍为 UI 占位（**点了不会有反应**）。
-  **调整层底栏已接线**（新建亮度/对比度调整图层）。
+  **调整层底栏已接线**（多类型菜单 + 自动白蒙版 + 属性页）。
   **蒙版底栏已接线**（无选区→显示全部/白；有选区→显示选区；再点删除）。行内显示蒙版缩略图；
   **添加后自动进入蒙版编辑**（蒙版缩略图高亮）；菜单「隐藏全部」等同。
   **单击蒙版**进入蒙版编辑（画笔写灰度：黑藏白显；橡皮涂白露出），
@@ -408,3 +415,4 @@
 | PSD 导入 / 导出 | 常见分层 PSD 简版读写 | 可选待排期 |
 | 智能对象 / 链接层 | 链接置入 MVP 已做；完整嵌入 SO / 监视器未做 | 链接 MVP ✅；完整 SO 待排期 |
 | 插件库 | 极简扩展点（滤镜/导出钩子） | 可选待排期 |
+| 存储为 Web | 多格式（PNG/JPEG/WebP 等）可选压缩算法/质量；预览与体积；对照 PS Save for Web | 可选待排期（[Roadmap Phase 5](../wiki/Roadmap.md)） |

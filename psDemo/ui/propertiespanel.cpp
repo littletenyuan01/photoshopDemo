@@ -4,13 +4,14 @@
 #include "propertiespanel.h"
 #include "ui_propertiespanel.h"
 
+#include "adjustmentpropshost.h"
 #include "app/appsession.h"
+#include "domain/filternode.h"
 #include "domain/imagedocument.h"
 #include "domain/layer.h"
 
 namespace {
 
-/** 折叠分区的箭头；展开/收起各一个（对应 GIMP 展开器 GtkExpander 的三角）。 */
 constexpr char kArrowExpanded[] = "▾ ";
 constexpr char kArrowCollapsed[] = "▸ ";
 
@@ -21,10 +22,12 @@ PropertiesPanel::PropertiesPanel(QWidget *parent)
     , ui(new Ui::PropertiesPanel)
 {
     ui->setupUi(this);
-    // 对齐图标 / ≡ 在 propertiespanel.ui
     ui->panelTabs->setCornerWidget(ui->btnPanelMenu, Qt::TopRightCorner);
 
-    // X/Y/旋转：失焦钳制；控件类型来自 ui_propertiespanel.h
+    m_adjHost = new AdjustmentPropsHost(ui->propertiesScrollBody);
+    ui->propertiesBodyLayout->insertWidget(1, m_adjHost);
+    m_adjHost->hide();
+
     connect(ui->editAngle, &QLineEdit::editingFinished, this, [this]() {
         bool ok = false;
         const double v = ui->editAngle->text().trimmed().toDouble(&ok);
@@ -44,6 +47,11 @@ PropertiesPanel::PropertiesPanel(QWidget *parent)
 
     bindCollapsible(ui->toggleTransform, ui->transformBody);
     bindCollapsible(ui->toggleAlign, ui->alignBody);
+
+    connect(m_adjHost, &AdjustmentPropsHost::previewChanged,
+            this, &PropertiesPanel::onAdjPreview);
+    connect(m_adjHost, &AdjustmentPropsHost::commitChanged,
+            this, &PropertiesPanel::onAdjCommit);
 
     refreshFromDocument();
 }
@@ -76,11 +84,25 @@ void PropertiesPanel::onSessionDocumentChanged(Ps::ImageDocument *document)
     m_document = document;
 
     if (m_document) {
-        // 像素/结构变化与换活动图层都只需整块重读，故两个信号共用同一个槽
-        // （早先写成两个只差 Q_UNUSED 的包装槽，纯冗余）
+        // contentChanged 在调参预览时很频繁：只刷新摘要，不重载滑条
         connect(m_document, &Ps::ImageDocument::contentChanged,
-                this, &PropertiesPanel::refreshFromDocument);
+                this, [this]() {
+                    if (!m_document)
+                        return;
+                    const Ps::Layer *layer = m_document->activeLayer();
+                    if (layer) {
+                        ui->labelTarget->setText(
+                            QStringLiteral("文档 %1 × %2 px｜图层 %3")
+                                .arg(m_document->width())
+                                .arg(m_document->height())
+                                .arg(layer->name()));
+                    }
+                });
         connect(m_document, &Ps::ImageDocument::activeLayerChanged,
+                this, &PropertiesPanel::refreshFromDocument);
+        connect(m_document, &Ps::ImageDocument::layerPropertiesChanged,
+                this, &PropertiesPanel::refreshFromDocument);
+        connect(m_document, &Ps::ImageDocument::structureChanged,
                 this, &PropertiesPanel::refreshFromDocument);
     }
     refreshFromDocument();
@@ -89,8 +111,6 @@ void PropertiesPanel::onSessionDocumentChanged(Ps::ImageDocument *document)
 void PropertiesPanel::bindCollapsible(QToolButton *toggle, QWidget *body)
 {
     Q_ASSERT(toggle && body);
-    // 分区显示名存在 text 里（如「变换」），箭头由这里统一拼，
-    // 避免 .ui 与代码各写一半箭头、出现「箭头说收起、内容还在」的错位
     const QString label = toggle->text();
     const auto apply = [toggle, body, label](bool expanded) {
         toggle->setText((expanded ? QString::fromUtf8(kArrowExpanded)
@@ -102,12 +122,39 @@ void PropertiesPanel::bindCollapsible(QToolButton *toggle, QWidget *body)
     apply(toggle->isChecked());
 }
 
+void PropertiesPanel::setAdjustmentMode(bool on)
+{
+    m_adjHost->setVisible(on);
+    ui->toggleTransform->setVisible(!on);
+    ui->transformBody->setVisible(!on && ui->toggleTransform->isChecked());
+    ui->toggleAlign->setVisible(!on);
+    ui->alignBody->setVisible(!on && ui->toggleAlign->isChecked());
+}
+
+void PropertiesPanel::onAdjPreview(const Ps::FilterNode &node)
+{
+    if (!m_document)
+        return;
+    const int li = m_document->activeLayerIndex();
+    m_document->setLayerFilterNode(li, 0, node, /*pushUndo=*/false);
+}
+
+void PropertiesPanel::onAdjCommit(const Ps::FilterNode &node)
+{
+    if (!m_document)
+        return;
+    const int li = m_document->activeLayerIndex();
+    m_document->setLayerFilterNode(li, 0, node, /*pushUndo=*/true);
+}
+
 void PropertiesPanel::refreshFromDocument()
 {
     if (!m_document) {
         ui->labelTarget->setText(QStringLiteral("未打开文档"));
         ui->editW->setText(QStringLiteral("0"));
         ui->editH->setText(QStringLiteral("0"));
+        setAdjustmentMode(false);
+        m_adjHost->clear();
         return;
     }
 
@@ -125,5 +172,13 @@ void PropertiesPanel::refreshFromDocument()
                                      .arg(m_document->height()));
         ui->editW->setText(QStringLiteral("0"));
         ui->editH->setText(QStringLiteral("0"));
+    }
+
+    if (layer && layer->isAdjustmentLayer() && layer->filters().count() > 0) {
+        setAdjustmentMode(true);
+        m_adjHost->setNode(layer->filters().at(0));
+    } else {
+        setAdjustmentMode(false);
+        m_adjHost->clear();
     }
 }

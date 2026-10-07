@@ -213,6 +213,18 @@ public:
     QPoint expandToIncludeLocal(const QRect &localNeeded);
 
     /**
+     * 临时合成预览覆盖（对照 GIMP transform composited preview 精简版）。
+     * 非空时 Compositor 用该图参与叠层（文档坐标 top-left），不改瓦片真相。
+     * 自由变换拖中写此缓冲；确认/取消时 clear。
+     */
+    bool hasCompositePreview() const { return !m_compositePreview.isNull(); }
+    const QImage &compositePreview() const { return m_compositePreview; }
+    int compositePreviewDocX() const { return m_compositePreviewDocX; }
+    int compositePreviewDocY() const { return m_compositePreviewDocY; }
+    void setCompositePreview(const QImage &image, int docX, int docY);
+    void clearCompositePreview();
+
+    /**
      * 挂文档 owner，使属性 setter 能回调广播。
      * **仅** ImageDocument::addLayer 应调用；UI 不要直接调。
      */
@@ -239,6 +251,11 @@ private:
     LayerStyleStack m_styles; ///< 非破坏图层样式（对照 PS fx / GIMP layer effects）
     std::unique_ptr<LayerMask> m_mask; ///< 图层蒙版；可空
     QString m_linkPath; ///< 链接源绝对路径；空=普通层（对照 GimpLink 文件）
+
+    /** 临时合成预览（文档坐标贴图）；空=无覆盖。 */
+    QImage m_compositePreview;
+    int m_compositePreviewDocX = 0;
+    int m_compositePreviewDocY = 0;
 
     /** 层内坐标内容包围盒缓存；与 offset 无关。 */
     mutable QRect m_contentBoundsLocal;

@@ -1,8 +1,8 @@
 /**
  * transformtool.h — 自由变换工具（tools 层）。
  *
- * 对照 GIMP Transform Grid：交互态只维护四角/矩阵（trans_info），不逐步写文档历史；
- * 实时预览写回同一图层瓦片（正常投影合成，z 序不变）；确认时才 push 一条撤销。
+ * 对照 GIMP Transform Grid：交互态只维护四角（trans_info），确认再写回。
+ * 拖中预览写入 Layer 临时合成覆盖（不改瓦片、不扩层）；确认一次 expand + 栅格化。
  * 会话内 Ctrl+Z / Ctrl+Shift+Z 逐步还原/重做变换步骤（对照 PS Free Transform）。
  */
 #ifndef TRANSFORMTOOL_H
@@ -134,18 +134,16 @@ private:
     /** @param userExit true = Esc/✗/✓ 后请求回到 Move；deactivate 传 false。 */
     void cancelSession(const ToolContext &ctx, bool userExit = true);
     bool commitSession(const ToolContext &ctx);
-    /** 会话内预览：从层上暂时挖空源矩形（不进文档历史；取消时写回）。 */
+    /** 会话内：从层上挖空源矩形（不进文档历史；取消时整层还原）。 */
     void liftSourceFromLayer(Layer *layer);
-    void putSourceBackToLayer(Layer *layer);
     /**
-     * 把当前四角预览写回该图层瓦片（走正常投影合成，z 序不变）。
-     * 对照 GIMP composited preview：预览在原图层位置参与叠层，不盖住上层。
+     * 把当前四角渲染到会话工作缓冲，挂到 Layer::setCompositePreview。
+     * 不写瓦片、不 expand（对照 GIMP composited preview 精简版）。
      */
     void updateLayerPreview(ImageDocument *doc);
-    QRect previewDestLocal(const Layer *layer) const;
+    /** 目标四角在文档坐标的包围盒（含边距）。 */
+    QRect previewDestDoc() const;
     void clearLayerRect(Layer *layer, const QRect &localRect);
-    /** 目标四角超出层 extent 时扩层（旋转常见），并平移 m_srcLocal。 */
-    void ensureLayerFitsCorners(Layer *layer);
 
     Handle hitTest(const QPointF &widgetPos, const ToolContext &ctx) const;
     QPointF cornerWidget(int index, const ToolContext &ctx) const;
@@ -174,7 +172,7 @@ private:
     int m_preSessionOx = 0;
     int m_preSessionOy = 0;
     QRect m_preSrcLocal;
-    QRect m_previewDirtyLocal; ///< 层内：上次实时预览脏区（取消/重绘前要清）
+    QRect m_previewDirtyDoc; ///< 文档坐标：上次预览脏区（投影增量）
     qreal m_baseW = 1.0;    ///< 会话开始时宽（文档像素）
     qreal m_baseH = 1.0;
 

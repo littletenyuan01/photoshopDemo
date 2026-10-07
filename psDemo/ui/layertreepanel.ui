@@ -784,7 +784,10 @@ QToolButton:disabled { color: #666; }</string>
          <string/>
         </property>
         <property name="toolTip">
-         <string>新建亮度/对比度调整图层</string>
+         <string>创建新的填充或调整图层</string>
+        </property>
+        <property name="popupMode">
+         <enum>QToolButton::ToolButtonPopupMode::InstantPopup</enum>
         </property>
         <property name="iconSize">
          <size>

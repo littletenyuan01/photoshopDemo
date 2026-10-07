@@ -2,7 +2,8 @@
  * projectio.h — `.pslite` 工程文件读写（io 层）。
  *
  * 对照 GIMP XCF 的最小子集；与 ImageDocument / Layer / Selection 配合。
- * 现阶段只有一种磁盘布局：改布局即改枚举，不保证旧档可开。
+ * 单一 ProjectFormat::Current；滤镜参数用固定字节块+预留，避免每加字段就撑爆旧档。
+ * Demo 完成前不保证更早布局的文件可开。
  */
 #ifndef PROJECTIO_H
 #define PROJECTIO_H
@@ -17,10 +18,10 @@ class ImageDocument;
 
 /**
  * 工程磁盘格式标识（写入文件头的 quint32）。
- * 当前仅 Current；布局不兼容变更时改此枚举值即可。
+ * 仅 Current；不兼容变更时改此值。滤镜参数块大小见 projectio.cpp `kFilterNodeParamBytes`。
  */
 enum class ProjectFormat : quint32 {
-    Current = 1,
+    Current = 2, ///< 滤镜节点：op+enabled+固定 512B 参数块（含预留）
 };
 
 /**
@@ -32,6 +33,7 @@ enum class ProjectFormat : quint32 {
  * - 魔数、ProjectFormat、文档宽高、活动层
  * - 每层：名 / 显隐 / 不透明度 / 混合 / offset + PNG 像素（无瓦片则长度 0）
  *   + 样式栈 + 可选蒙版 + 链接路径 + kind + 滤镜栈
+ *   （滤镜：count × {op, enabled, 固定长度参数 blob，尾部预留填 0}）
  * - 选区：灰度 PNG（空选区则长度 0）
  */
 class ProjectIo

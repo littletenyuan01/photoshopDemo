@@ -257,7 +257,8 @@ bool Compositor::blendLayerRange(QImage &dst,
             continue;
         }
 
-        if (!layer->hasPixelData())
+        const bool hasPreview = layer->hasCompositePreview();
+        if (!layer->hasPixelData() && !hasPreview)
             continue;
 
         const BlendMode mode = layer->blendMode();
@@ -275,6 +276,29 @@ bool Compositor::blendLayerRange(QImage &dst,
                                  && layer->mask()->isEnabled())
                                     ? layer->mask()
                                     : nullptr;
+
+        // 会话预览覆盖：瓦片（含挖空）+ 预览图叠在同一层位置，z 序不变
+        if (hasPreview) {
+            if (layer->hasPixelData()) {
+                layer->tiles().forEachAllocatedTile(
+                    [&](int, int, const QImage &tile, const QRect &bounds) {
+                        const QRect docBounds = bounds.translated(layerOx, layerOy);
+                        if (!docBounds.intersects(area))
+                            return;
+                        blendTileOnto(dst, tile,
+                                      bounds.x() + layerOx,
+                                      bounds.y() + layerOy,
+                                      opacity, modeOp, area,
+                                      mask, layerOx, layerOy);
+                    });
+            }
+            blendTileOnto(dst, layer->compositePreview(),
+                          layer->compositePreviewDocX(),
+                          layer->compositePreviewDocY(),
+                          opacity, modeOp, area,
+                          mask, layerOx, layerOy);
+            continue;
+        }
 
         const bool needMaterialize = layer->filters().hasEnabled()
                                      || layer->styles().hasEnabled();

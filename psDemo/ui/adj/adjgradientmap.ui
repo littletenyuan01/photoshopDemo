@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>AdjGradientMap</class>
+ <widget class="QWidget" name="AdjGradientMap">
+  <layout class="QVBoxLayout" name="rootLayout">
+   <property name="spacing"><number>4</number></property>
+   <property name="leftMargin"><number>0</number></property>
+   <property name="topMargin"><number>0</number></property>
+   <property name="rightMargin"><number>0</number></property>
+   <property name="bottomMargin"><number>0</number></property>
+   <item>
+    <widget class="QLabel" name="labelTitle">
+     <property name="text"><string>渐变映射</string></property>
+    </widget>
+   </item>
+   <item>
+    <widget class="QLabel" name="labelHint">
+     <property name="text"><string>默认黑→白按亮度映射；可改强度</string></property>
+     <property name="wordWrap"><bool>true</bool></property>
+    </widget>
+   </item>
+   <item>
+    <layout class="QGridLayout" name="grid">
+     <item row="0" column="0"><widget class="QLabel" name="label_strength"><property name="text"><string>强度</string></property></widget></item>
+     <item row="0" column="1"><widget class="QSlider" name="slider_strength"><property name="orientation"><enum>Qt::Orientation::Horizontal</enum></property><property name="minimum"><number>0</number></property><property name="maximum"><number>100</number></property><property name="value"><number>100</number></property></widget></item>
+     <item row="0" column="2"><widget class="QSpinBox" name="spin_strength"><property name="minimum"><number>0</number></property><property name="maximum"><number>100</number></property><property name="value"><number>100</number></property></widget></item>
+    </layout>
+   </item>
+   <item>
+    <spacer name="vSpacer"><property name="orientation"><enum>Qt::Orientation::Vertical</enum></property><property name="sizeHint" stdset="0"><size><width>20</width><height>1</height></size></property></spacer>
+   </item>
+  </layout>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>

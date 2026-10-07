@@ -7,9 +7,11 @@
 #define IMAGEDOCUMENT_H
 
 #include "blendmode.h"
+#include "filternode.h"
 #include "layerstack.h"
 #include "layerstyle.h"
 #include "selection.h"
+#include "engine/op/opname.h"
 
 #include <QColor>
 #include <QObject>
@@ -109,12 +111,20 @@ public:
      */
     int addBrightnessContrastFilter(qreal brightness = 0.12, qreal contrast = 0.18);
     /**
-     * 新建亮度/对比度调整层（对照 PS 调整图层 / 吃下方阶段性合成）。
-     * GIMP 原生无此层种，等价物是 drawable filter；本 Demo 按 PS 语义做独立层。
+     * 新建调整图层（对照 PS：独立层种 + 默认白色蒙版 + 属性面板调参）。
+     * GIMP 原生无此层种，等价物是 drawable filter；本 Demo 按 PS 语义。
      * @return 新层下标；失败 -1。
      */
+    int addAdjustmentLayer(OpName op);
+    /** @deprecated 请用 addAdjustmentLayer(OpName::BrightnessContrast)。 */
     int addBrightnessContrastAdjustmentLayer(qreal brightness = 0.12,
                                              qreal contrast = 0.18);
+    /**
+     * 替换指定滤镜节点参数（调整层属性面板）。
+     * @param pushUndo 滑条松手时 true；拖动中 false 仅预览。
+     */
+    bool setLayerFilterNode(int layerIndex, int filterIndex, const FilterNode &node,
+                            bool pushUndo);
     /** 开关指定滤镜；index 越界返回 false。 */
     bool setLayerFilterEnabled(int layerIndex, int filterIndex, bool enabled);
     /** 移除指定滤镜。 */

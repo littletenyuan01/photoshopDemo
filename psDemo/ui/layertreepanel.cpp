@@ -9,6 +9,7 @@
 #include "domain/layer.h"
 #include "domain/layerstylestack.h"
 #include "domain/selection.h"
+#include "engine/op/opname.h"
 #include "ui/layerrowwidget.h"
 #include "ui/layerstyledialog.h"
 
@@ -19,8 +20,10 @@
 #include <QDropEvent>
 #include <QEvent>
 #include <QListWidgetItem>
+#include <QAction>
 #include <QMenu>
 #include <QMimeData>
+#include <QToolButton>
 #include <QMouseEvent>
 #include <QPainter>
 #include <QPen>
@@ -53,6 +56,42 @@ LayerTreePanel::LayerTreePanel(QWidget *parent)
     connect(ui->btnDelete, &QToolButton::clicked, this, &LayerTreePanel::onBtnDeleteClicked);
     connect(ui->btnLayerStyle, &QToolButton::clicked, this, &LayerTreePanel::onBtnLayerStyleClicked);
     connect(ui->btnLayerMask, &QToolButton::clicked, this, &LayerTreePanel::onBtnLayerMaskClicked);
+    {
+        // 对照 PS 半圆按钮：弹出填充/调整菜单（填充项暂灰显）
+        auto *menu = new QMenu(ui->btnAdjustment);
+        auto addAdj = [this, menu](Ps::OpName op) {
+            QAction *a = menu->addAction(Ps::opNameTitle(op));
+            a->setData(int(op));
+            connect(a, &QAction::triggered, this, &LayerTreePanel::onAddAdjustmentLayer);
+        };
+        QAction *fillSolid = menu->addAction(QStringLiteral("纯色…"));
+        QAction *fillGrad = menu->addAction(QStringLiteral("渐变…"));
+        QAction *fillPat = menu->addAction(QStringLiteral("图案…"));
+        fillSolid->setEnabled(false);
+        fillGrad->setEnabled(false);
+        fillPat->setEnabled(false);
+        menu->addSeparator();
+        addAdj(Ps::OpName::BrightnessContrast);
+        addAdj(Ps::OpName::Levels);
+        addAdj(Ps::OpName::Curves);
+        addAdj(Ps::OpName::Exposure);
+        menu->addSeparator();
+        addAdj(Ps::OpName::Vibrance);
+        addAdj(Ps::OpName::HueSaturation);
+        addAdj(Ps::OpName::ColorBalance);
+        addAdj(Ps::OpName::BlackAndWhite);
+        addAdj(Ps::OpName::PhotoFilter);
+        addAdj(Ps::OpName::ChannelMixer);
+        addAdj(Ps::OpName::ColorLookup);
+        menu->addSeparator();
+        addAdj(Ps::OpName::Invert);
+        addAdj(Ps::OpName::Posterize);
+        addAdj(Ps::OpName::Threshold);
+        addAdj(Ps::OpName::GradientMap);
+        addAdj(Ps::OpName::SelectiveColor);
+        ui->btnAdjustment->setMenu(menu);
+        ui->btnAdjustment->setPopupMode(QToolButton::InstantPopup);
+    }
     connect(ui->btnAdjustment, &QToolButton::clicked, this, &LayerTreePanel::onBtnAdjustmentClicked);
     connect(ui->itemList, &QListWidget::itemSelectionChanged,
             this, &LayerTreePanel::onListSelectionChanged);
@@ -432,11 +471,21 @@ void LayerTreePanel::onBtnLayerMaskClicked()
 
 void LayerTreePanel::onBtnAdjustmentClicked()
 {
+    // InstantPopup 时菜单已弹出；保留槽以免旧信号空挂
+}
+
+void LayerTreePanel::onAddAdjustmentLayer()
+{
     Ps::ImageDocument *doc = document();
     if (!doc)
         return;
-    if (doc->addBrightnessContrastAdjustmentLayer() < 0)
+    auto *action = qobject_cast<QAction *>(sender());
+    if (!action)
         return;
+    const auto op = static_cast<Ps::OpName>(action->data().toInt());
+    if (!Ps::isAdjustmentOp(op))
+        return;
+    doc->addAdjustmentLayer(op);
 }
 
 void LayerTreePanel::onNewItem()

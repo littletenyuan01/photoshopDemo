@@ -89,6 +89,7 @@ SOURCES += \
     ui/labeledlineedit.cpp \
     ui/labeledcombobox.cpp \
     ui/propertiespanel.cpp \
+    ui/adjustmentpropshost.cpp \
     ui/toolbox.cpp \
     ui/tooloptionsbar.cpp \
     ui/colorpickerdialog.cpp \
@@ -194,6 +195,7 @@ HEADERS += \
     ui/labeledlineedit.h \
     ui/labeledcombobox.h \
     ui/propertiespanel.h \
+    ui/adjustmentpropshost.h \
     ui/toolbox.h \
     ui/tooloptionsbar.h \
     ui/colorpickerdialog.h \
@@ -225,7 +227,23 @@ FORMS += \
     ui/canvassizedialog.ui \
     ui/layerstyledialog.ui \
     ui/layerrowwidget.ui \
-    ui/layerstylerowwidget.ui
+    ui/layerstylerowwidget.ui \
+    ui/adj/adjbrightnesscontrast.ui \
+    ui/adj/adjlevels.ui \
+    ui/adj/adjcurves.ui \
+    ui/adj/adjexposure.ui \
+    ui/adj/adjvibrance.ui \
+    ui/adj/adjhuesaturation.ui \
+    ui/adj/adjcolorbalance.ui \
+    ui/adj/adjblackandwhite.ui \
+    ui/adj/adjphotofilter.ui \
+    ui/adj/adjchannelmixer.ui \
+    ui/adj/adjcolorlookup.ui \
+    ui/adj/adjinvert.ui \
+    ui/adj/adjposterize.ui \
+    ui/adj/adjthreshold.ui \
+    ui/adj/adjgradientmap.ui \
+    ui/adj/adjselectivecolor.ui
 
 RESOURCES += \
     resources.qrc

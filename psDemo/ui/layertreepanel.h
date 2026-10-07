@@ -79,6 +79,7 @@ private slots:
     void onBtnLayerStyleClicked();
     void onBtnLayerMaskClicked();
     void onBtnAdjustmentClicked();
+    void onAddAdjustmentLayer();
     void onListSelectionChanged();
     void onActiveLayerChanged(int index);
     void onLayerPropertiesChanged(int stackIndex);

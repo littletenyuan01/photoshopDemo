@@ -428,24 +428,63 @@ int ImageDocument::addBrightnessContrastFilter(qreal brightness, qreal contrast)
     return index;
 }
 
-int ImageDocument::addBrightnessContrastAdjustmentLayer(qreal brightness, qreal contrast)
+int ImageDocument::addAdjustmentLayer(OpName op)
 {
-    if (m_width <= 0 || m_height <= 0)
+    if (m_width <= 0 || m_height <= 0 || !isAdjustmentOp(op))
         return -1;
 
     // 全画布 extent：蒙版可盖住整幅；无瓦片（hasPixelData=false）
-    auto layer = std::make_unique<Layer>(tr("亮度/对比度"), m_width, m_height);
+    auto layer = std::make_unique<Layer>(opNameTitle(op), m_width, m_height);
     layer->setKindSilent(LayerKind::Adjustment);
-    FilterNode node(OpName::BrightnessContrast);
-    node.setBrightness(brightness);
-    node.setContrast(contrast);
+    FilterNode node(op);
+    // 亮度/对比度默认略抬一点，便于立刻看见效果；其余保持中性默认
+    if (op == OpName::BrightnessContrast) {
+        node.setBrightness(0.12);
+        node.setContrast(0.18);
+    }
     layer->filters().append(node);
+    // 对齐 PS：新建调整层自动挂白色蒙版（显示全部）；随层结构进同一 undo
+    layer->setMask(std::make_unique<LayerMask>(m_width, m_height, 255));
 
     const int index = addLayer(std::move(layer), tr("新建调整图层"));
     if (index < 0)
         return -1;
     setActiveLayerIndex(index);
     return index;
+}
+
+int ImageDocument::addBrightnessContrastAdjustmentLayer(qreal brightness, qreal contrast)
+{
+    const int index = addAdjustmentLayer(OpName::BrightnessContrast);
+    if (index < 0)
+        return -1;
+    Layer *layer = m_layers.layerAt(index);
+    if (!layer || layer->filters().count() < 1)
+        return index;
+    FilterNode node = layer->filters().at(0);
+    node.setBrightness(brightness);
+    node.setContrast(contrast);
+    layer->filters().at(0) = node;
+    layer->invalidateCompositeRaster();
+    markDirty();
+    return index;
+}
+
+bool ImageDocument::setLayerFilterNode(int layerIndex, int filterIndex,
+                                       const FilterNode &node, bool pushUndo)
+{
+    Layer *layer = m_layers.layerAt(layerIndex);
+    if (!layer || filterIndex < 0 || filterIndex >= layer->filters().count())
+        return false;
+    if (pushUndo)
+        pushLayerPropUndo(layerIndex, tr("调整图层参数"));
+    layer->filters().at(filterIndex) = node;
+    layer->invalidateCompositeRaster();
+    markDirty(layer->boundsInDocument().intersected(QRect(0, 0, m_width, m_height)));
+    // 预览拖动不刷属性面板（避免滑条被重载）；提交/undo 才发属性信号
+    if (pushUndo)
+        emit layerPropertiesChanged(layerIndex);
+    return true;
 }
 
 bool ImageDocument::setLayerFilterEnabled(int layerIndex, int filterIndex, bool enabled)

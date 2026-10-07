@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>AdjSelectiveColor</class>
+ <widget class="QWidget" name="AdjSelectiveColor">
+  <layout class="QVBoxLayout" name="rootLayout">
+   <property name="spacing"><number>4</number></property>
+   <property name="leftMargin"><number>0</number></property>
+   <property name="topMargin"><number>0</number></property>
+   <property name="rightMargin"><number>0</number></property>
+   <property name="bottomMargin"><number>0</number></property>
+   <item>
+    <widget class="QLabel" name="labelTitle">
+     <property name="text"><string>可选颜色（相对）</string></property>
+    </widget>
+   </item>
+   <item>
+    <widget class="QLabel" name="labelTarget">
+     <property name="text"><string>颜色</string></property>
+    </widget>
+   </item>
+   <item>
+    <widget class="QComboBox" name="comboTarget">
+     <item><property name="text"><string>红色</string></property></item>
+     <item><property name="text"><string>黄色</string></property></item>
+     <item><property name="text"><string>绿色</string></property></item>
+     <item><property name="text"><string>青色</string></property></item>
+     <item><property name="text"><string>蓝色</string></property></item>
+     <item><property name="text"><string>洋红</string></property></item>
+     <item><property name="text"><string>白色</string></property></item>
+     <item><property name="text"><string>中性色</string></property></item>
+     <item><property name="text"><string>黑色</string></property></item>
+    </widget>
+   </item>
+   <item>
+    <layout class="QGridLayout" name="grid">
+     <item row="0" column="0"><widget class="QLabel" name="label_c"><property name="text"><string>青色</string></property></widget></item>
+     <item row="0" column="1"><widget class="QSlider" name="slider_c"><property name="orientation"><enum>Qt::Orientation::Horizontal</enum></property><property name="minimum"><number>-100</number></property><property name="maximum"><number>100</number></property><property name="value"><number>0</number></property></widget></item>
+     <item row="0" column="2"><widget class="QSpinBox" name="spin_c"><property name="minimum"><number>-100</number></property><property name="maximum"><number>100</number></property><property name="value"><number>0</number></property></widget></item>
+     <item row="1" column="0"><widget class="QLabel" name="label_m"><property name="text"><string>品红</string></property></widget></item>
+     <item row="1" column="1"><widget class="QSlider" name="slider_m"><property name="orientation"><enum>Qt::Orientation::Horizontal</enum></property><property name="minimum"><number>-100</number></property><property name="maximum"><number>100</number></property><property name="value"><number>0</number></property></widget></item>
+     <item row="1" column="2"><widget class="QSpinBox" name="spin_m"><property name="minimum"><number>-100</number></property><property name="maximum"><number>100</number></property><property name="value"><number>0</number></property></widget></item>
+     <item row="2" column="0"><widget class="QLabel" name="label_y"><property name="text"><string>黄色</string></property></widget></item>
+     <item row="2" column="1"><widget class="QSlider" name="slider_y"><property name="orientation"><enum>Qt::Orientation::Horizontal</enum></property><property name="minimum"><number>-100</number></property><property name="maximum"><number>100</number></property><property name="value"><number>0</number></property></widget></item>
+     <item row="2" column="2"><widget class="QSpinBox" name="spin_y"><property name="minimum"><number>-100</number></property><property name="maximum"><number>100</number></property><property name="value"><number>0</number></property></widget></item>
+     <item row="3" column="0"><widget class="QLabel" name="label_k"><property name="text"><string>黑色</string></property></widget></item>
+     <item row="3" column="1"><widget class="QSlider" name="slider_k"><property name="orientation"><enum>Qt::Orientation::Horizontal</enum></property><property name="minimum"><number>-100</number></property><property name="maximum"><number>100</number></property><property name="value"><number>0</number></property></widget></item>
+     <item row="3" column="2"><widget class="QSpinBox" name="spin_k"><property name="minimum"><number>-100</number></property><property name="maximum"><number>100</number></property><property name="value"><number>0</number></property></widget></item>
+    </layout>
+   </item>
+   <item>
+    <spacer name="vSpacer"><property name="orientation"><enum>Qt::Orientation::Vertical</enum></property><property name="sizeHint" stdset="0"><size><width>20</width><height>1</height></size></property></spacer>
+   </item>
+  </layout>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>

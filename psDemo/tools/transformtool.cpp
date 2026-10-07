@@ -6,6 +6,7 @@
 #include "domain/imagedocument.h"
 #include "domain/layer.h"
 #include "domain/selection.h"
+#include "domain/tilebuffer.h"
 #include "engine/op/tilepatch.h"
 #include "engine/paintengine.h"
 #include "engine/paintselectionclip.h"
@@ -380,10 +381,9 @@ bool TransformTool::beginSession(const ToolContext &ctx)
     m_paramSkewV = 0.0;
     syncParamsFromCorners();
 
-    // 提起源像素后立刻写回「实时预览」到同一图层，走正常投影 → z 序不变。
-    // （若把预览画在画布最上层，会像图层被提到顶。）
+    // 提起源像素；预览走临时合成覆盖（不写瓦片、不扩层）
     liftSourceFromLayer(layer);
-    m_previewDirtyLocal = QRect();
+    m_previewDirtyDoc = {};
     m_doc = ctx.document;
     clearSessionHistory();
     m_session = true;
@@ -405,16 +405,6 @@ void TransformTool::liftSourceFromLayer(Layer *layer)
     m_lifted = true;
 }
 
-void TransformTool::putSourceBackToLayer(Layer *layer)
-{
-    // 取消时必须写回提起时的原始像素（翻转只改 m_srcPixels，不改 Original）
-    if (!layer || !m_lifted || m_srcLocal.isEmpty() || m_srcPixelsOriginal.isNull())
-        return;
-    TilePatch::blit(layer->tiles(), m_srcLocal, m_srcPixelsOriginal);
-    layer->invalidateContentBounds();
-    m_lifted = false;
-}
-
 void TransformTool::clearLayerRect(Layer *layer, const QRect &localRect)
 {
     if (!layer || localRect.isEmpty())
@@ -428,29 +418,12 @@ void TransformTool::clearLayerRect(Layer *layer, const QRect &localRect)
     layer->invalidateContentBounds();
 }
 
-QRect TransformTool::previewDestLocal(const Layer *layer) const
+QRect TransformTool::previewDestDoc() const
 {
-    if (!layer)
-        return {};
     QPolygonF poly;
-    for (int i = 0; i < 4; ++i) {
-        poly << QPointF(m_corners[i].x() - layer->offsetX(),
-                        m_corners[i].y() - layer->offsetY());
-    }
-    // 不与层 rect 求交：扩层前先要知道真实需要的包围盒
+    for (int i = 0; i < 4; ++i)
+        poly << m_corners[i];
     return poly.boundingRect().toAlignedRect().adjusted(-2, -2, 2, 2);
-}
-
-void TransformTool::ensureLayerFitsCorners(Layer *layer)
-{
-    if (!layer)
-        return;
-    const QRect need = previewDestLocal(layer);
-    const QPoint pad = layer->expandToIncludeLocal(need);
-    if (pad.isNull())
-        return;
-    m_srcLocal.translate(pad);
-    m_previewDirtyLocal.translate(pad);
 }
 
 void TransformTool::updateLayerPreview(ImageDocument *doc)
@@ -461,18 +434,24 @@ void TransformTool::updateLayerPreview(ImageDocument *doc)
     if (!layer || m_srcPixels.isNull())
         return;
 
-    ensureLayerFitsCorners(layer);
+    const QRect destDoc = previewDestDoc();
+    const QRect oldDirty = m_previewDirtyDoc;
 
-    const QRect newDest = previewDestLocal(layer)
-                              .intersected(QRect(0, 0, layer->width(), layer->height()));
-    const QRect clearR = m_previewDirtyLocal.united(m_srcLocal).united(newDest)
-                             .intersected(QRect(0, 0, layer->width(), layer->height()));
-    clearLayerRect(layer, clearR);
+    if (destDoc.isEmpty() || destDoc.width() <= 0 || destDoc.height() <= 0) {
+        layer->clearCompositePreview();
+        m_previewDirtyDoc = {};
+        const QRect dirty = oldDirty;
+        if (!dirty.isEmpty())
+            doc->markDirty(dirty);
+        return;
+    }
 
+    // 工作缓冲 = 目标包围盒；四角映射到缓冲局部坐标（不碰层 extent）
+    TileBuffer work(destDoc.width(), destDoc.height());
     QPointF destLocal[4];
     for (int i = 0; i < 4; ++i) {
-        destLocal[i] = QPointF(m_corners[i].x() - layer->offsetX(),
-                               m_corners[i].y() - layer->offsetY());
+        destLocal[i] = QPointF(m_corners[i].x() - destDoc.left(),
+                               m_corners[i].y() - destDoc.top());
     }
 
     PaintSelectionClip clip;
@@ -480,16 +459,28 @@ void TransformTool::updateLayerPreview(ImageDocument *doc)
         (m_interpolation == TransformInterpolation::Nearest)
             ? TransformInterpolation::Nearest
             : TransformInterpolation::Bilinear;
+    const QRect srcRect(0, 0, m_srcPixels.width(), m_srcPixels.height());
     const QRect written = PaintEngine::freeTransform(
-        layer->tiles(), m_srcLocal, m_srcPixels, destLocal,
+        work, srcRect, m_srcPixels, destLocal,
         /*clearSource=*/false, clip, liveInterp);
-    m_previewDirtyLocal = written.isEmpty() ? newDest : written.united(newDest);
-    layer->invalidateContentBounds();
 
-    const QRect dirtyDoc = clearR.united(m_previewDirtyLocal)
-                               .translated(layer->offsetX(), layer->offsetY());
-    if (!dirtyDoc.isEmpty())
-        doc->markDirty(dirtyDoc);
+    if (written.isEmpty()) {
+        layer->clearCompositePreview();
+        m_previewDirtyDoc = {};
+    } else {
+        const QImage preview = TilePatch::extract(work, written);
+        layer->setCompositePreview(preview,
+                                   destDoc.left() + written.left(),
+                                   destDoc.top() + written.top());
+        m_previewDirtyDoc = written.translated(destDoc.topLeft());
+    }
+
+    QRect mark = oldDirty.united(m_previewDirtyDoc);
+    if (!m_srcLocal.isEmpty())
+        mark = mark.united(m_srcLocal.translated(m_preSessionOx, m_preSessionOy));
+    mark = mark.intersected(QRect(0, 0, doc->width(), doc->height()));
+    if (!mark.isEmpty())
+        doc->markDirty(mark);
     else
         doc->markDirty();
 }
@@ -502,23 +493,23 @@ void TransformTool::cancelSession(const ToolContext &ctx, bool userExit)
     m_drag = Handle::None;
     if (ctx.document) {
         if (Layer *layer = ctx.document->layers().layerAt(m_layerIndex)) {
-            // 整层还原到进会话前（含扩层导致的尺寸/偏移）
+            layer->clearCompositePreview();
+            // 整层还原到进会话前（瓦片真相未在拖中被改过，除源矩形挖空）
             if (!m_preSessionPixels.isNull()) {
                 layer->replaceFromImage(m_preSessionPixels);
                 layer->setOffsetSilent(m_preSessionOx, m_preSessionOy);
                 layer->invalidateContentBounds();
-            } else {
-                const QRect clearR = m_previewDirtyLocal.united(m_srcLocal);
-                clearLayerRect(layer, clearR);
-                if (m_lifted)
-                    putSourceBackToLayer(layer);
+            } else if (m_lifted) {
+                clearLayerRect(layer, m_srcLocal);
+                TilePatch::blit(layer->tiles(), m_srcLocal, m_srcPixelsOriginal);
+                layer->invalidateContentBounds();
             }
             ctx.document->markDirty();
             emit ctx.document->layerPropertiesChanged(m_layerIndex);
         }
     }
     m_lifted = false;
-    m_previewDirtyLocal = QRect();
+    m_previewDirtyDoc = {};
     m_srcPixels = QImage();
     m_srcPixelsOriginal = QImage();
     m_preSessionPixels = QImage();
@@ -539,23 +530,32 @@ bool TransformTool::commitSession(const ToolContext &ctx)
     if (!layer)
         return false;
 
+    layer->clearCompositePreview();
+
     // 还原进会话前几何 → push → 再扩层 + 正式栅格化
     if (!m_preSessionPixels.isNull()) {
         layer->replaceFromImage(m_preSessionPixels);
         layer->setOffsetSilent(m_preSessionOx, m_preSessionOy);
         layer->invalidateContentBounds();
         m_srcLocal = m_preSrcLocal;
-    } else {
-        const QRect clearR = m_previewDirtyLocal.united(m_srcLocal);
-        clearLayerRect(layer, clearR);
-        if (m_lifted)
-            putSourceBackToLayer(layer);
     }
     m_lifted = false;
-    m_previewDirtyLocal = QRect();
+    m_previewDirtyDoc = {};
 
     ctx.document->pushLayerPixelsUndo(m_layerIndex, QObject::tr("自由变换"));
-    ensureLayerFitsCorners(layer);
+
+    // 仅确认时扩层一次
+    {
+        QPolygonF poly;
+        for (int i = 0; i < 4; ++i) {
+            poly << QPointF(m_corners[i].x() - layer->offsetX(),
+                            m_corners[i].y() - layer->offsetY());
+        }
+        const QRect need = poly.boundingRect().toAlignedRect().adjusted(-2, -2, 2, 2);
+        const QPoint pad = layer->expandToIncludeLocal(need);
+        if (!pad.isNull())
+            m_srcLocal.translate(pad);
+    }
 
     QPointF destLocal[4];
     for (int i = 0; i < 4; ++i) {
@@ -936,7 +936,7 @@ void TransformTool::drawOverlay(QPainter &painter, const ToolContext &ctx) const
 {
     if (!m_session)
         return;
-    // 像素预览已写回图层瓦片（updateLayerPreview），投影按正常 z 序合成；此处只画控件框
+    // 像素预览挂在 Layer::compositePreview，投影按正常 z 序合成；此处只画控件框
     painter.save();
     painter.setRenderHint(QPainter::Antialiasing, false);
     QPen pen(kBlue);

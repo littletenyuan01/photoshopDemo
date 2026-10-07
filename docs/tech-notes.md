@@ -42,6 +42,23 @@
 - 【本项目】只做脏矩形 + 分块缓存 + 按需重算；**不做**分块稀疏存储、不做优先级渲染线程。
 - 【排期】`wiki/Roadmap.md` Phase 7（v1 后加强）。
 
+### 调整图层：PS 层种 + 算子参数；GIMP 侧是 drawable filter / GEGL（2026-10）
+
+- 【PS】独立调整层 + 默认白蒙版 + 属性面板按类型换 UI。
+- 【GIMP】无对等「调整图层」层种；非破坏效果是挂在 drawable 上的 **`GimpDrawableFilter`**，
+  内部接 **GEGL 算子节点**（`gegl_node_new_child` / operation 字符串），可带 filter mask；
+  改参靠点 fx 打开滤镜对话框，不是 PS 式常驻属性页。社区插件用 pass-through 组仿 PS。
+- 【本项目】`OpName` 扩展调整类 → `FilterNode` 参数 → `FilterEval::applyNode` 分发（算子框架子集）；
+  UI：`ui/adj/*.ui`；创建：`addAdjustmentLayer` + 自动白蒙版。
+  曲线=5 点主通道 LUT；通道混合器/颜色查找/渐变映射/可选颜色均已接求值（Demo 级近似）。
+
+### 自由变换预览：会话工作缓冲，不写回 drawable（2026-10）
+
+- 【依据】GIMP Unified Transform / composited preview：拖中独立缓冲参与合成，确认再写 drawable。
+- 【本项目第 1 档】`Layer::compositePreview` + 临时 `TileBuffer`；拖中不 `expandToIncludeLocal`；确认一次扩层 + `FreeTransformOp`。
+- 【相对旧实现】去掉每帧写瓦片 / 每帧扩层 / 每帧 `clearLayerRect`；代价从「扩层 × 帧数」变为「目标盒栅格化 × 帧数」。
+- 【详表】[pending-dev.md](pending-dev.md)「逻辑优化对照」。
+
 ### 非破坏编辑：只取「滤镜是节点」的语义，不引入 GEGL
 
 - 【依据】`gimp-master/app/core/gimpdrawablefilter.c`、`gimpfilterstack.c`、`app/gegl/gimpapplicator.c`、`app/operations/layer-modes/`。
