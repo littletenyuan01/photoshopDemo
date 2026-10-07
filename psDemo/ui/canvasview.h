@@ -159,6 +159,13 @@ private:
     /** 空闲分块：继续合成挂起块并局部重画。 */
     void onProjectionIdle();
     void notifyViewChanged();
+
+    /** 调整层拖参：定时器合并 + 视口 ROI 预览；松手整幅 adopt。 */
+    void onAdjustmentPreview(int layerIndex);
+    void onAdjustmentPreviewCommit(int layerIndex);
+    void flushAdjustmentPreview();
+    void clearAdjustmentLive();
+    const QImage *activeLiveProjection() const;
     /** 将 m_offset 钳制到合法范围（含 pasteboard 过滚，对照 PS）。 */
     void clampOffset();
     /** 水平/竖直可平移的 offset 上下限（控件坐标）。 */
@@ -236,11 +243,23 @@ private:
 
     QTimer *m_antsTimer = nullptr; ///< 蚂蚁线虚线相位动画
     QTimer *m_projIdleTimer = nullptr; ///< 投影空闲分块（对照 GIMP projection idle）
+    QTimer *m_adjPreviewTimer = nullptr; ///< 合并滑条 tick，先让滑条重绘再算预览
     qreal m_antsPhase = 0.0;
     QPainterPath m_antsPath; ///< 选区轮廓（文档像素坐标）；selectionChanged 时重建
 
     QPointF m_pointerImagePos; ///< 最近指针文档坐标（Caps Lock 笔尖圈用）
     bool m_pointerInside = false;
+
+    // —— 调整层预览（对照 GIMP/GEGL：输入缓存一次，参数变只后台重跑滤镜）——
+    int m_adjLiveLayer = -1;
+    int m_adjPendingLayer = -1;
+    int m_adjPreviewGen = 0;     ///< 丢弃过期后台结果
+    bool m_adjPreviewBusy = false; ///< 单飞：同时只跑一个后台任务
+    bool m_adjPreviewDirty = false; ///< busy 期间又有新参数 → 结束后再跑
+    QRect m_adjStackRect; ///< below/above 缓存对应的文档矩形（拖参期间固定）
+    QImage m_adjBelow;  ///< 下方合成缓存（拖中为 ROI 尺寸；GEGL input）
+    QImage m_adjAbove;  ///< 调整层之上（同上）
+    QImage m_adjLive;   ///< 画布预览（文档全尺寸）
 };
 
 #endif // CANVASVIEW_H

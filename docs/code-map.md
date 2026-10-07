@@ -31,7 +31,7 @@
 | `io/projectio.h/.cpp` | `.pslite` 工程读写（`ProjectFormat::Current`；对照 GIMP XCF 最小子集） |
 | `io/psdio.h/.cpp` | `.psd` 子集导出（图层像素；对照 GIMP file-psd 极简） |
 | `tools/toolmanager.h/.cpp` | 注册表 + 活动工具 + 事件分发 + **信号转发**（活动工具会变，画布无法预先 connect） |
-| `tools/movetool.h/.cpp` | **移动**：点选层 + 平移 offset；变换框浮层（只显示） |
+| `tools/movetool.h/.cpp` | **移动**：点选层 + 平移 offset；拖中 `liveProjection`（图章贴图）；松手 `liveProjectionCommitted` → `Projection::adoptImage` |
 | `tools/transformtool.h/.cpp` | **自由变换**（Ctrl+T）：四角/边/旋转；拖中 `compositePreview`；确认 `FreeTransformOp` |
 | `tools/handtool.h/.cpp` | 平移；`isPanGesture` 供画布判定中键临时平移（空格走临时切工具） |
 | `tools/zoomtool.h/.cpp` | 锚点缩放（左键放大 / 右键缩小） |
@@ -160,6 +160,8 @@ UI 不得直接改 `Layer`，一律走 `setLayerVisible/Opacity/Name/BlendMode` 
 |----------|----------|
 | `AdjustmentLayer` | 调整层（`LayerKind::Adjustment`，无独立类文件） |
 | `ui/adj/*.ui` + `adjustmentpropshost.*` | 各调整类型属性页；选中调整层时嵌入属性面板 |
+| `ui/canvasview.cpp`（`flushAdjustmentPreview`） | 调整层拖参 live：后台建栈 + 单飞滤镜；对照见 `docs/pending-dev.md` |
+| `tools/movetool.*`（`m_liveApplyAbove`） | 移动时上方有调整层则每帧重跑上方栈；对照见 `docs/pending-dev.md` |
 | 矢量蒙版 / 通道面板蒙版 | 路径蒙版；从通道面板管理 |
 | `ToolInfo` 注册表 | 统一工具元数据（现分散在 toolid/toolbox/tooloptionsbar 三处） |
 

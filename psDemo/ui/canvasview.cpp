@@ -6,7 +6,11 @@
 #include "canvasview.h"
 
 #include "domain/imagedocument.h"
+#include "domain/filterstack.h"
+#include "domain/layer.h"
+#include "domain/layermask.h"
 #include "domain/selection.h"
+#include "engine/compositor.h"
 #include "engine/premul.h"
 #include "pixmaputils.h"
 #include "tools/handtool.h"
@@ -20,15 +24,18 @@
 #include <QDragMoveEvent>
 #include <QDropEvent>
 #include <QKeyEvent>
+#include <QMetaObject>
 #include <QMimeData>
 #include <QMouseEvent>
 #include <QPainter>
 #include <QPainterPath>
 #include <QPen>
+#include <QPointer>
 #include <QShowEvent>
 #include <QTimer>
 #include <QUrl>
 #include <QWheelEvent>
+#include <QtConcurrent>
 #include <QtMath>
 
 CanvasView::CanvasView(QWidget *parent)
@@ -36,6 +43,7 @@ CanvasView::CanvasView(QWidget *parent)
     , m_toolManager(new Ps::ToolManager(this))
     , m_antsTimer(new QTimer(this))
     , m_projIdleTimer(new QTimer(this))
+    , m_adjPreviewTimer(new QTimer(this))
 {
     setMouseTracking(true);
     setFocusPolicy(Qt::StrongFocus);
@@ -47,6 +55,13 @@ CanvasView::CanvasView(QWidget *parent)
     // 工具的请求信号统一由管理器转发上来，此处只连一次
     connect(m_toolManager, &Ps::ToolManager::repaintRequested,
             this, qOverload<>(&QWidget::update));
+    connect(m_toolManager, &Ps::ToolManager::liveProjectionCommitted,
+            this, [this](const QImage &image) {
+                // 移动松手：live 直接成为投影，块全有效，无「消失再出现」
+                if (m_projection.adoptImage(image) && m_document)
+                    m_document->clearDirtyRect();
+                update();
+            });
     connect(m_toolManager, &Ps::ToolManager::cursorChangeRequested,
             this, [this](const QCursor &cursor) { setCursor(cursor); });
     connect(m_toolManager, &Ps::ToolManager::foregroundPicked,
@@ -72,6 +87,11 @@ CanvasView::CanvasView(QWidget *parent)
     m_projIdleTimer->setInterval(0);
     connect(m_projIdleTimer, &QTimer::timeout, this, &CanvasView::onProjectionIdle);
 
+    // 合并滑条事件；主线程绝不合成。间隔略放宽，先让滑条重绘再开后台任务
+    m_adjPreviewTimer->setSingleShot(true);
+    m_adjPreviewTimer->setInterval(32);
+    connect(m_adjPreviewTimer, &QTimer::timeout, this, &CanvasView::flushAdjustmentPreview);
+
     refreshToolContext();
     updateToolCursor();
 }
@@ -88,11 +108,19 @@ void CanvasView::setDocument(Ps::ImageDocument *document)
 
     m_document = document;
 
+    clearAdjustmentLive();
+
     if (m_document) {
         // 只订阅「像素变了」与「结构变了」：
         // 图层属性变化（显隐/透明度）也走 contentChanged，画布需重投影，
         // 合成细节在 Projection / Compositor，画布不必区分。
         connect(m_document, &Ps::ImageDocument::contentChanged, this, [this]() {
+            // 移动 / 调整层 live：跳过 Projection::sync，直接重画
+            if (activeLiveProjection()) {
+                update();
+                return;
+            }
+            clearAdjustmentLive();
             // 对照 GIMP projection_flush：吸入脏区，视口优先，其余 idle
             const QRect painted = syncProjection();
             if (!painted.isEmpty()) {
@@ -104,6 +132,10 @@ void CanvasView::setDocument(Ps::ImageDocument *document)
                 update();
             }
         });
+        connect(m_document, &Ps::ImageDocument::adjustmentPreviewChanged,
+                this, &CanvasView::onAdjustmentPreview);
+        connect(m_document, &Ps::ImageDocument::adjustmentPreviewCommit,
+                this, &CanvasView::onAdjustmentPreviewCommit);
         // 选区单独订阅：只重画蚂蚁线，不重合成
         connect(m_document, &Ps::ImageDocument::selectionChanged, this, [this]() {
             rebuildSelectionOutlinePath();
@@ -364,6 +396,8 @@ void CanvasView::refreshToolContext()
     m_toolContext.shapeAntialias = m_shapeAntialias;
     m_toolContext.viewZoom = m_zoom;
     m_toolContext.viewOffset = m_offset;
+    m_toolContext.projectionSnapshot =
+        (m_document && !m_projection.isNull()) ? &m_projection.image() : nullptr;
 
     if (m_toolManager)
         m_toolManager->setContext(m_toolContext);
@@ -562,9 +596,9 @@ void CanvasView::paintEvent(QPaintEvent *)
                               QColor(255, 255, 255), QColor(200, 200, 200));
     painter.setRenderHint(QPainter::SmoothPixmapTransform, m_zoom < 1.0);
 
-    // 移动工具拖拽中优先画 live 预览（对照 GIMP：拖中不全量同步投影）
+    // 移动工具 / 调整层拖参：优先画 live（对照 GIMP 拖中不全量 sync）
     Ps::Tool *tool = m_toolManager ? m_toolManager->activeTool() : nullptr;
-    const QImage *live = tool ? tool->liveProjection() : nullptr;
+    const QImage *live = activeLiveProjection();
     if (live && !live->isNull())
         painter.drawImage(target, *live);
     else
@@ -848,7 +882,16 @@ void CanvasView::keyReleaseEvent(QKeyEvent *event)
 QRect CanvasView::syncProjection()
 {
     updateProjectionPriorityRect();
-    const QRect painted = m_projection.sync();
+    // sync 会清 dirtyRect：大面积脏（显隐调整层）需在之后 flush 视口，否则旧块仍被画出来
+    const QRect dirtyBefore = m_document ? m_document->dirtyRect() : QRect();
+    const int docArea = m_document ? m_document->width() * m_document->height() : 0;
+    const bool largeDirty = docArea > 0 && !dirtyBefore.isEmpty()
+        && (dirtyBefore.width() * dirtyBefore.height() >= docArea / 2);
+
+    QRect painted = m_projection.sync();
+    if (largeDirty && m_projection.hasPendingChunks())
+        painted = painted.united(m_projection.flushPriority());
+
     if (m_projection.hasPendingChunks()) {
         if (!m_projIdleTimer->isActive())
             m_projIdleTimer->start();
@@ -856,6 +899,286 @@ QRect CanvasView::syncProjection()
         m_projIdleTimer->stop();
     }
     return painted;
+}
+
+const QImage *CanvasView::activeLiveProjection() const
+{
+    if (!m_adjLive.isNull())
+        return &m_adjLive;
+    Ps::Tool *tool = m_toolManager ? m_toolManager->activeTool() : nullptr;
+    return tool ? tool->liveProjection() : nullptr;
+}
+
+void CanvasView::clearAdjustmentLive()
+{
+    if (m_adjPreviewTimer)
+        m_adjPreviewTimer->stop();
+    ++m_adjPreviewGen;
+    m_adjPreviewBusy = false;
+    m_adjPreviewDirty = false;
+    m_adjLiveLayer = -1;
+    m_adjPendingLayer = -1;
+    m_adjStackRect = {};
+    m_adjBelow = QImage();
+    m_adjAbove = QImage();
+    m_adjLive = QImage();
+}
+
+void CanvasView::onAdjustmentPreview(int layerIndex)
+{
+    m_adjPendingLayer = layerIndex;
+    if (!m_adjPreviewTimer->isActive())
+        m_adjPreviewTimer->start();
+}
+
+void CanvasView::flushAdjustmentPreview()
+{
+    const int layerIndex = m_adjPendingLayer;
+    if (layerIndex < 0 || !m_document)
+        return;
+
+    // 单飞：后台还在跑则只记 dirty，避免主线程排队/线程爆炸
+    if (m_adjPreviewBusy) {
+        m_adjPreviewDirty = true;
+        return;
+    }
+
+    const Ps::Layer *layer = m_document->layers().layerAt(layerIndex);
+    if (!layer || !layer->isAdjustmentLayer())
+        return;
+
+    // 主线程绝不 blendLayerRange：那是滑条卡顿的根因
+    const bool haveStacks = (m_adjLiveLayer == layerIndex && !m_adjBelow.isNull()
+                             && !m_adjStackRect.isEmpty());
+
+    updateProjectionPriorityRect();
+    // 拖中覆盖整视口（priorityRect），不再裁中心小块——否则只有一小块先变
+    QRect patch = haveStacks
+                      ? m_adjStackRect
+                      : m_projection.priorityRect().intersected(
+                            QRect(0, 0, m_document->width(), m_document->height()));
+    if (patch.isEmpty())
+        return;
+
+    if (m_adjLive.isNull()) {
+        if (!m_projection.isNull())
+            m_adjLive = m_projection.image(); // COW，先顶着旧图，避免闪空
+        else
+            m_adjLive = QImage(m_document->width(), m_document->height(),
+                               QImage::Format_ARGB32_Premultiplied);
+    }
+
+    // 拖参期间停投影 idle，避免与后台建栈抢读层缓存
+    m_projIdleTimer->stop();
+
+    const QImage belowRef = m_adjBelow; // 可能为空 → 后台建栈
+    const QImage aboveRef = m_adjAbove;
+    const QRect stackRect = m_adjStackRect;
+    Ps::FilterStack stack;
+    stack.replaceAll(layer->filters().snapshot());
+    const qreal opacity = layer->opacity();
+    const Ps::LayerMask *rawMask = (layer->hasMask() && layer->mask()
+                                    && layer->mask()->isEnabled())
+                                       ? layer->mask()
+                                       : nullptr;
+    const bool maskMatters = rawMask && !rawMask->isFullyOpaque();
+    const QImage maskRef = maskMatters ? rawMask->image() : QImage();
+    const int maskOx = layer->offsetX();
+    const int maskOy = layer->offsetY();
+    const int docW = m_document->width();
+    const int docH = m_document->height();
+    const int layerCount = m_document->layers().count();
+    QPointer<Ps::ImageDocument> docPtr(m_document);
+
+    const int gen = ++m_adjPreviewGen;
+    m_adjPreviewBusy = true;
+    m_adjPreviewDirty = false;
+
+    auto future = QtConcurrent::run([this, gen, patch, belowRef, aboveRef, stackRect, stack,
+                                     opacity, maskMatters, maskRef, maskOx, maskOy, haveStacks,
+                                     layerIndex, docW, docH, layerCount, docPtr]() {
+        QImage belowCrop;
+        QImage aboveCrop;
+        QImage belowFull;
+        QImage aboveFull;
+        QRect usePatch = patch;
+
+        if (haveStacks && !belowRef.isNull()) {
+            // 缓存为「整图 + stackRect」或「仅 ROI」两种：统一裁到 usePatch
+            usePatch = stackRect;
+            if (belowRef.size() == usePatch.size()) {
+                belowCrop = belowRef;
+                aboveCrop = aboveRef;
+            } else {
+                belowCrop = belowRef.copy(usePatch);
+                aboveCrop = aboveRef.copy(usePatch);
+            }
+        } else {
+            Ps::ImageDocument *doc = docPtr.data();
+            if (!doc) {
+                QMetaObject::invokeMethod(this, [this, gen]() {
+                    if (gen != m_adjPreviewGen)
+                        return;
+                    m_adjPreviewBusy = false;
+                }, Qt::QueuedConnection);
+                return;
+            }
+            belowFull = QImage(docW, docH, QImage::Format_ARGB32_Premultiplied);
+            belowFull.fill(Qt::transparent);
+            aboveFull = QImage(docW, docH, QImage::Format_ARGB32_Premultiplied);
+            aboveFull.fill(Qt::transparent);
+            if (!Ps::Compositor::blendLayerRange(belowFull, *doc, usePatch, 0, layerIndex, -1)
+                || !Ps::Compositor::blendLayerRange(aboveFull, *doc, usePatch, layerIndex + 1,
+                                                   layerCount, -1)) {
+                QMetaObject::invokeMethod(this, [this, gen]() {
+                    if (gen != m_adjPreviewGen)
+                        return;
+                    m_adjPreviewBusy = false;
+                    if (m_adjPreviewDirty) {
+                        m_adjPreviewDirty = false;
+                        flushAdjustmentPreview();
+                    }
+                }, Qt::QueuedConnection);
+                return;
+            }
+            belowCrop = belowFull.copy(usePatch);
+            aboveCrop = aboveFull.copy(usePatch);
+        }
+
+        // 视口可能很大：滤镜在缩小图上算，再放大回视口尺寸（覆盖整屏，不裁中心）
+        constexpr int kMaxFilterEdge = 512;
+        qreal scale = 1.0;
+        if (belowCrop.width() > kMaxFilterEdge || belowCrop.height() > kMaxFilterEdge) {
+            scale = qMin(kMaxFilterEdge / qreal(belowCrop.width()),
+                         kMaxFilterEdge / qreal(belowCrop.height()));
+        }
+        const QSize smallSize(qMax(1, int(belowCrop.width() * scale + 0.5)),
+                              qMax(1, int(belowCrop.height() * scale + 0.5)));
+        QImage belowWork = (scale < 0.999)
+                               ? belowCrop.scaled(smallSize, Qt::IgnoreAspectRatio,
+                                                  Qt::FastTransformation)
+                               : belowCrop;
+        QImage filtered = stack.apply(belowWork);
+        if (filtered.isNull()) {
+            QMetaObject::invokeMethod(this, [this, gen]() {
+                if (gen != m_adjPreviewGen)
+                    return;
+                m_adjPreviewBusy = false;
+                if (m_adjPreviewDirty) {
+                    m_adjPreviewDirty = false;
+                    flushAdjustmentPreview();
+                }
+            }, Qt::QueuedConnection);
+            return;
+        }
+        if (scale < 0.999) {
+            filtered = filtered.scaled(belowCrop.size(), Qt::IgnoreAspectRatio,
+                                       Qt::FastTransformation);
+        }
+
+        QImage patchImg;
+        if (!maskMatters && opacity >= 0.999) {
+            patchImg = std::move(filtered);
+        } else {
+            patchImg = belowCrop;
+            QImage maskCrop;
+            if (maskMatters && !maskRef.isNull()) {
+                maskCrop = maskRef.copy(QRect(usePatch.x() - maskOx, usePatch.y() - maskOy,
+                                              usePatch.width(), usePatch.height()));
+            }
+            for (int y = 0; y < usePatch.height(); ++y) {
+                QRgb *dline = reinterpret_cast<QRgb *>(patchImg.scanLine(y));
+                const QRgb *fline =
+                    reinterpret_cast<const QRgb *>(filtered.constScanLine(y));
+                const uchar *mline = (!maskCrop.isNull() && y < maskCrop.height())
+                                        ? maskCrop.constScanLine(y)
+                                        : nullptr;
+                for (int x = 0; x < usePatch.width(); ++x) {
+                    qreal t = opacity;
+                    if (mline && x < maskCrop.width())
+                        t *= mline[x] / 255.0;
+                    if (t <= 0.0)
+                        continue;
+                    if (t >= 0.999) {
+                        dline[x] = fline[x];
+                        continue;
+                    }
+                    const QRgb d = dline[x];
+                    const QRgb f = fline[x];
+                    dline[x] = qRgba(
+                        qBound(0, int(qRed(d) + (qRed(f) - qRed(d)) * t + 0.5), 255),
+                        qBound(0, int(qGreen(d) + (qGreen(f) - qGreen(d)) * t + 0.5), 255),
+                        qBound(0, int(qBlue(d) + (qBlue(f) - qBlue(d)) * t + 0.5), 255),
+                        qBound(0, int(qAlpha(d) + (qAlpha(f) - qAlpha(d)) * t + 0.5), 255));
+                }
+            }
+        }
+
+        if (!aboveCrop.isNull()) {
+            QPainter p(&patchImg);
+            p.setCompositionMode(QPainter::CompositionMode_SourceOver);
+            p.drawImage(0, 0, aboveCrop);
+        }
+
+        // 首次建栈：把 ROI 缓存回主线程（非整图，后续帧只滤镜）
+        const bool storeStacks = !haveStacks;
+        QMetaObject::invokeMethod(this, [this, gen, usePatch, patchImg, storeStacks, layerIndex,
+                                         belowCrop, aboveCrop]() {
+            m_adjPreviewBusy = false;
+            if (gen != m_adjPreviewGen || !m_document)
+                return;
+            if (storeStacks) {
+                m_adjBelow = belowCrop;
+                m_adjAbove = aboveCrop;
+                m_adjStackRect = usePatch;
+                m_adjLiveLayer = layerIndex;
+            }
+            if (!m_adjLive.isNull()) {
+                QPainter p(&m_adjLive);
+                p.setCompositionMode(QPainter::CompositionMode_Source);
+                p.drawImage(usePatch.topLeft(), patchImg);
+                update();
+            }
+            if (m_adjPreviewDirty) {
+                m_adjPreviewDirty = false;
+                flushAdjustmentPreview();
+            }
+        }, Qt::QueuedConnection);
+    });
+    Q_UNUSED(future);
+}
+
+void CanvasView::onAdjustmentPreviewCommit(int layerIndex)
+{
+    Q_UNUSED(layerIndex);
+    m_adjPreviewTimer->stop();
+    m_adjPendingLayer = -1;
+    ++m_adjPreviewGen;
+    m_adjPreviewBusy = false;
+    m_adjPreviewDirty = false;
+
+    // 丢掉 ROI 输入缓存；live 先留着盖住 sync，避免闪旧投影
+    m_adjStackRect = {};
+    m_adjBelow = QImage();
+    m_adjAbove = QImage();
+    m_adjLiveLayer = -1;
+
+    if (!m_document) {
+        m_adjLive = QImage();
+        update();
+        return;
+    }
+
+    // 文档参数已提交；视口优先分块合成（勿主线程全幅 rebuild）
+    const QRect painted = syncProjection();
+    m_adjLive = QImage();
+    if (!painted.isEmpty()) {
+        const QRectF wr(imageToWidget(painted.topLeft()),
+                        imageToWidget(QPointF(painted.right() + 1, painted.bottom() + 1)));
+        update(wr.normalized().toAlignedRect().adjusted(-1, -1, 1, 1));
+    } else {
+        update();
+    }
 }
 
 void CanvasView::updateProjectionPriorityRect()
@@ -897,6 +1220,13 @@ void CanvasView::onProjectionIdle()
 void CanvasView::notifyViewChanged()
 {
     updateProjectionPriorityRect();
+    // 视口变了：丢掉调整层 below 缓存，下次预览按新视口重建（对照 GIMP priority_rect）
+    if (!m_adjBelow.isNull()) {
+        m_adjStackRect = {};
+        m_adjBelow = QImage();
+        m_adjAbove = QImage();
+        m_adjLiveLayer = -1;
+    }
     // 平移/缩放后视口变了：若有挂起块，立刻优先补视口
     if (m_projection.hasPendingChunks()) {
         const QRect painted = m_projection.processPendingChunks(

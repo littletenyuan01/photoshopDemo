@@ -122,6 +122,8 @@ public:
     /**
      * 替换指定滤镜节点参数（调整层属性面板）。
      * @param pushUndo 滑条松手时 true；拖动中 false 仅预览。
+     * 预览：只改节点并发 adjustmentPreviewChanged（画布 live，不整幅 markDirty）。
+     * 提交：pushUndo + adjustmentPreviewCommit；画布 adopt live 定稿。
      */
     bool setLayerFilterNode(int layerIndex, int filterIndex, const FilterNode &node,
                             bool pushUndo);
@@ -209,7 +211,11 @@ public:
      */
     void setLayerBlendMode(int index, BlendMode mode, bool recordHistory = true);
     /** 平移图层 offset 并按新旧 bounds 并集 markDirty。 */
-    void translateLayer(int index, int dx, int dy);
+    /**
+     * 平移图层 offset。
+     * @param emitContent false 时只记脏区、不发 contentChanged（移动工具 live 预览用）。
+     */
+    void translateLayer(int index, int dx, int dy, bool emitContent = true);
     /**
      * 仅平移蒙版灰度（取消链接后单独移动蒙版）；层 offset 不变。
      * 冻结预览时只累计脏区。
@@ -342,6 +348,13 @@ signals:
     void selectionChanged();                     ///< 选区 mask 变更
     void editingTargetChanged();                 ///< 像素 ↔ 蒙版编辑目标切换
     void contentChanged();                       ///< 汇总：任意需整 UI 刷新时
+    /**
+     * 调整层参数拖动预览（对照 GIMP 滤镜对话框 ROI 预览 / PS 属性滑条）。
+     * 节点已写入层；画布应只重跑滤镜叠到缓存的 below/above，勿全栈 Projection::sync。
+     */
+    void adjustmentPreviewChanged(int layerIndex);
+    /** 调整层参数提交：画布应 adopt live 定稿（或回退 markDirty+sync）。 */
+    void adjustmentPreviewCommit(int layerIndex);
 
 private:
     friend class HistorySuppress;

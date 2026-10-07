@@ -9,6 +9,7 @@
 #include "engine/painttypes.h"
 
 #include <QColor>
+#include <QImage>
 #include <QPointF>
 #include <QRect>
 #include <QString>
@@ -78,6 +79,12 @@ struct ToolContext
     // —— 视图变换（供工具浮层把文档坐标画到控件上；由 CanvasView 填）——
     qreal viewZoom = 1.0;              ///< 当前缩放
     QPointF viewOffset;                ///< 文档原点在控件中的位置
+
+    /**
+     * 当前投影快照（只读；移动工具 press 时复用，避免再全栈合成 below）。
+     * 由 CanvasView 在分发事件前填入；无文档或未合成时为 nullptr。
+     */
+    const QImage *projectionSnapshot = nullptr;
 
     /** 文档坐标 → 控件坐标（与 CanvasView::imageToWidget 同构）。 */
     QPointF imageToWidget(const QPointF &imagePos) const

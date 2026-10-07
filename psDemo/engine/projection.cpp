@@ -1,8 +1,11 @@
 /**
  * projection.cpp — projection.h 实现（engine 层）。
  *
- * sync() 吸入 dirtyRect；小脏区立即 patch，大脏区视口优先 + 空闲分块渐进。
+ * sync() 吸入 dirtyRect；视口内限额立即 patch，其余 idle 渐进。
  * 对照 GIMP gimp_projection_add_update_area / chunk_render_* / set_priority_rect。
+ *
+ * 注意：切勿在 sync 里对「视口优先」使用不限块数且连带扫完全图——大层拖动时
+ * 每帧会把旧∪新 bounds 内所有块（含视口外）同步合成，表现为严重卡顿。
  */
 #include "projection.h"
 
@@ -48,6 +51,23 @@ void Projection::invalidate()
     m_chunkValid.clear();
     m_chunkCols = 0;
     m_chunkRows = 0;
+}
+
+bool Projection::adoptImage(const QImage &image)
+{
+    if (image.isNull() || !m_document)
+        return false;
+    if (image.width() != m_document->width() || image.height() != m_document->height())
+        return false;
+
+    if (image.format() == QImage::Format_ARGB32_Premultiplied)
+        m_buffer = image;
+    else
+        m_buffer = image.convertToFormat(QImage::Format_ARGB32_Premultiplied);
+
+    resetChunkGrid(m_buffer.size());
+    m_chunkValid.fill(true);
+    return true;
 }
 
 void Projection::setPriorityRect(const QRect &docRect)
@@ -103,7 +123,6 @@ bool Projection::ensureBuffer(const QSize &pixelSize)
     if (sizeOk)
         return true;
 
-    // 尺寸变更：先建空缓冲，全部标无效，由 sync/idle 渐进填
     m_buffer = QImage(pixelSize, QImage::Format_ARGB32_Premultiplied);
     m_buffer.fill(Qt::transparent);
     resetChunkGrid(pixelSize);
@@ -137,7 +156,7 @@ bool Projection::hasPendingChunks() const
     return false;
 }
 
-QRect Projection::recomposeInvalidChunks(bool priorityFirst, int maxChunks)
+QRect Projection::recomposeInvalidChunks(int maxChunks, ScanMode mode)
 {
     if (!m_document || m_chunkValid.isEmpty() || m_buffer.isNull())
         return {};
@@ -167,24 +186,50 @@ QRect Projection::recomposeInvalidChunks(bool priorityFirst, int maxChunks)
         return true;
     };
 
-    auto scan = [&](bool onlyPriority) {
-        for (int row = 0; row < m_chunkRows; ++row) {
-            for (int col = 0; col < m_chunkCols; ++col) {
-                if (maxChunks > 0 && done >= maxChunks)
-                    return;
-                if (onlyPriority) {
-                    const QRect piece = chunkRectAt(col, row, full);
-                    if (priority.isEmpty() || !piece.intersects(priority))
-                        continue;
-                }
+    auto budgetOk = [&]() {
+        return maxChunks <= 0 || done < maxChunks;
+    };
+
+    auto scanPriority = [&]() {
+        if (priority.isEmpty())
+            return;
+        const int c0 = qBound(0, priority.left() / kChunkSize, m_chunkCols - 1);
+        const int r0 = qBound(0, priority.top() / kChunkSize, m_chunkRows - 1);
+        const int c1 = qBound(0, priority.right() / kChunkSize, m_chunkCols - 1);
+        const int r1 = qBound(0, priority.bottom() / kChunkSize, m_chunkRows - 1);
+        for (int row = r0; row <= r1 && budgetOk(); ++row) {
+            for (int col = c0; col <= c1 && budgetOk(); ++col) {
+                const QRect piece = chunkRectAt(col, row, full);
+                if (!piece.intersects(priority))
+                    continue;
                 tryChunk(col, row);
             }
         }
     };
 
-    if (priorityFirst)
-        scan(true);
-    scan(false);
+    auto scanNonPriority = [&]() {
+        for (int row = 0; row < m_chunkRows && budgetOk(); ++row) {
+            for (int col = 0; col < m_chunkCols && budgetOk(); ++col) {
+                const QRect piece = chunkRectAt(col, row, full);
+                if (!priority.isEmpty() && piece.intersects(priority))
+                    continue;
+                tryChunk(col, row);
+            }
+        }
+    };
+
+    switch (mode) {
+    case ScanMode::PriorityOnly:
+        scanPriority();
+        break;
+    case ScanMode::NonPriorityOnly:
+        scanNonPriority();
+        break;
+    case ScanMode::PriorityThenRest:
+        scanPriority();
+        scanNonPriority();
+        break;
+    }
     return painted;
 }
 
@@ -208,10 +253,8 @@ QRect Projection::sync()
 
     const bool bufferWasOk = ensureBuffer(fullSize);
     if (!bufferWasOk) {
-        // 新建缓冲：整幅无效；优先视口，其余 idle
         dirty = full;
     } else if (dirty.isEmpty()) {
-        // 无新脏区：若仍有挂起块（例如刚改了 priority），不在此强刷
         return {};
     }
 
@@ -222,16 +265,17 @@ QRect Projection::sync()
 
     m_document->clearDirtyRect();
 
-    // 1) 视口内无效块全部立即合成（交互可见区不能拖沓）
-    QRect painted = recomposeInvalidChunks(/*priorityFirst=*/true, /*maxChunks=*/-1);
+    // 1) 视口内：限额（对照 GIMP flush 后 chunk 渐进，而非一帧打完视口）
+    QRect painted = recomposeInvalidChunks(kSyncPriorityBudget, ScanMode::PriorityOnly);
 
-    // 2) 剩余不多则一次做完；否则留给 idle（对照 GIMP chunk iterator）
+    // 2) 视口外：小量预算；剩多则 idle
     const int left = invalidChunkCount();
     if (left > 0 && left <= kSyncChunkBudget) {
-        painted = painted.united(recomposeInvalidChunks(false, -1));
+        painted = painted.united(
+            recomposeInvalidChunks(-1, ScanMode::NonPriorityOnly));
     } else if (left > 0) {
         painted = painted.united(
-            recomposeInvalidChunks(false, kSyncChunkBudget));
+            recomposeInvalidChunks(kSyncChunkBudget, ScanMode::NonPriorityOnly));
     }
 
     return painted;
@@ -241,8 +285,14 @@ QRect Projection::processPendingChunks(int maxChunks)
 {
     if (!hasPendingChunks())
         return {};
-    // 空闲时仍视口优先，平移/缩放后先补洞
-    return recomposeInvalidChunks(/*priorityFirst=*/true, maxChunks);
+    return recomposeInvalidChunks(maxChunks, ScanMode::PriorityThenRest);
+}
+
+QRect Projection::flushPriority()
+{
+    if (!hasPendingChunks())
+        return {};
+    return recomposeInvalidChunks(-1, ScanMode::PriorityOnly);
 }
 
 } // namespace Ps

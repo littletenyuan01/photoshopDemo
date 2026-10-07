@@ -34,10 +34,14 @@ public:
     int height() const { return m_gray.height(); }
 
     const QImage &image() const { return m_gray; }
-    QImage &image() { return m_gray; }
+    /** 非 const 取图视为可能改像素，清掉 isFullyOpaque 缓存。 */
+    QImage &image() { m_opaqueKnown = false; return m_gray; }
 
     /** 层内坐标取样；越界视为 0（全藏）。 */
     quint8 valueAt(int lx, int ly) const;
+
+    /** 整幅是否恒为 255（新建白蒙版命中；合成可当无蒙版）。 */
+    bool isFullyOpaque() const;
 
     /** 重置为纯色（尺寸不变）；空图则忽略。 */
     void fill(quint8 v);
@@ -61,9 +65,13 @@ public:
     LayerMask clone() const;
 
 private:
+    void setOpaqueHint(bool fullyOpaque) const;
+
     QImage m_gray; ///< Format_Grayscale8，层局部坐标
     bool m_enabled = true;
     bool m_linked = true;
+    mutable bool m_opaqueKnown = false;   ///< isFullyOpaque 缓存是否有效
+    mutable bool m_fullyOpaque = false;   ///< 缓存：整幅 255
 };
 
 } // namespace Ps

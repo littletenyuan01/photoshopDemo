@@ -12,14 +12,17 @@
 #include <QImage>
 #include <QtMath>
 
-#include <functional>
-
 namespace Ps {
 namespace FilterEval {
 
 namespace {
 
-void forEachPixel(QImage &image, const std::function<void(int *, int *, int *, int)> &fn)
+/**
+ * 点滤镜内环（对照 GEGL GeglOperationPointFilter）。
+ * 模板可内联，避免 std::function 每像素虚调用开销。
+ */
+template <typename Fn>
+void forEachPixel(QImage &image, Fn &&fn)
 {
     for (int y = 0; y < image.height(); ++y) {
         QRgb *line = reinterpret_cast<QRgb *>(image.scanLine(y));
@@ -34,22 +37,35 @@ void forEachPixel(QImage &image, const std::function<void(int *, int *, int *, i
     }
 }
 
+/** 直通灰度 LUT 点滤镜（亮度/对比度、色阶等；对照 GEGL 预计算表）。 */
+void applyChannelLut(QImage &image, const quint8 lut[256])
+{
+    for (int y = 0; y < image.height(); ++y) {
+        QRgb *line = reinterpret_cast<QRgb *>(image.scanLine(y));
+        for (int x = 0; x < image.width(); ++x) {
+            int r, g, b, a;
+            Premul::unpremultiplyRgb(line[x], &r, &g, &b, &a);
+            if (a <= 0)
+                continue;
+            line[x] = Premul::toPremultipliedRgb(
+                QColor(lut[r], lut[g], lut[b], a));
+        }
+    }
+}
+
 void applyBrightnessContrast(QImage &image, qreal brightness, qreal contrast)
 {
     if (image.isNull() || (qFuzzyIsNull(brightness) && qFuzzyIsNull(contrast)))
         return;
     const qreal c = 1.0 + contrast;
     const qreal b = brightness;
-    forEachPixel(image, [&](int *r, int *g, int *bl, int) {
-        auto ch = [&](int v) {
-            qreal n = v / 255.0;
-            n = (n - 0.5) * c + 0.5 + b;
-            return qBound(0, int(n * 255.0 + 0.5), 255);
-        };
-        *r = ch(*r);
-        *g = ch(*g);
-        *bl = ch(*bl);
-    });
+    quint8 lut[256];
+    for (int i = 0; i < 256; ++i) {
+        qreal n = i / 255.0;
+        n = (n - 0.5) * c + 0.5 + b;
+        lut[i] = quint8(qBound(0, int(n * 255.0 + 0.5), 255));
+    }
+    applyChannelLut(image, lut);
 }
 
 void applyInvert(QImage &image)
@@ -128,18 +144,16 @@ void applyLevels(QImage &image, qreal black, qreal white, qreal gamma)
     if (black <= 0.0 && white >= 255.0 && qFuzzyCompare(gamma, 1.0))
         return;
     const qreal span = qMax(1.0, white - black);
-    forEachPixel(image, [&](int *r, int *g, int *b, int) {
-        auto ch = [&](int v) {
-            qreal n = (v - black) / span;
-            n = qBound(0.0, n, 1.0);
-            if (!qFuzzyCompare(gamma, 1.0))
-                n = qPow(n, 1.0 / gamma);
-            return qBound(0, int(n * 255.0 + 0.5), 255);
-        };
-        *r = ch(*r);
-        *g = ch(*g);
-        *b = ch(*b);
-    });
+    const qreal invGamma = qFuzzyCompare(gamma, 1.0) ? 1.0 : (1.0 / gamma);
+    quint8 lut[256];
+    for (int i = 0; i < 256; ++i) {
+        qreal n = (i - black) / span;
+        n = qBound(0.0, n, 1.0);
+        if (!qFuzzyCompare(invGamma, 1.0))
+            n = qPow(n, invGamma);
+        lut[i] = quint8(qBound(0, int(n * 255.0 + 0.5), 255));
+    }
+    applyChannelLut(image, lut);
 }
 
 void applyColorBalance(QImage &image, qreal cr, qreal mg, qreal yb)

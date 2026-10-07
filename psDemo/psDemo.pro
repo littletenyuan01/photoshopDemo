@@ -1,4 +1,4 @@
-QT += widgets svg
+QT += widgets svg concurrent
 
 CONFIG += c++17
 

@@ -72,9 +72,12 @@
   切过去不消费事件，而不是意外继承上一个工具的行为。
 - **移动（V）**：按下时按像素点选最上层非透明内容并激活该层（图层面板同步）；
   拖拽平移其文档偏移（`Layer::offsetX/Y`），不搬瓦片像素。
-  拖中真改 offset + 投影脏区（视口优先 / idle）；`preview_freeze` 只冻缩略图。
-  对照 GIMP `gimpeditselectiontool` translate + `gimp_projection_flush`，见 [pending-dev.md](pending-dev.md)。
-  对照 `gimpmovetool.c` + `gimp_image_pick_layer` → `gimp_item_translate`。
+  **拖中**：工具自建 `liveProjection`（below + 图章；无调整层上方时烘焙 above；
+  有调整层上方时每帧对脏区重跑上方栈，挖空区也吃调整），CanvasView 跳过投影 sync；
+  **松手**：`Projection::adoptImage` 无缝定稿，无消失再出现。
+  `preview_freeze` 只冻缩略图；offset 真改但不 `emitContent`。
+  **改前为何卡/闪、改后为何跟手**对照见 [pending-dev.md](pending-dev.md)「移动工具拖图层」。
+  对照 `gimpmovetool.c` + `gimp_item_translate`；观感对齐 PS 连续拖动。
   未做：选区/路径移动、对齐、「仅移动当前层」开关。
 - **自由变换（Ctrl+T）**：编辑→自由变换 / 移动组飞出；选项栏与右键模式（含斜切/扭曲/透视）；
   拖角·边缩放、框内平移、框外旋转；Enter 提交、Esc 取消；会话内逐步撤销；翻转。
@@ -264,6 +267,9 @@
   色调分离、阈值、渐变映射、可选颜色；纯色/渐变/图案填充灰显后置）。
   `addAdjustmentLayer(OpName)`：**自动白蒙版**；选中后**属性面板切换为该类型参数页**
   （`ui/adj/*.ui` + `AdjustmentPropsHost`）。合成吃下方阶段性结果 + 蒙版；`FilterEval` 求值。
+  **性能**：拖参 live（主线程不合成；后台建 below/above + 单飞 FilterEval；整视口预览；
+  松手 `syncProjection`）；白蒙版合成快路径。
+  **改前为何卡 / 改后为何不卡**对照见 [pending-dev.md](pending-dev.md)「调整层拖参 / 显隐卡顿」。
   曲线为**主通道 5 点**精简版（非完整贝塞尔编辑器）；颜色查找为内置 1D LUT 预设。
   写入 `.pslite`（kind + 滤镜参数）。
   对照：PS 调整图层；GIMP 原生无此层种，等价物为 drawable filter（GEGL 算子图），非常驻属性页。

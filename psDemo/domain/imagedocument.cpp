@@ -480,8 +480,26 @@ bool ImageDocument::setLayerFilterNode(int layerIndex, int filterIndex,
         pushLayerPropUndo(layerIndex, tr("调整图层参数"));
     layer->filters().at(filterIndex) = node;
     layer->invalidateCompositeRaster();
+
+    // 调整层拖参：走 live 预览（只重跑滤镜）；像素层滤镜仍整区标脏
+    if (layer->isAdjustmentLayer()) {
+        if (pushUndo) {
+            // 脏区记下供缩略图；画布用 adopt 定稿，不必等分块 sync
+            const QRect dirty =
+                layer->boundsInDocument().intersected(QRect(0, 0, m_width, m_height));
+            m_dirty = true;
+            if (!dirty.isEmpty())
+                m_dirtyRect = m_dirtyRect.isNull() ? dirty : m_dirtyRect.united(dirty);
+            emit layerPropertiesChanged(layerIndex);
+            emit adjustmentPreviewCommit(layerIndex);
+            emit pixelsChanged(dirty.isEmpty() ? QRect(0, 0, m_width, m_height) : dirty);
+        } else {
+            emit adjustmentPreviewChanged(layerIndex);
+        }
+        return true;
+    }
+
     markDirty(layer->boundsInDocument().intersected(QRect(0, 0, m_width, m_height)));
-    // 预览拖动不刷属性面板（避免滑条被重载）；提交/undo 才发属性信号
     if (pushUndo)
         emit layerPropertiesChanged(layerIndex);
     return true;
@@ -944,7 +962,7 @@ void ImageDocument::setLayerBlendMode(int index, BlendMode mode, bool recordHist
     layer->setBlendMode(mode);
 }
 
-void ImageDocument::translateLayer(int index, int dx, int dy)
+void ImageDocument::translateLayer(int index, int dx, int dy, bool emitContent)
 {
     if (dx == 0 && dy == 0)
         return;
@@ -970,8 +988,11 @@ void ImageDocument::translateLayer(int index, int dx, int dy)
     m_dirty = true;
     m_dirtyRect = m_dirtyRect.isNull() ? dirty : m_dirtyRect.united(dirty);
 
-    // 对照 GIMP：拖中仍 gimp_projection_flush；preview_freeze 只冻缩略图
-    // → 发 contentChanged 驱动投影；冻住时不发 pixelsChanged（面板缩略图）
+    // emitContent=false：移动工具 live 预览路径，由工具自己重画，松手再投影 sync
+    if (!emitContent)
+        return;
+
+    // 对照 GIMP：拖中仍可 flush；preview_freeze 只冻缩略图
     if (!m_previewFrozen)
         emit layerPropertiesChanged(index);
     if (!m_previewFrozen)

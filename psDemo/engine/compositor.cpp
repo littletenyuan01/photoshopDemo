@@ -203,15 +203,18 @@ bool Compositor::blendLayerRange(QImage &dst,
             if (filtered.isNull())
                 continue;
 
-            const LayerMask *mask = (layer->hasMask() && layer->mask()
-                                     && layer->mask()->isEnabled())
-                                        ? layer->mask()
-                                        : nullptr;
+            const LayerMask *rawMask = (layer->hasMask() && layer->mask()
+                                        && layer->mask()->isEnabled())
+                                           ? layer->mask()
+                                           : nullptr;
+            // 默认白蒙版（全 255）等价于无蒙版，走 QPainter 整区替换
+            const LayerMask *mask =
+                (rawMask && !rawMask->isFullyOpaque()) ? rawMask : nullptr;
             const qreal opacity = layer->opacity();
             const int layerOx = layer->offsetX();
             const int layerOy = layer->offsetY();
 
-            // opacity≈1 且无蒙版：整区替换；否则预乘插值（保留下方透出）
+            // opacity≈1 且无有效蒙版：整区替换；否则预乘插值（保留下方透出）
             if (opacity >= 0.999 && !mask) {
                 QPainter painter(&dst);
                 painter.setCompositionMode(QPainter::CompositionMode_Source);
@@ -272,10 +275,13 @@ bool Compositor::blendLayerRange(QImage &dst,
         const int layerOy = layer->offsetY();
         const qreal opacity = layer->opacity();
         // 有蒙版且启用时乘到层 alpha（对照 GIMP Applicator aux / layer mask）
-        const LayerMask *mask = (layer->hasMask() && layer->mask()
-                                 && layer->mask()->isEnabled())
-                                    ? layer->mask()
-                                    : nullptr;
+        // 全白蒙版跳过，避免无谓的 valueAt 乘算
+        const LayerMask *rawMask = (layer->hasMask() && layer->mask()
+                                    && layer->mask()->isEnabled())
+                                       ? layer->mask()
+                                       : nullptr;
+        const LayerMask *mask =
+            (rawMask && !rawMask->isFullyOpaque()) ? rawMask : nullptr;
 
         // 会话预览覆盖：瓦片（含挖空）+ 预览图叠在同一层位置，z 序不变
         if (hasPreview) {

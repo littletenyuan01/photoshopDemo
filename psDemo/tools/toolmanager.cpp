@@ -114,6 +114,8 @@ void ToolManager::rewriteConnections()
             this, &ToolManager::foregroundPicked);
     connect(m_activeTool, &Tool::backgroundPicked,
             this, &ToolManager::backgroundPicked);
+    connect(m_activeTool, &Tool::liveProjectionCommitted,
+            this, &ToolManager::liveProjectionCommitted);
 }
 
 void ToolManager::setContext(const ToolContext &ctx)
