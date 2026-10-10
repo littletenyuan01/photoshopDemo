@@ -4,6 +4,11 @@
 #include "filterstack.h"
 
 #include "engine/filtereval.h"
+#include "engine/graph/pointfilterop.h"
+#include "engine/graph/psgraph.h"
+#include "engine/graph/sourceop.h"
+
+#include <memory>
 
 namespace Ps {
 
@@ -49,12 +54,18 @@ QImage FilterStack::apply(const QImage &source) const
     if (out.format() != QImage::Format_ARGB32_Premultiplied)
         out = out.convertToFormat(QImage::Format_ARGB32_Premultiplied);
 
+    // 建链图：source → f1 → f2 → …（对照 GimpFilterStack 的 GeglNode *graph）
+    // 点滤镜 ROI 恒等，逐像素结果与旧循环一致；图求值在此即「线性链的特例」。
+    PsGraph graph;
+    GraphNode::Id prev = graph.addNode(std::make_shared<ImageSourceOp>(out));
     for (const FilterNode &node : m_nodes) {
         if (!node.isEnabled())
             continue;
-        FilterEval::applyNode(out, node);
+        const GraphNode::Id cur = graph.addNode(std::make_shared<PointFilterOp>(node));
+        graph.connect(prev, cur, 0);
+        prev = cur;
     }
-    return out;
+    return graph.evaluate(prev, out.rect());
 }
 
 } // namespace Ps

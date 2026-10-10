@@ -13,6 +13,7 @@
 |------|------|
 | [operators.md](operators.md) | 算子调用链：注册表、常驻实例、三段式调度、脏区上行；缓冲/点两条路径的完整时序与示例 |
 | [magnetic-lasso.md](magnetic-lasso.md) | 磁性套索：局部吸附 vs live-wire、代价函数与参数标定、GIMP 常量对照、「贴边不稳」的成因与修正、验证方法 |
+| [../graph-engine.md](../graph-engine.md) | **图引擎（engine/graph）**：函数式 DAG、ROI 反向传播、节点缓存与脏传播、合成入图（对照 GEGL） |
 
 对照实现：
 

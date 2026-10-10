@@ -50,6 +50,13 @@ public:
                                 int layerBegin,
                                 int layerEnd,
                                 int skipLayer = -1);
+
+    /**
+     * 经图引擎合成（对照 composite 的图化等价路径，Stage 3）。
+     * 构建合成 DAG 并对 @p rect 求值；返回整图尺寸（区外透明）。
+     * 供校验图引擎与直接合成逐像素一致（见 graphselfcheck）。
+     */
+    static QImage compositeViaGraph(const ImageDocument &doc, const QRect &rect);
 };
 
 } // namespace Ps

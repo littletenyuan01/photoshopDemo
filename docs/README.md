@@ -24,6 +24,7 @@
 |------|------|
 | [overview.md](overview.md) | 工程总览与当前能力 |
 | [architecture.md](architecture.md) | 模块结构与数据流 |
+| [graph-engine.md](graph-engine.md) | **图引擎（engine/graph）**：DAG / ROI 反向传播 / 节点缓存与脏传播 / 合成入图，对照 GEGL |
 | [features.md](features.md) | 功能清单与使用说明 |
 | [pending-dev.md](pending-dev.md) | **待开发**：已有功能的已知风险与完善方向 |
 | [code-map.md](code-map.md) | 重点代码与文件索引 |

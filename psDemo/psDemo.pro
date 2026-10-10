@@ -53,6 +53,9 @@ SOURCES += \
     engine/op/opsinit.cpp \
     engine/op/opname.cpp \
     engine/op/pointopregistry.cpp \
+    engine/graph/psgraph.cpp \
+    engine/graph/compositegraph.cpp \
+    engine/graph/graphselfcheck.cpp \
     tools/tool.cpp \
     tools/toolmanager.cpp \
     tools/movetool.cpp \
@@ -130,6 +133,7 @@ HEADERS += \
     engine/paintselectionclip.h \
     engine/painttypes.h \
     engine/premul.h \
+    engine/compositepixel.h \
     engine/magneticedgesnap.h \
     engine/op/operation.h \
     engine/op/pointop.h \
@@ -155,6 +159,15 @@ HEADERS += \
     engine/op/opname.h \
     engine/op/pointopregistry.h \
     engine/op/layermodecatalog.h \
+    engine/graph/graphnode.h \
+    engine/graph/psgraph.h \
+    engine/graph/graphop.h \
+    engine/graph/graphsource.h \
+    engine/graph/pointfilterop.h \
+    engine/graph/sourceop.h \
+    engine/graph/blendop.h \
+    engine/graph/compositegraph.h \
+    engine/graph/graphselfcheck.h \
     tools/toolid.h \
     tools/toolevent.h \
     tools/toolcontext.h \

@@ -6,8 +6,10 @@
 #include "mainwindow.h"
 
 #include "engine/op/opsinit.h"
+#include "engine/graph/graphselfcheck.h"
 
 #include <QApplication>
+#include <QDebug>
 #include <QFile>
 #include <QIcon>
 
@@ -17,6 +19,10 @@ int main(int argc, char *argv[])
 
     // 对照 gimp_operations_init：先注册算子类型与 pad 依赖，再进 UI
     Ps::opsInit();
+
+    // 图引擎自检（结构 / 缓存失效 / 图化合成一致性）；失败仅告警，不阻断启动
+    if (!Ps::graphSelfCheck())
+        qWarning("PsGraph self-check failed");
 
     // 应用级图标：标题栏兜底；Windows 任务栏还需 RC_ICONS 把 .ico 嵌进 exe
     a.setWindowIcon(QIcon(QStringLiteral(":/icons/ui/app-logo.png")));

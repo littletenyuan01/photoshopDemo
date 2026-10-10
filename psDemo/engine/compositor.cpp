@@ -15,6 +15,9 @@
 #include "engine/op/layermodeop.h"
 #include "engine/op/pointopregistry.h"
 #include "engine/premul.h"
+#include "engine/compositepixel.h"
+#include "engine/graph/compositegraph.h"
+#include "engine/graph/psgraph.h"
 
 #include <QPainter>
 #include <QRect>
@@ -54,8 +57,8 @@ void blendTileOnto(QImage &dst,
     if (area.isEmpty())
         return;
 
-    const float opacityF = float(opacity);
-    const bool dissolving = (modeOp->mode() == BlendMode::Dissolve);
+    const BlendMode mode = modeOp->mode();
+    const bool dissolving = (mode == BlendMode::Dissolve);
     const bool useMask = mask && mask->isEnabled() && !mask->isNull();
 
     for (int y = area.top(); y <= area.bottom(); ++y) {
@@ -64,65 +67,10 @@ void blendTileOnto(QImage &dst,
                             + (area.left() - ox);
 
         for (int x = 0; x < area.width(); ++x) {
-            const QRgb sp = sline[x];
-            int sr = 0, sg = 0, sb = 0, sa = 0;
-            Premul::unpremultiplyRgb(sp, &sr, &sg, &sb, &sa);
-            if (sa == 0)
-                continue;
-
-            if (useMask) {
-                const int lx = (area.left() + x) - layerOx;
-                const int ly = y - layerOy;
-                sa = (sa * int(mask->valueAt(lx, ly)) + 127) / 255;
-                if (sa == 0)
-                    continue;
-            }
-
-            const QRgb dp = dline[x];
-            int dr = 0, dg = 0, db = 0, da = 0;
-            Premul::unpremultiplyRgb(dp, &dr, &dg, &db, &da);
-
-            float la = (sa / 255.0f) * opacityF;
-            if (dissolving) {
-                if (!Blend::dissolveKeeps(area.left() + x, y, sa, opacity))
-                    continue;
-                la = 1.0f;
-            }
-            if (la <= 0.0f)
-                continue;
-
-            const float cs[3] = { sr / 255.0f, sg / 255.0f, sb / 255.0f };
-            const float cb[3] = { dr / 255.0f, dg / 255.0f, db / 255.0f };
-
-            float out[3];
-            const float ia = da / 255.0f;
-            const float ar01 = la + (1.0f - la) * ia;
-
-            if (ia <= 0.0f) {
-                out[0] = cs[0];
-                out[1] = cs[1];
-                out[2] = cs[2];
-            } else {
-                const int backdrop[3] = { dr, dg, db };
-                const int source[3] = { sr, sg, sb };
-                float comp[3];
-                modeOp->blendPixel(backdrop, source, comp);
-
-                const float ratio = la / ar01;
-                for (int c = 0; c < 3; ++c)
-                    out[c] = ratio * (ia * (comp[c] / 255.0f - cs[c]) + cs[c] - cb[c]) + cb[c];
-            }
-
-            const int ar = qBound(0, int(ar01 * 255.0f + 0.5f), 255);
-            if (ar <= 0) {
-                dline[x] = 0;
-                continue;
-            }
-
-            const int pr = qBound(0, int(out[0] * ar + 0.5f), 255);
-            const int pg = qBound(0, int(out[1] * ar + 0.5f), 255);
-            const int pb = qBound(0, int(out[2] * ar + 0.5f), 255);
-            dline[x] = qRgba(pr, pg, pb, ar);
+            const int docX = area.left() + x;
+            const int maskV = useMask ? int(mask->valueAt(docX - layerOx, y - layerOy)) : -1;
+            dline[x] = compositePixelOnto(dline[x], sline[x], opacity, mode,
+                                          dissolving, docX, y, maskV);
         }
     }
 }
@@ -335,6 +283,22 @@ bool Compositor::blendLayerRange(QImage &dst,
     }
 
     return true;
+}
+
+QImage Compositor::compositeViaGraph(const ImageDocument &doc, const QRect &rect)
+{
+    PsGraph graph;
+    const GraphNode::Id sink = CompositeGraph::build(graph, doc);
+    const QImage region = graph.evaluate(sink, rect);
+
+    QImage out(doc.width(), doc.height(), QImage::Format_ARGB32_Premultiplied);
+    out.fill(Qt::transparent);
+    if (!region.isNull()) {
+        QPainter p(&out);
+        p.drawImage(rect.topLeft(), region);
+        p.end();
+    }
+    return out;
 }
 
 } // namespace Ps

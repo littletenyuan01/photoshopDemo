@@ -105,6 +105,8 @@ UI 不得直接改 `Layer`，一律走 `setLayerVisible/Opacity/Name/BlendMode` 
 | `engine/projection.h/.cpp` | 文档投影缓存（对照 GimpProjection）；64 块 + 视口优先 + 空闲分块渐进 `sync` / `processPendingChunks` |
 | `engine/paintengine.h/.cpp` | 门面：`OpRunner::run(OpName, …)`；笔画插值仍在此 |
 | `engine/filtereval.h/.cpp` | 滤镜节点求值（亮度/对比度等）；只改临时图 |
+| `engine/compositepixel.h` | `compositePixelOnto`：逐像素合成抽出的共享函数（`blendTileOnto` 与图 `BlendOp` 共用） |
+| `engine/graph/` | **图引擎（函数式 DAG）**：`GraphNode` / `PsGraph` / `GraphOp` / `GraphSource` + `PointFilterOp` / `SourceOp` / `BlendOp` + `CompositeGraph`；ROI 反向传播 + 节点缓存 + 脏传播；对照 GEGL（见 [graph-engine.md](graph-engine.md)） |
 
 **要点**：`blend`（算什么颜色）与 `compositor`（怎么按 Alpha 叠）分开，对齐 GIMP；
 算子是可命名调度壳，算法可仍在 `blend` / op 实现文件。绘制 dab 与合成分离。
@@ -114,6 +116,7 @@ UI 不得直接改 `Layer`，一律走 `setLayerVisible/Opacity/Name/BlendMode` 
 - 算子返回**层内脏矩形**，由调用方直接交给 `markDirty`；工具侧不再自行推算脏区。
 - 缓冲算子用 `OpContext::roi` + `OpPaintClip::operationWindow()` 把遍历限制在瓦片窗口，避免整层 `materialize()` / `setFromImage()`（后者会把 TileBuffer 的稀疏瓦片设计废掉）。
 - **完整调用链、时序与示例**（含 `prepare→process→finish` 契约、实例复用四条硬约束、坐标系换算、与 GIMP 对照）见 [engine/operators.md](engine/operators.md)。
+- **图引擎**（`engine/graph`，函数式 DAG，与上面命令式算子正交）：ROI 反向传播、节点缓存与脏传播、`CompositeGraph` 合成入图，见 [graph-engine.md](graph-engine.md)。
 
 ## ui
 
