@@ -23,6 +23,8 @@
 #include <QRect>
 #include <QtGlobal>
 
+#include <cstring>
+
 namespace Ps {
 
 namespace {
@@ -103,11 +105,12 @@ bool Compositor::compositeRegion(QImage &dst, const ImageDocument &doc, const QR
     if (area.isEmpty())
         return true;
 
-    // 投影该矩形从零叠起（对照投影 invalidate 后重算）
-    {
-        QPainter painter(&dst);
-        painter.setCompositionMode(QPainter::CompositionMode_Source);
-        painter.fillRect(area, Qt::transparent);
+    // 投影该矩形从零叠起（对照投影 invalidate 后重算）。
+    // 直接逐行清零，不用 QPainter：分块重算时每 chunk 建一次 QPainter 很贵；
+    // 且只写本矩形内的行段，便于将来按不相交区域并行。
+    for (int y = area.top(); y <= area.bottom(); ++y) {
+        QRgb *line = reinterpret_cast<QRgb *>(dst.scanLine(y)) + area.left();
+        std::memset(line, 0, size_t(area.width()) * sizeof(QRgb));
     }
 
     return blendLayerRange(dst, doc, area, 0, doc.layers().count(), -1);
@@ -231,14 +234,16 @@ bool Compositor::blendLayerRange(QImage &dst,
         const LayerMask *mask =
             (rawMask && !rawMask->isFullyOpaque()) ? rawMask : nullptr;
 
+        // 只遍历与本矩形相交的瓦片格（旧写法遍历该层**全部**瓦片再逐个判交，
+        // 分块重算时是 O(块数 × 层数 × 总瓦片数)）
+        const QRect localArea = area.translated(-layerOx, -layerOy);
+
         // 会话预览覆盖：瓦片（含挖空）+ 预览图叠在同一层位置，z 序不变
         if (hasPreview) {
             if (layer->hasPixelData()) {
-                layer->tiles().forEachAllocatedTile(
+                layer->tiles().forEachTileInRect(
+                    localArea,
                     [&](int, int, const QImage &tile, const QRect &bounds) {
-                        const QRect docBounds = bounds.translated(layerOx, layerOy);
-                        if (!docBounds.intersects(area))
-                            return;
                         blendTileOnto(dst, tile,
                                       bounds.x() + layerOx,
                                       bounds.y() + layerOy,
@@ -269,11 +274,9 @@ bool Compositor::blendLayerRange(QImage &dst,
             continue;
         }
 
-        layer->tiles().forEachAllocatedTile(
+        layer->tiles().forEachTileInRect(
+            localArea,
             [&](int, int, const QImage &tile, const QRect &bounds) {
-                const QRect docBounds = bounds.translated(layerOx, layerOy);
-                if (!docBounds.intersects(area))
-                    return;
                 blendTileOnto(dst, tile,
                               bounds.x() + layerOx,
                               bounds.y() + layerOy,

@@ -7,6 +7,7 @@
 #include "domain/layer.h"
 #include "domain/selection.h"
 #include "domain/tilebuffer.h"
+#include "engine/compositor.h"
 #include "engine/op/tilepatch.h"
 #include "engine/paintengine.h"
 #include "engine/paintselectionclip.h"
@@ -385,6 +386,7 @@ bool TransformTool::beginSession(const ToolContext &ctx)
     liftSourceFromLayer(layer);
     m_previewDirtyDoc = {};
     m_doc = ctx.document;
+    buildLiveBelow(ctx);
     clearSessionHistory();
     m_session = true;
     m_drag = Handle::None;
@@ -418,6 +420,80 @@ void TransformTool::clearLayerRect(Layer *layer, const QRect &localRect)
     layer->invalidateContentBounds();
 }
 
+const QImage *TransformTool::liveProjection() const
+{
+    if (m_useLive && !m_live.isNull())
+        return &m_live;
+    return nullptr;
+}
+
+void TransformTool::clearLive()
+{
+    m_useLive = false;
+    m_live = QImage();
+    m_liveBelow = QImage();
+}
+
+void TransformTool::buildLiveBelow(const ToolContext &ctx)
+{
+    m_liveBelow = QImage();
+    if (!m_doc)
+        return;
+    const int w = m_doc->width();
+    const int h = m_doc->height();
+    if (w <= 0 || h <= 0)
+        return;
+
+    const QRect full(0, 0, w, h);
+    const QImage *snap = ctx.projectionSnapshot;
+    const bool snapOk = snap && !snap->isNull() && snap->width() == w && snap->height() == h;
+
+    if (snapOk) {
+        // 从投影快照挖掉本层占位：清成透明再叠下方栈，避免旧像素残留（含样式外扩）
+        m_liveBelow = snap->copy();
+        const Layer *layer = m_doc->layers().layerAt(m_layerIndex);
+        if (layer) {
+            const QRect bounds = layer->styleBoundsInDocument().intersected(full);
+            if (!bounds.isEmpty()) {
+                QPainter p(&m_liveBelow);
+                p.setCompositionMode(QPainter::CompositionMode_Source);
+                p.fillRect(bounds, Qt::transparent);
+                p.end();
+                Compositor::blendLayerRange(m_liveBelow, *m_doc, bounds, 0, m_layerIndex, -1);
+            }
+        }
+    } else {
+        // 无快照：全文档直接合成下方栈
+        m_liveBelow = QImage(w, h, QImage::Format_ARGB32_Premultiplied);
+        m_liveBelow.fill(Qt::transparent);
+        Compositor::blendLayerRange(m_liveBelow, *m_doc, full, 0, m_layerIndex, -1);
+    }
+}
+
+void TransformTool::rebuildLive(const QRect &patchDoc)
+{
+    if (!m_doc || m_liveBelow.isNull())
+        return;
+    const QRect full(0, 0, m_doc->width(), m_doc->height());
+    const QRect area = patchDoc.intersected(full);
+    if (area.isEmpty())
+        return;
+
+    if (m_live.isNull())
+        m_live = m_liveBelow; // COW 共享，首次写时拷贝
+
+    // 先把 patch 还原到 below 状态，再从本层到顶重合成（含 compositePreview）
+    {
+        QPainter p(&m_live);
+        p.setCompositionMode(QPainter::CompositionMode_Source);
+        p.drawImage(area.topLeft(), m_liveBelow, area);
+        p.end();
+    }
+    Compositor::blendLayerRange(m_live, *m_doc, area, m_layerIndex,
+                                m_doc->layers().count(), -1);
+    m_useLive = true;
+}
+
 QRect TransformTool::previewDestDoc() const
 {
     QPolygonF poly;
@@ -441,8 +517,10 @@ void TransformTool::updateLayerPreview(ImageDocument *doc)
         layer->clearCompositePreview();
         m_previewDirtyDoc = {};
         const QRect dirty = oldDirty;
-        if (!dirty.isEmpty())
+        if (!dirty.isEmpty()) {
             doc->markDirty(dirty);
+            rebuildLive(dirty);
+        }
         return;
     }
 
@@ -483,6 +561,9 @@ void TransformTool::updateLayerPreview(ImageDocument *doc)
         doc->markDirty(mark);
     else
         doc->markDirty();
+
+    // live：把 patch 用「below + 本层..顶」重合成，画布据此跳过 Projection::sync
+    rebuildLive(mark.isEmpty() ? QRect(0, 0, doc->width(), doc->height()) : mark);
 }
 
 void TransformTool::cancelSession(const ToolContext &ctx, bool userExit)
@@ -491,6 +572,7 @@ void TransformTool::cancelSession(const ToolContext &ctx, bool userExit)
         return;
     m_session = false;
     m_drag = Handle::None;
+    clearLive();
     if (ctx.document) {
         if (Layer *layer = ctx.document->layers().layerAt(m_layerIndex)) {
             layer->clearCompositePreview();
@@ -531,6 +613,11 @@ bool TransformTool::commitSession(const ToolContext &ctx)
         return false;
 
     layer->clearCompositePreview();
+
+    // 先 adopt live 到投影，避免松手瞬间回落到旧投影再重算（对照 MoveTool finishDrag）
+    if (m_useLive && !m_live.isNull())
+        emit liveProjectionCommitted(m_live);
+    clearLive();
 
     // 还原进会话前几何 → push → 再扩层 + 正式栅格化
     if (!m_preSessionPixels.isNull()) {

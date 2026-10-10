@@ -49,22 +49,26 @@ public:
     QRect priorityRect() const { return m_priorityRect; }
 
     /**
-     * 吸入文档脏区并尽量立即刷新（视口优先、有预算）。
+     * 吸入文档脏区并尽量立即刷新（视口优先、块数 + 时间双预算）。
+     * @param maxMs 每阶段最多耗时（毫秒）；≤0 = 不限。给预算可避免大脏区一帧卡住 UI。
      * @return 本轮实际重算的文档矩形；无需更新时为空。
      */
-    QRect sync();
+    QRect sync(int maxMs = -1);
 
     /**
      * 空闲分块：再合成最多 @p maxChunks 个无效块（仍视口优先）。
+     * @param maxMs 最多耗时（毫秒）；≤0 = 不限。
      * @return 本批重算并集；无待办为空。
      */
-    QRect processPendingChunks(int maxChunks = kIdleChunkBudget);
+    QRect processPendingChunks(int maxChunks = kIdleChunkBudget, int maxMs = -1);
 
     /**
-     * 立刻刷完视口优先区内全部无效块（无预算）。
-     * 仅用于整幅脏（显隐调整层等），避免画出「旧块+新块」拼贴。
+     * 刷视口优先区内的无效块。
+     * @param maxMs 最多耗时（毫秒）；≤0 = 不限。
+     * 仅用于整幅脏（显隐调整层等），避免画出「旧块+新块」拼贴；
+     * 调用方须给预算，否则大视口会一次同步刷完（实测 ~170ms）。
      */
-    QRect flushPriority();
+    QRect flushPriority(int maxMs = -1);
 
     /** 是否还有未合成的无效块。 */
     bool hasPendingChunks() const;
@@ -99,8 +103,9 @@ private:
     /**
      * 合成无效块。
      * @param maxChunks ≤0 表示不限（仅用于「剩余很少」时一次收尾）
+     * @param maxMs    最多耗时（毫秒）；≤0 = 不限。与 maxChunks 谁先到谁停。
      */
-    QRect recomposeInvalidChunks(int maxChunks, ScanMode mode);
+    QRect recomposeInvalidChunks(int maxChunks, ScanMode mode, int maxMs = -1);
 
     ImageDocument *m_document = nullptr;
     QImage m_buffer;          ///< 投影缓存（预乘 ARGB32）

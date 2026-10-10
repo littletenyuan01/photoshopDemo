@@ -190,6 +190,30 @@ void TileBuffer::forEachTileInRect(const QRect &rect, bool allocateMissing, cons
     }
 }
 
+void TileBuffer::forEachTileInRect(const QRect &rect, const ConstTileCallback &fn) const
+{
+    if (!fn || m_tilesX <= 0 || m_tilesY <= 0)
+        return;
+
+    const QRect area = rect.intersected(QRect(0, 0, m_width, m_height));
+    if (area.isEmpty())
+        return;
+
+    const int tx0 = area.left() / kTileSize;
+    const int ty0 = area.top() / kTileSize;
+    const int tx1 = area.right() / kTileSize;
+    const int ty1 = area.bottom() / kTileSize;
+
+    for (int ty = ty0; ty <= ty1; ++ty) {
+        for (int tx = tx0; tx <= tx1; ++tx) {
+            const QImage *tile = tileAt(tx, ty);
+            if (!tile)
+                continue;
+            fn(tx, ty, *tile, tileBounds(tx, ty));
+        }
+    }
+}
+
 void TileBuffer::forEachAllocatedTile(const ConstTileCallback &fn) const
 {
     if (!fn)

@@ -98,6 +98,11 @@ public:
      * @param allocateMissing true → ensureTile（绘制写路径）；false → 只走已分配块（合成读路径）
      */
     void forEachTileInRect(const QRect &rect, bool allocateMissing, const TileCallback &fn);
+    /**
+     * **只读**重载：遍历与 rect 相交且**已分配**的瓦片格（不分配、不改缓冲）。
+     * 合成只读路径用它，避免「遍历整层瓦片再逐个判交」的 O(总瓦片数) 开销。
+     */
+    void forEachTileInRect(const QRect &rect, const ConstTileCallback &fn) const;
     /** 只遍历已分配瓦片（materialize / 缩略图）。 */
     void forEachAllocatedTile(const ConstTileCallback &fn) const;
 

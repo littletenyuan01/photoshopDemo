@@ -45,6 +45,9 @@ public:
     bool hasOverlay() const override { return m_session; }
     void drawOverlay(QPainter &painter, const ToolContext &ctx) const override;
 
+    /** 会话中提供 live 投影，画布据此跳过 Projection::sync（对照 MoveTool）。 */
+    const QImage *liveProjection() const override;
+
     void activate(const ToolContext &ctx, ViewPort &view) override;
     void deactivate(const ToolContext &ctx, ViewPort &view) override;
 
@@ -144,6 +147,11 @@ private:
     /** 目标四角在文档坐标的包围盒（含边距）。 */
     QRect previewDestDoc() const;
     void clearLayerRect(Layer *layer, const QRect &localRect);
+    /** 会话开始时缓存「本层之下全文档合成」（挖掉本层占位），供每帧 live 重建。 */
+    void buildLiveBelow(const ToolContext &ctx);
+    /** 每帧：把 patch 还原到 below，再从本层到顶重合成（含 compositePreview）。 */
+    void rebuildLive(const QRect &patchDoc);
+    void clearLive();
 
     Handle hitTest(const QPointF &widgetPos, const ToolContext &ctx) const;
     QPointF cornerWidget(int index, const ToolContext &ctx) const;
@@ -173,6 +181,9 @@ private:
     int m_preSessionOy = 0;
     QRect m_preSrcLocal;
     QRect m_previewDirtyDoc; ///< 文档坐标：上次预览脏区（投影增量）
+    QImage m_live;           ///< live 投影缓冲（会话中显示，跳过 sync）
+    QImage m_liveBelow;      ///< 本层之下全文档合成（挖掉本层占位）
+    bool m_useLive = false;  ///< 是否提供 live 投影
     qreal m_baseW = 1.0;    ///< 会话开始时宽（文档像素）
     qreal m_baseH = 1.0;
 

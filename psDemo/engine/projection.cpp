@@ -13,6 +13,7 @@
 #include "domain/imagedocument.h"
 #include "domain/tilebuffer.h"
 
+#include <QElapsedTimer>
 #include <QtGlobal>
 
 namespace Ps {
@@ -156,7 +157,7 @@ bool Projection::hasPendingChunks() const
     return false;
 }
 
-QRect Projection::recomposeInvalidChunks(int maxChunks, ScanMode mode)
+QRect Projection::recomposeInvalidChunks(int maxChunks, ScanMode mode, int maxMs)
 {
     if (!m_document || m_chunkValid.isEmpty() || m_buffer.isNull())
         return {};
@@ -164,6 +165,10 @@ QRect Projection::recomposeInvalidChunks(int maxChunks, ScanMode mode)
     const QRect full(0, 0, m_document->width(), m_document->height());
     if (full.isEmpty())
         return {};
+
+    QElapsedTimer clock;
+    if (maxMs > 0)
+        clock.start();
 
     const QRect priority = m_priorityRect.intersected(full);
     QRect painted;
@@ -187,7 +192,11 @@ QRect Projection::recomposeInvalidChunks(int maxChunks, ScanMode mode)
     };
 
     auto budgetOk = [&]() {
-        return maxChunks <= 0 || done < maxChunks;
+        if (maxChunks > 0 && done >= maxChunks)
+            return false;
+        if (maxMs > 0 && clock.elapsed() >= maxMs)
+            return false;
+        return true;
     };
 
     auto scanPriority = [&]() {
@@ -233,7 +242,7 @@ QRect Projection::recomposeInvalidChunks(int maxChunks, ScanMode mode)
     return painted;
 }
 
-QRect Projection::sync()
+QRect Projection::sync(int maxMs)
 {
     if (!m_document) {
         invalidate();
@@ -265,34 +274,43 @@ QRect Projection::sync()
 
     m_document->clearDirtyRect();
 
-    // 1) 视口内：限额（对照 GIMP flush 后 chunk 渐进，而非一帧打完视口）
-    QRect painted = recomposeInvalidChunks(kSyncPriorityBudget, ScanMode::PriorityOnly);
+    QElapsedTimer clock;
+    if (maxMs > 0)
+        clock.start();
 
-    // 2) 视口外：小量预算；剩多则 idle
-    const int left = invalidChunkCount();
-    if (left > 0 && left <= kSyncChunkBudget) {
-        painted = painted.united(
-            recomposeInvalidChunks(-1, ScanMode::NonPriorityOnly));
-    } else if (left > 0) {
-        painted = painted.united(
-            recomposeInvalidChunks(kSyncChunkBudget, ScanMode::NonPriorityOnly));
+    // 1) 视口内：限额（对照 GIMP flush 后 chunk 渐进，而非一帧打完视口）
+    QRect painted = recomposeInvalidChunks(kSyncPriorityBudget, ScanMode::PriorityOnly, maxMs);
+
+    // 2) 视口外：小量预算；剩多则 idle（与阶段 1 **共用**同一时间预算，故总耗时 ≤ maxMs）
+    int remain = maxMs;
+    if (maxMs > 0)
+        remain = maxMs - int(clock.elapsed());
+    if (remain > 0 || maxMs <= 0) {
+        const int left = invalidChunkCount();
+        if (left > 0 && left <= kSyncChunkBudget) {
+            painted = painted.united(
+                recomposeInvalidChunks(-1, ScanMode::NonPriorityOnly, remain));
+        } else if (left > 0) {
+            painted = painted.united(
+                recomposeInvalidChunks(kSyncChunkBudget, ScanMode::NonPriorityOnly, remain));
+        }
     }
 
     return painted;
 }
 
-QRect Projection::processPendingChunks(int maxChunks)
+QRect Projection::processPendingChunks(int maxChunks, int maxMs)
 {
     if (!hasPendingChunks())
         return {};
-    return recomposeInvalidChunks(maxChunks, ScanMode::PriorityThenRest);
+    return recomposeInvalidChunks(maxChunks, ScanMode::PriorityThenRest, maxMs);
 }
 
-QRect Projection::flushPriority()
+QRect Projection::flushPriority(int maxMs)
 {
     if (!hasPendingChunks())
         return {};
-    return recomposeInvalidChunks(-1, ScanMode::PriorityOnly);
+    return recomposeInvalidChunks(-1, ScanMode::PriorityOnly, maxMs);
 }
 
 } // namespace Ps
