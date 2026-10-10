@@ -79,6 +79,8 @@ struct ToolContext
     // —— 视图变换（供工具浮层把文档坐标画到控件上；由 CanvasView 填）——
     qreal viewZoom = 1.0;              ///< 当前缩放
     QPointF viewOffset;                ///< 文档原点在控件中的位置
+    /** 当前视口对应的文档矩形（移动工具只建 ROI 栈，避免按下整幅合成卡半秒）。 */
+    QRect visibleDocRect;
 
     /**
      * 当前投影快照（只读；移动工具 press 时复用，避免再全栈合成 below）。

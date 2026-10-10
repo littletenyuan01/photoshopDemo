@@ -396,6 +396,8 @@ void CanvasView::refreshToolContext()
     m_toolContext.shapeAntialias = m_shapeAntialias;
     m_toolContext.viewZoom = m_zoom;
     m_toolContext.viewOffset = m_offset;
+    updateProjectionPriorityRect();
+    m_toolContext.visibleDocRect = m_projection.priorityRect();
     m_toolContext.projectionSnapshot =
         (m_document && !m_projection.isNull()) ? &m_projection.image() : nullptr;
 

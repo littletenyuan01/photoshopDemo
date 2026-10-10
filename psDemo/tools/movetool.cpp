@@ -1,8 +1,8 @@
 /**
  * movetool.cpp — 移动工具实现（tools 层）。
  *
- * 跟手预览：press 建 below + 层图章；motion 只在脏区重贴。
- * 上方有调整层时：below 不用投影快照，每帧对补丁重跑上方栈（挖空区也吃调整）。
+ * 跟手预览：press 只建视口∪层 ROI（避免整幅 copy/合成卡半秒）；motion 脏区贴图章。
+ * 上方有调整层时：纯 below ROI + 每帧对补丁重跑上方栈；拖出 ROI 再扩展。
  * 松手：liveProjectionCommitted → 投影 adopt，画面不闪、位置立刻固定。
  */
 #include "movetool.h"
@@ -68,7 +68,9 @@ void MoveTool::clearLive()
 {
     m_useLive = false;
     m_liveApplyAbove = false;
+    m_belowFromSnapshot = false;
     m_liveLayerBounds = {};
+    m_stackRect = {};
     m_below = QImage();
     m_above = QImage();
     m_stamp = QImage();
@@ -101,8 +103,26 @@ bool MoveTool::hasAdjustmentAbove(const ImageDocument *doc, int layerIndex)
     return false;
 }
 
+bool MoveTool::hasVisiblePixelAbove(const ImageDocument *doc, int layerIndex)
+{
+    if (!doc)
+        return false;
+    const int n = doc->layers().count();
+    for (int i = layerIndex + 1; i < n; ++i) {
+        const Layer *L = doc->layers().layerAt(i);
+        if (!L || !L->isVisible() || L->opacity() <= 0.0)
+            continue;
+        if (L->isAdjustmentLayer())
+            continue;
+        if (L->hasPixelData() || L->hasCompositePreview())
+            return true;
+    }
+    return false;
+}
+
 bool MoveTool::buildLiveStacks(ImageDocument *doc, int layerIndex,
-                               const QImage *projectionSnapshot)
+                               const QImage *projectionSnapshot,
+                               const QRect &visibleDoc)
 {
     if (!doc || layerIndex < 0 || layerIndex >= doc->layers().count())
         return false;
@@ -117,28 +137,54 @@ bool MoveTool::buildLiveStacks(ImageDocument *doc, int layerIndex,
 
     const QRect full(0, 0, w, h);
     const QRect layerBounds = layer->styleBoundsInDocument().intersected(full);
-    m_liveApplyAbove = hasAdjustmentAbove(doc, layerIndex);
+    // 只建视口∪层占位（外扩一块），禁止按下时整幅 fill/blend
+    constexpr int kPad = 64;
+    QRect work = layerBounds;
+    if (!visibleDoc.isEmpty())
+        work = work.united(visibleDoc.intersected(full));
+    if (work.isEmpty())
+        work = full;
+    work = work.adjusted(-kPad, -kPad, kPad, kPad).intersected(full);
 
-    // 上方有调整层时：不能复用「已含调整结果」的投影快照，否则挖空区不会重跑调整；
-    // below 必须是纯下方栈；above 每帧对真实内容 blend（不能烘焙到透明底）。
-    if (!m_liveApplyAbove && projectionSnapshot && !projectionSnapshot->isNull()
-        && projectionSnapshot->width() == w && projectionSnapshot->height() == h) {
+    m_liveApplyAbove = hasAdjustmentAbove(doc, layerIndex);
+    m_belowFromSnapshot = false;
+    m_stackRect = work;
+
+    const bool snapOk = projectionSnapshot && !projectionSnapshot->isNull()
+                        && projectionSnapshot->width() == w
+                        && projectionSnapshot->height() == h;
+
+    if (!m_liveApplyAbove && snapOk) {
+        // 投影挖洞：一次整图 copy，但不再全幅 blend above/below
         m_below = projectionSnapshot->copy();
         if (!layerBounds.isEmpty())
             Compositor::blendLayerRange(m_below, *doc, layerBounds, 0, layerIndex, -1);
+        m_belowFromSnapshot = true;
+        m_stackRect = full; // 快照路径整幅可用
     } else {
+        // 有调整层上方：只合成 ROI 纯 below；live 先贴投影保持画布连续
         m_below = QImage(w, h, QImage::Format_ARGB32_Premultiplied);
-        m_below.fill(Qt::transparent);
-        if (!Compositor::blendLayerRange(m_below, *doc, full, 0, layerIndex, -1))
+        {
+            QPainter p(&m_below);
+            p.setCompositionMode(QPainter::CompositionMode_Source);
+            p.fillRect(work, Qt::transparent);
+        }
+        if (!Compositor::blendLayerRange(m_below, *doc, work, 0, layerIndex, -1))
             return false;
+        if (snapOk)
+            m_live = projectionSnapshot->copy();
     }
 
-    if (m_liveApplyAbove) {
+    if (m_liveApplyAbove || !hasVisiblePixelAbove(doc, layerIndex)) {
         m_above = QImage();
     } else {
         m_above = QImage(w, h, QImage::Format_ARGB32_Premultiplied);
-        m_above.fill(Qt::transparent);
-        if (!Compositor::blendLayerRange(m_above, *doc, full, layerIndex + 1,
+        {
+            QPainter p(&m_above);
+            p.setCompositionMode(QPainter::CompositionMode_Source);
+            p.fillRect(work, Qt::transparent);
+        }
+        if (!Compositor::blendLayerRange(m_above, *doc, work, layerIndex + 1,
                                          doc->layers().count(), -1))
             return false;
     }
@@ -153,13 +199,50 @@ bool MoveTool::buildLiveStacks(ImageDocument *doc, int layerIndex,
     m_stampDrawDy = raster.originDy;
     m_stampOpacity = layer->opacity();
 
-    // 图章快路径：Normal + 可预烘焙蒙版；其它混合模式走局部 blendLayerRange
     if (layer->blendMode() != BlendMode::Normal) {
         m_stamp = QImage();
     } else if (layer->hasMask() && layer->mask() && layer->mask()->isEnabled()) {
         applyMaskToStamp(m_stamp, layer->mask());
     }
 
+    // live 留给 rebuildLive：与 below COW 共享，避免第二次整图 copy
+    m_live = QImage();
+    return true;
+}
+
+bool MoveTool::ensureStackCovers(ImageDocument *doc, const QRect &need)
+{
+    if (!doc || m_below.isNull() || m_belowFromSnapshot)
+        return true;
+    const QRect full(0, 0, doc->width(), doc->height());
+    const QRect area = need.intersected(full);
+    if (area.isEmpty() || m_stackRect.contains(area))
+        return true;
+
+    const QRect grow = m_stackRect.united(area);
+    // 只补尚未覆盖区域的包围盒
+    QRegion missing = QRegion(grow) - QRegion(m_stackRect);
+    if (missing.isEmpty()) {
+        m_stackRect = grow;
+        return true;
+    }
+    const QRect miss = missing.boundingRect().intersected(full);
+    {
+        QPainter p(&m_below);
+        p.setCompositionMode(QPainter::CompositionMode_Source);
+        p.fillRect(miss, Qt::transparent);
+    }
+    if (!Compositor::blendLayerRange(m_below, *doc, miss, 0, m_layerIndex, -1))
+        return false;
+    if (!m_above.isNull() && !m_liveApplyAbove) {
+        QPainter p(&m_above);
+        p.setCompositionMode(QPainter::CompositionMode_Source);
+        p.fillRect(miss, Qt::transparent);
+        if (!Compositor::blendLayerRange(m_above, *doc, miss, m_layerIndex + 1,
+                                         doc->layers().count(), -1))
+            return false;
+    }
+    m_stackRect = grow;
     return true;
 }
 
@@ -173,14 +256,26 @@ void MoveTool::rebuildLive(ImageDocument *doc, const QRect &patchDoc)
     if (!layer)
         return;
 
+    // 首次：只刷层占位（绝不整幅再跑调整滤镜）
+    QRect patch = patchDoc.isEmpty()
+                      ? layer->styleBoundsInDocument().intersected(full)
+                      : patchDoc.intersected(full);
+    if (patch.isEmpty())
+        patch = m_stackRect.intersected(full);
+    if (!ensureStackCovers(doc, patch))
+        return;
+
+    if (m_live.isNull()) {
+        // 无投影快照时：COW 共享 below，避免二次整图 copy
+        m_live = m_below;
+    }
+
     const QPoint stampPos(layer->offsetX() + m_stampDrawDx,
                           layer->offsetY() + m_stampDrawDy);
     const int layerCount = doc->layers().count();
 
-    auto paintPatch = [&](const QRect &areaIn) {
-        const QRect area = areaIn.intersected(full);
-        if (area.isEmpty())
-            return;
+    const QRect area = patch.intersected(full);
+    if (!area.isEmpty()) {
         {
             QPainter p(&m_live);
             p.setCompositionMode(QPainter::CompositionMode_Source);
@@ -197,7 +292,6 @@ void MoveTool::rebuildLive(ImageDocument *doc, const QRect &patchDoc)
                                         m_layerIndex + 1, -1);
         }
         if (m_liveApplyAbove) {
-            // 对 below+图章 的真实像素重跑上方栈（调整层才能吃到挖空区）
             Compositor::blendLayerRange(m_live, *doc, area, m_layerIndex + 1,
                                         layerCount, -1);
         } else if (!m_above.isNull()) {
@@ -205,29 +299,6 @@ void MoveTool::rebuildLive(ImageDocument *doc, const QRect &patchDoc)
             p.setCompositionMode(QPainter::CompositionMode_SourceOver);
             p.drawImage(area.topLeft(), m_above, area);
         }
-    };
-
-    if (m_live.isNull() || patchDoc.isEmpty()) {
-        m_live = m_below.copy();
-        if (!m_stamp.isNull()) {
-            QPainter p(&m_live);
-            p.setCompositionMode(QPainter::CompositionMode_SourceOver);
-            p.setOpacity(m_stampOpacity);
-            p.drawImage(stampPos, m_stamp);
-        } else {
-            Compositor::blendLayerRange(m_live, *doc, full, m_layerIndex,
-                                        m_layerIndex + 1, -1);
-        }
-        if (m_liveApplyAbove) {
-            Compositor::blendLayerRange(m_live, *doc, full, m_layerIndex + 1,
-                                        layerCount, -1);
-        } else if (!m_above.isNull()) {
-            QPainter p(&m_live);
-            p.setCompositionMode(QPainter::CompositionMode_SourceOver);
-            p.drawImage(0, 0, m_above);
-        }
-    } else {
-        paintPatch(patchDoc);
     }
 
     m_liveLayerBounds = layer->styleBoundsInDocument().intersected(full);
@@ -335,8 +406,8 @@ bool MoveTool::mousePress(const ToolEvent &event, const ToolContext &ctx, ViewPo
 
     ctx.document->pushLayerOffsetUndo(index);
 
-    if (buildLiveStacks(ctx.document, index, ctx.projectionSnapshot))
-        rebuildLive(ctx.document);
+    if (buildLiveStacks(ctx.document, index, ctx.projectionSnapshot, ctx.visibleDocRect))
+        rebuildLive(ctx.document); // 内部只刷层占位 ROI，不整幅滤镜
 
     emit repaintRequested();
     return true;

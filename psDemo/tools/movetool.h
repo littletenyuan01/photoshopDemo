@@ -37,19 +37,24 @@ private:
     void finishDrag(ImageDocument *doc);
     void clearLive();
     bool buildLiveStacks(ImageDocument *doc, int layerIndex,
-                         const QImage *projectionSnapshot);
+                         const QImage *projectionSnapshot, const QRect &visibleDoc);
     void rebuildLive(ImageDocument *doc, const QRect &patchDoc = QRect());
+    /** 拖出已建 ROI 时扩展 below（及非调整 above）。 */
+    bool ensureStackCovers(ImageDocument *doc, const QRect &need);
     QRect stampDocRect(const Layer *layer, const QRect &docBounds) const;
     /** 上方是否有启用的调整层（决定不能烘焙 above / 不能复用投影快照）。 */
     static bool hasAdjustmentAbove(const ImageDocument *doc, int layerIndex);
+    static bool hasVisiblePixelAbove(const ImageDocument *doc, int layerIndex);
 
     bool m_dragging = false;
     bool m_movingMaskOnly = false;
     bool m_useLive = false;
     bool m_liveApplyAbove = false; ///< true：每帧对补丁 blend 上方栈（含调整层）
+    bool m_belowFromSnapshot = false; ///< below 由投影挖洞而来（无调整层上方）
     int m_layerIndex = -1;
     QPointF m_lastImagePos;
     QRect m_liveLayerBounds;
+    QRect m_stackRect;  ///< below/above 已覆盖的文档 ROI（非整幅）
     QImage m_below;
     QImage m_above;     ///< 仅无调整层上方时烘焙；否则空，走 liveApplyAbove
     QImage m_stamp;     ///< 按下时 composite raster（层局部，含滤镜/样式）
