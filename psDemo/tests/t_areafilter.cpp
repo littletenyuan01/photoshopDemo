@@ -18,6 +18,7 @@
 #include "engine/graph/pointfilterop.h"
 #include "engine/graph/psgraph.h"
 #include "engine/graph/sourceop.h"
+#include "engine/op/filterop.h"
 #include "engine/op/opname.h"
 #include "engine/projection.h"
 #include "io/projectio.h"
@@ -209,6 +210,15 @@ int tAreaFilter()
         const long long d = PsTests::diffCount(got, ref);
         r.check(d == 0,
                 QStringLiteral("盒模糊：滑动窗口 == 朴素窗口（语义 oracle，diffs=%1）").arg(d));
+    }
+
+    // —— ⑥ FilterOp 三段式与每线程常驻实例协议 ——
+    // （每线程一份：并行分块会多线程并发调用同一算子，共享可变状态是并行崩溃的根源）
+    {
+        FilterOp *a = filterOpInstance(OpName::BoxBlur);
+        FilterOp *b = filterOpInstance(OpName::BoxBlur);
+        r.check(a != nullptr, QStringLiteral("BoxBlur 已注册为 FilterOp（走三段式）"));
+        r.check(a == b, QStringLiteral("同一线程内是常驻实例（临时缓冲跨调用复用）"));
     }
 
     return r.fails;

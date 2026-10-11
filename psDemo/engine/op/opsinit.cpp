@@ -4,8 +4,9 @@
  * 向 OpRegistry / PointOpRegistry 注册缓冲算子 + LayerModeOp；只存工厂，不构造实例。
  */
 #include "opsinit.h"
-
+#include "boxblurfilterop.h"
 #include "clonestampdabop.h"
+#include "filterop.h"
 #include "floodfillop.h"
 #include "focusdabop.h"
 #include "gradientop.h"
@@ -98,6 +99,11 @@ void opsInit()
         OpName::LayerMode,
         [] { return std::unique_ptr<PointOp>(new LayerModeOp); },
     });
+
+    // 滤镜算子（有临时资源，走 FilterOp 三段式；每线程一份实例）。
+    // 点滤镜不在此注册 —— 它们无资源，由 FilterEval 直接分发，避免三段式开销。
+    registerFilterOp(OpName::BoxBlur,
+                     [] { return std::unique_ptr<FilterOp>(new BoxBlurFilterOp); });
 }
 
 } // namespace Ps

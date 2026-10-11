@@ -6,6 +6,7 @@
 #include "filtereval.h"
 
 #include "domain/filternode.h"
+#include "engine/op/filterop.h"
 #include "engine/premul.h"
 
 #include <QColor>
@@ -399,198 +400,10 @@ void applySelectiveColor(QImage &image, const FilterNode &node)
 
 } // namespace
 
-/**
- * 可分离盒模糊（对照 gegl:box-blur 的两趟滑动窗口）。
- *
- * 先转**直通 alpha** 再逐通道卷积，最后乘回预乘 —— 避免在预乘像素上直滤导致
- * 透明边缘的暗边。abyss = 透明（越界当 0），与「层外即透明」一致。
- */
 namespace {
 
-/**
- * 面积算子的临时缓冲池（每线程一份，只缓存**最近一次**尺寸的两块图）。
- *
- * 为什么要池：逐 64×64 块合成会反复调用同一算子，每次 new 两块整图 = 分配 + 首次触页
- * （实测占 64×64 块调用的约 30%）。对照 GEGL：临时缓冲由 buffer backend 复用，而非每次分配。
- *
- * 为什么 thread_local：并行分块下同一算子会被多个工作线程同时调用，全局静态会数据竞争。
- * 为什么设上限：整层级调用（如 1024²）若长期驻留，16 线程下会白占大量内存 ——
- * 超过上限就退回「用后即弃」，不驻留。
- */
-struct AreaBufferPool {
-    QImage a;
-    QImage b;
-    QSize cached;
-
-    static constexpr qint64 kMaxCachedPixels = 1 << 20; // ~4 MB / 块
-
-    /** 命中缓存则给出池内两块；超上限则用调用方给的 fallback（用后即弃）。 */
-    void acquire(const QSize &size, QImage &fallbackA, QImage &fallbackB,
-                 QImage **pa, QImage **pb)
-    {
-        if (qint64(size.width()) * size.height() <= kMaxCachedPixels) {
-            if (cached != size) {
-                a = QImage(size, QImage::Format_ARGB32);
-                b = QImage(size, QImage::Format_ARGB32);
-                cached = size;
-            }
-            *pa = &a;
-            *pb = &b;
-            return;
-        }
-        fallbackA = QImage(size, QImage::Format_ARGB32);
-        fallbackB = QImage(size, QImage::Format_ARGB32);
-        *pa = &fallbackA;
-        *pb = &fallbackB;
-    }
-};
-
-AreaBufferPool &areaBufferPool()
-{
-    thread_local AreaBufferPool pool;
-    return pool;
-}
-
-} // namespace
-
-void applyBoxBlur(QImage &image, int radius)
-{
-    if (image.isNull() || radius <= 0)
-        return;
-    const int w = image.width();
-    const int h = image.height();
-    if (w <= 0 || h <= 0)
-        return;
-    const int n = radius * 2 + 1; // 盒宽
-    const quint32 half = quint32(n / 2);
-    // 整数除法约 20~40 周期，而 n 每次调用固定 → 换成「倒数乘法」（内环热点）。
-    // 本处 sum ≤ (2*128+1)*255 ≈ 65k、n ≤ 257，该近似在此范围内**精确**。
-    const quint32 inv = quint32(0xFFFFFFFFull / quint32(n)) + 1u;
-    const auto norm = [inv, half](quint32 sum) -> quint32 {
-        return quint32((quint64(sum + half) * inv) >> 32);
-    };
-
-    // 临时缓冲：优先复用线程本地池（省掉每次分配 + 首次触页）
-    QImage fallbackA, fallbackB;
-    QImage *pStraight = nullptr;
-    QImage *pTmp = nullptr;
-    areaBufferPool().acquire(image.size(), fallbackA, fallbackB, &pStraight, &pTmp);
-    QImage &straight = *pStraight;
-    QImage &tmp = *pTmp;
-
-    // 1) 预乘 → 直通
-    for (int y = 0; y < h; ++y) {
-        const QRgb *s = reinterpret_cast<const QRgb *>(image.constScanLine(y));
-        QRgb *d = reinterpret_cast<QRgb *>(straight.scanLine(y));
-        for (int x = 0; x < w; ++x)
-            d[x] = qUnpremultiply(s[x]);
-    }
-
-    // 2) 水平趟 → tmp
-    for (int y = 0; y < h; ++y) {
-        const QRgb *s = reinterpret_cast<const QRgb *>(straight.constScanLine(y));
-        QRgb *d = reinterpret_cast<QRgb *>(tmp.scanLine(y));
-        quint32 r = 0, g = 0, b = 0, a = 0;
-        for (int k = -radius; k <= radius; ++k) {
-            const int x = k;
-            if (x < 0 || x >= w)
-                continue;
-            r += qRed(s[x]); g += qGreen(s[x]); b += qBlue(s[x]); a += qAlpha(s[x]);
-        }
-        for (int x = 0; x < w; ++x) {
-            d[x] = qRgba(norm(r), norm(g), norm(b), norm(a));
-            const int add = x + radius + 1;
-            const int del = x - radius;
-            if (add < w) { r += qRed(s[add]); g += qGreen(s[add]); b += qBlue(s[add]); a += qAlpha(s[add]); }
-            if (del >= 0) { r -= qRed(s[del]); g -= qGreen(s[del]); b -= qBlue(s[del]); a -= qAlpha(s[del]); }
-        }
-    }
-
-    // 3) 垂直趟 → straight（复用缓冲）
-    // 预先取行首地址：逐样本 QImage::pixel() 的格式分发/边界检查、scanLine() 的 detach
-    // 检查都是内环热点（对照 GEGL：直接走 buffer 的行指针）。
-    QVector<const QRgb *> srcRows(h);
-    QVector<QRgb *> dstRows(h);
-    for (int y = 0; y < h; ++y) {
-        srcRows[y] = reinterpret_cast<const QRgb *>(tmp.constScanLine(y));
-        dstRows[y] = reinterpret_cast<QRgb *>(straight.scanLine(y));
-    }
-    // 垂直趟有两种走法，按**图高**自适应（两条都是 O(w·h)，差别在每像素成本 vs 访存局部性）：
-    //  · 逐列扫：每像素只有标量寄存器累加（成本最低），但工作集是 h 行×64B 的缓存行；
-    //    h×64B 仍在 L1（~32KB，即 h ≲ 512）时它是更快的那个。
-    //  · 按列块：每像素要读写 4 个 running-sum 数组（成本更高），但每行读/写连续、sums 常驻 L1；
-    //    h 大时局部性收益压过成本（实测 h=1024：23.9 → 15.1 ms）。
-    constexpr int kColBlock = 64;
-    constexpr int kBlockedMinRows = 512;
-    if (h > kBlockedMinRows) {
-        QVector<quint32> sumR(kColBlock), sumG(kColBlock), sumB(kColBlock), sumA(kColBlock);
-        for (int x0 = 0; x0 < w; x0 += kColBlock) {
-            const int bw = qMin(kColBlock, w - x0);
-            for (int i = 0; i < bw; ++i)
-                sumR[i] = sumG[i] = sumB[i] = sumA[i] = 0;
-            for (int k = -radius; k <= radius; ++k) {
-                if (k < 0 || k >= h)
-                    continue;
-                const QRgb *row = srcRows[k] + x0;
-                for (int i = 0; i < bw; ++i) {
-                    const QRgb p = row[i];
-                    sumR[i] += qRed(p); sumG[i] += qGreen(p);
-                    sumB[i] += qBlue(p); sumA[i] += qAlpha(p);
-                }
-            }
-            for (int y = 0; y < h; ++y) {
-                QRgb *drow = dstRows[y] + x0;
-                for (int i = 0; i < bw; ++i)
-                    drow[i] = qRgba(norm(sumR[i]), norm(sumG[i]), norm(sumB[i]), norm(sumA[i]));
-                const int add = y + radius + 1;
-                const int del = y - radius;
-                if (add < h) {
-                    const QRgb *row = srcRows[add] + x0;
-                    for (int i = 0; i < bw; ++i) {
-                        const QRgb p = row[i];
-                        sumR[i] += qRed(p); sumG[i] += qGreen(p);
-                        sumB[i] += qBlue(p); sumA[i] += qAlpha(p);
-                    }
-                }
-                if (del >= 0) {
-                    const QRgb *row = srcRows[del] + x0;
-                    for (int i = 0; i < bw; ++i) {
-                        const QRgb p = row[i];
-                        sumR[i] -= qRed(p); sumG[i] -= qGreen(p);
-                        sumB[i] -= qBlue(p); sumA[i] -= qAlpha(p);
-                    }
-                }
-            }
-        }
-    } else {
-        for (int x = 0; x < w; ++x) {
-            quint32 r = 0, g = 0, b = 0, a = 0;
-            for (int k = -radius; k <= radius; ++k) {
-                if (k < 0 || k >= h)
-                    continue;
-                const QRgb p = srcRows[k][x];
-                r += qRed(p); g += qGreen(p); b += qBlue(p); a += qAlpha(p);
-            }
-            for (int y = 0; y < h; ++y) {
-                dstRows[y][x] = qRgba(norm(r), norm(g), norm(b), norm(a));
-                const int add = y + radius + 1;
-                const int del = y - radius;
-                if (add < h) { const QRgb p = srcRows[add][x]; r += qRed(p); g += qGreen(p); b += qBlue(p); a += qAlpha(p); }
-                if (del >= 0) { const QRgb p = srcRows[del][x]; r -= qRed(p); g -= qGreen(p); b -= qBlue(p); a -= qAlpha(p); }
-            }
-        }
-    }
-
-    // 4) 直通 → 预乘写回
-    for (int y = 0; y < h; ++y) {
-        const QRgb *s = reinterpret_cast<const QRgb *>(straight.constScanLine(y));
-        QRgb *d = reinterpret_cast<QRgb *>(image.scanLine(y));
-        for (int x = 0; x < w; ++x)
-            d[x] = qPremultiply(s[x]);
-    }
-}
-
-void applyNode(QImage &image, const FilterNode &node)
+/** 点滤镜（无临时资源）：直接分发 —— 三段式对它们纯属开销，与 PointOp 的取舍一致。 */
+void applyPointNode(QImage &image, const FilterNode &node)
 {
     switch (node.op()) {
     case OpName::BrightnessContrast:
@@ -643,12 +456,32 @@ void applyNode(QImage &image, const FilterNode &node)
     case OpName::SelectiveColor:
         applySelectiveColor(image, node);
         break;
-    case OpName::BoxBlur:
-        applyBoxBlur(image, node.blurRadius());
-        break;
     default:
         break;
     }
+}
+
+} // namespace
+
+void applyNode(QImage &image, const FilterNode &node)
+{
+    if (image.isNull())
+        return;
+
+    // 有临时资源的滤镜走 FilterOp 三段式（每线程常驻实例，见 engine/op/filterop.h）：
+    // prepare 申请/校验资源 → process 就地处理 → finish 释放不该跨调用保留的资源。
+    if (FilterOp *op = filterOpInstance(node.op())) {
+        FilterContext ctx;
+        ctx.node = &node;
+        ctx.size = image.size();
+        if (op->prepare(ctx))
+            op->process(image, ctx);
+        op->finish(ctx);
+        return;
+    }
+
+    // 未注册的（点）滤镜：直接调用，避免三段式开销
+    applyPointNode(image, node);
 }
 
 } // namespace FilterEval

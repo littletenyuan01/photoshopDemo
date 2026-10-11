@@ -17,9 +17,9 @@
 
 ---
 
-## 1. 两条调用路径
+## 1. 三条调用路径
 
-进程里同时存在两种"算子"，它们的执行方式完全不同，不要混为一谈：
+进程里同时存在**三种**"算子"，执行方式各不相同，不要混为一谈：
 
 | | 路径 A：缓冲算子 | 路径 B：点算子 |
 |---|---|---|
@@ -34,6 +34,10 @@
 
 > 路径 B 之所以这么轻，是因为 `pointop.h` 里的 `PointOp` 是**空壳**（连 `process` 虚函数都没有）。
 > 它借了算子的名字与注册表，但**不是可调度算子**——参见 §10「仍欠」。
+
+**路径 C：滤镜算子（`FilterOp`）** —— 作用在**临时 QImage**（滤镜链 / 调整层的下方合成结果），**绝不写回层瓦片**。有 `prepare/process/finish` 三段式 + **每线程一份**常驻实例，由 `FilterEval::applyNode` 驱动。`BoxBlur` 是第一个落地的（面积算子需要整块临时缓冲）；点滤镜无临时资源，**不**注册为 `FilterOp`，仍走 `applyNode` 的直接分发（三段式对它们纯属开销，与 `PointOp` 同一取舍）。
+
+> 为什么单列一族而非并入 `BufferOp`：`BufferOp` 的 `OpContext` 装的是 `TileBuffer`/`Selection`，而滤镜作用在 `QImage` 上 —— 两种「资源」形态不同，硬塞一族会让 `OpContext` 既装瓦片又装图。
 
 两条路径在时间上的关系：
 
@@ -488,6 +492,7 @@ forEachTileInRect(workRect, allocateMissing = true, …)
 | 4 | `opname.*` 名字表 / 各算子 `id()/name()` 无调用点 | 约 100 行 + 5 处 override 目前不产生行为 | Phase 8 滤镜列表会消费（对照 GEGL 的 `name`/`title` 键） |
 | 5 | 算子与撤销没有接缝 | `OpRunner` 不知道撤销；绘制门面仍由调用点 `pushLayerPixelsUndo`（与 GIMP paint core 自 push 同类） | **已对齐 GIMP 口径**：不另做 Command 总线；漏 push = bug |
 | 6 | 油漆桶空脏区时不取消选区 | 同一个"什么都没变"的点击，选区命运与成功填充时不同（`PaintBucketTool::mousePress` 的早返回跳过了 `clearSelection`） | 待定；属分支顺序问题，非算子问题 |
+| 7 | 滤镜求值原分「FilterEval 直接调用」与「BufferOp 三段式」两条壳 | 有临时资源的滤镜（面积算子）无法复用缓冲、无统一生命周期 | **已收口**：新增 `FilterOp` 族（`prepare/process/finish` + 每线程实例），`BoxBlur` 已迁入；其余点滤镜仍走直接分发（无资源，三段式纯开销） |
 
 ### 10.3 图例
 

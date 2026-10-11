@@ -630,6 +630,34 @@ sliderReleased → setLayerFilterNode(..., pushUndo=true)
 
 ---
 
+## 滤镜算子族 FilterOp：统一「有资源滤镜」的生命周期（第 2 档）
+
+**为什么改**：此前滤镜求值走 `FilterEval::applyNode` 的**自由函数 switch**（直接调用、无生命周期），
+与绘制类走 `BufferOp`/`OpRunner` 的**三段式**是两条互不相干的壳。面积算子（如 BoxBlur）需要
+整块临时缓冲，没有三段式就只能每次 new —— 我上一轮用 `thread_local` 池临时顶住（见上节），
+但那只是「复用」，不是「申请/释放有归属」的生命周期。Roadmap 9.0.1-1 就是要收这个口。
+
+**改法**：新增**第三族算子 `FilterOp`**（`engine/op/filterop.h`）：
+
+| 要素 | 决定 | 为什么 |
+|---|---|---|
+| 另立一族，而非并入 `BufferOp` | 滤镜作用在**临时 QImage**、不写回层瓦片 | `BufferOp` 的 `OpContext` 装的是 `TileBuffer`/`Selection`，硬塞一族会让它既装瓦片又装图 |
+| 生命周期 | `prepare → process → finish`，`finish` 无条件调用 | 与 `BufferOp` 一致：`prepare` 申请/校验、`finish` 释放「不该跨调用保留」的资源（≈ finally） |
+| 常驻实例 + finish 的分工 | 固定尺寸的临时缓冲是**实例状态**（跨调用复用）；**超出保留上限**的大缓冲在 `finish` 放掉 | 常驻的意义就是复用（对照 GEGL buffer backend）；但要防大图在 16 线程下白占内存 |
+| 线程协议 | **每线程一份实例**（`thread_local` 表），不加锁 | 并行分块会多线程并发调用同一算子；共享可变状态是并行崩溃的根源（前例：`LayerModeOp` 的共享 `m_mode`） |
+| 点滤镜 | **不**注册为 `FilterOp`，仍走 `applyNode` 直接分发 | 无临时资源，三段式纯属开销（与 `PointOp` 同一取舍） |
+
+`BoxBlur` 迁入 `engine/op/boxblurfilterop.{h,cpp}`（算法原样搬移，临时缓冲改由 `prepare` 持有、
+`finish` 依 `m_oversized` 释放）；`FilterEval::applyNode` 变为「有 FilterOp 实例 → 三段式；否则 → 点滤镜直接分发」。
+
+**验证**：`areafilter` 新增两条断言 —— `BoxBlur` 已注册为 FilterOp、同一线程内 `filterOpInstance` 返回同一指针；
+语义 oracle 仍 diffs=0（算法搬移行为等价）。全套 12/12，主程序干净重建 0/0。
+
+**仍欠（下一轮）**：其余**有资源**的滤镜（中值、锐化 USM 等）新增时逐个迁入 `FilterOp`，不要再写自由函数；
+「调整层 + 面积算子」的 ROI 外扩仍未接共享缓冲合成路径（仍由 `isAdjustmentOp(BoxBlur)==false` 护栏）。
+
+---
+
 ## 未排期：进一步对齐 GIMP 时可按模块补
 
 若要以 GIMP Unified Transform 为齐，建议分轮，不必与上面绑在一起：
