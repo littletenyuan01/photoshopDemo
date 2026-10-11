@@ -28,6 +28,7 @@ int tTransformLive();
 int tDirtyBudget();
 int tAreaFilter();
 int tFilterUndo();
+int tFilterPanel();
 
 namespace {
 
@@ -45,6 +46,7 @@ const Case kCases[] = {
     { "dirtybudget", "带滤镜层的小脏区重投影受时间预算约束（回归护栏）", tDirtyBudget },
     { "areafilter", "面积算子（盒模糊 / 高斯 / 中值 / 锐化 / 浮雕 / USM / 查找边缘）：ROI 外扩、分块无接缝、语义 oracle、精度量化、往返", tAreaFilter },
     { "filterundo", "滤镜对话框的撤销原子性：确定=一条撤销、取消=不留痕", tFilterUndo },
+    { "filterpanel", "图层滤镜栈面板：列出/开关/换序/删除都真的驱动 domain，且各留一条 undo", tFilterPanel },
 };
 
 } // namespace

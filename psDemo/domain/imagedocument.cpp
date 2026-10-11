@@ -574,8 +574,25 @@ bool ImageDocument::removeLayerFilter(int layerIndex, int filterIndex, bool push
     return true;
 }
 
-int ImageDocument::ensureActiveLayerStyle(LayerStyleKind kind)
+bool ImageDocument::moveLayerFilter(int layerIndex, int from, int to)
 {
+    Layer *layer = m_layers.layerAt(layerIndex);
+    if (!layer)
+        return false;
+    const int n = layer->filters().count();
+    if (from < 0 || from >= n || to < 0 || to >= n || from == to)
+        return false;
+
+    pushLayerPropUndo(layerIndex, tr("调整滤镜顺序"));
+    QVector<FilterNode> nodes = layer->filters().snapshot();
+    nodes.move(from, to);
+    layer->filters().replaceAll(nodes);
+    layer->invalidateCompositeRaster();
+    markDirty(layer->boundsInDocument().intersected(QRect(0, 0, m_width, m_height)));
+    return true;
+}
+
+int ImageDocument::ensureActiveLayerStyle(LayerStyleKind kind){
     Layer *layer = activeLayer();
     if (!layer || !layer->isVisible())
         return -1;

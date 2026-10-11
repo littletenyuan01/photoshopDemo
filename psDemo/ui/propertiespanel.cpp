@@ -5,6 +5,7 @@
 #include "ui_propertiespanel.h"
 
 #include "adjustmentpropshost.h"
+#include "filterstackwidget.h"
 #include "app/appsession.h"
 #include "domain/filternode.h"
 #include "domain/imagedocument.h"
@@ -27,6 +28,10 @@ PropertiesPanel::PropertiesPanel(QWidget *parent)
     m_adjHost = new AdjustmentPropsHost(ui->propertiesScrollBody);
     ui->propertiesBodyLayout->insertWidget(1, m_adjHost);
     m_adjHost->hide();
+
+    // 图层滤镜栈（像素层）：与调整层参数并列在同一个属性面板里（见 filterstackwidget.h 的说明）
+    m_filterStack = new FilterStackWidget(ui->propertiesScrollBody);
+    ui->propertiesBodyLayout->insertWidget(2, m_filterStack);
 
     connect(ui->editAngle, &QLineEdit::editingFinished, this, [this]() {
         bool ok = false;
@@ -181,4 +186,7 @@ void PropertiesPanel::refreshFromDocument()
         setAdjustmentMode(false);
         m_adjHost->clear();
     }
+
+    // 像素层的滤镜栈：让「非破坏」真的可见、可管（调整层走上面的参数页，不进这个列表）
+    m_filterStack->setContext(m_document, m_document ? m_document->activeLayerIndex() : -1);
 }

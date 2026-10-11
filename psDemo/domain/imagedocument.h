@@ -142,6 +142,12 @@ public:
     bool removeLayerFilter(int layerIndex, int filterIndex, bool pushUndo = true);
 
     /**
+     * 调整层滤镜栈内的顺序（滤镜是有序的，顺序影响结果）。
+     * @param from/to 栈内下标；越界或相同则返回 false（不进撤销）。
+     */
+    bool moveLayerFilter(int layerIndex, int from, int to);
+
+    /**
      * 滤镜对话框的**区域化预览**：改节点但不进撤销栈，且**只标脏 region**（调用方给可见区）。
      *
      * 为什么安全：滤镜对话框是**模态**的 → 预览期间视口不会变，屏幕外的旧像素看不见；

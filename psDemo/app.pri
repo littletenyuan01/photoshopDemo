@@ -95,6 +95,7 @@ SOURCES += \
     ui/pathtreepanel.cpp \
     ui/dockpanel.cpp \
     ui/filterdialog.cpp \
+    ui/filterstackwidget.cpp \
     ui/colorspanel.cpp \
     ui/infopanel.cpp \
     ui/hsvcolorwell.cpp \
@@ -219,6 +220,7 @@ HEADERS += \
     ui/pathtreepanel.h \
     ui/dockpanel.h \
     ui/filterdialog.h \
+    ui/filterstackwidget.h \
     ui/pixmaputils.h \
     ui/colorspanel.h \
     ui/infopanel.h \

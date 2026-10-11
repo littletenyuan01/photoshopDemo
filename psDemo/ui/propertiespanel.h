@@ -10,6 +10,7 @@
 
 class QToolButton;
 class AdjustmentPropsHost;
+class FilterStackWidget;
 
 QT_BEGIN_NAMESPACE
 namespace Ui {
@@ -52,6 +53,7 @@ private:
 
     Ui::PropertiesPanel *ui;
     AdjustmentPropsHost *m_adjHost = nullptr;
+    FilterStackWidget *m_filterStack = nullptr; ///< 像素层的非破坏滤镜栈列表
     Ps::AppSession *m_session = nullptr;
     Ps::ImageDocument *m_document = nullptr;
 };

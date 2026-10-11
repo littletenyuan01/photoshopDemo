@@ -33,7 +33,8 @@ SOURCES += \
     tests/t_transform.cpp \
     tests/t_dirtybudget.cpp \
     tests/t_areafilter.cpp \
-    tests/t_filterundo.cpp
+    tests/t_filterundo.cpp \
+    tests/t_filterpanel.cpp
 
 HEADERS += \
     tests/testutil.h
