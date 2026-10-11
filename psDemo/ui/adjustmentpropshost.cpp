@@ -406,6 +406,16 @@ void AdjustmentPropsHost::ensurePages()
         wireSliderSpin(radius.slider, radius.spin, [this](int v) { m_node.setGaussRadius(v); });
         add(Ps::OpName::GaussianBlur, page);
     }
+    {
+        // 中间值 / 中值模糊（面积算子）：无 .ui，一页一个半径滑块（1..8）
+        auto *page = new QWidget(m_stack);
+        auto *col = new QVBoxLayout(page);
+        col->setContentsMargins(0, 0, 0, 0);
+        const SliderRow radius = makeSliderRow(page, QStringLiteral("半径"), QStringLiteral("median_radius"), 1, 8);
+        col->addWidget(radius.row);
+        wireSliderSpin(radius.slider, radius.spin, [this](int v) { m_node.setMedianRadius(v); });
+        add(Ps::OpName::MedianBlur, page);
+    }
 }
 
 void AdjustmentPropsHost::showPageFor(Ps::OpName op)
@@ -522,6 +532,9 @@ void AdjustmentPropsHost::loadControlsFromNode()
         break;
     case Ps::OpName::GaussianBlur:
         setPair("slider_gauss_radius", "spin_gauss_radius", m_node.gaussRadius());
+        break;
+    case Ps::OpName::MedianBlur:
+        setPair("slider_median_radius", "spin_median_radius", m_node.medianRadius());
         break;
     default:
         break;

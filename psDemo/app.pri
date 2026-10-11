@@ -41,6 +41,7 @@ SOURCES += \
     engine/op/filterop.cpp \
     engine/op/findedgesfilterop.cpp \
     engine/op/gaussianblurfilterop.cpp \
+    engine/op/medianblurfilterop.cpp \
     engine/op/unsharpmaskfilterop.cpp \
     engine/op/floodfillop.cpp \
     engine/op/gradientop.cpp \
@@ -151,6 +152,7 @@ HEADERS += \
     engine/op/filterop.h \
     engine/op/findedgesfilterop.h \
     engine/op/gaussianblurfilterop.h \
+    engine/op/medianblurfilterop.h \
     engine/op/unsharpmaskfilterop.h \
     engine/op/floodfillop.h \
     engine/op/gradientop.h \

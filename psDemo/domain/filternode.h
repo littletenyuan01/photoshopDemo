@@ -176,10 +176,14 @@ public:
     int gaussRadius() const { return m_gaussRadius; }
     void setGaussRadius(int v) { m_gaussRadius = qBound(1, v, 64); }
 
+    // —— 中值模糊（面积算子）：半径（1..8；滑窗直方图，成本与窗口面积无关）——
+    int medianRadius() const { return m_medianRadius; }
+    void setMedianRadius(int v) { m_medianRadius = qBound(1, v, 8); }
+
     /**
      * 该算子需要的输入外扩（像素）：点算子 = 0；盒模糊/USM = 半径；查找边缘 = 1（3×3）；
      * 高斯模糊 = 半径 + 2（**安全上界**：三趟盒模糊半径之和 ≈ 0.98×半径，留 2px 余量，
-     * 宁可比需要的外扩多一点，也不要因外扩不足在 64×64 块界留下接缝）。
+     * 宁可比需要的外扩多一点，也不要因外扩不足在 64×64 块界留下接缝）；中值 = 半径。
      */
     int inputPad() const
     {
@@ -192,6 +196,8 @@ public:
             return 1; // 3×3 Sobel
         case OpName::GaussianBlur:
             return m_gaussRadius + 2;
+        case OpName::MedianBlur:
+            return m_medianRadius;
         default:
             return 0;
         }
@@ -244,6 +250,7 @@ private:
     qreal m_usmAmount = 1.0;   ///< 1.0 = 100%（PS 默认量级）
     int m_usmThreshold = 0;    ///< 0 = 全像素参与（PS 默认 0）
     int m_gaussRadius = 5;
+    int m_medianRadius = 3;
 };
 
 } // namespace Ps

@@ -20,10 +20,15 @@
 #include "engine/graph/sourceop.h"
 #include "engine/op/filterop.h"
 #include "engine/op/opname.h"
+
+#include <algorithm>
+#include <cmath>
+
 #include "engine/projection.h"
 #include "io/projectio.h"
 #include "testutil.h"
 
+#include <QElapsedTimer>
 #include <QImage>
 #include <QRect>
 
@@ -181,6 +186,41 @@ QImage naiveGaussian(const QImage &src, double sigma)
                 v[c] = qBound(0, int(acc + 0.5), 255);
             }
             // 与算子同口径：alpha 也参与滤波，RGB 用滤波后的直通值再预乘
+            out.setPixel(x, y, qPremultiply(qRgba(v[0], v[1], v[2], v[3])));
+        }
+    }
+    return out;
+}
+
+/**
+ * 朴素中值（逐像素取窗口 → `std::sort` → 取正中）——中值算子的**语义 oracle**。
+ * 刻意用「排序」而不是直方图：与实现（滑窗直方图）在方法上互相独立，否则两处会一起错。
+ */
+QImage naiveMedian(const QImage &src, int r)
+{
+    const int w = src.width();
+    const int h = src.height();
+    QImage out(src.size(), src.format());
+    const auto ch = [&src, w, h](int x, int y, int c) -> int {
+        if (x < 0 || y < 0 || x >= w || y >= h)
+            return 0; // abyss = 透明
+        const QRgb p = qUnpremultiply(src.pixel(x, y));
+        return (c == 0) ? qRed(p) : ((c == 1) ? qGreen(p) : ((c == 2) ? qBlue(p) : qAlpha(p)));
+    };
+    QVector<int> samples;
+    const int n = (2 * r + 1) * (2 * r + 1);
+    samples.resize(n);
+    for (int y = 0; y < h; ++y) {
+        for (int x = 0; x < w; ++x) {
+            int v[4] = {0, 0, 0, 0};
+            for (int c = 0; c < 4; ++c) {
+                int i = 0;
+                for (int dy = -r; dy <= r; ++dy)
+                    for (int dx = -r; dx <= r; ++dx)
+                        samples[i++] = ch(x + dx, y + dy, c);
+                std::sort(samples.begin(), samples.end());
+                v[c] = samples[n / 2]; // n 恒为奇数 → 正中间就是中值
+            }
             out.setPixel(x, y, qPremultiply(qRgba(v[0], v[1], v[2], v[3])));
         }
     }
@@ -443,6 +483,65 @@ int tAreaFilter()
                     QStringLiteral("往返保住高斯半径 8"));
         } else {
             r.check(false, QStringLiteral("重新打开含高斯的 .pslite"));
+        }
+    }
+
+    // —— ⑩ 中值：语义 oracle（朴素排序中值）+ 分块 == 整幅 + 往返 ——
+    {
+        const int SW = 40, SH = 32, R = 2;
+        const QImage src = PsTests::makeLayerImage(SW, SH, 29, 255);
+        QImage got = src;
+        FilterNode node(OpName::MedianBlur);
+        node.setMedianRadius(R);
+        FilterEval::applyNode(got, node);
+        const QImage ref = naiveMedian(src, R);
+        const long long d = PsTests::diffCount(got, ref);
+        r.check(d == 0,
+                QStringLiteral("中值：滑窗直方图 == 朴素排序中值（语义 oracle，diffs=%1）").arg(d));
+        r.check(PsTests::diffCount(src, got) > 0, QStringLiteral("中值确实改变了画面"));
+
+        const int W = 256, H = 256;
+        auto doc = ImageDocument::createBlank(W, H, Qt::white);
+        doc->placeImageAsLayer(PsTests::makeLayerImage(180, 150, 37, 220),
+                               QStringLiteral("medianL"));
+        doc->layers().layerAt(1)->setOffset(30, 40);
+        FilterNode mnode(OpName::MedianBlur);
+        mnode.setMedianRadius(3);
+        doc->layers().layerAt(1)->filters().append(mnode);
+
+        const QImage whole = compositeWhole(doc.get());
+        const QImage chunked = compositeChunked(doc.get());
+        const long long dc = PsTests::diffCount(whole, chunked);
+        r.check(dc == 0,
+                QStringLiteral("像素层中值：分块投影 == 整幅合成，无跨块接缝（diffs=%1）").arg(dc));
+
+        // 成本实测（不是估计）：中值是目前最重的面积算子，给个可核对的数字
+        {
+            const int BW = 512, BH = 512;
+            QImage big = PsTests::makeLayerImage(BW, BH, 41, 255);
+            FilterNode bnode(OpName::MedianBlur);
+            bnode.setMedianRadius(3);
+            QElapsedTimer t;
+            t.start();
+            FilterEval::applyNode(big, bnode);
+            const qint64 ms = t.elapsed();
+            const double nsPerPx = double(ms) * 1e6 / double(BW) * double(BH) / double(BW) / double(BH);
+            r.info(QStringLiteral("中值 r=3：%1x%2 用 %3 ms（约 %4 ns/像素；本机单次噪声可达 ±50%）")
+                       .arg(BW).arg(BH).arg(ms).arg(nsPerPx, 0, 'f', 1));
+        }
+
+        // 往返：medianRadius 要能存回来
+        const QString path = PsTests::tempFilePath(QStringLiteral("median.pslite"));
+        QString err;
+        const bool saved = ProjectIo::save(*doc, path, &err);
+        auto back = saved ? ProjectIo::load(path, &err) : nullptr;
+        if (back && back->layers().count() > 1
+            && back->layers().layerAt(1)->filters().count() > 0) {
+            const FilterNode &n = back->layers().layerAt(1)->filters().at(0);
+            r.check(n.op() == OpName::MedianBlur && n.medianRadius() == 3,
+                    QStringLiteral("往返保住中值半径 3"));
+        } else {
+            r.check(false, QStringLiteral("重新打开含中值的 .pslite"));
         }
     }
 

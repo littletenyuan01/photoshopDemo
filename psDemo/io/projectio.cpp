@@ -111,6 +111,7 @@ void writeFilterNodeParams(QDataStream &p, const FilterNode &n)
     p << qint32(n.blurRadius());
     p << qint32(n.usmRadius()) << double(n.usmAmount()) << qint32(n.usmThreshold());
     p << qint32(n.gaussRadius());
+    p << qint32(n.medianRadius());
     // —— 预留：后续新参数追加在此注释之后、勿改已有顺序 ——
 }
 
@@ -140,6 +141,7 @@ bool readFilterNodeParams(QDataStream &p, FilterNode *n)
     double usmAmount = 1.0;
     qint32 usmThreshold = 0;
     qint32 gaussRadius = 5;
+    qint32 medianRadius = 3;
     p >> brightness >> contrast;
     p >> hue >> saturation >> lightness >> vibrance;
     p >> exposure >> exposureOffset >> gammaCorrection;
@@ -156,6 +158,7 @@ bool readFilterNodeParams(QDataStream &p, FilterNode *n)
     p >> blurRadius;
     p >> usmRadius >> usmAmount >> usmThreshold;
     p >> gaussRadius;
+    p >> medianRadius;
     if (p.status() != QDataStream::Ok)
         return false;
     n->setBrightness(brightness);
@@ -212,6 +215,7 @@ bool readFilterNodeParams(QDataStream &p, FilterNode *n)
     n->setUsmAmount(usmAmount);
     n->setUsmThreshold(int(usmThreshold));
     n->setGaussRadius(int(gaussRadius));
+    n->setMedianRadius(int(medianRadius));
     return true;
 }
 

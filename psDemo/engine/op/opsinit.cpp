@@ -13,6 +13,7 @@
 #include "focusdabop.h"
 #include "gradientop.h"
 #include "layermodeop.h"
+#include "medianblurfilterop.h"
 #include "opname.h"
 #include "oppad.h"
 #include "opregistry.h"
@@ -113,6 +114,8 @@ void opsInit()
                      [] { return std::unique_ptr<FilterOp>(new FindEdgesFilterOp); });
     registerFilterOp(OpName::GaussianBlur,
                      [] { return std::unique_ptr<FilterOp>(new GaussianBlurFilterOp); });
+    registerFilterOp(OpName::MedianBlur,
+                     [] { return std::unique_ptr<FilterOp>(new MedianBlurFilterOp); });
 }
 
 } // namespace Ps
