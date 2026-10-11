@@ -35,6 +35,7 @@
 | [layers/](layers/README.md) | 图层与文档概念（新建、PPI、合成、瓦片内存、**实现对照**） |
 | [engine/operators.md](engine/operators.md) | **算子调用链与示例**：注册表 / 常驻实例 / prepare→process→finish / 脏区上行；缓冲与点两条路径的完整时序 |
 | [engine/magnetic-lasso.md](engine/magnetic-lasso.md) | **磁性套索算法与标定**：局部吸附 vs live-wire、代价函数、参数标定表、GIMP 常量对照、贴边不稳的成因与修正 |
+| [engine/roi.md](engine/roi.md) | **ROI（请求区 / 所需输入区）**：为什么滤镜绕不开它、三类算子判定表、对称外扩的局限、与 GEGL `get_required_for_output` 的对照、通用化迁移设计 |
 | [scope-estimate.md](scope-estimate.md) | 图层/选区/蒙版等功能评估与工作量 |
 | [completeness.md](completeness.md) | 除编辑能力外，怎样才算完善 |
 | [cursor-role-prompt.md](cursor-role-prompt.md) | 可粘贴的 Cursor 角色 Prompt |

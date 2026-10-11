@@ -158,6 +158,16 @@ public:
                                    const QRect &region);
 
     /**
+     * 记录「当前可见区」提示（由画布在更新视口时写入）。
+     *
+     * 用途：调用方不持有画布时（例如属性面板里的滤镜列表），仍能走**区域化预览** ——
+     * 传空的 region 给 `setLayerFilterNodePreview` 即回落到这个提示。
+     * 它是纯提示：过期最多导致多算/少算一块可见区，不影响正确性（定稿都会整层标脏）。
+     */
+    void setPreviewRegionHint(const QRect &region) { m_previewRegionHint = region; }
+    QRect previewRegionHint() const { return m_previewRegionHint; }
+
+    /**
      * 给活动层确保一条图层样式（无则追加默认并启用；已有则打开）。
      * 对照 GIMP append_new_filter / PS 图层样式。
      * @return 效果下标；失败 -1。
@@ -412,6 +422,7 @@ private:
     QRect m_dirtyRect;                           ///< 累计脏区（文档坐标）
     std::unique_ptr<HistoryStack> m_history;     ///< 撤销栈
     int m_historySuppress = 0;                   ///< >0 时跳过 push 撤销
+    QRect m_previewRegionHint;                   ///< 「当前可见区」提示（见 setPreviewRegionHint）
     bool m_previewFrozen = false;                ///< 拖层中冻结面板广播
     bool m_editingLayerMask = false;             ///< 活动层是否在编辑蒙版
 };

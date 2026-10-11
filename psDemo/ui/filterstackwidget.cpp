@@ -14,6 +14,7 @@
 #include <QLabel>
 #include <QListWidget>
 #include <QPushButton>
+#include <QTimer>
 #include <QVBoxLayout>
 
 namespace {
@@ -175,11 +176,35 @@ void FilterStackWidget::onEdit()
     if (!layer || index >= layer->filters().count())
         return;
 
+    const Ps::FilterNode original = layer->filters().at(index);
     FilterDialog dlg(this);
-    dlg.setNode(layer->filters().at(index));
-    if (dlg.exec() != QDialog::Accepted)
+    dlg.setNode(original);
+
+    // 实时预览：沿用「新加滤镜」那条通道 —— region 传空 = 用文档里的**当前可见区提示**
+    // （面板不持有画布），再按 80ms 节流（拖动再快也不排队）。
+    QTimer throttle;
+    throttle.setSingleShot(true);
+    throttle.setInterval(80);
+    Ps::FilterNode latest = original;
+    connect(&dlg, &FilterDialog::previewChanged, this,
+            [&latest, &throttle](const Ps::FilterNode &n) {
+                latest = n;
+                if (!throttle.isActive())
+                    throttle.start();
+            });
+    connect(&throttle, &QTimer::timeout, this, [this, index, &latest]() {
+        m_doc->setLayerFilterNodePreview(m_layer, index, latest, QRect());
+    });
+
+    if (dlg.exec() != QDialog::Accepted) {
+        // 取消：预览只刷过可见区，屏幕外仍是预览值 ⇒ 必须用整层标脏把原参数写回去
+        if (m_doc->setLayerFilterNode(m_layer, index, original, /*pushUndo=*/false)) {
+            refresh();
+            emit stackChanged();
+        }
         return;
-    // 面板不持有画布 → 不做实时预览，确定后一次生效（见头文件说明）
+    }
+    // 确定：整层标脏 + 恰好一条撤销
     if (m_doc->setLayerFilterNode(m_layer, index, dlg.node(), /*pushUndo=*/true)) {
         refresh();
         emit stackChanged();

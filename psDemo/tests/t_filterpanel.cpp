@@ -10,6 +10,7 @@
 #include "domain/imagedocument.h"
 #include "domain/layer.h"
 #include "engine/op/opname.h"
+#include "engine/projection.h"
 #include "testutil.h"
 #include "ui/filterstackwidget.h"
 
@@ -88,6 +89,41 @@ int tFilterPanel()
                     .arg(list->count()));
         doc->undo();
         r.check(layer->filters().count() == 2, QStringLiteral("撤销 → 被删的滤镜回来了"));
+    }
+
+    // —— 区域化预览的回落：面板不持有画布，靠文档里的「可见区提示」 ——
+    {
+        auto doc3 = ImageDocument::createBlank(256, 256, Qt::white);
+        doc3->placeImageAsLayer(PsTests::makeLayerImage(256, 256, 7, 255), QStringLiteral("L3"));
+        Layer *l3 = doc3->layers().layerAt(1);
+        FilterNode noop(OpName::BoxBlur);
+        noop.setBlurRadius(0);
+        l3->filters().append(noop);
+
+        Projection p;
+        p.bind(doc3.get());
+        p.setPriorityRect(QRect(0, 0, 256, 256));
+        doc3->markDirty();
+        p.sync();
+        while (p.hasPendingChunks())
+            p.processPendingChunks(0);
+        const QImage before = p.image();
+
+        doc3->setPreviewRegionHint(QRect(0, 0, 64, 64)); // 假装画布报告「只看得到左上角」
+        FilterNode blur(OpName::BoxBlur);
+        blur.setBlurRadius(4);
+        doc3->setLayerFilterNodePreview(1, 0, blur, QRect()); // 空 region → 回落到提示
+        p.sync();
+        while (p.hasPendingChunks())
+            p.processPendingChunks(0);
+        const QImage after = p.image();
+
+        const QRect in(0, 0, 64, 64);
+        const QRect out(64, 0, 192, 256);
+        const long long inD = PsTests::diffCount(before.copy(in), after.copy(in));
+        const long long outD = PsTests::diffCount(before.copy(out), after.copy(out));
+        r.check(inD > 0 && outD == 0,
+                QStringLiteral("空 region → 用可见区提示（区内 %1 / 区外 %2）").arg(inD).arg(outD));
     }
 
     // —— 没有滤镜时面板隐藏（不占地方）——

@@ -1203,7 +1203,12 @@ QRect CanvasView::visibleDocumentRect() const
 
 void CanvasView::updateProjectionPriorityRect()
 {
-    m_projection.setPriorityRect(visibleDocumentRect());
+    const QRect vis = visibleDocumentRect();
+    m_projection.setPriorityRect(vis);
+    // 顺手把「当前可见区」记到文档上：属性面板里的滤镜编辑没有画布句柄，
+    // 靠这个提示也能做区域化预览（见 ImageDocument::setPreviewRegionHint）。
+    if (m_document)
+        m_document->setPreviewRegionHint(vis);
 }
 
 void CanvasView::onProjectionIdle()

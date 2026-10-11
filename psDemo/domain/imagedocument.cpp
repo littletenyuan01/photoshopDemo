@@ -551,8 +551,10 @@ bool ImageDocument::setLayerFilterNodePreview(int layerIndex, int filterIndex,
         return true;
     }
 
-    // 像素层滤镜：只把可见区标脏（理由见头文件）。空区域 = 没有可见内容，直接返回。
-    const QRect r = region.intersected(layer->boundsInDocument())
+    // 像素层滤镜：只把可见区标脏（理由见头文件）。区域为空 → 回落到「当前可见区」提示，
+    // 这样不持有画布的调用方（属性面板的滤镜列表）也能走区域化预览。
+    const QRect want = region.isEmpty() ? m_previewRegionHint : region;
+    const QRect r = want.intersected(layer->boundsInDocument())
                         .intersected(QRect(0, 0, m_width, m_height));
     if (!r.isEmpty())
         markDirty(r);
