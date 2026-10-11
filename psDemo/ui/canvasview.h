@@ -80,6 +80,12 @@ public:
     void zoomActual();
     void centerOnImage();
 
+    /**
+     * 当前视口对应的**文档可见矩形**（含外扩一块）。
+     * 滤镜预览用它把重算范围限制在看得见的地方（见 ImageDocument::setLayerFilterNodePreview）。
+     */
+    QRect visibleDocumentRect() const;
+
     // —— 工具 ——
     void setCurrentTool(Ps::ToolId id);
     Ps::ToolId currentTool() const;

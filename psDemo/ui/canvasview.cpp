@@ -1186,12 +1186,10 @@ void CanvasView::onAdjustmentPreviewCommit(int layerIndex)
     }
 }
 
-void CanvasView::updateProjectionPriorityRect()
+QRect CanvasView::visibleDocumentRect() const
 {
-    if (!m_document) {
-        m_projection.setPriorityRect({});
-        return;
-    }
+    if (!m_document)
+        return {};
     // 对照 gimp_display_shell_update_priority_rect：视口 → 文档坐标
     const QPointF topLeft = widgetToImage(QPointF(0, 0));
     const QPointF bottomRight = widgetToImage(QPointF(width(), height()));
@@ -1200,8 +1198,12 @@ void CanvasView::updateProjectionPriorityRect()
     // 略外扩一块，滚动时边缘少露洞
     vis = vis.adjusted(-Ps::Projection::kChunkSize, -Ps::Projection::kChunkSize,
                        Ps::Projection::kChunkSize, Ps::Projection::kChunkSize);
-    vis = vis.intersected(QRect(0, 0, m_document->width(), m_document->height()));
-    m_projection.setPriorityRect(vis);
+    return vis.intersected(QRect(0, 0, m_document->width(), m_document->height()));
+}
+
+void CanvasView::updateProjectionPriorityRect()
+{
+    m_projection.setPriorityRect(visibleDocumentRect());
 }
 
 void CanvasView::onProjectionIdle()

@@ -535,6 +535,30 @@ bool ImageDocument::setLayerFilterEnabled(int layerIndex, int filterIndex, bool 
     return true;
 }
 
+bool ImageDocument::setLayerFilterNodePreview(int layerIndex, int filterIndex,
+                                              const FilterNode &node, const QRect &region)
+{
+    Layer *layer = m_layers.layerAt(layerIndex);
+    if (!layer || filterIndex < 0 || filterIndex >= layer->filters().count())
+        return false;
+
+    layer->filters().at(filterIndex) = node;
+    layer->invalidateCompositeRaster();
+
+    // 调整层有自己的 live 预览通道（降采样 + 异步），沿用
+    if (layer->isAdjustmentLayer()) {
+        emit adjustmentPreviewChanged(layerIndex);
+        return true;
+    }
+
+    // 像素层滤镜：只把可见区标脏（理由见头文件）。空区域 = 没有可见内容，直接返回。
+    const QRect r = region.intersected(layer->boundsInDocument())
+                        .intersected(QRect(0, 0, m_width, m_height));
+    if (!r.isEmpty())
+        markDirty(r);
+    return true;
+}
+
 bool ImageDocument::removeLayerFilter(int layerIndex, int filterIndex, bool pushUndo)
 {
     Layer *layer = m_layers.layerAt(layerIndex);

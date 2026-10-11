@@ -1607,11 +1607,26 @@ void MainWindow::runFilterDialog(Ps::OpName op)
 
     FilterDialog dlg(this);
     dlg.setNode(node);
-    // 实时预览：slider 变化 → 写回节点并整区重合成（不 push undo）
+
+    // 实时预览的两道护栏（原先「每个 tick 整层重合成」在大文档 + 重滤镜下会秒级卡死）：
+    //  ① 只刷新**可见区** —— 对话框是模态的，预览期间视口不会变，屏幕外的旧像素看不见；
+    //  ② **节流 80ms**，且只带最新值 —— 拖动再快也不会把重合成任务排队堆起来。
+    // 定稿（下面的 add/remove）仍会整层标脏，所以屏幕外最终也会被刷新。
+    CanvasView *cv = ui->canvasWorkspace->canvasView();
+    QTimer previewThrottle;
+    previewThrottle.setSingleShot(true);
+    previewThrottle.setInterval(80);
+    Ps::FilterNode latest = node;
     connect(&dlg, &FilterDialog::previewChanged, this,
-            [doc, li, fi](const Ps::FilterNode &n) {
-                doc->setLayerFilterNode(li, fi, n, /*pushUndo=*/false);
+            [&latest, &previewThrottle](const Ps::FilterNode &n) {
+                latest = n;
+                if (!previewThrottle.isActive())
+                    previewThrottle.start();
             });
+    connect(&previewThrottle, &QTimer::timeout, this, [doc, li, fi, cv, &latest]() {
+        const QRect region = cv ? cv->visibleDocumentRect() : QRect();
+        doc->setLayerFilterNodePreview(li, fi, latest, region);
+    });
 
     if (dlg.exec() == QDialog::Accepted) {
         const Ps::FilterNode finalNode = dlg.node();

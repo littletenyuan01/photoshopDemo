@@ -10,6 +10,7 @@
  */
 #include "app/historystack.h"
 #include "domain/filternode.h"
+#include "engine/projection.h"
 #include "domain/imagedocument.h"
 #include "domain/layer.h"
 #include "engine/compositor.h"
@@ -72,6 +73,47 @@ int tFilterUndo()
                 QStringLiteral("取消后回到原样（filters=%1 diffs=%2）").arg(cnt).arg(dCancel));
         r.check(doc->history().canUndo() == canUndoBefore,
                 QStringLiteral("取消流程不改变撤销栈可用性"));
+    }
+
+    // —— 场景 C：滤镜预览**只刷新给定区域**（拖动时不重算整层，大文档才不卡）——
+    {
+        const int W = 256, H = 256;
+        auto d3 = ImageDocument::createBlank(W, H, Qt::white);
+        d3->placeImageAsLayer(PsTests::makeLayerImage(W, H, 31, 255), QStringLiteral("L"));
+        Layer *l3 = d3->layers().layerAt(1);
+
+        // 先挂一个「恒等」滤镜（半径 0），让投影整体填满一次
+        FilterNode noop(OpName::BoxBlur);
+        noop.setBlurRadius(0);
+        l3->filters().append(noop);
+
+        Projection p;
+        p.bind(d3.get());
+        p.setPriorityRect(QRect(0, 0, W, H));
+        d3->markDirty();
+        p.sync();
+        while (p.hasPendingChunks())
+            p.processPendingChunks(0);
+        const QImage beforeRegion = p.image();
+
+        // 只在左上 64×64（正好一个 64×64 块）上预览一个有效果的半径
+        const QRect region(0, 0, 64, 64);
+        FilterNode blur(OpName::BoxBlur);
+        blur.setBlurRadius(4);
+        d3->setLayerFilterNodePreview(1, 0, blur, region);
+        p.sync(); // 投影在 sync 里取脏区（不调它就拿不到这次 markDirty）
+        while (p.hasPendingChunks())
+            p.processPendingChunks(0);
+        const QImage afterRegion = p.image();
+
+        const QRect outside(64, 0, W - 64, H);
+        const long long inDiff =
+            PsTests::diffCount(beforeRegion.copy(region), afterRegion.copy(region));
+        const long long outDiff =
+            PsTests::diffCount(beforeRegion.copy(outside), afterRegion.copy(outside));
+        r.check(inDiff > 0, QStringLiteral("区域预览：区内已刷新（diffs=%1）").arg(inDiff));
+        r.check(outDiff == 0,
+                QStringLiteral("区域预览：区外保持旧像素、未重算（diffs=%1）").arg(outDiff));
     }
 
     return r.fails;

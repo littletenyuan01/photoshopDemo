@@ -142,6 +142,16 @@ public:
     bool removeLayerFilter(int layerIndex, int filterIndex, bool pushUndo = true);
 
     /**
+     * 滤镜对话框的**区域化预览**：改节点但不进撤销栈，且**只标脏 region**（调用方给可见区）。
+     *
+     * 为什么安全：滤镜对话框是**模态**的 → 预览期间视口不会变，屏幕外的旧像素看不见；
+     * 定稿（`addLayerFilter` / `removeLayerFilter`）会整层标脏，届时全部刷新。
+     * 为什么需要：像素层滤镜的预览原本整层标脏 —— 大文档 + 重滤镜（如中值）拖一次就是秒级。
+     */
+    bool setLayerFilterNodePreview(int layerIndex, int filterIndex, const FilterNode &node,
+                                   const QRect &region);
+
+    /**
      * 给活动层确保一条图层样式（无则追加默认并启用；已有则打开）。
      * 对照 GIMP append_new_filter / PS 图层样式。
      * @return 效果下标；失败 -1。
