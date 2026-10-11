@@ -14,6 +14,9 @@
 #include "domain/tilebuffer.h"
 
 #include <QElapsedTimer>
+#include <QPair>
+#include <QThreadPool>
+#include <QtConcurrent>
 #include <QtGlobal>
 
 namespace Ps {
@@ -171,74 +174,109 @@ QRect Projection::recomposeInvalidChunks(int maxChunks, ScanMode mode, int maxMs
         clock.start();
 
     const QRect priority = m_priorityRect.intersected(full);
-    QRect painted;
-    int done = 0;
 
-    auto tryChunk = [&](int col, int row) -> bool {
-        const int idx = row * m_chunkCols + col;
-        if (m_chunkValid.testBit(idx))
-            return false;
-        const QRect piece = chunkRectAt(col, row, full);
-        if (piece.isEmpty()) {
-            m_chunkValid.setBit(idx);
-            return false;
+    // —— 1) 收集候选 chunk（只收集、不合成；顺序 = 扫描顺序）——
+    QVector<QPair<int, int>> cand; // (col, row)
+    auto addRange = [&](int c0, int r0, int c1, int r1, bool wantPriority) {
+        for (int row = r0; row <= r1; ++row) {
+            for (int col = c0; col <= c1; ++col) {
+                const int idx = row * m_chunkCols + col;
+                if (m_chunkValid.testBit(idx))
+                    continue;
+                const QRect piece = chunkRectAt(col, row, full);
+                if (piece.isEmpty()) {
+                    m_chunkValid.setBit(idx);
+                    continue;
+                }
+                const bool inPri = !priority.isEmpty() && piece.intersects(priority);
+                if (inPri != wantPriority)
+                    continue;
+                cand.append(qMakePair(col, row));
+            }
         }
-        if (!Compositor::compositeRegion(m_buffer, *m_document, piece))
-            return false;
-        m_chunkValid.setBit(idx);
-        painted = painted.isNull() ? piece : painted.united(piece);
-        ++done;
-        return true;
     };
 
-    auto budgetOk = [&]() {
-        if (maxChunks > 0 && done >= maxChunks)
-            return false;
-        if (maxMs > 0 && clock.elapsed() >= maxMs)
-            return false;
-        return true;
-    };
-
-    auto scanPriority = [&]() {
-        if (priority.isEmpty())
-            return;
+    if (mode != ScanMode::NonPriorityOnly && !priority.isEmpty()) {
         const int c0 = qBound(0, priority.left() / kChunkSize, m_chunkCols - 1);
         const int r0 = qBound(0, priority.top() / kChunkSize, m_chunkRows - 1);
         const int c1 = qBound(0, priority.right() / kChunkSize, m_chunkCols - 1);
         const int r1 = qBound(0, priority.bottom() / kChunkSize, m_chunkRows - 1);
-        for (int row = r0; row <= r1 && budgetOk(); ++row) {
-            for (int col = c0; col <= c1 && budgetOk(); ++col) {
-                const QRect piece = chunkRectAt(col, row, full);
-                if (!piece.intersects(priority))
-                    continue;
-                tryChunk(col, row);
-            }
-        }
-    };
-
-    auto scanNonPriority = [&]() {
-        for (int row = 0; row < m_chunkRows && budgetOk(); ++row) {
-            for (int col = 0; col < m_chunkCols && budgetOk(); ++col) {
-                const QRect piece = chunkRectAt(col, row, full);
-                if (!priority.isEmpty() && piece.intersects(priority))
-                    continue;
-                tryChunk(col, row);
-            }
-        }
-    };
-
-    switch (mode) {
-    case ScanMode::PriorityOnly:
-        scanPriority();
-        break;
-    case ScanMode::NonPriorityOnly:
-        scanNonPriority();
-        break;
-    case ScanMode::PriorityThenRest:
-        scanPriority();
-        scanNonPriority();
-        break;
+        addRange(c0, r0, c1, r1, /*wantPriority=*/true);
     }
+    if (mode != ScanMode::PriorityOnly)
+        addRange(0, 0, m_chunkCols - 1, m_chunkRows - 1, /*wantPriority=*/false);
+
+    // —— 2) 分批合成：同一时间预算下，并行能把视口更快铺满（单帧上限不变）——
+    QRect painted;
+    int done = 0;
+    const int threads = qMax(1, QThreadPool::globalInstance()->maxThreadCount());
+    const int batchCap = qMax(1, threads * 4);
+
+    // 并行前在主线程做两件事：预热各层 mutable 缓存、确保投影缓冲独占（否则 worker
+    // 首次 scanLine 会各自 detach）。缓存不变，循环外做一次即可。
+    Compositor::warmLayerCaches(*m_document);
+    (void)m_buffer.bits();
+
+    // 并行批次每次 blockingMap 的固定开销（唤醒 + 汇总）约数 ms：按「预算 − 固定开销」
+    // 折算块数，否则小预算下一次 batches 就会冲破预算。
+    constexpr double kBatchOverheadMs = 4.0;
+
+    for (int start = 0; start < cand.size();) {
+        if (maxChunks > 0 && done >= maxChunks)
+            break;
+        if (maxMs > 0 && clock.elapsed() >= maxMs)
+            break;
+
+        int take;
+        if (maxMs > 0 && threads > 1) {
+            const double usable = double(maxMs) - kBatchOverheadMs;
+            take = (usable > 0.0) ? int(usable / m_msPerChunkParallel) : 1;
+        } else {
+            take = batchCap;
+        }
+        take = qBound(1, take, batchCap);
+        take = qMin(take, int(cand.size()) - start);
+        if (maxChunks > 0)
+            take = qMin(take, maxChunks - done);
+        if (take <= 0)
+            break;
+
+        if (take >= 2 && threads > 1) {
+            QVector<QRect> pieces;
+            pieces.reserve(take);
+            for (int k = 0; k < take; ++k)
+                pieces.append(chunkRectAt(cand[start + k].first, cand[start + k].second, full));
+
+            QElapsedTimer batchClock;
+            batchClock.start();
+            QtConcurrent::blockingMap(pieces, [this](const QRect &piece) {
+                Compositor::compositeRegion(m_buffer, *m_document, piece);
+            });
+            // 只用「足够大」的批次更新估计：小批次被固定开销主导，会把估计越推越高
+            if (take >= threads) {
+                const double per = (batchClock.nsecsElapsed() / 1e6) / take;
+                m_msPerChunkParallel =
+                    qBound(0.05, 0.7 * m_msPerChunkParallel + 0.3 * per, 2.0);
+            }
+
+            for (const QRect &piece : pieces) {
+                markChunksValid(piece);
+                painted = painted.isNull() ? piece : painted.united(piece);
+            }
+        } else {
+            for (int k = 0; k < take; ++k) {
+                const QRect piece =
+                    chunkRectAt(cand[start + k].first, cand[start + k].second, full);
+                if (!Compositor::compositeRegion(m_buffer, *m_document, piece))
+                    continue;
+                markChunksValid(piece);
+                painted = painted.isNull() ? piece : painted.united(piece);
+            }
+        }
+        done += take;
+        start += take;
+    }
+
     return painted;
 }
 

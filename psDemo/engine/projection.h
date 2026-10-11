@@ -113,6 +113,7 @@ private:
     int m_chunkCols = 0;      ///< 块网格列数
     int m_chunkRows = 0;      ///< 块网格行数
     QRect m_priorityRect;     ///< 视口优先区（文档坐标）
+    double m_msPerChunkParallel = 0.25; ///< 并行单块耗时估计（EMA；用于折算批大小）
 };
 
 } // namespace Ps

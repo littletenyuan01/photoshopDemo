@@ -890,9 +890,12 @@ QRect CanvasView::syncProjection()
     const bool largeDirty = docArea > 0 && !dirtyBefore.isEmpty()
         && (dirtyBefore.width() * dirtyBefore.height() >= docArea / 2);
 
-    QRect painted = m_projection.sync();
+    // 时间预算：大脏区不再一次同步刷完（实测旧行为一帧可卡 ~450ms）；
+    // 每帧只花这么多，其余交给 idle 分帧。sync 与 flush 各给一半，本帧总耗时 ≈ 2×预算。
+    constexpr int kProjectionBudgetMs = 8;
+    QRect painted = m_projection.sync(kProjectionBudgetMs);
     if (largeDirty && m_projection.hasPendingChunks())
-        painted = painted.united(m_projection.flushPriority());
+        painted = painted.united(m_projection.flushPriority(kProjectionBudgetMs));
 
     if (m_projection.hasPendingChunks()) {
         if (!m_projIdleTimer->isActive())
@@ -1208,7 +1211,9 @@ void CanvasView::onProjectionIdle()
         return;
     }
     updateProjectionPriorityRect();
-    const QRect painted = m_projection.processPendingChunks();
+    // idle 分帧：块数不限（并行下单块很便宜），只留 8ms 时间预算兜底，避免占住 UI 线程
+    constexpr int kIdleBudgetMs = 8;
+    const QRect painted = m_projection.processPendingChunks(/*maxChunks=*/0, kIdleBudgetMs);
     if (!painted.isEmpty()) {
         // 文档矩形 → 控件局部更新
         const QRectF widgetRect(imageToWidget(painted.topLeft()),
@@ -1231,8 +1236,7 @@ void CanvasView::notifyViewChanged()
     }
     // 平移/缩放后视口变了：若有挂起块，立刻优先补视口
     if (m_projection.hasPendingChunks()) {
-        const QRect painted = m_projection.processPendingChunks(
-            Ps::Projection::kSyncChunkBudget);
+        const QRect painted = m_projection.processPendingChunks(/*maxChunks=*/0, /*maxMs=*/10);
         if (!painted.isEmpty())
             update();
         if (m_projection.hasPendingChunks() && !m_projIdleTimer->isActive())
