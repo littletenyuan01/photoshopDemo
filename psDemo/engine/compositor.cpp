@@ -1,7 +1,7 @@
 /**
  * compositor.cpp — compositor.h 实现（engine 层）。
  *
- * blendTileOnto 逐瓦片解预乘 → LayerModeOp::blendPixel → composite_union 写回。
+ * blendTileOnto 逐瓦片解预乘 → Blend::pixel → composite_union 写回。
  */
 #include "compositor.h"
 
@@ -19,8 +19,11 @@
 #include "engine/graph/compositegraph.h"
 #include "engine/graph/psgraph.h"
 
+#include <QAtomicInt>
 #include <QPainter>
 #include <QRect>
+#include <QThreadPool>
+#include <QtConcurrent>
 #include <QtGlobal>
 
 #include <cstring>
@@ -36,22 +39,21 @@ namespace {
  * - 颜色 B(Cb, Cs)：`LayerModeOp` ⇔ `gimpoperationlayermode-blend.c`
  * - Alpha 合成：本函数 ⇔ `gimpoperationlayermode-composite.c` 的 `composite_union`
  *
- * @param modeOp 调用方**每层**解析一次的常驻算子。
- *        本函数逐瓦片调用，绝不能在这里取算子（旧代码每瓦片一次堆分配 +
- *        QHash 查找；对照 GIMP：per-mode op 缓存，见 gimp_layer_mode_get_operation）。
+ * @param mode 混合模式（**按值**传入）。不再依赖常驻 `LayerModeOp` 实例：
+ *        那是共享可变状态，按 chunk 并行合成会竞态；颜色算法本就在 `Blend::pixel`。
  */
 void blendTileOnto(QImage &dst,
                    const QImage &src,
                    int ox,
                    int oy,
                    qreal opacity,
-                   LayerModeOp *modeOp,
+                   BlendMode mode,
                    const QRect &dirty,
                    const LayerMask *mask,
                    int layerOx,
                    int layerOy)
 {
-    if (opacity <= 0.0 || src.isNull() || !modeOp)
+    if (opacity <= 0.0 || src.isNull())
         return;
 
     const QRect tileRect(ox, oy, src.width(), src.height());
@@ -59,7 +61,6 @@ void blendTileOnto(QImage &dst,
     if (area.isEmpty())
         return;
 
-    const BlendMode mode = modeOp->mode();
     const bool dissolving = (mode == BlendMode::Dissolve);
     const bool useMask = mask && mask->isEnabled() && !mask->isNull();
 
@@ -165,11 +166,19 @@ bool Compositor::blendLayerRange(QImage &dst,
             const int layerOx = layer->offsetX();
             const int layerOy = layer->offsetY();
 
-            // opacity≈1 且无有效蒙版：整区替换；否则预乘插值（保留下方透出）
+            // opacity≈1 且无有效蒙版：整区替换。
+            // 直接逐行拷贝，不用 QPainter：同一 paint device 不能被多个 QPainter 同时绘制
+            // （按 chunk 并行时会崩），而这里本就是 Source 模式的整幅贴图。
             if (opacity >= 0.999 && !mask) {
-                QPainter painter(&dst);
-                painter.setCompositionMode(QPainter::CompositionMode_Source);
-                painter.drawImage(area.topLeft(), filtered);
+                const int copyW = qMin(area.width(), filtered.width());
+                const int copyH = qMin(area.height(), filtered.height());
+                for (int y = 0; y < copyH; ++y) {
+                    QRgb *dline = reinterpret_cast<QRgb *>(dst.scanLine(area.top() + y))
+                                  + area.left();
+                    const QRgb *fline =
+                        reinterpret_cast<const QRgb *>(filtered.constScanLine(y));
+                    std::memcpy(dline, fline, size_t(copyW) * sizeof(QRgb));
+                }
             } else {
                 for (int y = area.top(); y <= area.bottom(); ++y) {
                     QRgb *dline = reinterpret_cast<QRgb *>(dst.scanLine(y))
@@ -215,12 +224,12 @@ bool Compositor::blendLayerRange(QImage &dst,
         if (!layer->hasPixelData() && !hasPreview)
             continue;
 
+        // 只做注册表「是否已初始化」的**只读**校验；不再取常驻 LayerModeOp 实例：
+        // 那是共享可变状态（setMode 写 m_mode），并行合成必然竞态。颜色算法本就在
+        // Blend::pixel，此处把 mode 作为值往下传（compositePixelOnto 同样按值收 mode）。
         const BlendMode mode = layer->blendMode();
-        auto *modeOp = static_cast<LayerModeOp *>(
-            PointOpRegistry::instance(layerModeOperation(mode)));
-        if (!modeOp)
+        if (!PointOpRegistry::find(layerModeOperation(mode)))
             continue;
-        modeOp->setMode(mode);
 
         const int layerOx = layer->offsetX();
         const int layerOy = layer->offsetY();
@@ -247,14 +256,14 @@ bool Compositor::blendLayerRange(QImage &dst,
                         blendTileOnto(dst, tile,
                                       bounds.x() + layerOx,
                                       bounds.y() + layerOy,
-                                      opacity, modeOp, area,
+                                      opacity, mode, area,
                                       mask, layerOx, layerOy);
                     });
             }
             blendTileOnto(dst, layer->compositePreview(),
                           layer->compositePreviewDocX(),
                           layer->compositePreviewDocY(),
-                          opacity, modeOp, area,
+                          opacity, mode, area,
                           mask, layerOx, layerOy);
             continue;
         }
@@ -262,13 +271,13 @@ bool Compositor::blendLayerRange(QImage &dst,
         const bool needMaterialize = layer->filters().hasEnabled()
                                      || layer->styles().hasEnabled();
         if (needMaterialize) {
-            // 复用层局部复合缓存：平移只改 offset，不再每帧整层模糊
-            const Layer::CompositeRaster raster = layer->ensureCompositeRaster();
-            if (!raster.image.isNull()) {
-                blendTileOnto(dst, raster.image,
-                              layerOx + raster.originDx,
-                              layerOy + raster.originDy,
-                              opacity, modeOp, area,
+            // **按 area 区域**求值，而不是整层：整层粒度会让「画一笔」也重建全幅
+            // 滤镜链（实测 447ms @2000x1500 + 3 点滤镜）。点滤镜逐像素，按区域与
+            // 「整层后裁剪」逐像素等价；有样式时该函数内部退回整层缓存。
+            const Layer::CompositeRegion r = layer->compositeRasterRegion(area);
+            if (!r.image.isNull()) {
+                blendTileOnto(dst, r.image, r.docX, r.docY,
+                              opacity, mode, area,
                               mask, layerOx, layerOy);
             }
             continue;
@@ -280,12 +289,73 @@ bool Compositor::blendLayerRange(QImage &dst,
                 blendTileOnto(dst, tile,
                               bounds.x() + layerOx,
                               bounds.y() + layerOy,
-                              opacity, modeOp, area,
+                              opacity, mode, area,
                               mask, layerOx, layerOy);
             });
     }
 
     return true;
+}
+
+void Compositor::warmLayerCaches(const ImageDocument &doc)
+{
+    const LayerStack &stack = doc.layers();
+    for (int i = 0; i < stack.count(); ++i) {
+        const Layer *layer = stack.layerAt(i);
+        if (!layer || !layer->isVisible() || layer->opacity() <= 0.0)
+            continue;
+        // 只有「有启用样式」的层还走整层 mutable 缓存（compositeRasterRegion 对有样式的
+        // 层退回 ensureCompositeRaster）。纯滤镜层已按区域求值、不碰该缓存，不必预热。
+        // 调整层本来就不走这条路（它滤的是下方结果，不是自身空栅格）。
+        if (!layer->isAdjustmentLayer() && layer->styles().hasEnabled())
+            (void)layer->ensureCompositeRaster();
+        // 有蒙版 → 预热「是否全白」判定（同为 mutable 缓存）
+        if (layer->hasMask() && layer->mask() && layer->mask()->isEnabled())
+            (void)layer->mask()->isFullyOpaque();
+    }
+}
+
+bool Compositor::blendLayerRangeParallel(QImage &dst, const ImageDocument &doc,
+                                         const QRect &rect, int layerBegin, int layerEnd,
+                                         int skipLayer)
+{
+    if (dst.isNull())
+        return false;
+    const QRect area = rect.intersected(dst.rect());
+    if (area.isEmpty())
+        return false;
+
+    // 块大小与投影一致（64）：共用同一套瓦片/脏块粒度
+    constexpr int kChunk = 64;
+    const int cols = (area.width() + kChunk - 1) / kChunk;
+    const int rows = (area.height() + kChunk - 1) / kChunk;
+    const int threads = qMax(1, QThreadPool::globalInstance()->maxThreadCount());
+
+    if (cols * rows < 2 || threads <= 1)
+        return blendLayerRange(dst, doc, area, layerBegin, layerEnd, skipLayer);
+
+    // 并行前置（与投影分块合成同一套）：主线程预热 mutable 缓存 + 确保 dst 独占
+    warmLayerCaches(doc);
+    (void)dst.bits();
+
+    QVector<QRect> pieces;
+    pieces.reserve(cols * rows);
+    for (int r = 0; r < rows; ++r) {
+        for (int c = 0; c < cols; ++c) {
+            const int x = area.left() + c * kChunk;
+            const int y = area.top() + r * kChunk;
+            pieces.append(QRect(x, y, qMin(kChunk, area.right() - x + 1),
+                                qMin(kChunk, area.bottom() - y + 1)));
+        }
+    }
+
+    // 各块只读写自己那块 dst 区域，互不相交 → 可并行
+    QAtomicInt ok(1);
+    QtConcurrent::blockingMap(pieces, [&](const QRect &piece) {
+        if (!blendLayerRange(dst, doc, piece, layerBegin, layerEnd, skipLayer))
+            ok.storeRelaxed(0);
+    });
+    return ok.loadRelaxed() != 0;
 }
 
 QImage Compositor::compositeViaGraph(const ImageDocument &doc, const QRect &rect)

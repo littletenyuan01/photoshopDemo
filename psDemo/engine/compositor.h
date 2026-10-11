@@ -52,6 +52,31 @@ public:
                                 int skipLayer = -1);
 
     /**
+     * `blendLayerRange` 的**分块并行**版：把 @p rect 切成 64x64 块交给 QtConcurrent。
+     *
+     * 与 `blendLayerRange` **逐像素等价**（各块只读写自己那块 dst 区域：栅格层读层瓦片、
+     * 调整层 `dst.copy(area)` 后写回同区，互不相交）。
+     *
+     * 用途：工具层「拖中逐帧」的单次大区域重合成 —— 例如移动层上方有调整层时，
+     * 每帧都要重跑上方全部层；实测 2480x3508 文档上该调用串行需 59~64ms/帧（约 16fps）。
+     *
+     * 内部会在**主线程**先预热各层 mutable 缓存并确保 @p dst 独占。
+     */
+    static bool blendLayerRangeParallel(QImage &dst,
+                                        const ImageDocument &doc,
+                                        const QRect &rect,
+                                        int layerBegin,
+                                        int layerEnd,
+                                        int skipLayer = -1);
+
+    /**
+     * 并行合成前在**主线程**预热各层的 mutable 缓存
+     * （`Layer::ensureCompositeRaster` / `LayerMask::isFullyOpaque`）。
+     * 不预热 → worker 首访会写这两个缓存 → 数据竞争。
+     */
+    static void warmLayerCaches(const ImageDocument &doc);
+
+    /**
      * 经图引擎合成（对照 composite 的图化等价路径，Stage 3）。
      * 构建合成 DAG 并对 @p rect 求值；返回整图尺寸（区外透明）。
      * 供校验图引擎与直接合成逐像素一致（见 graphselfcheck）。

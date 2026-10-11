@@ -160,6 +160,22 @@ public:
     void invalidateCompositeRaster() const;
 
     /**
+     * **区域**版层复合栅格：只求值 @p regionDoc（文档坐标）覆盖的那部分。
+     *
+     * 为什么要它：投影按 64x64 块推进，而整层粒度意味着「画一笔」也会重建全幅
+     * 滤镜链 —— 实测 2000x1500 + 3 个点滤镜 = **447ms**，且不受投影时间预算约束。
+     * 点滤镜逐像素，故「按区域滤镜」与「整层滤镜后裁剪」**逐像素等价**。
+     *
+     * 有启用样式时暂走整层缓存（样式需外扩 halo；见 docs/pending-dev.md「仍欠」）。
+     */
+    struct CompositeRegion {
+        QImage image; ///< 覆盖 regionDoc 与层范围的交集；层外为透明
+        int docX = 0; ///< image 左上角的文档 x
+        int docY = 0; ///< image 左上角的文档 y
+    };
+    CompositeRegion compositeRasterRegion(const QRect &regionDoc) const;
+
+    /**
      * 链接图层（对照 GIMP GimpLinkLayer / GimpLink 瘦身版）。
      * 非空路径 = 链接层：像素是源文件的栅格化缓存；改源文件后可「更新链接」。
      * 空路径 = 普通像素层。破链时仍显示缓存像素。

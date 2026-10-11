@@ -5,6 +5,7 @@
 
 #include "imagedocument.h"
 #include "engine/layerstyleeval.h"
+#include "engine/op/tilepatch.h"
 
 #include <QFileInfo>
 #include <QPointF>
@@ -172,6 +173,37 @@ Layer::CompositeRaster Layer::ensureCompositeRaster() const
     m_compositeOriginDx = out.originDx;
     m_compositeOriginDy = out.originDy;
     m_compositeRasterValid = true;
+    return out;
+}
+
+Layer::CompositeRegion Layer::compositeRasterRegion(const QRect &regionDoc) const
+{
+    CompositeRegion out;
+
+    // 有启用样式：样式要外扩 halo（投影/描边…），区域化必须带 pad 再裁回。
+    // 这块暂沿用整层缓存（正确性优先），见 docs/pending-dev.md 的「仍欠」。
+    if (m_styles.hasEnabled()) {
+        const CompositeRaster whole = ensureCompositeRaster();
+        out.image = whole.image;
+        out.docX = offsetX() + whole.originDx;
+        out.docY = offsetY() + whole.originDy;
+        return out;
+    }
+
+    // 层内坐标的需求区，且必须夹在层范围内（TilePatch::extract 要求 rect 非负）
+    const QRect local = regionDoc.translated(-offsetX(), -offsetY());
+    const QRect want = local.intersected(QRect(0, 0, m_tiles.width(), m_tiles.height()));
+    if (want.isEmpty())
+        return out; // 空图 → 调用方跳过该层
+
+    // 只取这块像素，再对这块跑滤镜链：点滤镜逐像素，与「整层滤镜后裁剪」逐像素等价
+    QImage base = TilePatch::extract(m_tiles, want);
+    if (m_filters.hasEnabled())
+        base = m_filters.apply(base);
+
+    out.image = base;
+    out.docX = want.left() + offsetX();
+    out.docY = want.top() + offsetY();
     return out;
 }
 
