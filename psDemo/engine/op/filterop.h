@@ -22,6 +22,8 @@
  * 【线程协议】采用**每线程一份实例**（thread_local 表），而不是加锁：
  * 并行分块合成会**并发**调用同一算子，共享可变实例状态正是并行崩溃的根源
  * （前例：`LayerModeOp` 的共享 `m_mode` 曾导致并行合成访问冲突，见 docs/pending-dev.md）。
+ * 注意该表**故意不析构**（容器在堆上、生命周期到进程结束）—— 理由是退出时的 TLS 析构顺序，
+ * 见 `filterop.cpp` 的 `instanceTable()` 注释。
  */
 #ifndef ENGINE_OP_FILTEROP_H
 #define ENGINE_OP_FILTEROP_H

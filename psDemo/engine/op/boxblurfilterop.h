@@ -24,8 +24,15 @@ public:
     void process(QImage &image, const FilterContext &ctx) override;
     void finish(const FilterContext &ctx) override;
 
-    /** 超过此像素数就不再跨调用保留缓冲（大图在多线程下会白占内存）。 */
-    static constexpr qint64 kMaxRetainedPixels = 1 << 20; // ~4 MB / 块
+    /**
+     * 跨调用保留缓冲的像素上限：128×128（两块共 ~128 KB）。
+     *
+     * 【为什么压这么小】实例表是「堆上且故意不析构」的（见 filterop.cpp 的退出崩溃说明）：
+     * 线程退出时缓冲不会被回收，而 Qt 线程池的闲置线程会过期重建 → 上限不压小就会累积。
+     * 128² 仍覆盖最热的 **64×64 块**路径（含小半径 pad）；整层级等大区域每次分配，
+     * 此前实测该退让只值 ~5~9%（大区域的分配相对总耗时本来就小）。
+     */
+    static constexpr qint64 kMaxRetainedPixels = 128 * 128;
 
 private:
     QImage m_straight; ///< 直通 alpha 缓冲（跨调用复用）
