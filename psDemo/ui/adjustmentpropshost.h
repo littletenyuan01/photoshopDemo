@@ -49,6 +49,8 @@ private:
     Ps::FilterNode m_node;
     bool m_block = false;
     bool m_pagesReady = false;
+    /** 自上次提交以来是否发生过预览改动（用于去重提交、避免 undo 条目重复）。 */
+    bool m_pendingPreview = false;
 };
 
 #endif // UI_ADJUSTMENTPROPSHOST_H

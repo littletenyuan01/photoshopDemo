@@ -69,6 +69,7 @@ void AdjustmentPropsHost::setNode(const Ps::FilterNode &node)
 {
     ensurePages();
     m_node = node;
+    m_pendingPreview = false;
     setEnabled(true);
     m_title->setText(node.title());
     showPageFor(node.op());
@@ -77,14 +78,20 @@ void AdjustmentPropsHost::setNode(const Ps::FilterNode &node)
 
 void AdjustmentPropsHost::emitPreview()
 {
-    if (!m_block)
-        emit previewChanged(m_node);
+    if (m_block)
+        return;
+    m_pendingPreview = true;
+    emit previewChanged(m_node);
 }
 
 void AdjustmentPropsHost::emitCommit()
 {
-    if (!m_block)
-        emit commitChanged(m_node);
+    // 只有「确实有过未提交的预览改动」才提交：避免 sliderReleased 与数值框
+    // editingFinished 相继触发时产生重复的 undo 条目。
+    if (m_block || !m_pendingPreview)
+        return;
+    m_pendingPreview = false;
+    emit commitChanged(m_node);
 }
 
 void AdjustmentPropsHost::wireSliderSpin(QSlider *slider, QSpinBox *spin,
@@ -113,6 +120,9 @@ void AdjustmentPropsHost::wireSliderSpin(QSlider *slider, QSpinBox *spin,
                 emitPreview();
             });
     connect(slider, &QSlider::sliderReleased, this, &AdjustmentPropsHost::emitCommit);
+    // 数值框输入/回车/失焦也要提交：否则「在框里输值」只走预览 —— 不产生 undo、
+    // 也不把文档标记为已修改，关窗时可能不提示保存，用户的改动就丢了。
+    connect(spin, &QSpinBox::editingFinished, this, &AdjustmentPropsHost::emitCommit);
     connect(spin, &QSpinBox::editingFinished, this, &AdjustmentPropsHost::emitCommit);
 }
 
