@@ -93,6 +93,7 @@ bool LayerFilterJob::start(ImageDocument *doc, int layerIndex, const QRect &want
         const auto shouldAbort = [cancelFlag]() { return cancelFlag->load(); };
 
         const QSize outSize = outRect.size();
+        const int outLocalLeft = outRect.left() - srcOrigin.x();
         const int outLocalTop = outRect.top() - srcOrigin.y();
         QImage result(outSize, QImage::Format_ARGB32_Premultiplied);
         result.fill(Qt::transparent);
@@ -121,12 +122,19 @@ bool LayerFilterJob::start(ImageDocument *doc, int layerIndex, const QRect &want
             }
         }
 
-        // 单条带：裁输入（本带输出行 ± pad）→ 求值 → 裁回本带 → 写入 result 对应行。
+        // 单条带：裁输入（本带输出区 ± pad）→ 求值 → 裁回本带 → 写入 result 对应行。
+        //
+        // 【几何：别漏掉 outLocalLeft/Top】`snap` 是「请求区外扩 pad」抽出来的图，所以
+        // `outRect` 在 snap 本地坐标里的原点是 `(outLocalLeft, outLocalTop)`，而 pad 是**真实存在**的
+        // （不像「want = 整层」时那样被 intersect 裁剪吸收掉）。
+        // 定稿路径 want=整层 ⇒ outLocal 恒为 0，公式退化后仍对；预览路径 want=子区域 ⇒ 必须带上。
+        // 曾漏掉这两项：条带取到的是「未外扩」的列、裁回也少偏一圈 → 预览区域整块像素全错
+        // （实测 diffs=10800 = 恰好区域面积），而定稿测试照样绿。
         const auto bandWorker = [&](const QRect &band) {
             if (cancelFlag->load())
                 return;
-            const QRect srcBand = band.translated(0, outLocalTop)
-                                      .adjusted(0, -pad, 0, pad)
+            const QRect srcBand = band.translated(outLocalLeft, outLocalTop)
+                                      .adjusted(-pad, -pad, pad, pad)
                                       .intersected(QRect(0, 0, snap.width(), snap.height()));
             if (srcBand.isEmpty())
                 return;
@@ -134,8 +142,9 @@ bool LayerFilterJob::start(ImageDocument *doc, int layerIndex, const QRect &want
             QImage filtered = stack.apply(work, shouldAbort);
             if (cancelFlag->load() || filtered.isNull())
                 return;
-            const QRect keep(band.left() + (srcBand.left() - band.left()),
-                             band.top() - srcBand.top(), band.width(), band.height());
+            const QRect keep(outLocalLeft + band.left() - srcBand.left(),
+                             outLocalTop + band.top() - srcBand.top(), band.width(),
+                             band.height());
             if (keep.left() < 0 || keep.top() < 0 || keep.right() >= filtered.width()
                 || keep.bottom() >= filtered.height())
                 return; // 几何不成立（理论上不会）：宁可少一块，也不要贴错位置
@@ -178,17 +187,17 @@ bool LayerFilterJob::start(ImageDocument *doc, int layerIndex, const QRect &want
                     && layerIndex < docPtr->layers().count()) {
                     if (Layer *layer = docPtr->layers().layerAt(layerIndex)) {
                         if (layer->contentGeneration() == generation) {
-                            // 【顺序是正确性的一部分】必须先 markDirty 再写缓存：
-                            // `ImageDocument::markDirty` 会**失效活动层的复合栅格缓存**
-                            // （imagedocument.cpp 里的 `layer->invalidateCompositeRaster()`），
-                            // 而那个失效函数连着清区域滤镜缓存 —— 反过来的话，
-                            // 刚写进去的结果会被自己这一发 markDirty 立刻清掉
-                            // （本轮实测：回调日志「写入成功 covers=1」紧跟一条
-                            //  `INVALIDATE … gen->12`，端到端因此永远等不到缓存）。
-                            docPtr->markDirty(outRect);
+                            // 【顺序是正确性的一部分】「静默标脏 → 写缓存 → 自通知」三步：
+                            //  1) `markDirtyQuiet` 会失效活动层缓存（含区域滤镜缓存），
+                            //     所以必须在写缓存**之前**；用静默版是为了不让它同步发
+                            //     contentChanged —— 那会让画布当场合成一次，而此刻缓存还没写，
+                            //     等于把刚挪到后台的重算又在 UI 线程上跑一遍（白干）。
+                            //  2) 反过来「先写缓存后标脏」更不行：那会把自己刚写的清掉。
+                            docPtr->markDirtyQuiet(outRect);
                             layer->setRegionFilterResult(outRect, result);
-                            // 缓存正式就位 → 再通知一次，让投影用**命中缓存**的路径重算这块
-                            // （此刻层内容已是最新、缓存与它同代，命中即正确）。
+                            // 一次性通知：缩略图/面板走 pixelsChanged，画布走 contentChanged
+                            //（此刻缓存已就位 → 投影命中缓存，只做取子图 + 混合）。
+                            emit docPtr->pixelsChanged(outRect);
                             emit docPtr->contentChanged();
                             wrote = true;
                         }

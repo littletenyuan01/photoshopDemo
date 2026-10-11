@@ -148,11 +148,22 @@ public:
     bool moveLayerFilter(int layerIndex, int from, int to);
 
     /**
-     * 滤镜对话框的**区域化预览**：改节点但不进撤销栈，且**只标脏 region**（调用方给可见区）。
+     * 滤镜对话框 / 面板的**区域化预览**：改节点但不进撤销栈，且**只标脏 region**（调用方给可见区）。
      *
-     * 为什么安全：滤镜对话框是**模态**的 → 预览期间视口不会变，屏幕外的旧像素看不见；
-     * 定稿（`addLayerFilter` / `removeLayerFilter`）会整层标脏，届时全部刷新。
+     * 为什么安全：滤镜对话框是**非模态**但预览期间视口基本不动（画布会持续写「可见区提示」）；
+     * 屏幕外的旧像素看不见；定稿（`addLayerFilter` / `removeLayerFilter`）会整层标脏，届时全部刷新。
      * 为什么需要：像素层滤镜的预览原本整层标脏 —— 大文档 + 重滤镜（如中值）拖一次就是秒级。
+     *
+     * 【异步预览的约定 —— 与画布的分工，务必按这个顺序读】
+     * 本条**只负责**「改节点 + 失效缓存 + **静默**标脏区域」，然后发一条
+     * `layerFilterPreviewChanged(layerIndex, region)`：
+     *   1. 先 `markDirtyQuiet(region)`（**不发** contentChanged），再发预览信号。
+     *      顺序不能反：静默标脏会推进层的「内容世代号」，后台任务必须捕获推进后的值。
+     *   2. 用静默标脏是为了**不让画布当场同步合成** —— 否则重滤镜仍会在 UI 线程上跑一遍，
+     *      那就等于没异步。脏区照样累计着，等后台任务写好区域缓存后由它自己发
+     *      `contentChanged`，那时投影命中缓存、只做「取子图 + 混合」。
+     *   3. 画布收到预览信号后**直接**起后台任务（`LayerFilterJob`）；纯点滤镜
+     *      （`inputPad()==0`，几毫秒）不值得异步，画布自行退回同步。
      */
     bool setLayerFilterNodePreview(int layerIndex, int filterIndex, const FilterNode &node,
                                    const QRect &region);
@@ -204,6 +215,18 @@ public:
     void markDirty(const QRect &rect);
     /** 整文档 markDirty。 */
     void markDirty();
+    /**
+     * **静默**标脏：与 `markDirty` 一样累计脏区、失效活动层的内容包围盒与复合栅格缓存，
+     * 但**不发** `pixelsChanged` / `contentChanged`。
+     *
+     * 【谁需要它】异步滤镜任务（`engine/layerfilterjob.*`）的收尾必须是
+     * 「失效缓存 → 写区域缓存 → 一次性通知」这三步，顺序不能换：
+     *  · 先 `markDirty` 会**同步**发 contentChanged，画布当场就会合成一次 —— 而此刻
+     *    区域缓存还没写，于是刚挪到后台的那次重算又在 UI 线程上跑了一遍（白干）；
+     *  · 反过来「先写缓存、后标脏」也不行：`markDirty` 会失效活动层缓存，把刚写的清掉。
+     * 故拆成「静默标脏 + 写缓存 + 自己通知」。
+     */
+    void markDirtyQuiet(const QRect &rect);
     /** 自上次 clearDirty 以来累计的脏区（文档坐标）。 */
     const QRect &dirtyRect() const { return m_dirtyRect; }
     void clearDirtyRect() { m_dirtyRect = QRect(); }
@@ -390,6 +413,16 @@ signals:
     void adjustmentPreviewChanged(int layerIndex);
     /** 调整层参数提交：画布应 adopt live 定稿（或回退 markDirty+sync）。 */
     void adjustmentPreviewCommit(int layerIndex);
+    /**
+     * **像素层**滤镜参数预览（`setLayerFilterNodePreview`）：画布据此把
+     * 「可见区重算滤镜」交给后台（重滤镜否则会占 UI 线程）。
+     *
+     * 约定见 `setLayerFilterNodePreview` 的注释：本信号在 `markDirty(region)` **之前**发出，
+     * 画布只记 pending；真正起后台任务发生在随后的 `contentChanged`（那时世代号已稳定）。
+     *
+     * @param regionDoc 本次预览要重算的文档矩形（已与层范围、画布范围求交）
+     */
+    void layerFilterPreviewChanged(int layerIndex, const QRect &regionDoc);
 
 private:
     friend class HistorySuppress;

@@ -556,8 +556,18 @@ bool ImageDocument::setLayerFilterNodePreview(int layerIndex, int filterIndex,
     const QRect want = region.isEmpty() ? m_previewRegionHint : region;
     const QRect r = want.intersected(layer->boundsInDocument())
                         .intersected(QRect(0, 0, m_width, m_height));
-    if (!r.isEmpty())
-        markDirty(r);
+    if (!r.isEmpty()) {
+        // 【顺序是约定的一部分】
+        //  1) 先 `markDirtyQuiet`：它会把层内容世代号推进一次（失效缓存），
+        //     后台任务必须捕获**推进后**的世代号，否则回调时的世代校验必然失败；
+        //  2) 再发预览信号：画布据此**直接**起后台任务。
+        // 用静默版是为了**不发 contentChanged** —— 否则画布会当场同步合成一次，
+        // 而那次合成正是要把重滤镜从 UI 线程上挪走的东西（等于没异步）。
+        // 脏区仍然累计着，等后台任务写好缓存后由它自己发 contentChanged，
+        // 那时投影命中缓存、只做「取子图 + 混合」。
+        markDirtyQuiet(r);
+        emit layerFilterPreviewChanged(layerIndex, r);
+    }
     return true;
 }
 
@@ -973,6 +983,21 @@ void ImageDocument::markDirty(const QRect &rect)
 void ImageDocument::markDirty()
 {
     markDirty(QRect(0, 0, m_width, m_height));
+}
+
+/** 见头文件：与 markDirty 同效，但不发信号（供异步任务「静默标脏 → 写缓存 → 自通知」）。 */
+void ImageDocument::markDirtyQuiet(const QRect &rect)
+{
+    if (rect.isEmpty())
+        return;
+
+    m_dirty = true;
+    m_dirtyRect = m_dirtyRect.isNull() ? rect : m_dirtyRect.united(rect);
+
+    if (Layer *layer = activeLayer()) {
+        layer->invalidateContentBounds();
+        layer->invalidateCompositeRaster();
+    }
 }
 
 void ImageDocument::setLayerVisible(int index, bool visible)

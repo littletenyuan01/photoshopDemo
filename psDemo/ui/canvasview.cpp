@@ -150,6 +150,9 @@ void CanvasView::setDocument(Ps::ImageDocument *document)
                 this, &CanvasView::onAdjustmentPreview);
         connect(m_document, &Ps::ImageDocument::adjustmentPreviewCommit,
                 this, &CanvasView::onAdjustmentPreviewCommit);
+        // 像素层滤镜预览：只记 pending（起任务放在随之而来的 contentChanged，见约定）
+        connect(m_document, &Ps::ImageDocument::layerFilterPreviewChanged,
+                this, &CanvasView::onLayerFilterPreview);
         // 滤镜「定稿」：内容一变就看看这次是不是「给活动层新加了重滤镜」——
         // 是则把整层滤镜求值交给后台（结果写入层的区域缓存），投影随后只做取子图 + 混合。
         connect(m_document, &Ps::ImageDocument::contentChanged,
@@ -1012,28 +1015,66 @@ void CanvasView::maybeStartAsyncFilterFinalize()
 
     // 已经在跑：直接接替（LayerFilterJob::start 内部会作废旧的一代）。
     // 这里不再「先 cancel 再 start」——那会让旧任务白取消、新任务又被拒启。
-    if (!m_filterJob) {
-        m_filterJob = new Ps::LayerFilterJob(this);
-        connect(m_filterJob, &Ps::LayerFilterJob::finished, this, [this](bool wrote) {
-            m_filterProgressTimer->stop();
-            emit filterFinalizeProgress(QString());
-            if (wrote) {
-                // 缓存已写入且文档已 markDirty：contentChanged 会把脏区交给投影，
-                // 此处只需重画一次（那条链可能已经同步跑过了）。
-                update();
-            }
-        });
-    }
-
     const QRect want = layer->boundsInDocument().intersected(
         QRect(0, 0, m_document->width(), m_document->height()));
-    if (m_filterJob->start(m_document, active, want)) {
+    if (startFilterJobFor(active, want)) {
         m_filterJobLayer = active;
         m_filterJobFilterPrint = print;
         m_filterJobHavePrint = true;
         m_filterProgressTimer->start();
         // 先给一行占位文案：重滤镜第一次求值前没有任何进度可报
         emit filterFinalizeProgress(tr("滤镜定稿：后台求值…"));
+    }
+}
+
+bool CanvasView::startFilterJobFor(int layerIndex, const QRect &want)
+{
+    if (!m_document || layerIndex < 0 || want.isEmpty())
+        return false;
+    if (!m_filterJob) {
+        m_filterJob = new Ps::LayerFilterJob(this);
+        connect(m_filterJob, &Ps::LayerFilterJob::finished, this, [this](bool wrote) {
+            m_filterProgressTimer->stop();
+            emit filterFinalizeProgress(QString());
+            if (wrote) {
+                // 任务回调已「静默标脏 → 写区域缓存 → 发 contentChanged」，
+                // 投影那条链命中缓存后会自己刷新；这里只补一次重画（防漏）。
+                update();
+            }
+        });
+    }
+    return m_filterJob->start(m_document, layerIndex, want);
+}
+
+void CanvasView::onLayerFilterPreview(int layerIndex, const QRect &regionDoc)
+{
+    if (!m_document || layerIndex < 0 || regionDoc.isEmpty())
+        return;
+    Ps::Layer *layer = m_document->layers().layerAt(layerIndex);
+    if (!layer)
+        return;
+
+    // 只有**重滤镜**（面积算子 `inputPad()>0`）值得挪到后台：
+    //  · 纯点滤镜逐像素，可见区也就几毫秒 → 退回同步，异步化只是徒增复杂度；
+    //  · 几何算子（位移）走整层专用路径；有样式的层走整层缓存；调整层有自己的 live 通道。
+    const bool heavy = strongestPadOfLayer(layer) > 0 && !layer->filters().hasGeometryOp()
+                       && !layer->isAdjustmentLayer() && !layer->styles().hasEnabled();
+    if (heavy && startFilterJobFor(layerIndex, regionDoc)) {
+        m_filterProgressTimer->start();
+        emit filterFinalizeProgress(tr("滤镜预览：后台求值…"));
+        update(); // 旧投影先顶着，等任务写好缓存再刷新
+        return;
+    }
+
+    // 退回同步：与 contentChanged 路径同一套（视口优先 + 时间预算）。
+    clearAdjustmentLive();
+    const QRect painted = syncProjection();
+    if (!painted.isEmpty()) {
+        const QRectF wr(imageToWidget(painted.topLeft()),
+                        imageToWidget(QPointF(painted.right() + 1, painted.bottom() + 1)));
+        update(wr.normalized().toAlignedRect().adjusted(-1, -1, 1, 1));
+    } else {
+        update();
     }
 }
 

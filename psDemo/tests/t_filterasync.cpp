@@ -148,3 +148,85 @@ int tFilterAsync()
 
     return r.fails;
 }
+
+/**
+ * 滤镜**预览**的异步化：改参数时把「可见区重算滤镜」挪到后台（不再卡 UI 线程）。
+ *
+ * 守的契约（见 `ImageDocument::setLayerFilterNodePreview` 的约定）：
+ *  ① 预览走**静默标脏**：发 `layerFilterPreviewChanged`、但**不发** `contentChanged`
+ *     （发了就等于画布当场同步合成，异步白做）；
+ *  ② 画布据此起后台任务，只重算**给的那块区域**；
+ *  ③ 任务完成后该区域命中缓存，且结果与「整层滤镜后裁同块」**逐像素一致**。
+ */
+int tFilterPreviewAsync()
+{
+    Reporter r;
+
+    const int W = 320, H = 240;
+    auto doc = ImageDocument::createBlank(W, H, Qt::white);
+    doc->placeImageAsLayer(PsTests::makeLayerImage(W, H, 7, 255), QStringLiteral("heavy"));
+    Layer *layer = doc->layers().layerAt(1);
+    if (!layer) {
+        r.check(false, QStringLiteral("有活动像素层"));
+        return r.fails;
+    }
+
+    // 先在「无人订阅」时把重滤镜装上，避免 setup 阶段就触发定稿任务
+    FilterNode median(OpName::MedianBlur);
+    median.setMedianRadius(4);
+    doc->addLayerFilter(median, /*pushUndo=*/false);
+
+    // 订阅信号（放在 setup 之后，计数从 0 起）
+    int previewSignals = 0;
+    int contentSignals = 0;
+    QRect previewRegion;
+    QObject::connect(doc.get(), &ImageDocument::layerFilterPreviewChanged, doc.get(),
+                     [&](int, const QRect &region) { ++previewSignals; previewRegion = region; });
+    QObject::connect(doc.get(), &ImageDocument::contentChanged, doc.get(),
+                     [&]() { ++contentSignals; });
+
+    // 离屏画布接管（订阅 layerFilterPreviewChanged）
+    CanvasView canvas;
+    canvas.resize(400, 300);
+    canvas.setDocument(doc.get());
+    contentSignals = 0; // setDocument 内部的同步合成不算
+
+    const QRect region(40, 30, 120, 90);
+    FilterNode preview = median;
+    preview.setMedianRadius(6);
+    doc->setLayerFilterNodePreview(1, 0, preview, region);
+
+    // —— ① 静默标脏：发预览信号，但**不发** contentChanged ——
+    r.check(previewSignals == 1,
+            QStringLiteral("预览：发且只发一次 layerFilterPreviewChanged（实际 %1）").arg(previewSignals));
+    r.check(previewRegion == region, QStringLiteral("预览：信号带的是给的那块区域"));
+    r.check(contentSignals == 0,
+            QStringLiteral("预览：静默标脏（不发 contentChanged；实际发了 %1 次）").arg(contentSignals));
+
+    // —— ②③ 后台任务写好这块区域的缓存 ——
+    QElapsedTimer t;
+    t.start();
+    bool cached = false;
+    while (t.elapsed() < 3000 && !cached) {
+        QApplication::processEvents();
+        cached = layer->regionFilterCovers(region);
+    }
+    r.check(cached, QStringLiteral("预览：后台任务把该区域写进了缓存（等待 %1 ms）").arg(t.elapsed()));
+    r.check(contentSignals >= 1,
+            QStringLiteral("预览：任务完成后补发了 contentChanged（实际 %1 次）").arg(contentSignals));
+
+    // —— 缓存命中结果 == 「整层滤镜后裁同块」 ——
+    {
+        FilterStack stack;
+        stack.replaceAll(layer->filters().snapshot());
+        const QImage whole = stack.apply(layer->materialize());
+        const QImage ref = whole.copy(region);
+        const Layer::CompositeRegion got = layer->compositeRasterRegion(region);
+        r.check(got.image.size() == ref.size() && PsTests::diffCount(got.image, ref) == 0,
+                QStringLiteral("预览：命中缓存的区域 == 整层滤镜后裁同块（diffs=%1）")
+                    .arg(PsTests::diffCount(got.image, ref)));
+    }
+
+    canvas.setDocument(nullptr);
+    return r.fails;
+}

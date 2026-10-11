@@ -192,6 +192,17 @@ private:
     void cancelFilterFinalize();
     /** 活动层滤镜栈里最强算子的外扩（0 = 纯点滤镜，不值得异步）。 */
     static int strongestPadOfLayer(const Ps::Layer *layer);
+
+    /**
+     * **像素层滤镜预览**的异步化（与定稿共用 `LayerFilterJob`）。
+     *
+     * 由 `ImageDocument::layerFilterPreviewChanged` 直接触发（该信号**不**伴随
+     * contentChanged —— 预览走静默标脏，见 `setLayerFilterNodePreview` 的约定）：
+     * 重滤镜就起后台任务、本轮只重画旧投影；纯点滤镜仍退回同步（几毫秒）。
+     */
+    void onLayerFilterPreview(int layerIndex, const QRect &regionDoc);
+    /** 起/接替一次后台滤镜任务；返回 false 表示参数不成立（调用方退回同步路径）。 */
+    bool startFilterJobFor(int layerIndex, const QRect &want);
     /** 将 m_offset 钳制到合法范围（含 pasteboard 过滚，对照 PS）。 */
     void clampOffset();
     /** 水平/竖直可平移的 offset 上下限（控件坐标）。 */
