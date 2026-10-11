@@ -14,16 +14,22 @@
 #include <QDialog>
 #include <QVector>
 
+class QTimer;
 class AdjustmentPropsHost;
 
 /**
- * 滤镜参数对话框。
+ * 滤镜参数对话框（**非模态**）。
  *
- * **文档级撤销**由调用方决定：本对话框把节点以「临时」方式加进图层做预览，
- * 确定时才正式落盘（一条撤销）、取消则摘掉（零撤销）。
+ * 【为什么非模态】对照 GIMP：GEGL 滤镜在 2.10 里是**工具**（`GimpGeglTool` → `GimpOperationTool`，
+ * 参数 UI 填进工具选项框），所以是**非模态**的 —— 拖参数时还能缩放/平移画布看细节。
+ * 我们原来的模态对话框没有这个能力，还逼出一个补丁（模态会吞掉主窗口快捷键）。
  *
- * **对话框内的 Ctrl+Z**：模态对话框会吞掉主窗口的撤销快捷键，故这里自带一条 ——
- * 逐步回退参数（每次提交记一份「提交前」的节点）。它只回退参数，不碰文档撤销栈。
+ * 【职责边界】对话框**无状态、不碰文档**：只发 `previewChanged`（自带 80ms 节流），
+ * 「预览写到哪个图层」「确定/取消怎么落盘」都由调用方决定。
+ * 非模态下 `exec()` 的返回值不再可用，调用方改接 `accepted()` / `rejected()`。
+ *
+ * 【对话框内的 Ctrl+Z】保留：它只回退本对话框的参数（非模态后主窗口的撤销键在画布获焦时也可用，
+ * 但那条会去撤销**上一次**文档操作，不是回退本次参数）。
  */
 class FilterDialog : public QDialog
 {
@@ -35,6 +41,7 @@ public:
     Ps::FilterNode node() const;
 
 signals:
+    /** 参数变化（已按 80ms 节流，永远是最新值）。 */
     void previewChanged(const Ps::FilterNode &node);
 
 private:
@@ -44,6 +51,8 @@ private:
     AdjustmentPropsHost *m_host = nullptr;
     Ps::FilterNode m_last;               ///< 上次参数提交后的节点（撤销栈基准）
     QVector<Ps::FilterNode> m_paramUndo; ///< 各次提交「之前」的节点
+    QTimer *m_throttle = nullptr;        ///< 预览节流（非模态下调用方拿不到同步返回值，节流放这里）
+    Ps::FilterNode m_latest;             ///< 待发的预览值
 };
 
 #endif // UI_FILTERDIALOG_H

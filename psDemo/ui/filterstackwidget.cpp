@@ -184,38 +184,30 @@ void FilterStackWidget::onEdit()
         return;
 
     const Ps::FilterNode original = layer->filters().at(index);
-    FilterDialog dlg(this);
-    dlg.setNode(original);
 
-    // 实时预览：沿用「新加滤镜」那条通道 —— region 传空 = 用文档里的**当前可见区提示**
-    // （面板不持有画布），再按 80ms 节流（拖动再快也不排队）。
-    QTimer throttle;
-    throttle.setSingleShot(true);
-    throttle.setInterval(80);
-    Ps::FilterNode latest = original;
-    connect(&dlg, &FilterDialog::previewChanged, this,
-            [&latest, &throttle](const Ps::FilterNode &n) {
-                latest = n;
-                if (!throttle.isActive())
-                    throttle.start();
-            });
-    connect(&throttle, &QTimer::timeout, this, [this, index, &latest]() {
-        m_doc->setLayerFilterNodePreview(m_layer, index, latest, QRect());
+    // 非模态对话框（与菜单路径一致）：拖参数时还能缩放/平移画布。
+    // 面板不持有画布 ⇒ 预览 region 传空，回落到文档里的「当前可见区提示」；节流在对话框内部。
+    auto *dlg = new FilterDialog(this);
+    dlg->setAttribute(Qt::WA_DeleteOnClose);
+    dlg->setNode(original);
+    connect(dlg, &FilterDialog::previewChanged, this, [this, index](const Ps::FilterNode &n) {
+        if (m_doc)
+            m_doc->setLayerFilterNodePreview(m_layer, index, n, QRect());
     });
-
-    if (dlg.exec() != QDialog::Accepted) {
-        // 取消：预览只刷过可见区，屏幕外仍是预览值 ⇒ 必须用整层标脏把原参数写回去
-        if (m_doc->setLayerFilterNode(m_layer, index, original, /*pushUndo=*/false)) {
+    connect(dlg, &QDialog::accepted, this, [this, index, dlg]() {
+        if (m_doc && m_doc->setLayerFilterNode(m_layer, index, dlg->node(), /*pushUndo=*/true)) {
             refresh();
             emit stackChanged();
         }
-        return;
-    }
-    // 确定：整层标脏 + 恰好一条撤销
-    if (m_doc->setLayerFilterNode(m_layer, index, dlg.node(), /*pushUndo=*/true)) {
-        refresh();
-        emit stackChanged();
-    }
+    });
+    connect(dlg, &QDialog::rejected, this, [this, index, original]() {
+        // 取消：预览只刷过可见区，屏幕外仍是预览值 ⇒ 必须用整层标脏把原参数写回去
+        if (m_doc && m_doc->setLayerFilterNode(m_layer, index, original, /*pushUndo=*/false)) {
+            refresh();
+            emit stackChanged();
+        }
+    });
+    dlg->show();
 }
 
 void FilterStackWidget::onMove(int delta)

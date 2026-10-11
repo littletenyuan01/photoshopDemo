@@ -8,6 +8,7 @@
 #include <QDialogButtonBox>
 #include <QKeySequence>
 #include <QShortcut>
+#include <QTimer>
 #include <QVBoxLayout>
 
 FilterDialog::FilterDialog(QWidget *parent)
@@ -24,9 +25,18 @@ FilterDialog::FilterDialog(QWidget *parent)
     connect(buttons, &QDialogButtonBox::accepted, this, &QDialog::accept);
     connect(buttons, &QDialogButtonBox::rejected, this, &QDialog::reject);
 
-    // 参数面板的实时变化 → 转发给调用方做预览
-    connect(m_host, &AdjustmentPropsHost::previewChanged,
-            this, &FilterDialog::previewChanged);
+    // 参数面板的实时变化 → 节流 80ms 后转发给调用方做预览。
+    // 【为什么节流放在这里】非模态后调用方拿不到同步返回值，函数早就返回了，
+    // 调用点再放一个局部 QTimer 会立刻析构；放对话框里生命周期天然正确。
+    m_throttle = new QTimer(this);
+    m_throttle->setSingleShot(true);
+    m_throttle->setInterval(80);
+    connect(m_throttle, &QTimer::timeout, this, [this]() { emit previewChanged(m_latest); });
+    connect(m_host, &AdjustmentPropsHost::previewChanged, this, [this](const Ps::FilterNode &n) {
+        m_latest = n;
+        if (!m_throttle->isActive())
+            m_throttle->start();
+    });
 
     // 松手 / 数值框回车 = 一次参数提交 → 记下「提交前」的节点，供对话框内 Ctrl+Z 逐步回退
     connect(m_host, &AdjustmentPropsHost::commitChanged, this,
@@ -44,6 +54,7 @@ FilterDialog::FilterDialog(QWidget *parent)
 void FilterDialog::setNode(const Ps::FilterNode &node)
 {
     m_last = node;
+    m_latest = node;
     m_paramUndo.clear();
     m_host->setNode(node);
 }
@@ -59,6 +70,7 @@ void FilterDialog::undoLastChange()
         return;
     const Ps::FilterNode prev = m_paramUndo.takeLast();
     m_last = prev;
+    m_latest = prev;
     m_host->setNode(prev); // 面板内有 m_block 保护，不会反过来触发预览/提交
     emit previewChanged(prev); // 让画布跟着回退
 }

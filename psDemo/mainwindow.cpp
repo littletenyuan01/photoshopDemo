@@ -1623,39 +1623,28 @@ void MainWindow::runFilterDialog(Ps::OpName op)
         return;
     }
 
-    FilterDialog dlg(this);
-    dlg.setNode(node);
-
-    // 实时预览的两道护栏（原先「每个 tick 整层重合成」在大文档 + 重滤镜下会秒级卡死）：
-    //  ① 只刷新**可见区** —— 对话框是模态的，预览期间视口不会变，屏幕外的旧像素看不见；
-    //  ② **节流 80ms**，且只带最新值 —— 拖动再快也不会把重合成任务排队堆起来。
-    // 定稿（下面的 add/remove）仍会整层标脏，所以屏幕外最终也会被刷新。
-    CanvasView *cv = ui->canvasWorkspace->canvasView();
-    QTimer previewThrottle;
-    previewThrottle.setSingleShot(true);
-    previewThrottle.setInterval(80);
-    Ps::FilterNode latest = node;
-    connect(&dlg, &FilterDialog::previewChanged, this,
-            [&latest, &previewThrottle](const Ps::FilterNode &n) {
-                latest = n;
-                if (!previewThrottle.isActive())
-                    previewThrottle.start();
+    // 非模态对话框（对照 GIMP 的滤镜工具：参数非模态，拖参数还能缩放/平移画布看细节）。
+    // 不再有 exec() 的返回值 ⇒ 确定/取消改由信号驱动；预览节流在对话框内部做。
+    auto *dlg = new FilterDialog(this);
+    dlg->setAttribute(Qt::WA_DeleteOnClose);
+    dlg->setNode(node);
+    // 预览只刷可见区：region 传空 → 回落到文档里的「当前可见区提示」（画布更新视口时写入）
+    connect(dlg, &FilterDialog::previewChanged, this,
+            [doc, li, fi](const Ps::FilterNode &n) {
+                doc->setLayerFilterNodePreview(li, fi, n, QRect());
             });
-    connect(&previewThrottle, &QTimer::timeout, this, [doc, li, fi, cv, &latest]() {
-        const QRect region = cv ? cv->visibleDocumentRect() : QRect();
-        doc->setLayerFilterNodePreview(li, fi, latest, region);
-    });
-
-    if (dlg.exec() == QDialog::Accepted) {
-        const Ps::FilterNode finalNode = dlg.node();
+    connect(dlg, &QDialog::accepted, this, [this, doc, li, fi, dlg]() {
+        const Ps::FilterNode finalNode = dlg->node();
         doc->removeLayerFilter(li, fi, /*pushUndo=*/false);
         if (doc->addLayerFilter(finalNode, /*pushUndo=*/true) < 0)
             flashStatusMessage(tr("无法添加滤镜"));
         else
             flashStatusMessage(tr("已应用滤镜（非破坏）"));
-    } else {
+    });
+    connect(dlg, &QDialog::rejected, this, [doc, li, fi]() {
         doc->removeLayerFilter(li, fi, /*pushUndo=*/false);
-    }
+    });
+    dlg->show();
 }
 
 void MainWindow::applyFilterDirect(Ps::OpName op)
