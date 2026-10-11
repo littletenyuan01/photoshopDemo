@@ -232,6 +232,10 @@ public:
     quint32 noiseSeed() const { return m_noiseSeed; }
     void setNoiseSeed(quint32 v) { m_noiseSeed = v; }
 
+    // —— 减少杂色（Demo：中值 + 与原图按强度混合；0..100%）——
+    int reduceNoiseStrength() const { return m_reduceNoiseStrength; }
+    void setReduceNoiseStrength(int v) { m_reduceNoiseStrength = qBound(0, v, 100); }
+
     /**
      * 「想算出 `output` 这块像素，输入至少要有哪一块」—— **层内坐标**（与 output 同一空间）。
      *
@@ -320,10 +324,13 @@ public:
         case OpName::GaussianBlur:
             return m_gaussRadius + 2;
         case OpName::MedianBlur:
+        case OpName::DustAndScratches:
+        case OpName::ReduceNoise:
             return m_medianRadius;
         case OpName::Sharpen:
         case OpName::Emboss:
-            return 1; // 3×3 线性核
+        case OpName::SharpenEdges:
+            return 1; // 3×3 线性核 / Sobel
         case OpName::Maximum:
         case OpName::Minimum:
             return m_extremumRadius;
@@ -401,6 +408,7 @@ private:
     bool m_noiseGaussian = false;
     bool m_noiseMonochromatic = true;
     quint32 m_noiseSeed = 0x9E3779B9u; ///< 固定默认：同参数 → 同噪声（见 noiseSeed() 注释）
+    int m_reduceNoiseStrength = 50; ///< 减少杂色：与中值结果的混合强度 %
 };
 
 } // namespace Ps

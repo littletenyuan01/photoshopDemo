@@ -7,6 +7,7 @@
 #include "boxblurfilterop.h"
 #include "clonestampdabop.h"
 #include "customfilterop.h"
+#include "dustscratchfilterop.h"
 #include "embossfilterop.h"
 #include "extremumfilterop.h"
 #include "filterop.h"
@@ -25,6 +26,7 @@
 #include "opregistry.h"
 #include "pointopregistry.h"
 #include "selectfloodop.h"
+#include "sharpenedgesfilterop.h"
 #include "sharpenfilterop.h"
 #include "selectpolygonop.h"
 #include "shapefillop.h"
@@ -147,6 +149,12 @@ void opsInit()
                      [] { return std::unique_ptr<FilterOp>(new HighPassFilterOp); });
     registerFilterOp(OpName::MotionBlur,
                      [] { return std::unique_ptr<FilterOp>(new MotionBlurFilterOp); });
+    registerFilterOp(OpName::DustAndScratches,
+                     [] { return std::unique_ptr<FilterOp>(new DustAndScratchesFilterOp); });
+    registerFilterOp(OpName::ReduceNoise,
+                     [] { return std::unique_ptr<FilterOp>(new ReduceNoiseFilterOp); });
+    registerFilterOp(OpName::SharpenEdges,
+                     [] { return std::unique_ptr<FilterOp>(new SharpenEdgesFilterOp); });
 }
 
 } // namespace Ps

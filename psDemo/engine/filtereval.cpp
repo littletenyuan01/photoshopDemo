@@ -492,6 +492,22 @@ void applyAddNoise(QImage &image, const FilterNode &node)
     }
 }
 
+/** 曝光过度（对照 PS「滤镜→风格化→曝光过度」）：v>128 ? 255-v : v。 */
+void applySolarize(QImage &image)
+{
+    const int w = image.width();
+    const int h = image.height();
+    for (int y = 0; y < h; ++y) {
+        QRgb *row = reinterpret_cast<QRgb *>(image.scanLine(y));
+        for (int x = 0; x < w; ++x) {
+            const QRgb p = qUnpremultiply(row[x]);
+            const auto sol = [](int v) { return v > 128 ? 255 - v : v; };
+            row[x] = qPremultiply(
+                qRgba(sol(qRed(p)), sol(qGreen(p)), sol(qBlue(p)), qAlpha(p)));
+        }
+    }
+}
+
 /** 点滤镜（无临时资源）：直接分发 —— 三段式对它们纯属开销，与 PointOp 的取舍一致。 */
 void applyPointNode(QImage &image, const FilterNode &node)
 {
@@ -501,6 +517,9 @@ void applyPointNode(QImage &image, const FilterNode &node)
         break;
     case OpName::Invert:
         applyInvert(image);
+        break;
+    case OpName::Solarize:
+        applySolarize(image);
         break;
     case OpName::HueSaturation:
         applyHueSaturation(image, node.hue(), node.saturation(), node.lightness());

@@ -260,11 +260,38 @@ void MainWindow::setupMenus()
     connect(ui->actionBoxBlur, &QAction::triggered, this,
             [this]() { runFilterDialog(Ps::OpName::BoxBlur); });
 
-    // 滤镜 → 锐化 → 进一步锐化（3×3 线性核；强度 1 即经典「锐化」）
+    // 滤镜 → 模糊 → 模糊 / 进一步模糊（= 盒模糊固定半径，直接应用）
+    ui->actionFilterBlur->setEnabled(true);
+    ui->actionFilterBlur->setToolTip(tr("模糊（盒模糊半径 1，非破坏，直接应用）"));
+    connect(ui->actionFilterBlur, &QAction::triggered, this, [this]() {
+        Ps::FilterNode n(Ps::OpName::BoxBlur);
+        n.setBlurRadius(1);
+        applyFilterNode(n);
+    });
+    ui->actionBlurMore->setEnabled(true);
+    ui->actionBlurMore->setToolTip(tr("进一步模糊（盒模糊半径 2，非破坏，直接应用）"));
+    connect(ui->actionBlurMore, &QAction::triggered, this, [this]() {
+        Ps::FilterNode n(Ps::OpName::BoxBlur);
+        n.setBlurRadius(2);
+        applyFilterNode(n);
+    });
+
+    // 滤镜 → 锐化 → 锐化（强度 1，直接应用）/ 进一步锐化（对话框可调强度）
+    ui->actionFilterSharpen->setEnabled(true);
+    ui->actionFilterSharpen->setToolTip(tr("锐化（3×3 核强度 1，非破坏，直接应用）"));
+    connect(ui->actionFilterSharpen, &QAction::triggered, this, [this]() {
+        Ps::FilterNode n(Ps::OpName::Sharpen);
+        n.setSharpenStrength(1);
+        applyFilterNode(n);
+    });
     ui->actionSharpenMore->setEnabled(true);
-    ui->actionSharpenMore->setToolTip(tr("锐化（3×3 线性核，非破坏，作用于活动像素层）"));
+    ui->actionSharpenMore->setToolTip(tr("进一步锐化（3×3 线性核，可调强度，非破坏）"));
     connect(ui->actionSharpenMore, &QAction::triggered, this,
             [this]() { runFilterDialog(Ps::OpName::Sharpen); });
+    ui->actionSharpenEdges->setEnabled(true);
+    ui->actionSharpenEdges->setToolTip(tr("锐化边缘（Sobel 遮罩 × 锐化，非破坏）"));
+    connect(ui->actionSharpenEdges, &QAction::triggered, this,
+            [this]() { runFilterDialog(Ps::OpName::SharpenEdges); });
 
     // 滤镜 → 模糊 → 高斯模糊（面积算子；三次盒模糊逼近）
     ui->actionGaussianBlur->setEnabled(true);
@@ -277,6 +304,25 @@ void MainWindow::setupMenus()
     ui->actionMedian->setToolTip(tr("中间值 / 中值模糊（非破坏，作用于活动像素层）"));
     connect(ui->actionMedian, &QAction::triggered, this,
             [this]() { runFilterDialog(Ps::OpName::MedianBlur); });
+
+    // 滤镜 → 杂色 → 去斑 / 蒙尘与划痕 / 减少杂色（批次 A）
+    ui->actionDespeckle->setEnabled(true);
+    ui->actionDespeckle->setToolTip(tr("去斑（中值半径 1，非破坏，直接应用）"));
+    connect(ui->actionDespeckle, &QAction::triggered, this, [this]() {
+        Ps::FilterNode n(Ps::OpName::MedianBlur);
+        n.setMedianRadius(1);
+        applyFilterNode(n);
+    });
+    ui->actionDustAndScratches->setEnabled(true);
+    ui->actionDustAndScratches->setToolTip(
+        tr("蒙尘与划痕（Demo：中值，差超阈值才替换；非破坏）"));
+    connect(ui->actionDustAndScratches, &QAction::triggered, this,
+            [this]() { runFilterDialog(Ps::OpName::DustAndScratches); });
+    ui->actionReduceNoise->setEnabled(true);
+    ui->actionReduceNoise->setToolTip(
+        tr("减少杂色（Demo：中值 + 强度混合；非 PS 全功能；非破坏）"));
+    connect(ui->actionReduceNoise, &QAction::triggered, this,
+            [this]() { runFilterDialog(Ps::OpName::ReduceNoise); });
 
     // 滤镜 → 锐化 → USM 锐化（面积算子；复用盒模糊做模糊级）
     ui->actionUnsharpMask->setEnabled(true);
@@ -295,6 +341,12 @@ void MainWindow::setupMenus()
     ui->actionFindEdges->setToolTip(tr("查找边缘（非破坏，作用于活动像素层）"));
     connect(ui->actionFindEdges, &QAction::triggered, this,
             [this]() { applyFilterDirect(Ps::OpName::FindEdges); });
+
+    // 滤镜 → 风格化 → 曝光过度（点算子，直接应用）
+    ui->actionSolarize->setEnabled(true);
+    ui->actionSolarize->setToolTip(tr("曝光过度（高光反相，非破坏，直接应用）"));
+    connect(ui->actionSolarize, &QAction::triggered, this,
+            [this]() { applyFilterDirect(Ps::OpName::Solarize); });
 
     // 滤镜 → 其它 → 位移（**几何算子**：把像素整体搬 (dx,dy)，可选环绕）
     ui->actionOffset->setEnabled(true);
@@ -1649,10 +1701,18 @@ void MainWindow::runFilterDialog(Ps::OpName op)
         return;
     }
 
-    // 默认参数：盒模糊给个能看见效果的半径
+    // 默认参数：让对话框打开即有可见效果
     Ps::FilterNode node(op);
     if (op == Ps::OpName::BoxBlur)
         node.setBlurRadius(5);
+    else if (op == Ps::OpName::DustAndScratches) {
+        node.setMedianRadius(1);
+        node.setThreshold(10);
+    } else if (op == Ps::OpName::ReduceNoise) {
+        node.setMedianRadius(2);
+        node.setReduceNoiseStrength(50);
+    } else if (op == Ps::OpName::SharpenEdges)
+        node.setSharpenStrength(1);
 
     // 先把节点**临时**加到图层（pushUndo=false，不进撤销栈），供对话框实时预览；
     // 确定时才「摘掉临时节点 + 正式加入」——这样一次滤镜操作正好是一条撤销
@@ -1689,6 +1749,11 @@ void MainWindow::runFilterDialog(Ps::OpName op)
 
 void MainWindow::applyFilterDirect(Ps::OpName op)
 {
+    applyFilterNode(Ps::FilterNode(op));
+}
+
+void MainWindow::applyFilterNode(const Ps::FilterNode &node)
+{
     Ps::ImageDocument *doc = m_session ? m_session->document() : nullptr;
     if (!doc)
         return;
@@ -1700,8 +1765,6 @@ void MainWindow::applyFilterDirect(Ps::OpName op)
         return;
     }
 
-    // 无参数滤镜：直接正式加入（一条撤销正好回到加滤镜之前）
-    const Ps::FilterNode node(op);
     if (doc->addLayerFilter(node, /*pushUndo=*/true) < 0)
         flashStatusMessage(tr("无法添加滤镜"));
     else

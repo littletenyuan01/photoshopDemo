@@ -125,6 +125,7 @@ void writeFilterNodeParams(QDataStream &p, const FilterNode &n)
     p << qint32(n.motionDistance()) << qint32(n.motionAngle());
     p << qint32(n.noiseAmount()) << quint8(n.noiseGaussian() ? 1 : 0)
       << quint8(n.noiseMonochromatic() ? 1 : 0) << quint32(n.noiseSeed());
+    p << qint32(n.reduceNoiseStrength());
     // —— 预留：后续新参数追加在此注释之后、勿改已有顺序 ——
 }
 
@@ -171,6 +172,7 @@ bool readFilterNodeParams(QDataStream &p, FilterNode *n)
     quint8 noiseGaussian = 0;
     quint8 noiseMonochromatic = 1;
     quint32 noiseSeed = 0x9E3779B9u;
+    qint32 reduceNoiseStrength = 50;
     p >> brightness >> contrast;
     p >> hue >> saturation >> lightness >> vibrance;
     p >> exposure >> exposureOffset >> gammaCorrection;
@@ -198,6 +200,7 @@ bool readFilterNodeParams(QDataStream &p, FilterNode *n)
     p >> highPassRadius;
     p >> motionDistance >> motionAngle;
     p >> noiseAmount >> noiseGaussian >> noiseMonochromatic >> noiseSeed;
+    p >> reduceNoiseStrength; // 尾部追加；旧 blob 此处为 0（ReduceNoise 新建时由 UI 写默认）
     if (p.status() != QDataStream::Ok)
         return false;
     n->setBrightness(brightness);
@@ -271,6 +274,7 @@ bool readFilterNodeParams(QDataStream &p, FilterNode *n)
     n->setNoiseGaussian(noiseGaussian != 0);
     n->setNoiseMonochromatic(noiseMonochromatic != 0);
     n->setNoiseSeed(noiseSeed);
+    n->setReduceNoiseStrength(int(reduceNoiseStrength));
     return true;
 }
 

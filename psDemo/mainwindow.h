@@ -16,6 +16,7 @@ class QResizeEvent;
 
 namespace Ps {
 class AppSession;
+class FilterNode;
 class ImageDocument;
 }
 
@@ -117,6 +118,8 @@ private slots:
     void runFilterDialog(Ps::OpName op);
     /** 无参数滤镜：直接非破坏地追加到活动像素层（不进对话框）。 */
     void applyFilterDirect(Ps::OpName op);
+    /** 带预设参数直接追加（批次 A：模糊 r=1 等复用项）。 */
+    void applyFilterNode(const Ps::FilterNode &node);
     void onEnsureLayerStyle(int kind);
     void onClearLayerStyles();
     void onCopyLayerStyles();

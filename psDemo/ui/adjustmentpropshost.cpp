@@ -573,6 +573,42 @@ void AdjustmentPropsHost::ensurePages()
         });
         add(Ps::OpName::AddNoise, page);
     }
+    {
+        // 蒙尘与划痕：半径 + 阈值（Demo：中值，差超阈值才替换）
+        auto *page = new QWidget(m_stack);
+        auto *col = new QVBoxLayout(page);
+        col->setContentsMargins(0, 0, 0, 0);
+        const SliderRow radius = makeSliderRow(page, QStringLiteral("半径"), QStringLiteral("dust_radius"), 1, 8);
+        const SliderRow thr = makeSliderRow(page, QStringLiteral("阈值"), QStringLiteral("dust_threshold"), 0, 255);
+        col->addWidget(radius.row);
+        col->addWidget(thr.row);
+        wireSliderSpin(radius.slider, radius.spin, [this](int v) { m_node.setMedianRadius(v); });
+        wireSliderSpin(thr.slider, thr.spin, [this](int v) { m_node.setThreshold(v); });
+        add(Ps::OpName::DustAndScratches, page);
+    }
+    {
+        // 减少杂色：半径 + 强度%（Demo：中值混合）
+        auto *page = new QWidget(m_stack);
+        auto *col = new QVBoxLayout(page);
+        col->setContentsMargins(0, 0, 0, 0);
+        const SliderRow radius = makeSliderRow(page, QStringLiteral("半径"), QStringLiteral("reduce_radius"), 1, 8);
+        const SliderRow str = makeSliderRow(page, QStringLiteral("强度 %"), QStringLiteral("reduce_strength"), 0, 100);
+        col->addWidget(radius.row);
+        col->addWidget(str.row);
+        wireSliderSpin(radius.slider, radius.spin, [this](int v) { m_node.setMedianRadius(v); });
+        wireSliderSpin(str.slider, str.spin, [this](int v) { m_node.setReduceNoiseStrength(v); });
+        add(Ps::OpName::ReduceNoise, page);
+    }
+    {
+        // 锐化边缘：强度（复用锐化强度）
+        auto *page = new QWidget(m_stack);
+        auto *col = new QVBoxLayout(page);
+        col->setContentsMargins(0, 0, 0, 0);
+        const SliderRow strength = makeSliderRow(page, QStringLiteral("强度"), QStringLiteral("sharpen_edges_strength"), 1, 4);
+        col->addWidget(strength.row);
+        wireSliderSpin(strength.slider, strength.spin, [this](int v) { m_node.setSharpenStrength(v); });
+        add(Ps::OpName::SharpenEdges, page);
+    }
 }
 
 void AdjustmentPropsHost::showPageFor(Ps::OpName op)
@@ -732,6 +768,17 @@ void AdjustmentPropsHost::loadControlsFromNode()
             cb->setCurrentIndex(m_node.noiseGaussian() ? 1 : 0);
         if (auto *ck = page->findChild<QCheckBox *>(QStringLiteral("check_noise_mono")))
             ck->setChecked(m_node.noiseMonochromatic());
+        break;
+    case Ps::OpName::DustAndScratches:
+        setPair("slider_dust_radius", "spin_dust_radius", m_node.medianRadius());
+        setPair("slider_dust_threshold", "spin_dust_threshold", m_node.threshold());
+        break;
+    case Ps::OpName::ReduceNoise:
+        setPair("slider_reduce_radius", "spin_reduce_radius", m_node.medianRadius());
+        setPair("slider_reduce_strength", "spin_reduce_strength", m_node.reduceNoiseStrength());
+        break;
+    case Ps::OpName::SharpenEdges:
+        setPair("slider_sharpen_edges_strength", "spin_sharpen_edges_strength", m_node.sharpenStrength());
         break;
     default:
         break;

@@ -39,6 +39,7 @@ int tOffset();
 int tMoreFilters();
 int tHighPassMotion();
 int tNoise();
+int tBatchA();
 
 namespace {
 
@@ -67,6 +68,7 @@ const Case kCases[] = {
     { "morefilters", "最大值/最小值/自定滤镜：语义 oracle、分块投影无接缝、参数往返", tMoreFilters },
     { "hpblur", "高通保留/运动模糊：组合式与一维盒 oracle、分块投影无接缝、往返", tHighPassMotion },
     { "noise", "添加杂色：确定性（同参可复现）、位置稳定（区域==整层裁块）、单色/高斯、往返", tNoise },
+    { "batcha", "滤镜批次 A：曝光过度/蒙尘/减少杂色/锐化边缘 oracle + 分块投影 + 往返", tBatchA },
 };
 
 } // namespace

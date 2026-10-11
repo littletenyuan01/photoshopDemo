@@ -59,6 +59,10 @@ constexpr OpNameInfo kOpNameTable[] = {
     {OpName::HighPass,             "ps:high-pass",             "高通保留"},
     {OpName::MotionBlur,           "ps:motion-blur",           "运动模糊"},
     {OpName::AddNoise,             "ps:add-noise",             "添加杂色"},
+    {OpName::Solarize,             "ps:solarize",              "曝光过度"},
+    {OpName::DustAndScratches,     "ps:dust-and-scratches",    "蒙尘与划痕"},
+    {OpName::ReduceNoise,          "ps:reduce-noise",          "减少杂色"},
+    {OpName::SharpenEdges,         "ps:sharpen-edges",         "锐化边缘"},
 };
 
 const OpNameInfo *infoFor(OpName name)
@@ -106,6 +110,9 @@ bool isAdjustmentOp(OpName name)
     case OpName::HighPass:
     case OpName::MotionBlur:
     case OpName::AddNoise:
+    case OpName::DustAndScratches:
+    case OpName::ReduceNoise:
+    case OpName::SharpenEdges:
         return false;
     default:
         break;
