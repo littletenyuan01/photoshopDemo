@@ -25,7 +25,7 @@
 
 namespace Ps {
 
-/** 位移（几何算子；wrap / 透明两种 abyss）。 */
+/** 位移（移出即丢、空出透明；见 .cpp 顶部「为什么不做环绕」）。 */
 class OffsetFilterOp : public FilterOp
 {
 public:
@@ -35,17 +35,9 @@ public:
     void process(QImage &image, const FilterContext &ctx) override;
     void finish(const FilterContext &ctx) override;
 
-    /**
-     * **几何算子必须整幅求值**：输出像素读的是别处的输入，逐块求值会在块界错位。
-     * `FilterStack` 据此把该栈标记为「含几何算子」，由 `Layer::compositeRasterRegion`
-     * 退化为整层求值一次再裁请求区（与「有样式」走整层缓存同一类取舍）。
-     */
-    static constexpr bool kNeedsWholeImage = true;
-
 private:
     int m_dx = 0;
     int m_dy = 0;
-    bool m_wrap = true;
 };
 
 } // namespace Ps

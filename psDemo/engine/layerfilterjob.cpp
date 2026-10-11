@@ -61,7 +61,7 @@ bool LayerFilterJob::start(ImageDocument *doc, int layerIndex, const QRect &want
         return false;
     // 【位移栈不走条带并行】位移的输入需求是**平移型**（输出区 ∪ 平移后的输出区），
     // 不是「对称外扩」，条带的边界公式（band ± pad）对它不成立 —— 这正是台账 #20 那类
-    // 「公式只在某种调用形态下才对」的坑。非环绕位移本身可以在合成路径上逐块求值
+    // 「公式只在某种调用形态下才对」的坑。位移在合成路径上可以逐块求值
     // （见 `FilterNode::requiredInputs`），所以这里直接拒绝，让调用方退回同步的区域路径。
     if (layer->filters().containsOffset())
         return false;

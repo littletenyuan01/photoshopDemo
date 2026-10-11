@@ -114,8 +114,9 @@ void writeFilterNodeParams(QDataStream &p, const FilterNode &n)
     p << qint32(n.medianRadius());
     p << qint32(n.sharpenStrength());
     p << qint32(n.embossStrength());
-    // 位移（几何算子）：dx/dy/wrap。**只在尾部追加**，勿动已有顺序（本项目 .pslite 兼容口径）。
-    p << qint32(n.offsetDx()) << qint32(n.offsetDy()) << quint8(n.offsetWrap() ? 1 : 0);
+    // 位移：dx/dy + 一个**遗留的环绕位**。该位恒写 0（环绕已移除），但**必须保留**：
+    // 参数块是固定长度的追加式布局，中间抽掉任何字段都会让旧文件的后续字段整体错位。
+    p << qint32(n.offsetDx()) << qint32(n.offsetDy()) << quint8(0);
     p << qint32(n.extremumRadius());
     for (int i = 0; i < 9; ++i)
         p << qint32(n.customWeight(i));
@@ -158,7 +159,7 @@ bool readFilterNodeParams(QDataStream &p, FilterNode *n)
     qint32 embossStrength = 1;
     qint32 offsetDx = 0;
     qint32 offsetDy = 0;
-    quint8 offsetWrap = 1;
+    quint8 offsetWrapLegacy = 0; // 遗留的环绕位：照读以保持后续字段对齐，值忽略（环绕已移除）
     qint32 extremumRadius = 1;
     qint32 customW[9] = {0, 0, 0, 0, 1, 0, 0, 0, 0};
     qint32 customScale = 1;
@@ -189,7 +190,7 @@ bool readFilterNodeParams(QDataStream &p, FilterNode *n)
     p >> medianRadius;
     p >> sharpenStrength;
     p >> embossStrength;
-    p >> offsetDx >> offsetDy >> offsetWrap;
+    p >> offsetDx >> offsetDy >> offsetWrapLegacy;
     p >> extremumRadius;
     for (int i = 0; i < 9; ++i)
         p >> customW[i];
@@ -258,7 +259,6 @@ bool readFilterNodeParams(QDataStream &p, FilterNode *n)
     n->setEmbossStrength(int(embossStrength));
     n->setOffsetDx(int(offsetDx));
     n->setOffsetDy(int(offsetDy));
-    n->setOffsetWrap(offsetWrap != 0);
     n->setExtremumRadius(int(extremumRadius));
     for (int i = 0; i < 9; ++i)
         n->setCustomWeight(i, int(customW[i]));

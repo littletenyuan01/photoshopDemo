@@ -208,16 +208,15 @@ Layer::CompositeRegion Layer::compositeRasterRegion(const QRect &regionDoc) cons
     CompositeRegion out;
 
     // 有启用样式：样式要外扩 halo（投影/描边…），区域化必须带 pad 再裁回。
-    // 有**几何算子**（位移）：它读「别处」的输入，逐块求值会在块界错位。
     // 有**位置相关算子**（添加杂色）：输出依赖像素绝对位置，逐块求值会让噪声在块界错位/重复。
-    // 三者都退回「整层求值一次，再按请求区裁」，见 docs/engine/roi.md §5。
+    // 两者都退回「整层求值一次，再按请求区裁」，见 docs/engine/roi.md §5。
     // 也因此**不**吃下面的区域滤镜缓存（那个是逐块几何）。
-    if (m_styles.hasEnabled() || m_filters.hasGeometryOp() || m_filters.hasPositionalOp()) {
+    if (m_styles.hasEnabled() || m_filters.hasPositionalOp()) {
         // 【异步预览/定稿复用的落点】位置相关算子的后台任务算的就是**整层**，并把它写进
         // 区域滤镜缓存。这里优先复用它 —— 否则会再同步整层重算一遍，等于把刚挪到后台的活
         // 又在 UI 线程上做一次（与台账 #13 是同一类「缓存写给谁看」的问题）。
-        // 只对「纯位置相关」开放：有样式时算的不是同一张图；有几何算子时缓存语义不同。
-        if (!m_styles.hasEnabled() && !m_filters.hasGeometryOp() && m_filters.hasPositionalOp()) {
+        // 只对「纯位置相关」开放：有样式时算的不是同一张图。
+        if (!m_styles.hasEnabled() && m_filters.hasPositionalOp()) {
             const QRect layerDoc(offsetX(), offsetY(), m_tiles.width(), m_tiles.height());
             if (regionFilterCovers(layerDoc)) {
                 // 缓存正好是这一块时**直接隐式共享**（不深拷贝）：8.7 Mpx 层的一次

@@ -44,24 +44,10 @@ bool FilterStack::hasEnabled() const
     return false;
 }
 
-bool FilterStack::hasGeometryOp() const
-{
-    // 「必须整幅求值一次」的几何算子：**只有环绕位移**。
-    // 它是**多矩形**依赖（输出最左边要读输入最右边），单矩形根本表达不了；
-    // 而非环绕位移（现在的默认）的输入需求是**单矩形**（输出区 ∪ 平移后的输出区），
-    // 可以逐块求值 —— 见 FilterNode::requiredInputs。
-    // 判据写成「按算子名 + 看环绕开关」而不是「看 pad」：面积算子也有 pad，但它们可以逐块求值。
-    // 新增几何算子时必须加到这里（否则会被当成可逐块求值 → 块界错位）。
-    for (const FilterNode &n : m_nodes) {
-        if (n.isEnabled() && n.op() == OpName::Offset && n.offsetWrap())
-            return true;
-    }
-    return false;
-}
-
 bool FilterStack::containsOffset() const
 {
-    // 条带并行对位移不适用：位移的需求是**平移型**（不是对称外扩），条带边界公式不成立。
+    // 条带并行对位移不适用：位移的需求是**平移型**（输出区 ∪ 平移后的输出区），
+    // 不是「对称外扩」，条带的边界公式（band ± pad）对它不成立。
     for (const FilterNode &n : m_nodes) {
         if (n.isEnabled() && n.op() == OpName::Offset)
             return true;

@@ -1055,11 +1055,11 @@ void CanvasView::onLayerFilterPreview(int layerIndex, const QRect &regionDoc)
         return;
 
     // 只有**重滤镜**（面积算子 `inputPad()>0`）或**位置相关算子**（添加杂色）值得挪到后台：
-    //  · 纯点滤镜逐像素，可见区也就几毫秒 → 退回同步，异步化只是徒增复杂度；
-    //  · 几何算子（位移）走整层专用路径；有样式的层走整层缓存；调整层有自己的 live 通道。
+    //  · 纯点滤镜逐像素、位移是纯搬运，可见区也就几毫秒 → 退回同步，异步化只是徒增复杂度；
+    //  · 有样式的层走整层缓存；调整层有自己的 live 通道。
     const bool positional = layer->filters().hasPositionalOp();
     const bool heavy = (strongestPadOfLayer(layer) > 0 || positional)
-                       && !layer->filters().hasGeometryOp() && !layer->isAdjustmentLayer()
+                       && !layer->filters().containsOffset() && !layer->isAdjustmentLayer()
                        && !layer->styles().hasEnabled();
 
     // 【位置相关算子必须整层求值】噪声按输入图本地坐标取；只有整层一次求值，
