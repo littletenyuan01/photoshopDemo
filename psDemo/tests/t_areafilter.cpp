@@ -227,6 +227,38 @@ QImage naiveMedian(const QImage &src, int r)
     return out;
 }
 
+/** 朴素 3×3 锐化（逐像素、abyss=透明）——锐化算子的**语义 oracle**。 */
+QImage naiveSharpen(const QImage &src, int s)
+{
+    const int w = src.width();
+    const int h = src.height();
+    QImage out(src.size(), src.format());
+    const int center = 1 + 4 * s;
+    const auto at = [&src, w, h](int x, int y) -> QRgb {
+        if (x < 0 || y < 0 || x >= w || y >= h)
+            return 0u; // abyss = 透明
+        return qUnpremultiply(src.pixel(x, y));
+    };
+    const auto ch = [](QRgb q, int c) -> int {
+        return (c == 0) ? qRed(q) : ((c == 1) ? qGreen(q) : ((c == 2) ? qBlue(q) : qAlpha(q)));
+    };
+    for (int y = 0; y < h; ++y) {
+        for (int x = 0; x < w; ++x) {
+            const QRgb p = at(x, y);
+            const QRgb up = at(x, y - 1), down = at(x, y + 1);
+            const QRgb left = at(x - 1, y), right = at(x + 1, y);
+            int v[4] = {0, 0, 0, 0};
+            for (int c = 0; c < 4; ++c) {
+                v[c] = qBound(0, center * ch(p, c)
+                                     - s * (ch(up, c) + ch(down, c) + ch(left, c) + ch(right, c)),
+                              255);
+            }
+            out.setPixel(x, y, qPremultiply(qRgba(v[0], v[1], v[2], v[3])));
+        }
+    }
+    return out;
+}
+
 /** 全幅合成（整幅一次 compositeRegion）。 */QImage compositeWhole(ImageDocument *doc)
 {
     return Compositor::composite(*doc);
@@ -542,6 +574,56 @@ int tAreaFilter()
                     QStringLiteral("往返保住中值半径 3"));
         } else {
             r.check(false, QStringLiteral("重新打开含中值的 .pslite"));
+        }
+    }
+
+    // —— ⑪ 锐化：语义 oracle（朴素 3×3 卷积）+ 强度差异 + 分块 == 整幅 + 往返 ——
+    {
+        const QImage src = PsTests::makeLayerImage(40, 32, 43, 255);
+        for (int s = 1; s <= 2; ++s) {
+            QImage got = src;
+            FilterNode node(OpName::Sharpen);
+            node.setSharpenStrength(s);
+            FilterEval::applyNode(got, node);
+            const QImage ref = naiveSharpen(src, s);
+            const long long d = PsTests::diffCount(got, ref);
+            r.check(d == 0,
+                    QStringLiteral("锐化 s=%1：与朴素 3×3 卷积一致（diffs=%2）").arg(s).arg(d));
+        }
+        QImage a = src, b = src;
+        FilterNode n1(OpName::Sharpen);
+        n1.setSharpenStrength(1);
+        FilterNode n3(OpName::Sharpen);
+        n3.setSharpenStrength(3);
+        FilterEval::applyNode(a, n1);
+        FilterEval::applyNode(b, n3);
+        r.check(PsTests::diffCount(a, b) > 0, QStringLiteral("锐化强度 1 vs 3 结果不同"));
+
+        const int W = 256, H = 256;
+        auto doc = ImageDocument::createBlank(W, H, Qt::white);
+        doc->placeImageAsLayer(PsTests::makeLayerImage(180, 150, 47, 220),
+                               QStringLiteral("sharpL"));
+        doc->layers().layerAt(1)->setOffset(30, 40);
+        FilterNode snode(OpName::Sharpen);
+        snode.setSharpenStrength(2);
+        doc->layers().layerAt(1)->filters().append(snode);
+        const QImage whole = compositeWhole(doc.get());
+        const QImage chunked = compositeChunked(doc.get());
+        const long long dc = PsTests::diffCount(whole, chunked);
+        r.check(dc == 0,
+                QStringLiteral("像素层锐化：分块投影 == 整幅合成，无跨块接缝（diffs=%1）").arg(dc));
+
+        const QString path = PsTests::tempFilePath(QStringLiteral("sharpen.pslite"));
+        QString err;
+        const bool saved = ProjectIo::save(*doc, path, &err);
+        auto back = saved ? ProjectIo::load(path, &err) : nullptr;
+        if (back && back->layers().count() > 1
+            && back->layers().layerAt(1)->filters().count() > 0) {
+            const FilterNode &n = back->layers().layerAt(1)->filters().at(0);
+            r.check(n.op() == OpName::Sharpen && n.sharpenStrength() == 2,
+                    QStringLiteral("往返保住锐化强度 2"));
+        } else {
+            r.check(false, QStringLiteral("重新打开含锐化的 .pslite"));
         }
     }
 

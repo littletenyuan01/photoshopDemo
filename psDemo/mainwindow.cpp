@@ -260,6 +260,12 @@ void MainWindow::setupMenus()
     connect(ui->actionBoxBlur, &QAction::triggered, this,
             [this]() { runFilterDialog(Ps::OpName::BoxBlur); });
 
+    // 滤镜 → 锐化 → 进一步锐化（3×3 线性核；强度 1 即经典「锐化」）
+    ui->actionSharpenMore->setEnabled(true);
+    ui->actionSharpenMore->setToolTip(tr("锐化（3×3 线性核，非破坏，作用于活动像素层）"));
+    connect(ui->actionSharpenMore, &QAction::triggered, this,
+            [this]() { runFilterDialog(Ps::OpName::Sharpen); });
+
     // 滤镜 → 模糊 → 高斯模糊（面积算子；三次盒模糊逼近）
     ui->actionGaussianBlur->setEnabled(true);
     ui->actionGaussianBlur->setToolTip(tr("高斯模糊（非破坏，作用于活动像素层）"));

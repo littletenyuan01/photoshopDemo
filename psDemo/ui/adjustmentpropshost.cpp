@@ -416,6 +416,16 @@ void AdjustmentPropsHost::ensurePages()
         wireSliderSpin(radius.slider, radius.spin, [this](int v) { m_node.setMedianRadius(v); });
         add(Ps::OpName::MedianBlur, page);
     }
+    {
+        // 锐化（面积算子）：无 .ui，一页一个强度滑块（1..4；1 = 经典锐化）
+        auto *page = new QWidget(m_stack);
+        auto *col = new QVBoxLayout(page);
+        col->setContentsMargins(0, 0, 0, 0);
+        const SliderRow strength = makeSliderRow(page, QStringLiteral("强度"), QStringLiteral("sharpen_strength"), 1, 4);
+        col->addWidget(strength.row);
+        wireSliderSpin(strength.slider, strength.spin, [this](int v) { m_node.setSharpenStrength(v); });
+        add(Ps::OpName::Sharpen, page);
+    }
 }
 
 void AdjustmentPropsHost::showPageFor(Ps::OpName op)
@@ -535,6 +545,9 @@ void AdjustmentPropsHost::loadControlsFromNode()
         break;
     case Ps::OpName::MedianBlur:
         setPair("slider_median_radius", "spin_median_radius", m_node.medianRadius());
+        break;
+    case Ps::OpName::Sharpen:
+        setPair("slider_sharpen_strength", "spin_sharpen_strength", m_node.sharpenStrength());
         break;
     default:
         break;

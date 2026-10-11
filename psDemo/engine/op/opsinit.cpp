@@ -19,6 +19,7 @@
 #include "opregistry.h"
 #include "pointopregistry.h"
 #include "selectfloodop.h"
+#include "sharpenfilterop.h"
 #include "selectpolygonop.h"
 #include "shapefillop.h"
 #include "freetransformop.h"
@@ -116,6 +117,8 @@ void opsInit()
                      [] { return std::unique_ptr<FilterOp>(new GaussianBlurFilterOp); });
     registerFilterOp(OpName::MedianBlur,
                      [] { return std::unique_ptr<FilterOp>(new MedianBlurFilterOp); });
+    registerFilterOp(OpName::Sharpen,
+                     [] { return std::unique_ptr<FilterOp>(new SharpenFilterOp); });
 }
 
 } // namespace Ps

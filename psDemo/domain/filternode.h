@@ -180,10 +180,17 @@ public:
     int medianRadius() const { return m_medianRadius; }
     void setMedianRadius(int v) { m_medianRadius = qBound(1, v, 8); }
 
+    // —— 锐化（面积算子）：3×3 线性核强度（1..4；1 = 经典锐化，更大 ≈ 进一步锐化）——
+    int sharpenStrength() const { return m_sharpenStrength; }
+    void setSharpenStrength(int v) { m_sharpenStrength = qBound(1, v, 4); }
+
     /**
-     * 该算子需要的输入外扩（像素）：点算子 = 0；盒模糊/USM = 半径；查找边缘 = 1（3×3）；
+     * 该算子需要的输入外扩（像素）：点算子 = 0；盒模糊/USM = 半径；查找边缘/锐化 = 1（3×3）；
      * 高斯模糊 = 半径 + 2（**安全上界**：三趟盒模糊半径之和 ≈ 0.98×半径，留 2px 余量，
      * 宁可比需要的外扩多一点，也不要因外扩不足在 64×64 块界留下接缝）；中值 = 半径。
+     *
+     * 注意本机制只能表达**对称**外扩 —— GIMP 的 `gimp:offset` 需要的是「平移后的通用矩形」
+     * （见其 `get_required_for_output`），装不进来，故 offset 暂缓（见 docs/pending-dev.md）。
      */
     int inputPad() const
     {
@@ -198,6 +205,8 @@ public:
             return m_gaussRadius + 2;
         case OpName::MedianBlur:
             return m_medianRadius;
+        case OpName::Sharpen:
+            return 1; // 3×3 线性核
         default:
             return 0;
         }
@@ -251,6 +260,7 @@ private:
     int m_usmThreshold = 0;    ///< 0 = 全像素参与（PS 默认 0）
     int m_gaussRadius = 5;
     int m_medianRadius = 3;
+    int m_sharpenStrength = 1;
 };
 
 } // namespace Ps
