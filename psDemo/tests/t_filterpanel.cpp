@@ -126,13 +126,20 @@ int tFilterPanel()
                 QStringLiteral("空 region → 用可见区提示（区内 %1 / 区外 %2）").arg(inD).arg(outD));
     }
 
-    // —— 没有滤镜时面板隐藏（不占地方）——
+    // —— 可发现性：没有滤镜时**不隐藏**，给一行占位提示（隐藏等于用户不知道有这功能）——
     {
         auto doc2 = ImageDocument::createBlank(W, H, Qt::white);
         doc2->placeImageAsLayer(PsTests::makeLayerImage(W, H, 5, 255), QStringLiteral("L2"));
         FilterStackWidget p2;
         p2.setContext(doc2.get(), 1);
-        r.check(p2.isHidden(), QStringLiteral("无滤镜时面板隐藏"));
+        auto *list2 = p2.findChild<QListWidget *>(QStringLiteral("filterList"));
+        r.check(!p2.isHidden(), QStringLiteral("无滤镜时面板仍显示（不隐藏）"));
+        r.check(list2 && list2->count() == 1
+                    && list2->item(0)->text().contains(QStringLiteral("暂无滤镜")),
+                QStringLiteral("无滤镜时给出占位提示（实际 %1 行）")
+                    .arg(list2 ? list2->count() : -1));
+        auto *edit2 = p2.findChild<QPushButton *>(QStringLiteral("btnFilterEdit"));
+        r.check(edit2 && !edit2->isEnabled(), QStringLiteral("无滤镜时编辑按钮禁用"));
     }
 
     return r.fails;

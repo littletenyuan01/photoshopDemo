@@ -29,9 +29,10 @@ PropertiesPanel::PropertiesPanel(QWidget *parent)
     ui->propertiesBodyLayout->insertWidget(1, m_adjHost);
     m_adjHost->hide();
 
-    // 图层滤镜栈（像素层）：与调整层参数并列在同一个属性面板里（见 filterstackwidget.h 的说明）
+    // 图层滤镜栈（像素层）：与调整层参数并列在同一个属性面板里（见 filterstackwidget.h 的说明）。
+    // 插到**最前面**：放底部需要滚动才能看到 —— 实测「用户找不到」= 功能等于没有。
     m_filterStack = new FilterStackWidget(ui->propertiesScrollBody);
-    ui->propertiesBodyLayout->insertWidget(2, m_filterStack);
+    ui->propertiesBodyLayout->insertWidget(0, m_filterStack);
 
     connect(ui->editAngle, &QLineEdit::editingFinished, this, [this]() {
         bool ok = false;

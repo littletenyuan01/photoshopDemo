@@ -121,19 +121,26 @@ void FilterStackWidget::refresh()
             item->setCheckState(n.isEnabled() ? Qt::Checked : Qt::Unchecked);
             item->setData(Qt::UserRole, i);
         }
-        if (m_list->count() > 0)
+        if (m_list->count() == 0) {
+            // 没有滤镜时**不隐藏**，给一行占位说明：否则用户根本不知道有这个功能
+            auto *hint = new QListWidgetItem(
+                tr("（暂无滤镜：用「滤镜」菜单应用后会出现在这里）"), m_list);
+            hint->setFlags(Qt::NoItemFlags);
+        }
+        if (m_list->count() > 0 && layer->filters().count() > 0)
             m_list->setCurrentRow(0);
     }
     m_block = false;
 
-    const int rows = m_list->count();
-    setVisible(usable && rows > 0);
+    // 只有在没有可用像素层时才隐藏（调整层走上面的参数页）
+    setVisible(usable);
     updateButtons();
 }
 
 void FilterStackWidget::updateButtons()
 {
-    const int rows = m_list->count();
+    Ps::Layer *layer = (m_doc && m_layer >= 0) ? m_doc->layers().layerAt(m_layer) : nullptr;
+    const int rows = layer ? layer->filters().count() : 0;
     const int cur = currentIndex();
     m_editBtn->setEnabled(cur >= 0);
     m_delBtn->setEnabled(cur >= 0);
