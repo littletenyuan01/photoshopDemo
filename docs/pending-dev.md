@@ -559,6 +559,34 @@ sliderReleased → setLayerFilterNode(..., pushUndo=true)
 
 ---
 
+## 面积算子 BoxBlur + ROI 外扩（滤镜库起步）
+
+**背景**：此前所有滤镜/调整都是点算子（ROI 恒等）；`GraphOp::requiredInputs` 的外扩分支设计好了却从没被用过 —— 模糊/锐化/杂色这类「邻域算子」一个都没有。
+
+**落地（首片）**：
+
+- `OpName::BoxBlur` + `FilterNode::blurRadius`（含 `inputPad()`）+ `FilterStack::totalPad()`。
+- `FilterEval::applyBoxBlur`：**直通 alpha** 的可分离盒模糊（两趟滑动窗口），abyss = 透明（层外即透明）。
+- 图路径：`PointFilterOp::requiredInputs` 按 `inputPad()` 外扩、`process` 求值后裁回 `out`（面积算子 `canProcessInPlace()==false`，走常规拷贝路径）。
+- 像素层滤镜（生产路径）：`Layer::compositeRasterRegion` 取「请求区外扩 totalPad」再求值、裁回。
+- `.pslite` 增存 `blurRadius`（仍在 512B 预留块内）。
+
+**验证（常驻用例 `areafilter`，12/12 通过）**：
+
+- 图路径 BoxBlur == 直接 FilterEval（diffs=0）—— ROI 外扩/裁回真走通；
+- **像素层 BoxBlur 分块投影 == 整幅合成（diffs=0）—— 跨 64×64 块无接缝**（面积算子最易错处）；
+- 半径变化改变结果；BoxBlur 非调整层算子（护栏）；往返保住 radius。
+
+**关键结论（为什么先做面积算子而非菜单）**：这是结构上真正缺的一块；且 `compositeRasterRegion` 读的是**层自己的瓦片**、不碰共享投影缓冲，pad 天然无接缝 —— 像素层面积算子这一步是**安全且正确**的。
+
+**仍欠（下一轮）**：
+
+- **调整层 + 面积算子**：调整层滤镜的是「下方合成结果」= 共享投影缓冲，其 ROI 外扩要解决「外扩区可能落在未合成的块上」→ 需要合成器支持**子缓冲/偏移**（在临时区算、只拷回请求区），或按层反向扫描每层 `need_i`。本轮用 `isAdjustmentOp(BoxBlur)==false` 作护栏，避免静默错像素。
+- 更多面积算子：中值、锐化（USM）、Sobel、位移（参考 GIMP `gimpoperationoffset.c`）。
+- abyss 策略固定为「透明」；GEGL 有 CLIP / LOOP / BLACK / WHITE / TRANSPARENT，后续可参数化。
+
+---
+
 ## 未排期：进一步对齐 GIMP 时可按模块补
 
 若要以 GIMP Unified Transform 为齐，建议分轮，不必与上面绑在一起：

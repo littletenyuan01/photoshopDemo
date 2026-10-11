@@ -398,6 +398,81 @@ void applySelectiveColor(QImage &image, const FilterNode &node)
 
 } // namespace
 
+/**
+ * 可分离盒模糊（对照 gegl:box-blur 的两趟滑动窗口）。
+ *
+ * 先转**直通 alpha** 再逐通道卷积，最后乘回预乘 —— 避免在预乘像素上直滤导致
+ * 透明边缘的暗边。abyss = 透明（越界当 0），与「层外即透明」一致。
+ */
+void applyBoxBlur(QImage &image, int radius)
+{
+    if (image.isNull() || radius <= 0)
+        return;
+    const int w = image.width();
+    const int h = image.height();
+    if (w <= 0 || h <= 0)
+        return;
+    const int n = radius * 2 + 1; // 盒宽
+
+    // 1) 预乘 → 直通
+    QImage straight(image.size(), QImage::Format_ARGB32);
+    for (int y = 0; y < h; ++y) {
+        const QRgb *s = reinterpret_cast<const QRgb *>(image.constScanLine(y));
+        QRgb *d = reinterpret_cast<QRgb *>(straight.scanLine(y));
+        for (int x = 0; x < w; ++x)
+            d[x] = qUnpremultiply(s[x]);
+    }
+
+    // 2) 水平趟 → tmp
+    QImage tmp(image.size(), QImage::Format_ARGB32);
+    for (int y = 0; y < h; ++y) {
+        const QRgb *s = reinterpret_cast<const QRgb *>(straight.constScanLine(y));
+        QRgb *d = reinterpret_cast<QRgb *>(tmp.scanLine(y));
+        quint32 r = 0, g = 0, b = 0, a = 0;
+        for (int k = -radius; k <= radius; ++k) {
+            const int x = k;
+            if (x < 0 || x >= w)
+                continue;
+            r += qRed(s[x]); g += qGreen(s[x]); b += qBlue(s[x]); a += qAlpha(s[x]);
+        }
+        for (int x = 0; x < w; ++x) {
+            d[x] = qRgba((r + n / 2) / n, (g + n / 2) / n, (b + n / 2) / n, (a + n / 2) / n);
+            const int add = x + radius + 1;
+            const int del = x - radius;
+            if (add < w) { r += qRed(s[add]); g += qGreen(s[add]); b += qBlue(s[add]); a += qAlpha(s[add]); }
+            if (del >= 0) { r -= qRed(s[del]); g -= qGreen(s[del]); b -= qBlue(s[del]); a -= qAlpha(s[del]); }
+        }
+    }
+
+    // 3) 垂直趟 → straight（复用缓冲）
+    for (int x = 0; x < w; ++x) {
+        quint32 r = 0, g = 0, b = 0, a = 0;
+        for (int k = -radius; k <= radius; ++k) {
+            const int y = k;
+            if (y < 0 || y >= h)
+                continue;
+            const QRgb p = tmp.pixel(x, y);
+            r += qRed(p); g += qGreen(p); b += qBlue(p); a += qAlpha(p);
+        }
+        for (int y = 0; y < h; ++y) {
+            reinterpret_cast<QRgb *>(straight.scanLine(y))[x] =
+                qRgba((r + n / 2) / n, (g + n / 2) / n, (b + n / 2) / n, (a + n / 2) / n);
+            const int add = y + radius + 1;
+            const int del = y - radius;
+            if (add < h) { const QRgb p = tmp.pixel(x, add); r += qRed(p); g += qGreen(p); b += qBlue(p); a += qAlpha(p); }
+            if (del >= 0) { const QRgb p = tmp.pixel(x, del); r -= qRed(p); g -= qGreen(p); b -= qBlue(p); a -= qAlpha(p); }
+        }
+    }
+
+    // 4) 直通 → 预乘写回
+    for (int y = 0; y < h; ++y) {
+        const QRgb *s = reinterpret_cast<const QRgb *>(straight.constScanLine(y));
+        QRgb *d = reinterpret_cast<QRgb *>(image.scanLine(y));
+        for (int x = 0; x < w; ++x)
+            d[x] = qPremultiply(s[x]);
+    }
+}
+
 void applyNode(QImage &image, const FilterNode &node)
 {
     switch (node.op()) {
@@ -450,6 +525,9 @@ void applyNode(QImage &image, const FilterNode &node)
         break;
     case OpName::SelectiveColor:
         applySelectiveColor(image, node);
+        break;
+    case OpName::BoxBlur:
+        applyBoxBlur(image, node.blurRadius());
         break;
     default:
         break;

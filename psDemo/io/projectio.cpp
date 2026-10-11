@@ -108,6 +108,7 @@ void writeFilterNodeParams(QDataStream &p, const FilterNode &n)
     p << qint32(n.selectiveColorTarget())
       << double(n.selectiveCyan()) << double(n.selectiveMagenta())
       << double(n.selectiveYellow()) << double(n.selectiveBlack());
+    p << qint32(n.blurRadius());
     // —— 预留：后续新参数追加在此注释之后、勿改已有顺序 ——
 }
 
@@ -132,6 +133,7 @@ bool readFilterNodeParams(QDataStream &p, FilterNode *n)
     double gradStr = 100.0;
     qint32 selTarget = 0;
     double selC = 0, selM = 0, selY = 0, selK = 0;
+    qint32 blurRadius = 0;
     p >> brightness >> contrast;
     p >> hue >> saturation >> lightness >> vibrance;
     p >> exposure >> exposureOffset >> gammaCorrection;
@@ -145,6 +147,7 @@ bool readFilterNodeParams(QDataStream &p, FilterNode *n)
     p >> mixMono >> lutPreset;
     p >> gradA >> gradB >> gradStr;
     p >> selTarget >> selC >> selM >> selY >> selK;
+    p >> blurRadius;
     if (p.status() != QDataStream::Ok)
         return false;
     n->setBrightness(brightness);
@@ -196,6 +199,7 @@ bool readFilterNodeParams(QDataStream &p, FilterNode *n)
     n->setSelectiveMagenta(selM);
     n->setSelectiveYellow(selY);
     n->setSelectiveBlack(selK);
+    n->setBlurRadius(int(blurRadius));
     return true;
 }
 

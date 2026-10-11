@@ -45,6 +45,7 @@ constexpr OpNameInfo kOpNameTable[] = {
     {OpName::Threshold,            "ps:threshold",             "阈值"},
     {OpName::GradientMap,          "ps:gradient-map",          "渐变映射"},
     {OpName::SelectiveColor,       "ps:selective-color",       "可选颜色"},
+    {OpName::BoxBlur,              "ps:box-blur",              "盒模糊"},
 };
 
 const OpNameInfo *infoFor(OpName name)
@@ -74,6 +75,9 @@ QString opNameTitle(OpName name)
 
 bool isAdjustmentOp(OpName name)
 {
+    // 面积算子暂不作为调整图层（其 ROI 外扩尚未接入共享缓冲合成路径，见 docs/pending-dev）。
+    if (name == OpName::BoxBlur)
+        return false;
     return name >= OpName::BrightnessContrast && name < OpName::Count;
 }
 

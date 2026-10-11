@@ -192,14 +192,24 @@ Layer::CompositeRegion Layer::compositeRasterRegion(const QRect &regionDoc) cons
 
     // 层内坐标的需求区，且必须夹在层范围内（TilePatch::extract 要求 rect 非负）
     const QRect local = regionDoc.translated(-offsetX(), -offsetY());
-    const QRect want = local.intersected(QRect(0, 0, m_tiles.width(), m_tiles.height()));
+    const QRect layerRect(0, 0, m_tiles.width(), m_tiles.height());
+    const QRect want = local.intersected(layerRect);
     if (want.isEmpty())
         return out; // 空图 → 调用方跳过该层
 
-    // 只取这块像素，再对这块跑滤镜链：点滤镜逐像素，与「整层滤镜后裁剪」逐像素等价
-    QImage base = TilePatch::extract(m_tiles, want);
+    // 面积算子要读「请求区外扩 totalPad」的真实像素，再裁回 want：
+    // 只取 want+pad（越出层范围的由 extract 填透明 = 层外即透明的 abyss），
+    // 求值后裁回 want。点滤镜 totalPad()==0 时退化为原路径。
+    const int pad = m_filters.totalPad();
+    const QRect srcWant = want.adjusted(-pad, -pad, pad, pad).intersected(layerRect);
+    QImage base = TilePatch::extract(m_tiles, srcWant);
     if (m_filters.hasEnabled())
         base = m_filters.apply(base);
+    if (srcWant != want) {
+        const int dx = want.left() - srcWant.left();
+        const int dy = want.top() - srcWant.top();
+        base = base.copy(dx, dy, want.width(), want.height());
+    }
 
     out.image = base;
     out.docX = want.left() + offsetX();

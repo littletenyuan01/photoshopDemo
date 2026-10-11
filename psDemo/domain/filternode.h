@@ -160,6 +160,16 @@ public:
     void setSelectiveYellow(qreal v) { m_selY = qBound(-100.0, v, 100.0); }
     void setSelectiveBlack(qreal v) { m_selK = qBound(-100.0, v, 100.0); }
 
+    // —— 盒模糊（面积算子）：半径（像素）——
+    int blurRadius() const { return m_blurRadius; }
+    void setBlurRadius(int v) { m_blurRadius = qBound(0, v, 128); }
+
+    /**
+     * 该算子需要的输入外扩（像素）：点算子 = 0；盒模糊 = 半径。
+     * 面积算子要在「请求区外扩」上取输入，再裁回请求区。
+     */
+    int inputPad() const { return (m_op == OpName::BoxBlur) ? m_blurRadius : 0; }
+
 private:
     OpName m_op = OpName::BrightnessContrast;
     bool m_enabled = true;
@@ -202,6 +212,7 @@ private:
     qreal m_selM = 0.0;
     qreal m_selY = 0.0;
     qreal m_selK = 0.0;
+    int m_blurRadius = 0;
 };
 
 } // namespace Ps

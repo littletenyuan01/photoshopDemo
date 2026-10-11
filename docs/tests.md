@@ -38,6 +38,7 @@ release\psdemo_tests.exe composite regionraster   :: 只跑指定用例
 | `blendparallel` | `blendLayerRangeParallel` 与串行版逐像素一致（移动工具逐帧路径） |
 | `transformlive` | 自由变换 live 投影与提交后合成一致（identity 严格相等 / 缩小 50% 千分之一内） |
 | `dirtybudget` | 带滤镜层上 64×64 脏区重投影的时间上界（区域化前约 280ms → 现在约 2ms） |
+| `areafilter` | 面积算子 `BoxBlur`：图路径 ROI 外扩 == 直接求值；像素层分块 == 整幅（无跨块接缝）；半径/护栏/往返 |
 
 ## 约定
 

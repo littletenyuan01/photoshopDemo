@@ -47,6 +47,7 @@ enum class OpName {
     Threshold,              ///< 阈值
     GradientMap,            ///< 渐变映射（求值后置）
     SelectiveColor,         ///< 可选颜色（求值后置）
+    BoxBlur,                ///< 盒模糊（面积算子；暂仅像素层滤镜，非调整层）
     Count                   ///< 哨兵，勿当作真实算子
 };
 

@@ -38,6 +38,19 @@ public:
     /** 是否存在至少一个已启用节点（合成快速路径用）。 */
     bool hasEnabled() const;
 
+    /**
+     * 所有**已启用**节点的输入外扩之和（面积算子半径之和；点算子为 0）。
+     * 调用方若只想算某矩形，须先取「该矩形外扩 totalPad()」再求值、最后裁回。
+     */
+    int totalPad() const
+    {
+        int p = 0;
+        for (const FilterNode &n : m_nodes)
+            if (n.isEnabled())
+                p += n.inputPad();
+        return p;
+    }
+
     /** 整栈快照 / 替换（对话框确认、属性 undo）。 */
     QVector<FilterNode> snapshot() const { return m_nodes; }
     void replaceAll(const QVector<FilterNode> &nodes) { m_nodes = nodes; }

@@ -169,7 +169,7 @@ virtual QImage read(const QRect &rect) const = 0;
 | 1 | **未接 Projection** | 生产合成仍走 `Compositor::compositeRegion`（命令式循环）；`compositeViaGraph` 是校验/演示路径，未被投影调用 |
 | 2 | **图未持久化复用** | `FilterStack::apply` 与 `compositeViaGraph` 每次都 `build` 新图。**已实测**：只建图不求值（4 节点 + 3 连接）为 **0.0017 ms/次**，故持久化无可测收益、未做；跨帧缓存/脏传播仍未接入真实重投影。线性链上已改为**就地求值**（`GraphOp::canProcessInPlace`），省掉逐节点整图拷贝（3 节点省约 18 ms @2000×1500）。 |
 | 3 | **合成源非稀疏** | 生产合成已改为**按区域**取层栅格（`Layer::compositeRasterRegion`：只 `extract` 请求块 → 只滤那块），稀疏优势在合成路径兑现；但**图路径**的 `LayerRasterSource` 仍用整层 `ensureCompositeRaster()`，且区域化目前只覆盖**纯滤镜层**（有启用样式的层退回整层缓存） |
-| 4 | **无面积/变换算子** | `requiredInputs` 已留外扩点，但目前只有点算子（ROI 恒等）；模糊 / 位移等未做 |
+| 4 | **面积/变换算子** | `requiredInputs` 已真正接上：`PointFilterOp` 按节点 `inputPad()` 外扩 ROI、求值后裁回；首个面积算子 `OpName::BoxBlur` 落地（`FilterEval::applyBoxBlur`，直通 alpha 可分离盒模糊，abyss=透明）。**仍欠**：模糊以外的面积算子（中值/锐化/Sobel/位移…）、**调整层 + 面积算子**（ROI 外扩未接共享缓冲合成路径）、以及变换算子 |
 | 5 | **异步 / 多线程**（原 Stage 4） | **按块并行已做**（在 `Projection::recomposeInvalidChunks`：`QtConcurrent::blockingMap` + 三处线程安全前置，含 `GraphOp::canProcessInPlace` 的独占交接）。注意它是**阻塞式**并行、不是异步；**异步求值 / 可取消求值仍未做**，图内也没有自己的调度器 |
 
 ---

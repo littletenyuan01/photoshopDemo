@@ -101,6 +101,10 @@
 > 【目标】能力对齐 GEGL 的 ROI / 异步 / 多线程图求值；**仍不捆绑 GEGL 库**。  
 > 【前置】Phase 7 脏区 + Phase 8 节点栈；`OpRunner` 须先可线程安全（见 `docs/engine/operators.md` §7）。
 
+> **进度同步（2026-11）**：9.0 的图引擎骨架（`engine/graph/`）、ROI 反向传播、节点缓存/脏传播、
+> 滤镜链就地求值、层复合栅格区域化、分块并行合成、逐像素快路径**均已落地**（提交 `7ef1cbf`、`36c1ea9`、`ddeb741`、`cbedaa3`、`5737ba0`）。
+> 首个**面积算子 `OpName::BoxBlur` + ROI 外扩**也已打通（图路径 `requiredInputs` 外扩 / 像素层滤镜 pad+裁回，提交见本轮）；**仍未做**：`FilterEval→OpRunner` 统一入口、节点缓存参数指纹、异步/可取消、图内调度器、`OpRunner` 线程协议、滤镜产品面，以及**调整层 + 面积算子**（其 ROI 外扩尚未接入共享缓冲合成路径，见 `docs/pending-dev.md`）。
+
 ### 9.0 现有雏形（已实现，改造起点）
 
 | GEGL 概念 | 本项目现状 | 缺口 |
