@@ -2,10 +2,12 @@
  * t_offset.cpp — 位移（几何算子）：语义 oracle + **分块投影 == 整幅** + 全幅求值护栏。
  *
  * 守的契约（见 engine/op/offsetfilterop.h 与 docs/engine/roi.md §5）：
- *  ① wrap（默认）：`out(x,y) = in((x-dx) mod w, (y-dy) mod h)`，与朴素取模逐像素一致；
- *  ② 非 wrap：移出即丢、空出透明，与朴素实现逐像素一致；
- *  ③ **分块投影 == 整幅合成**（diffs=0）—— 这是几何算子最要紧的护栏：它必须整幅求值，
- *     否则会在 64×64 块界错位（这正是本项目给几何算子单开一条整层路径的原因）；
+ *  ① **非环绕（默认）**：移出即丢、空出透明，与朴素实现逐像素一致；
+ *  ② 环绕（可选，对标 GIMP 默认）：`out(x,y) = in((x-dx) mod w, (y-dy) mod h)`，与朴素取模一致；
+ *  ③ **分块投影 == 整幅合成**（diffs=0）—— 最要紧的护栏：
+ *     · 非环绕：输入需求是**单矩形**（输出区 ∪ 平移后的输出区）→ 走逐块路径，
+ *       若需求算错就会在 64×64 块界错位；
+ *     · 环绕：多矩形依赖 → 必须整幅求值（`hasGeometryOp()` 送整层路径）；
  *  ④ dx=dy=0 → 不改变画面；⑤ 存读往返保住 dx/dy/wrap。
  */
 #include "domain/filternode.h"
@@ -126,16 +128,29 @@ int tOffset()
         FilterNode node(OpName::Offset);
         node.setOffsetDx(37); // 刻意非 64 的整数倍，跨块界
         node.setOffsetDy(-21);
-        node.setOffsetWrap(true);
+        node.setOffsetWrap(false); // **默认档**：单矩形需求 → 逐块求值（最容易在块界出错的那条路）
         layer->filters().append(node);
         layer->invalidateCompositeRaster();
-        r.check(layer->filters().hasGeometryOp(),
-                QStringLiteral("滤镜栈被识别为「含几何算子」"));
+        r.check(!layer->filters().hasGeometryOp(),
+                QStringLiteral("非环绕位移不被判为「必须整幅求值」（它的需求是单矩形）"));
+        r.check(layer->filters().containsOffset(),
+                QStringLiteral("但它仍被认作「含位移」（条带并行不适用）"));
 
         const QImage whole = Compositor::composite(*doc);
         const QImage chunked = chunkedProjection(doc.get());
         const long long dc = PsTests::diffCount(whole, chunked);
-        r.check(dc == 0, QStringLiteral("位移：分块投影 == 整幅合成，无块界错位（diffs=%1）").arg(dc));
+        r.check(dc == 0,
+                QStringLiteral("非环绕位移：分块投影 == 整幅合成，无块界错位（diffs=%1）").arg(dc));
+
+        // 再验一次**环绕**档（走整层专用路径），两档都要无块界错位
+        layer->filters().at(0).setOffsetWrap(true);
+        layer->invalidateCompositeRaster();
+        r.check(layer->filters().hasGeometryOp(),
+                QStringLiteral("环绕位移被判为「必须整幅求值」（多矩形依赖）"));
+        const long long dcw = PsTests::diffCount(Compositor::composite(*doc),
+                                                 chunkedProjection(doc.get()));
+        r.check(dcw == 0, QStringLiteral("环绕位移：分块投影 == 整幅合成（diffs=%1）").arg(dcw));
+        layer->filters().at(0).setOffsetWrap(false);
 
         // 位移确实改变了画面（否则上面那条可能是「两边都没动」的假通过）
         auto plain = ImageDocument::createBlank(W, H, Qt::white);
@@ -144,6 +159,26 @@ int tOffset()
         const QImage before = Compositor::composite(*plain);
         r.check(PsTests::diffCount(before, whole) > 0,
                 QStringLiteral("位移确实改变了画面（diffs=%1）").arg(PsTests::diffCount(before, whole)));
+
+        // —— ⑥ 输入需求的形状（逐块路径全靠它；写错就是块界错位） ——
+        {
+            FilterNode o(OpName::Offset);
+            o.setOffsetDx(10);
+            o.setOffsetDy(-6);
+            const QRect want(100, 100, 64, 64);
+            // want = (100,100,64,64)；dx=10 → x 并上 [90,153]；dy=-6 → y 并上 [106,169]
+            r.check(o.requiredInputs(want) == QRect(90, 100, 74, 70),
+                    QStringLiteral("非环绕：需求 = 输出区 ∪ 平移后的输出区，仍是单矩形"
+                                   "（实际 %1,%2 %3×%4）")
+                        .arg(o.requiredInputs(want).left()).arg(o.requiredInputs(want).top())
+                        .arg(o.requiredInputs(want).width())
+                        .arg(o.requiredInputs(want).height()));
+            o.setOffsetWrap(true);
+            r.check(o.requiredInputs(want) == want,
+                    QStringLiteral("环绕：不给需求（走整层路径，用不到）"));
+            FilterNode def(OpName::Offset);
+            r.check(!def.offsetWrap(), QStringLiteral("位移的**默认**是不环绕（层外透明）"));
+        }
 
         // —— ⑤ 存读往返 ——
         const QString path = PsTests::tempFilePath(QStringLiteral("offset.pslite"));
@@ -154,7 +189,7 @@ int tOffset()
             && back->layers().layerAt(1)->filters().count() > 0) {
             const FilterNode &n = back->layers().layerAt(1)->filters().at(0);
             r.check(n.op() == OpName::Offset && n.offsetDx() == 37 && n.offsetDy() == -21
-                        && n.offsetWrap(),
+                        && !n.offsetWrap(),
                     QStringLiteral("往返保住位移 dx/dy/wrap（实际 %1,%2 wrap=%3）")
                         .arg(n.offsetDx()).arg(n.offsetDy()).arg(n.offsetWrap() ? 1 : 0));
         } else {

@@ -59,6 +59,12 @@ bool LayerFilterJob::start(ImageDocument *doc, int layerIndex, const QRect &want
     // 故异步定稿对它没有意义（见 layer.cpp 的注释）。
     if (layer->styles().hasEnabled() || !layer->filters().hasEnabled())
         return false;
+    // 【位移栈不走条带并行】位移的输入需求是**平移型**（输出区 ∪ 平移后的输出区），
+    // 不是「对称外扩」，条带的边界公式（band ± pad）对它不成立 —— 这正是台账 #20 那类
+    // 「公式只在某种调用形态下才对」的坑。非环绕位移本身可以在合成路径上逐块求值
+    // （见 `FilterNode::requiredInputs`），所以这里直接拒绝，让调用方退回同步的区域路径。
+    if (layer->filters().containsOffset())
+        return false;
 
     // 接替在途任务（若有）：先让旧任务尽早上路，再接管「谁说话算数」。
     // 【为什么允许接替】见头文件：同一改动会连续触发两次 contentChanged，

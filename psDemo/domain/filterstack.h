@@ -75,6 +75,9 @@ public:
      */
     bool hasGeometryOp() const;
 
+    /** 栈里是否有任何已启用的**位移**（含非环绕）。条带并行对它不适用（见 `LayerFilterJob`）。 */
+    bool containsOffset() const;
+
     /**
      * 栈里是否有**位置相关算子**（当前只有「添加杂色」）。
      *

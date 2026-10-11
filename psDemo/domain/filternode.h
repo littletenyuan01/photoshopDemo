@@ -245,8 +245,8 @@ public:
      * 【默认实现】对称外扩 `inputPad()` —— 与旧行为**逐像素一致**，所以七个面积算子的调用方
      * 观感不变（只做 ② 时全套测试必须保持绿，这是本步的验收标准）。
      *
-     * 【几何算子（位移）】它的输入需求是「整层」，单矩形根本表达不了 —— 由 `hasGeometryOp()`
-     * 走整层专用路径，这里返回 output 即可（那条路径不会用到本函数）。
+     * 【位移】分两种情况：**环绕**的输入需求是「整层」（多矩形，单矩形表达不了）→ 由
+     * `hasGeometryOp()` 送整层专用路径；**非环绕**（默认）是单矩形 → 正常逐块求值。
      */
     QRect requiredInputs(const QRect &output) const
     {
@@ -260,6 +260,16 @@ public:
             default:
                 return output.adjusted(-d, -d, d, d); // 45°：两向都要
             }
+        }
+        if (op() == OpName::Offset) {
+            // 环绕：输入需求是「整层」—— 它是**多矩形**依赖（输出最左边要读输入最右边），
+            // 单矩形表达不了。由 `hasGeometryOp()` 送去整层专用路径，这里返回 output（用不到）。
+            if (m_offsetWrap)
+                return output;
+            // 非环绕（**默认**）：取图窗口取「输出区 ∪ 平移后的输出区」——**仍是一个矩形**，
+            // 因此可以逐块求值。算子照旧做 (dx,dy) 平移，调用方再按 `want − srcWant` 裁回，
+            // 两步合起来正好等于「从平移后的位置取像素」；越界部分由 extract 填透明 = 层外透明。
+            return output.united(output.translated(-m_offsetDx, -m_offsetDy));
         }
         const int p = inputPad();
         return (p > 0) ? output.adjusted(-p, -p, p, p) : output;
@@ -387,7 +397,8 @@ private:
     int m_embossStrength = 1;
     int m_offsetDx = 0;
     int m_offsetDy = 0;
-    bool m_offsetWrap = true;
+    bool m_offsetWrap = false; ///< 默认**不**环绕（= 层外透明，与 PS「位移」的默认取向一致，
+                               ///< 且非环绕的输入需求是单矩形 → 能逐块求值；环绕要多矩形 → 走整层）
     int m_extremumRadius = 1;
     int m_customW[9] = {0, 0, 0, 0, 1, 0, 0, 0, 0}; ///< 默认恒等（中心 1）
     int m_customScale = 1;
