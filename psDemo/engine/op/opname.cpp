@@ -56,6 +56,8 @@ constexpr OpNameInfo kOpNameTable[] = {
     {OpName::Maximum,              "ps:maximum",               "最大值"},
     {OpName::Minimum,              "ps:minimum",               "最小值"},
     {OpName::CustomFilter,         "ps:custom-filter",         "自定"},
+    {OpName::HighPass,             "ps:high-pass",             "高通保留"},
+    {OpName::MotionBlur,           "ps:motion-blur",           "运动模糊"},
 };
 
 const OpNameInfo *infoFor(OpName name)
@@ -100,6 +102,8 @@ bool isAdjustmentOp(OpName name)
     case OpName::Maximum:
     case OpName::Minimum:
     case OpName::CustomFilter:
+    case OpName::HighPass:
+    case OpName::MotionBlur:
         return false;
     default:
         break;

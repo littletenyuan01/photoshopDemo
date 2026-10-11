@@ -318,6 +318,18 @@ void MainWindow::setupMenus()
     connect(ui->actionCustomFilter, &QAction::triggered, this,
             [this]() { runFilterDialog(Ps::OpName::CustomFilter); });
 
+    // 滤镜 → 其它 → 高通保留（src - 盒模糊 + 128；复用盒模糊做模糊级）
+    ui->actionHighPass->setEnabled(true);
+    ui->actionHighPass->setToolTip(tr("高通保留（保留边缘、平坦区呈中灰；非破坏）"));
+    connect(ui->actionHighPass, &QAction::triggered, this,
+            [this]() { runFilterDialog(Ps::OpName::HighPass); });
+
+    // 滤镜 → 模糊 → 动感模糊（一维盒模糊，0°/45°/90°）
+    ui->actionMotionBlur->setEnabled(true);
+    ui->actionMotionBlur->setToolTip(tr("动感模糊（距离 + 0°/45°/90°；非破坏）"));
+    connect(ui->actionMotionBlur, &QAction::triggered, this,
+            [this]() { runFilterDialog(Ps::OpName::MotionBlur); });
+
     // —— 图层→新建调整图层→亮度/对比度（PS 式：作用于下方合成）——
     ui->actionNewAdjBrightness->setEnabled(true);
     ui->actionNewAdjBrightness->setToolTip(

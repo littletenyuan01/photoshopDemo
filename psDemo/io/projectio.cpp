@@ -120,6 +120,8 @@ void writeFilterNodeParams(QDataStream &p, const FilterNode &n)
     for (int i = 0; i < 9; ++i)
         p << qint32(n.customWeight(i));
     p << qint32(n.customScale()) << qint32(n.customOffset());
+    p << qint32(n.highPassRadius());
+    p << qint32(n.motionDistance()) << qint32(n.motionAngle());
     // —— 预留：后续新参数追加在此注释之后、勿改已有顺序 ——
 }
 
@@ -159,6 +161,9 @@ bool readFilterNodeParams(QDataStream &p, FilterNode *n)
     qint32 customW[9] = {0, 0, 0, 0, 1, 0, 0, 0, 0};
     qint32 customScale = 1;
     qint32 customOffset = 0;
+    qint32 highPassRadius = 5;
+    qint32 motionDistance = 10;
+    qint32 motionAngle = 0;
     p >> brightness >> contrast;
     p >> hue >> saturation >> lightness >> vibrance;
     p >> exposure >> exposureOffset >> gammaCorrection;
@@ -183,6 +188,8 @@ bool readFilterNodeParams(QDataStream &p, FilterNode *n)
     for (int i = 0; i < 9; ++i)
         p >> customW[i];
     p >> customScale >> customOffset;
+    p >> highPassRadius;
+    p >> motionDistance >> motionAngle;
     if (p.status() != QDataStream::Ok)
         return false;
     n->setBrightness(brightness);
@@ -250,6 +257,9 @@ bool readFilterNodeParams(QDataStream &p, FilterNode *n)
         n->setCustomWeight(i, int(customW[i]));
     n->setCustomScale(int(customScale));
     n->setCustomOffset(int(customOffset));
+    n->setHighPassRadius(int(highPassRadius));
+    n->setMotionDistance(int(motionDistance));
+    n->setMotionAngle(int(motionAngle));
     return true;
 }
 

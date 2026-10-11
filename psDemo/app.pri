@@ -47,6 +47,8 @@ SOURCES += \
     engine/op/offsetfilterop.cpp \
     engine/op/extremumfilterop.cpp \
     engine/op/customfilterop.cpp \
+    engine/op/highpassfilterop.cpp \
+    engine/op/motionblurfilterop.cpp \
     engine/op/sharpenfilterop.cpp \
     engine/op/unsharpmaskfilterop.cpp \
     engine/op/floodfillop.cpp \
@@ -165,6 +167,8 @@ HEADERS += \
     engine/op/offsetfilterop.h \
     engine/op/extremumfilterop.h \
     engine/op/customfilterop.h \
+    engine/op/highpassfilterop.h \
+    engine/op/motionblurfilterop.h \
     engine/op/sharpenfilterop.h \
     engine/op/unsharpmaskfilterop.h \
     engine/op/floodfillop.h \

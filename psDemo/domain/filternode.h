@@ -209,6 +209,16 @@ public:
     int customOffset() const { return m_customOffset; }
     void setCustomOffset(int v) { m_customOffset = qBound(-255, v, 255); }
 
+    // —— 高通保留：半径（1..64；src - 盒模糊 + 128）——
+    int highPassRadius() const { return m_highPassRadius; }
+    void setHighPassRadius(int v) { m_highPassRadius = qBound(1, v, 64); }
+
+    // —— 运动模糊：距离（1..128）+ 角度（0 / 45 / 90，一维盒模糊方向）——
+    int motionDistance() const { return m_motionDistance; }
+    void setMotionDistance(int v) { m_motionDistance = qBound(1, v, 128); }
+    int motionAngle() const { return m_motionAngle; }
+    void setMotionAngle(int v) { m_motionAngle = (v == 45 || v == 90) ? v : 0; }
+
     /**
      * 该算子需要的输入外扩（像素）：点算子 = 0；盒模糊/USM = 半径；查找边缘/锐化/浮雕 = 1（3×3）；
      * 高斯模糊 = 半径 + 2（**安全上界**：三趟盒模糊半径之和 ≈ 0.98×半径，留 2px 余量，
@@ -238,6 +248,10 @@ public:
             return m_extremumRadius;
         case OpName::CustomFilter:
             return 1; // 3×3 卷积核
+        case OpName::HighPass:
+            return m_highPassRadius;
+        case OpName::MotionBlur:
+            return m_motionDistance; // 保守：45° 也按距离外扩（对称外扩是安全上界）
         default:
             return 0;
         }
@@ -300,6 +314,9 @@ private:
     int m_customW[9] = {0, 0, 0, 0, 1, 0, 0, 0, 0}; ///< 默认恒等（中心 1）
     int m_customScale = 1;
     int m_customOffset = 0;
+    int m_highPassRadius = 5;
+    int m_motionDistance = 10;
+    int m_motionAngle = 0;
 };
 
 } // namespace Ps

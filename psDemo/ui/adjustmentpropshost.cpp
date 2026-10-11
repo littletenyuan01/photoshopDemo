@@ -508,6 +508,43 @@ void AdjustmentPropsHost::ensurePages()
         wireSliderSpin(off.slider, off.spin, [this](int v) { m_node.setCustomOffset(v); });
         add(Ps::OpName::CustomFilter, page);
     }
+    {
+        // 高通保留：一页一个半径滑块（1..64；模糊级复用盒模糊）
+        auto *page = new QWidget(m_stack);
+        auto *col = new QVBoxLayout(page);
+        col->setContentsMargins(0, 0, 0, 0);
+        const SliderRow radius = makeSliderRow(page, QStringLiteral("半径"), QStringLiteral("highpass_radius"), 1, 64);
+        col->addWidget(radius.row);
+        wireSliderSpin(radius.slider, radius.spin, [this](int v) { m_node.setHighPassRadius(v); });
+        add(Ps::OpName::HighPass, page);
+    }
+    {
+        // 运动模糊：距离滑块（1..128）+ 角度下拉（0°/45°/90°）
+        auto *page = new QWidget(m_stack);
+        auto *col = new QVBoxLayout(page);
+        col->setContentsMargins(0, 0, 0, 0);
+        const SliderRow dist = makeSliderRow(page, QStringLiteral("距离"), QStringLiteral("motion_distance"), 1, 128);
+        col->addWidget(dist.row);
+        wireSliderSpin(dist.slider, dist.spin, [this](int v) { m_node.setMotionDistance(v); });
+        auto *row = new QWidget(page);
+        auto *rowLay = new QHBoxLayout(row);
+        rowLay->setContentsMargins(0, 0, 0, 0);
+        rowLay->addWidget(new QLabel(QStringLiteral("角度"), row));
+        auto *combo = new QComboBox(row);
+        combo->setObjectName(QStringLiteral("combo_motion_angle"));
+        combo->addItem(QStringLiteral("水平 0°"), 0);
+        combo->addItem(QStringLiteral("斜向 45°"), 45);
+        combo->addItem(QStringLiteral("垂直 90°"), 90);
+        rowLay->addWidget(combo, 1);
+        col->addWidget(row);
+        connect(combo, qOverload<int>(&QComboBox::currentIndexChanged), this, [this, combo](int) {
+            if (m_block)
+                return;
+            m_node.setMotionAngle(combo->currentData().toInt());
+            emitPreview();
+        });
+        add(Ps::OpName::MotionBlur, page);
+    }
 }
 
 void AdjustmentPropsHost::showPageFor(Ps::OpName op)
@@ -652,6 +689,16 @@ void AdjustmentPropsHost::loadControlsFromNode()
         }
         setPair("slider_custom_scale", "spin_custom_scale", m_node.customScale());
         setPair("slider_custom_offset", "spin_custom_offset", m_node.customOffset());
+        break;
+    case Ps::OpName::HighPass:
+        setPair("slider_highpass_radius", "spin_highpass_radius", m_node.highPassRadius());
+        break;
+    case Ps::OpName::MotionBlur:
+        setPair("slider_motion_distance", "spin_motion_distance", m_node.motionDistance());
+        if (auto *cb = page->findChild<QComboBox *>(QStringLiteral("combo_motion_angle"))) {
+            const int idx = cb->findData(m_node.motionAngle());
+            cb->setCurrentIndex(idx >= 0 ? idx : 0);
+        }
         break;
     default:
         break;

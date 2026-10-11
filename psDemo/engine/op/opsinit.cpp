@@ -13,10 +13,12 @@
 #include "findedgesfilterop.h"
 #include "floodfillop.h"
 #include "gaussianblurfilterop.h"
+#include "highpassfilterop.h"
 #include "focusdabop.h"
 #include "gradientop.h"
 #include "layermodeop.h"
 #include "medianblurfilterop.h"
+#include "motionblurfilterop.h"
 #include "offsetfilterop.h"
 #include "opname.h"
 #include "oppad.h"
@@ -140,6 +142,11 @@ void opsInit()
     // 自定滤镜（3×3 卷积核）：验证「算子参数带数组」的路径
     registerFilterOp(OpName::CustomFilter,
                      [] { return std::unique_ptr<FilterOp>(new CustomFilterOp); });
+    // 高通保留（复用盒模糊做模糊级）+ 运动模糊（一维盒模糊）
+    registerFilterOp(OpName::HighPass,
+                     [] { return std::unique_ptr<FilterOp>(new HighPassFilterOp); });
+    registerFilterOp(OpName::MotionBlur,
+                     [] { return std::unique_ptr<FilterOp>(new MotionBlurFilterOp); });
 }
 
 } // namespace Ps

@@ -38,7 +38,8 @@ SOURCES += \
     tests/t_filterasync.cpp \
     tests/t_roi.cpp \
     tests/t_offset.cpp \
-    tests/t_morefilters.cpp
+    tests/t_morefilters.cpp \
+    tests/t_hpblur.cpp
 
 HEADERS += \
     tests/testutil.h

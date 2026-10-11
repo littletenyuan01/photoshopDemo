@@ -25,9 +25,9 @@ release\psdemo_tests.exe composite regionraster   :: 只跑指定用例
 
 ## 用例
 
-> 当前 **18 个用例**：`pixelprim / filterchain / regionraster / composite / graphcheck / projectio /
+> 当前 **19 个用例**：`pixelprim / filterchain / regionraster / composite / graphcheck / projectio /
 > adjustpanel / adjustapply / blendparallel / transformlive / dirtybudget / areafilter /
-> filterundo / filterpanel / filterasync / roictx / offset / morefilters`。
+> filterundo / filterpanel / filterasync / roictx / offset / morefilters / hpblur`。
 
 | 名字 | 守住什么 |
 |---|---|
@@ -49,6 +49,7 @@ release\psdemo_tests.exe composite regionraster   :: 只跑指定用例
 | `roictx` | ROI 第①步：用**测试探针**钉住两条求值路径的几何真值（直接/图路径 = 整张图；像素层路径 = 文档坐标下的「所需输入区/请求区」换算成本地坐标）；几何如实描述手里那张图；**带几何 + 裁回 == 不带几何求值后裁回**（逐像素） |
 | `offset` | 位移（**几何算子**）：wrap / 透明各 7 组参数 == **朴素取模 oracle**；dx=dy=0 不改画面；**分块投影 == 整幅合成**（几何算子若被逐块求值必在块界错位，这是最要紧的护栏）；栈被识别为「含几何算子」；往返保住 dx/dy/wrap |
 | `morefilters` | 最大值/最小值 == 朴素极值 oracle、自定 == 朴素 3×3 卷积（含 scale=0）；三者**分块投影 == 整幅**（无块界接缝）；参数往返保真 |
+| `hpblur` | 高通 == `clamp(src - 盒模糊 + 128)`（用生产盒模糊做参照）；运动模糊 0°/45°/90° == 朴素一维盒；两者**分块投影 == 整幅**；参数往返保真 |
 
 ## 约定
 
