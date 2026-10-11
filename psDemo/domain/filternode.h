@@ -219,6 +219,21 @@ public:
     int motionAngle() const { return m_motionAngle; }
     void setMotionAngle(int v) { m_motionAngle = (v == 45 || v == 90) ? v : 0; }
 
+    // —— 添加杂色：数量（0..100 %）+ 分布（均匀/高斯）+ 单色 + 种子 ——
+    int noiseAmount() const { return m_noiseAmount; }
+    void setNoiseAmount(int v) { m_noiseAmount = qBound(0, v, 100); }
+    bool noiseGaussian() const { return m_noiseGaussian; }
+    void setNoiseGaussian(bool on) { m_noiseGaussian = on; }
+    bool noiseMonochromatic() const { return m_noiseMonochromatic; }
+    void setNoiseMonochromatic(bool on) { m_noiseMonochromatic = on; }
+    /**
+     * 噪声种子。**必须持久化且不进「随机每次不同」的路径**：噪声被当作
+     * `(x, y, seed, 通道)` 的确定函数（见 `engine/filtereval.cpp` 的 `applyAddNoise`），
+     * 这样预览/定稿/撤销/重开文件都会得到**同一张**噪声图，不需要保存噪声位图。
+     */
+    quint32 noiseSeed() const { return m_noiseSeed; }
+    void setNoiseSeed(quint32 v) { m_noiseSeed = v; }
+
     /**
      * **预览降采样**用：返回一份「空间类参数按 @p divisor 缩小」的副本。
      *
@@ -349,6 +364,10 @@ private:
     int m_highPassRadius = 5;
     int m_motionDistance = 10;
     int m_motionAngle = 0;
+    int m_noiseAmount = 12;
+    bool m_noiseGaussian = false;
+    bool m_noiseMonochromatic = true;
+    quint32 m_noiseSeed = 0x9E3779B9u; ///< 固定默认：同参数 → 同噪声（见 noiseSeed() 注释）
 };
 
 } // namespace Ps

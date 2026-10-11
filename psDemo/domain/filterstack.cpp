@@ -56,6 +56,17 @@ bool FilterStack::hasGeometryOp() const
     return false;
 }
 
+bool FilterStack::hasPositionalOp() const
+{
+    // 目前唯一的位置相关算子是「添加杂色」：输出依赖像素的**绝对位置**（噪声是位置的函数）。
+    // 与 hasGeometryOp 一样按算子点名（不看 pad —— 它 pad 就是 0），新增时必须加到这里。
+    for (const FilterNode &n : m_nodes) {
+        if (n.isEnabled() && n.op() == OpName::AddNoise)
+            return true;
+    }
+    return false;
+}
+
 /** 对 source 拷贝自底向顶应用已启用节点；无启用节点时原样返回。 */
 QImage FilterStack::apply(const QImage &source) const
 {

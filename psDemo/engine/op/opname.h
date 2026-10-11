@@ -70,6 +70,7 @@ enum class OpName {
     CustomFilter,           ///< 自定（3×3 卷积核 + 缩放/位移；一个算子顶多个）
     HighPass,               ///< 高通保留（src - 盒模糊 + 128，保留边缘）
     MotionBlur,             ///< 运动模糊（一维盒模糊沿 0°/45°/90°）
+    AddNoise,               ///< 添加杂色（点算子；噪声是 (x,y,seed) 的确定函数，须整层求值）
     Count                   ///< 哨兵，勿当作真实算子
 };
 

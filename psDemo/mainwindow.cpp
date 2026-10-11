@@ -330,6 +330,12 @@ void MainWindow::setupMenus()
     connect(ui->actionMotionBlur, &QAction::triggered, this,
             [this]() { runFilterDialog(Ps::OpName::MotionBlur); });
 
+    // 滤镜 → 杂色 → 添加杂色（点算子；噪声是 (x,y,seed) 的确定函数，故整层求值）
+    ui->actionAddNoise->setEnabled(true);
+    ui->actionAddNoise->setToolTip(tr("添加杂色（数量 + 均匀/高斯 + 单色；非破坏，噪声可复现）"));
+    connect(ui->actionAddNoise, &QAction::triggered, this,
+            [this]() { runFilterDialog(Ps::OpName::AddNoise); });
+
     // —— 图层→新建调整图层→亮度/对比度（PS 式：作用于下方合成）——
     ui->actionNewAdjBrightness->setEnabled(true);
     ui->actionNewAdjBrightness->setToolTip(

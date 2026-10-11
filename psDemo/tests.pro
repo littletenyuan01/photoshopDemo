@@ -39,7 +39,8 @@ SOURCES += \
     tests/t_roi.cpp \
     tests/t_offset.cpp \
     tests/t_morefilters.cpp \
-    tests/t_hpblur.cpp
+    tests/t_hpblur.cpp \
+    tests/t_noise.cpp
 
 HEADERS += \
     tests/testutil.h

@@ -122,6 +122,8 @@ void writeFilterNodeParams(QDataStream &p, const FilterNode &n)
     p << qint32(n.customScale()) << qint32(n.customOffset());
     p << qint32(n.highPassRadius());
     p << qint32(n.motionDistance()) << qint32(n.motionAngle());
+    p << qint32(n.noiseAmount()) << quint8(n.noiseGaussian() ? 1 : 0)
+      << quint8(n.noiseMonochromatic() ? 1 : 0) << quint32(n.noiseSeed());
     // —— 预留：后续新参数追加在此注释之后、勿改已有顺序 ——
 }
 
@@ -164,6 +166,10 @@ bool readFilterNodeParams(QDataStream &p, FilterNode *n)
     qint32 highPassRadius = 5;
     qint32 motionDistance = 10;
     qint32 motionAngle = 0;
+    qint32 noiseAmount = 12;
+    quint8 noiseGaussian = 0;
+    quint8 noiseMonochromatic = 1;
+    quint32 noiseSeed = 0x9E3779B9u;
     p >> brightness >> contrast;
     p >> hue >> saturation >> lightness >> vibrance;
     p >> exposure >> exposureOffset >> gammaCorrection;
@@ -190,6 +196,7 @@ bool readFilterNodeParams(QDataStream &p, FilterNode *n)
     p >> customScale >> customOffset;
     p >> highPassRadius;
     p >> motionDistance >> motionAngle;
+    p >> noiseAmount >> noiseGaussian >> noiseMonochromatic >> noiseSeed;
     if (p.status() != QDataStream::Ok)
         return false;
     n->setBrightness(brightness);
@@ -260,6 +267,10 @@ bool readFilterNodeParams(QDataStream &p, FilterNode *n)
     n->setHighPassRadius(int(highPassRadius));
     n->setMotionDistance(int(motionDistance));
     n->setMotionAngle(int(motionAngle));
+    n->setNoiseAmount(int(noiseAmount));
+    n->setNoiseGaussian(noiseGaussian != 0);
+    n->setNoiseMonochromatic(noiseMonochromatic != 0);
+    n->setNoiseSeed(noiseSeed);
     return true;
 }
 

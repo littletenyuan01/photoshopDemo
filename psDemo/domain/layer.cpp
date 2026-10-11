@@ -209,9 +209,10 @@ Layer::CompositeRegion Layer::compositeRasterRegion(const QRect &regionDoc) cons
 
     // 有启用样式：样式要外扩 halo（投影/描边…），区域化必须带 pad 再裁回。
     // 有**几何算子**（位移）：它读「别处」的输入，逐块求值会在块界错位。
-    // 两者都退回「整层求值一次，再按请求区裁」，见 docs/engine/roi.md §5。
+    // 有**位置相关算子**（添加杂色）：输出依赖像素绝对位置，逐块求值会让噪声在块界错位/重复。
+    // 三者都退回「整层求值一次，再按请求区裁」，见 docs/engine/roi.md §5。
     // 也因此**不**吃下面的区域滤镜缓存（那个是逐块几何）。
-    if (m_styles.hasEnabled() || m_filters.hasGeometryOp()) {
+    if (m_styles.hasEnabled() || m_filters.hasGeometryOp() || m_filters.hasPositionalOp()) {
         const CompositeRaster whole = ensureCompositeRaster();
         out.image = whole.image;
         out.docX = offsetX() + whole.originDx;

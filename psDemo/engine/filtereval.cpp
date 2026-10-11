@@ -402,6 +402,96 @@ void applySelectiveColor(QImage &image, const FilterNode &node)
 
 namespace {
 
+/**
+ * 确定性噪声散列：`(x, y, seed, channel)` → 32 位。纯函数，无状态。
+ *
+ * 【为什么必须是「位置的确定函数」】非破坏滤镜会被**反复重算**：拖参数时的预览、定稿、
+ * 撤销/重做、重开 `.pslite`。若用 `rand()`，每次重算图案都不同 —— 预览会闪、定稿与预览对不上、
+ * 撤销回不到原样。做成纯函数以后：同参数永远同图案，**不必保存噪声位图**，也就能进任意滤镜栈。
+ *
+ * 【坐标口径】x/y 是**输入图本地坐标**，所以调用链必须保证「整层一次性求值」——
+ * 见 `FilterStack::hasPositionalOp()`：若被切成 64×64 块分别求值，每块的 (0,0) 都不同，
+ * 噪声会在块界错位/重复（与几何算子必须整层求值同一个理由）。
+ */
+quint32 noiseHash(quint32 x, quint32 y, quint32 seed, quint32 channel)
+{
+    quint32 h = seed ^ (x * 0x9E3779B9u) ^ (y * 0x85EBCA6Bu) ^ (channel * 0xC2B2AE35u);
+    h ^= h >> 16;
+    h *= 0x7FEB352Du;
+    h ^= h >> 15;
+    h *= 0x846CA68Bu;
+    h ^= h >> 16;
+    return h;
+}
+
+/** 散列 → [0,1) 均匀。 */
+qreal noiseUnit(quint32 h)
+{
+    return qreal(h >> 8) * (1.0 / 16777216.0);
+}
+
+/**
+ * 近似标准正态：三个均匀量之和（Irwin–Hall）。σ=1、范围 ±3 —— 与 Box-Muller 观感相当。
+ *
+ * 【为什么不用 Box-Muller】它每像素要 `qLn + qCos + qSqrt` 三次超越函数调用；实测
+ * 「高斯 + 彩噪」在 1600×1200 上要 **535 ms**（每次拖参数都是同步整层重算 = 直接卡顿），
+ * 而三个散列只需整数运算 → 与「均匀」同量级。预览要的是观感与手感，不是分布检验。
+ */
+qreal noiseGauss(quint32 h1, quint32 h2, quint32 h3)
+{
+    return 2.0 * (noiseUnit(h1) + noiseUnit(h2) + noiseUnit(h3)) - 3.0;
+}
+
+/**
+ * 添加杂色（对照 PS「滤镜→杂色→添加杂色」）。
+ *
+ * 数量 100% 对应「±满量程」（均匀分布）或「±3σ」（高斯，令 σ = 幅度/3，两种分布观感可比）。
+ * 单色 = 同一扰动加给 R/G/B（灰噪声）；否则三通道各自独立（彩噪声）。
+ * 全透明像素跳过：给不可见像素加噪声没有意义，还会把它变成可见的彩色脏点。
+ */
+void applyAddNoise(QImage &image, const FilterNode &node)
+{
+    const qreal amount = node.noiseAmount(); // 0..100 (%)
+    if (amount <= 0.0)
+        return;
+    const qreal amp = amount * 2.55; // 100% → 255
+    const bool gauss = node.noiseGaussian();
+    const bool mono = node.noiseMonochromatic();
+    const quint32 seed = node.noiseSeed();
+    const int w = image.width();
+    const int h = image.height();
+
+    for (int y = 0; y < h; ++y) {
+        QRgb *row = reinterpret_cast<QRgb *>(image.scanLine(y));
+        for (int x = 0; x < w; ++x) {
+            const QRgb p = qUnpremultiply(row[x]);
+            const int a = qAlpha(p);
+            if (a == 0)
+                continue;
+            const auto sample = [&](quint32 ch) -> qreal {
+                const quint32 h1 = noiseHash(quint32(x), quint32(y), seed, ch);
+                if (!gauss)
+                    return (noiseUnit(h1) * 2.0 - 1.0) * amp;
+                const quint32 h2 = noiseHash(quint32(x), quint32(y), seed, ch + 101u);
+                const quint32 h3 = noiseHash(quint32(x), quint32(y), seed, ch + 202u);
+                return noiseGauss(h1, h2, h3) * (amp / 3.0);
+            };
+            int dr, dg, db;
+            if (mono) {
+                const int d = qRound(sample(0u));
+                dr = dg = db = d;
+            } else {
+                dr = qRound(sample(1u));
+                dg = qRound(sample(2u));
+                db = qRound(sample(3u));
+            }
+            row[x] = qPremultiply(qRgba(qBound(0, qRed(p) + dr, 255),
+                                        qBound(0, qGreen(p) + dg, 255),
+                                        qBound(0, qBlue(p) + db, 255), a));
+        }
+    }
+}
+
 /** 点滤镜（无临时资源）：直接分发 —— 三段式对它们纯属开销，与 PointOp 的取舍一致。 */
 void applyPointNode(QImage &image, const FilterNode &node)
 {
@@ -455,6 +545,9 @@ void applyPointNode(QImage &image, const FilterNode &node)
         break;
     case OpName::SelectiveColor:
         applySelectiveColor(image, node);
+        break;
+    case OpName::AddNoise:
+        applyAddNoise(image, node);
         break;
     default:
         break;

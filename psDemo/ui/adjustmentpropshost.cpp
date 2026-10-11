@@ -545,6 +545,43 @@ void AdjustmentPropsHost::ensurePages()
         });
         add(Ps::OpName::MotionBlur, page);
     }
+    {
+        // 添加杂色：数量滑块（0..100%）+ 分布下拉 + 单色勾选
+        auto *page = new QWidget(m_stack);
+        auto *col = new QVBoxLayout(page);
+        col->setContentsMargins(0, 0, 0, 0);
+        const SliderRow amt = makeSliderRow(page, QStringLiteral("数量 %"), QStringLiteral("noise_amount"), 0, 100);
+        col->addWidget(amt.row);
+        wireSliderSpin(amt.slider, amt.spin, [this](int v) { m_node.setNoiseAmount(v); });
+
+        auto *row = new QWidget(page);
+        auto *rowLay = new QHBoxLayout(row);
+        rowLay->setContentsMargins(0, 0, 0, 0);
+        rowLay->addWidget(new QLabel(QStringLiteral("分布"), row));
+        auto *combo = new QComboBox(row);
+        combo->setObjectName(QStringLiteral("combo_noise_dist"));
+        combo->addItem(QStringLiteral("平均分布"), 0);
+        combo->addItem(QStringLiteral("高斯分布"), 1);
+        rowLay->addWidget(combo, 1);
+        col->addWidget(row);
+        connect(combo, qOverload<int>(&QComboBox::currentIndexChanged), this, [this, combo](int) {
+            if (m_block)
+                return;
+            m_node.setNoiseGaussian(combo->currentIndex() == 1);
+            emitPreview();
+        });
+
+        auto *mono = new QCheckBox(QStringLiteral("单色（三通道加同一个扰动）"), page);
+        mono->setObjectName(QStringLiteral("check_noise_mono"));
+        col->addWidget(mono);
+        connect(mono, &QCheckBox::toggled, this, [this](bool on) {
+            if (m_block)
+                return;
+            m_node.setNoiseMonochromatic(on);
+            emitPreview();
+        });
+        add(Ps::OpName::AddNoise, page);
+    }
 }
 
 void AdjustmentPropsHost::showPageFor(Ps::OpName op)
@@ -699,6 +736,13 @@ void AdjustmentPropsHost::loadControlsFromNode()
             const int idx = cb->findData(m_node.motionAngle());
             cb->setCurrentIndex(idx >= 0 ? idx : 0);
         }
+        break;
+    case Ps::OpName::AddNoise:
+        setPair("slider_noise_amount", "spin_noise_amount", m_node.noiseAmount());
+        if (auto *cb = page->findChild<QComboBox *>(QStringLiteral("combo_noise_dist")))
+            cb->setCurrentIndex(m_node.noiseGaussian() ? 1 : 0);
+        if (auto *ck = page->findChild<QCheckBox *>(QStringLiteral("check_noise_mono")))
+            ck->setChecked(m_node.noiseMonochromatic());
         break;
     default:
         break;

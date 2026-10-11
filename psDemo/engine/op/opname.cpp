@@ -58,6 +58,7 @@ constexpr OpNameInfo kOpNameTable[] = {
     {OpName::CustomFilter,         "ps:custom-filter",         "自定"},
     {OpName::HighPass,             "ps:high-pass",             "高通保留"},
     {OpName::MotionBlur,           "ps:motion-blur",           "运动模糊"},
+    {OpName::AddNoise,             "ps:add-noise",             "添加杂色"},
 };
 
 const OpNameInfo *infoFor(OpName name)
@@ -104,6 +105,7 @@ bool isAdjustmentOp(OpName name)
     case OpName::CustomFilter:
     case OpName::HighPass:
     case OpName::MotionBlur:
+    case OpName::AddNoise:
         return false;
     default:
         break;
