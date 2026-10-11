@@ -62,6 +62,12 @@ public:
     QVector<GraphNode::Id> downstreamOf(GraphNode::Id id) const;
 
     /**
+     * 有多少个**节点输入口**消费 @p id 的输出。
+     * ==1 表示只有唯一消费者，可把该缓冲就地交给它（免一次整图拷贝）。
+     */
+    int consumerCount(GraphNode::Id id) const;
+
+    /**
      * 求值：产出节点 @p id 覆盖 @p region 的输出图。
      * 递归向上游索取 requiredInputs 区域；节点无算子或输入未连接返回空图。
      * 命中节点缓存（同区域且未失效）直接返回，否则重算并写缓存。

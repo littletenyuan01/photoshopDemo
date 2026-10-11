@@ -39,6 +39,23 @@ public:
      * 不得修改 @p ins。
      */
     virtual QImage process(const QVector<QImage> &ins, const QRect &out) const = 0;
+
+    /**
+     * 是否可**就地**处理：输入缓冲可被本算子直接改写（逐像素算子成立）。
+     *
+     * 求值器只在「该输入与本节点区域一致、且只被本节点消费」时才走就地路径，
+     * 故对 DAG 里的其它消费者没有影响。
+     */
+    virtual bool canProcessInPlace() const { return false; }
+
+    /**
+     * 就地求值（可选）：@p ins 的元素可被直接改写（调用方保证其独占）。
+     * 仅当 canProcessInPlace() 为真时被调用；默认退化为 process()。
+     */
+    virtual QImage processInPlace(QVector<QImage> &&ins, const QRect &out) const
+    {
+        return process(ins, out);
+    }
 };
 
 } // namespace Ps

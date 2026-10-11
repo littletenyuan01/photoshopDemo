@@ -8,6 +8,8 @@
 #include <QHash>
 #include <QQueue>
 
+#include <utility>
+
 namespace Ps {
 
 GraphNode::Id PsGraph::addNode(std::shared_ptr<GraphOp> op)
@@ -142,6 +144,20 @@ QVector<GraphNode::Id> PsGraph::downstreamOf(GraphNode::Id id) const
     return result;
 }
 
+int PsGraph::consumerCount(GraphNode::Id id) const
+{
+    if (!isValidId(id))
+        return 0;
+    int n = 0;
+    for (int v = 0; v < m_nodes.size(); ++v) {
+        for (GraphNode::Id w : m_nodes[v].inputs()) {
+            if (w == id)
+                ++n;
+        }
+    }
+    return n;
+}
+
 QImage PsGraph::evaluate(GraphNode::Id id, const QRect &region)
 {
     GraphNode *nd = node(id);
@@ -167,6 +183,18 @@ QImage PsGraph::evaluate(GraphNode::Id id, const QRect &region)
         if (img.isNull() && !req[i].isEmpty())
             return {}; // 上游求值失败
         ins.append(img);
+    }
+
+    // 就地链路：算子声明可改写输入、且该输入只被本节点消费 → 直接在上游缓冲上跑，
+    // 省掉每节点一次整图拷贝（线性滤镜链上这是主要开销）。
+    // 先把上游缓存持有的引用放掉，让 ins[0] 独占；否则 applyNode 的 scanLine 会
+    // 触发 detach，拷贝照旧。放掉缓存只损失一次可重算的缓存，不影响正确性。
+    if (op->canProcessInPlace() && ins.size() == 1 && consumerCount(nd->input(0)) == 1) {
+        if (GraphNode *up = node(nd->input(0)))
+            up->invalidateCache();
+        QImage out = op->processInPlace(std::move(ins), region);
+        nd->setCache(out, region);
+        return out;
     }
 
     QImage out = op->process(ins, region);

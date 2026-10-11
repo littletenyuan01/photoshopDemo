@@ -12,6 +12,8 @@
 #include "domain/filternode.h"
 #include "engine/filtereval.h"
 
+#include <utility>
+
 namespace Ps {
 
 /**
@@ -31,6 +33,18 @@ public:
     {
         Q_UNUSED(out);
         QImage result = ins.value(0);
+        if (!result.isNull())
+            FilterEval::applyNode(result, m_node);
+        return result;
+    }
+
+    /** 逐像素滤镜 → 可就地改输入（滤镜链上免每节点整图拷贝）。 */
+    bool canProcessInPlace() const override { return true; }
+
+    QImage processInPlace(QVector<QImage> &&ins, const QRect &out) const override
+    {
+        Q_UNUSED(out);
+        QImage result = std::move(ins[0]); // 移走句柄（非深拷贝）
         if (!result.isNull())
             FilterEval::applyNode(result, m_node);
         return result;
