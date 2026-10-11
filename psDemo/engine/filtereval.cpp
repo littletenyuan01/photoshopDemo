@@ -10,6 +10,7 @@
 
 #include <QColor>
 #include <QImage>
+#include <QVector>
 #include <QtMath>
 
 namespace Ps {
@@ -404,6 +405,54 @@ void applySelectiveColor(QImage &image, const FilterNode &node)
  * 先转**直通 alpha** 再逐通道卷积，最后乘回预乘 —— 避免在预乘像素上直滤导致
  * 透明边缘的暗边。abyss = 透明（越界当 0），与「层外即透明」一致。
  */
+namespace {
+
+/**
+ * 面积算子的临时缓冲池（每线程一份，只缓存**最近一次**尺寸的两块图）。
+ *
+ * 为什么要池：逐 64×64 块合成会反复调用同一算子，每次 new 两块整图 = 分配 + 首次触页
+ * （实测占 64×64 块调用的约 30%）。对照 GEGL：临时缓冲由 buffer backend 复用，而非每次分配。
+ *
+ * 为什么 thread_local：并行分块下同一算子会被多个工作线程同时调用，全局静态会数据竞争。
+ * 为什么设上限：整层级调用（如 1024²）若长期驻留，16 线程下会白占大量内存 ——
+ * 超过上限就退回「用后即弃」，不驻留。
+ */
+struct AreaBufferPool {
+    QImage a;
+    QImage b;
+    QSize cached;
+
+    static constexpr qint64 kMaxCachedPixels = 1 << 20; // ~4 MB / 块
+
+    /** 命中缓存则给出池内两块；超上限则用调用方给的 fallback（用后即弃）。 */
+    void acquire(const QSize &size, QImage &fallbackA, QImage &fallbackB,
+                 QImage **pa, QImage **pb)
+    {
+        if (qint64(size.width()) * size.height() <= kMaxCachedPixels) {
+            if (cached != size) {
+                a = QImage(size, QImage::Format_ARGB32);
+                b = QImage(size, QImage::Format_ARGB32);
+                cached = size;
+            }
+            *pa = &a;
+            *pb = &b;
+            return;
+        }
+        fallbackA = QImage(size, QImage::Format_ARGB32);
+        fallbackB = QImage(size, QImage::Format_ARGB32);
+        *pa = &fallbackA;
+        *pb = &fallbackB;
+    }
+};
+
+AreaBufferPool &areaBufferPool()
+{
+    thread_local AreaBufferPool pool;
+    return pool;
+}
+
+} // namespace
+
 void applyBoxBlur(QImage &image, int radius)
 {
     if (image.isNull() || radius <= 0)
@@ -413,9 +462,23 @@ void applyBoxBlur(QImage &image, int radius)
     if (w <= 0 || h <= 0)
         return;
     const int n = radius * 2 + 1; // 盒宽
+    const quint32 half = quint32(n / 2);
+    // 整数除法约 20~40 周期，而 n 每次调用固定 → 换成「倒数乘法」（内环热点）。
+    // 本处 sum ≤ (2*128+1)*255 ≈ 65k、n ≤ 257，该近似在此范围内**精确**。
+    const quint32 inv = quint32(0xFFFFFFFFull / quint32(n)) + 1u;
+    const auto norm = [inv, half](quint32 sum) -> quint32 {
+        return quint32((quint64(sum + half) * inv) >> 32);
+    };
+
+    // 临时缓冲：优先复用线程本地池（省掉每次分配 + 首次触页）
+    QImage fallbackA, fallbackB;
+    QImage *pStraight = nullptr;
+    QImage *pTmp = nullptr;
+    areaBufferPool().acquire(image.size(), fallbackA, fallbackB, &pStraight, &pTmp);
+    QImage &straight = *pStraight;
+    QImage &tmp = *pTmp;
 
     // 1) 预乘 → 直通
-    QImage straight(image.size(), QImage::Format_ARGB32);
     for (int y = 0; y < h; ++y) {
         const QRgb *s = reinterpret_cast<const QRgb *>(image.constScanLine(y));
         QRgb *d = reinterpret_cast<QRgb *>(straight.scanLine(y));
@@ -424,7 +487,6 @@ void applyBoxBlur(QImage &image, int radius)
     }
 
     // 2) 水平趟 → tmp
-    QImage tmp(image.size(), QImage::Format_ARGB32);
     for (int y = 0; y < h; ++y) {
         const QRgb *s = reinterpret_cast<const QRgb *>(straight.constScanLine(y));
         QRgb *d = reinterpret_cast<QRgb *>(tmp.scanLine(y));
@@ -436,7 +498,7 @@ void applyBoxBlur(QImage &image, int radius)
             r += qRed(s[x]); g += qGreen(s[x]); b += qBlue(s[x]); a += qAlpha(s[x]);
         }
         for (int x = 0; x < w; ++x) {
-            d[x] = qRgba((r + n / 2) / n, (g + n / 2) / n, (b + n / 2) / n, (a + n / 2) / n);
+            d[x] = qRgba(norm(r), norm(g), norm(b), norm(a));
             const int add = x + radius + 1;
             const int del = x - radius;
             if (add < w) { r += qRed(s[add]); g += qGreen(s[add]); b += qBlue(s[add]); a += qAlpha(s[add]); }
@@ -445,22 +507,29 @@ void applyBoxBlur(QImage &image, int radius)
     }
 
     // 3) 垂直趟 → straight（复用缓冲）
+    // 预先取行首地址：逐样本 QImage::pixel() 的格式分发/边界检查、scanLine() 的 detach
+    // 检查都是内环热点（对照 GEGL：直接走 buffer 的行指针）。
+    QVector<const QRgb *> srcRows(h);
+    QVector<QRgb *> dstRows(h);
+    for (int y = 0; y < h; ++y) {
+        srcRows[y] = reinterpret_cast<const QRgb *>(tmp.constScanLine(y));
+        dstRows[y] = reinterpret_cast<QRgb *>(straight.scanLine(y));
+    }
     for (int x = 0; x < w; ++x) {
         quint32 r = 0, g = 0, b = 0, a = 0;
         for (int k = -radius; k <= radius; ++k) {
             const int y = k;
             if (y < 0 || y >= h)
                 continue;
-            const QRgb p = tmp.pixel(x, y);
+            const QRgb p = srcRows[y][x];
             r += qRed(p); g += qGreen(p); b += qBlue(p); a += qAlpha(p);
         }
         for (int y = 0; y < h; ++y) {
-            reinterpret_cast<QRgb *>(straight.scanLine(y))[x] =
-                qRgba((r + n / 2) / n, (g + n / 2) / n, (b + n / 2) / n, (a + n / 2) / n);
+            dstRows[y][x] = qRgba(norm(r), norm(g), norm(b), norm(a));
             const int add = y + radius + 1;
             const int del = y - radius;
-            if (add < h) { const QRgb p = tmp.pixel(x, add); r += qRed(p); g += qGreen(p); b += qBlue(p); a += qAlpha(p); }
-            if (del >= 0) { const QRgb p = tmp.pixel(x, del); r -= qRed(p); g -= qGreen(p); b -= qBlue(p); a -= qAlpha(p); }
+            if (add < h) { const QRgb p = srcRows[add][x]; r += qRed(p); g += qGreen(p); b += qBlue(p); a += qAlpha(p); }
+            if (del >= 0) { const QRgb p = srcRows[del][x]; r -= qRed(p); g -= qGreen(p); b -= qBlue(p); a -= qAlpha(p); }
         }
     }
 

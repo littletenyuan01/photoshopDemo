@@ -33,6 +33,60 @@ using PsTests::Reporter;
 
 namespace {
 
+/**
+ * 盒模糊语义 oracle：**逐像素朴素窗口**（不滑动），两趟 + 中间取整，
+ * 与 applyBoxBlur 的语义一致（直通 alpha、abyss=透明、round-half-up）。
+ * 慢但小图够用 —— 用来抓滑动窗口的 off-by-one / 初值错，同时验证倒数乘法等价于整数除法。
+ */
+QImage naiveSeparableBoxBlur(const QImage &src, int radius)
+{
+    const int w = src.width(), h = src.height();
+    const int n = radius * 2 + 1;
+
+    QImage straight(w, h, QImage::Format_ARGB32);
+    for (int y = 0; y < h; ++y)
+        for (int x = 0; x < w; ++x)
+            straight.setPixel(x, y, qUnpremultiply(src.pixel(x, y)));
+
+    QImage tmp(w, h, QImage::Format_ARGB32);
+    for (int y = 0; y < h; ++y) {
+        for (int x = 0; x < w; ++x) {
+            int sr = 0, sg = 0, sb = 0, sa = 0;
+            for (int dx = -radius; dx <= radius; ++dx) {
+                const int xx = x + dx;
+                if (xx < 0 || xx >= w)
+                    continue;
+                const QRgb p = straight.pixel(xx, y);
+                sr += qRed(p); sg += qGreen(p); sb += qBlue(p); sa += qAlpha(p);
+            }
+            tmp.setPixel(x, y, qRgba((sr + n / 2) / n, (sg + n / 2) / n,
+                                     (sb + n / 2) / n, (sa + n / 2) / n));
+        }
+    }
+
+    QImage out(w, h, QImage::Format_ARGB32);
+    for (int y = 0; y < h; ++y) {
+        for (int x = 0; x < w; ++x) {
+            int sr = 0, sg = 0, sb = 0, sa = 0;
+            for (int dy = -radius; dy <= radius; ++dy) {
+                const int yy = y + dy;
+                if (yy < 0 || yy >= h)
+                    continue;
+                const QRgb p = tmp.pixel(x, yy);
+                sr += qRed(p); sg += qGreen(p); sb += qBlue(p); sa += qAlpha(p);
+            }
+            out.setPixel(x, y, qRgba((sr + n / 2) / n, (sg + n / 2) / n,
+                                     (sb + n / 2) / n, (sa + n / 2) / n));
+        }
+    }
+
+    QImage premul(w, h, QImage::Format_ARGB32_Premultiplied);
+    for (int y = 0; y < h; ++y)
+        for (int x = 0; x < w; ++x)
+            premul.setPixel(x, y, qPremultiply(out.pixel(x, y)));
+    return premul;
+}
+
 /** 全幅合成（整幅一次 compositeRegion）。 */
 QImage compositeWhole(ImageDocument *doc)
 {
@@ -138,6 +192,23 @@ int tAreaFilter()
             r.check(n.op() == OpName::BoxBlur && n.blurRadius() == 5,
                     QStringLiteral("往返保住 BoxBlur 与 radius=5"));
         }
+    }
+
+    // —— ⑤ 语义 oracle：滑动窗口 == 逐像素朴素窗口 ——
+    // （只验「区域==整幅」会漏掉「两处都错得一样」；这里用独立实现做真值）
+    {
+        const int W = 32, H = 24, R = 2;
+        const QImage src = PsTests::makeLayerImage(W, H, 11, 190);
+        FilterNode node(OpName::BoxBlur);
+        node.setBlurRadius(R);
+
+        QImage got = src;
+        FilterEval::applyNode(got, node);
+        const QImage ref = naiveSeparableBoxBlur(src, R);
+
+        const long long d = PsTests::diffCount(got, ref);
+        r.check(d == 0,
+                QStringLiteral("盒模糊：滑动窗口 == 朴素窗口（语义 oracle，diffs=%1）").arg(d));
     }
 
     return r.fails;
