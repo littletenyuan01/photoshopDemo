@@ -164,11 +164,31 @@ public:
     int blurRadius() const { return m_blurRadius; }
     void setBlurRadius(int v) { m_blurRadius = qBound(0, v, 128); }
 
+    // —— USM 锐化（面积算子）：模糊半径 / 强度 / 阈值 ——
+    int usmRadius() const { return m_usmRadius; }
+    void setUsmRadius(int v) { m_usmRadius = qBound(1, v, 64); }
+    qreal usmAmount() const { return m_usmAmount; }
+    void setUsmAmount(qreal v) { m_usmAmount = qBound(0.0, v, 5.0); }
+    int usmThreshold() const { return m_usmThreshold; }
+    void setUsmThreshold(int v) { m_usmThreshold = qBound(0, v, 255); }
+
     /**
-     * 该算子需要的输入外扩（像素）：点算子 = 0；盒模糊 = 半径。
+     * 该算子需要的输入外扩（像素）：点算子 = 0；盒模糊/USM = 半径；查找边缘 = 1（3×3）。
      * 面积算子要在「请求区外扩」上取输入，再裁回请求区。
      */
-    int inputPad() const { return (m_op == OpName::BoxBlur) ? m_blurRadius : 0; }
+    int inputPad() const
+    {
+        switch (m_op) {
+        case OpName::BoxBlur:
+            return m_blurRadius;
+        case OpName::UnsharpMask:
+            return m_usmRadius;
+        case OpName::FindEdges:
+            return 1; // 3×3 Sobel
+        default:
+            return 0;
+        }
+    }
 
 private:
     OpName m_op = OpName::BrightnessContrast;
@@ -213,6 +233,9 @@ private:
     qreal m_selY = 0.0;
     qreal m_selK = 0.0;
     int m_blurRadius = 0;
+    int m_usmRadius = 2;
+    qreal m_usmAmount = 1.0;   ///< 1.0 = 100%（PS 默认量级）
+    int m_usmThreshold = 0;    ///< 0 = 全像素参与（PS 默认 0）
 };
 
 } // namespace Ps

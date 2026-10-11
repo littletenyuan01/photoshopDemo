@@ -480,7 +480,11 @@ void applyNode(QImage &image, const FilterNode &node)
         return;
     }
 
-    // 未注册的（点）滤镜：直接调用，避免三段式开销
+    // 未注册的（点）滤镜：直接调用，避免三段式开销。
+    // 面积算子（inputPad>0）**必须**注册为 FilterOp —— 漏调 opsInit 会静默不处理，
+    // 故在开发期（debug）直接断言出来，别让它悄悄变成「点了没反应」。
+    Q_ASSERT_X(node.inputPad() == 0, "FilterEval::applyNode",
+               "面积算子未注册为 FilterOp：是不是漏调了 Ps::opsInit()？");
     applyPointNode(image, node);
 }
 

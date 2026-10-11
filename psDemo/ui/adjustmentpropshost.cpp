@@ -41,6 +41,32 @@ QWidget *makePage(QWidget *parent, UiT *ui)
     return page;
 }
 
+/** 程序化建的「标签 + 滑动条 + 数值框」一行（给没有 .ui 的参数页用）。 */
+struct SliderRow {
+    QWidget *row = nullptr;
+    QSlider *slider = nullptr;
+    QSpinBox *spin = nullptr;
+};
+
+SliderRow makeSliderRow(QWidget *parent, const QString &text, const QString &name, int lo, int hi)
+{
+    SliderRow r;
+    r.row = new QWidget(parent);
+    auto *lay = new QHBoxLayout(r.row);
+    lay->setContentsMargins(0, 0, 0, 0);
+    auto *label = new QLabel(text, r.row);
+    r.slider = new QSlider(Qt::Horizontal, r.row);
+    r.slider->setRange(lo, hi);
+    r.slider->setObjectName(QStringLiteral("slider_") + name);
+    r.spin = new QSpinBox(r.row);
+    r.spin->setRange(lo, hi);
+    r.spin->setObjectName(QStringLiteral("spin_") + name);
+    lay->addWidget(label);
+    lay->addWidget(r.slider, 1);
+    lay->addWidget(r.spin);
+    return r;
+}
+
 } // namespace
 
 AdjustmentPropsHost::AdjustmentPropsHost(QWidget *parent)
@@ -346,19 +372,29 @@ void AdjustmentPropsHost::ensurePages()
     {
         // 盒模糊（面积算子）：无 .ui，程序化建一页（半径 0..128）
         auto *page = new QWidget(m_stack);
-        auto *row = new QHBoxLayout(page);
-        row->setContentsMargins(0, 0, 0, 0);
-        auto *slider = new QSlider(Qt::Horizontal, page);
-        slider->setRange(0, 128);
-        slider->setObjectName(QStringLiteral("slider_radius"));
-        auto *spin = new QSpinBox(page);
-        spin->setRange(0, 128);
-        spin->setObjectName(QStringLiteral("spin_radius"));
-        row->addWidget(new QLabel(QStringLiteral("半径"), page));
-        row->addWidget(slider, 1);
-        row->addWidget(spin);
-        wireSliderSpin(slider, spin, [this](int v) { m_node.setBlurRadius(v); });
+        auto *col = new QVBoxLayout(page);
+        col->setContentsMargins(0, 0, 0, 0);
+        const SliderRow radius = makeSliderRow(page, QStringLiteral("半径"), QStringLiteral("radius"), 0, 128);
+        col->addWidget(radius.row);
+        wireSliderSpin(radius.slider, radius.spin, [this](int v) { m_node.setBlurRadius(v); });
         add(Ps::OpName::BoxBlur, page);
+    }
+    {
+        // USM 锐化（面积算子）：无 .ui，程序化建一页
+        // 强度用百分比整数表示（0..500 → 0.0..5.0），与其它页「整数控件 + qreal 参数」的口径一致
+        auto *page = new QWidget(m_stack);
+        auto *col = new QVBoxLayout(page);
+        col->setContentsMargins(0, 0, 0, 0);
+        const SliderRow radius = makeSliderRow(page, QStringLiteral("半径"), QStringLiteral("usm_radius"), 1, 64);
+        const SliderRow amount = makeSliderRow(page, QStringLiteral("强度"), QStringLiteral("usm_amount"), 0, 500);
+        const SliderRow threshold = makeSliderRow(page, QStringLiteral("阈值"), QStringLiteral("usm_threshold"), 0, 255);
+        col->addWidget(radius.row);
+        col->addWidget(amount.row);
+        col->addWidget(threshold.row);
+        wireSliderSpin(radius.slider, radius.spin, [this](int v) { m_node.setUsmRadius(v); });
+        wireSliderSpin(amount.slider, amount.spin, [this](int v) { m_node.setUsmAmount(v / 100.0); });
+        wireSliderSpin(threshold.slider, threshold.spin, [this](int v) { m_node.setUsmThreshold(v); });
+        add(Ps::OpName::UnsharpMask, page);
     }
 }
 
@@ -468,6 +504,11 @@ void AdjustmentPropsHost::loadControlsFromNode()
         break;
     case Ps::OpName::BoxBlur:
         setPair("slider_radius", "spin_radius", m_node.blurRadius());
+        break;
+    case Ps::OpName::UnsharpMask:
+        setPair("slider_usm_radius", "spin_usm_radius", m_node.usmRadius());
+        setPair("slider_usm_amount", "spin_usm_amount", int(m_node.usmAmount() * 100.0 + 0.5));
+        setPair("slider_usm_threshold", "spin_usm_threshold", m_node.usmThreshold());
         break;
     default:
         break;

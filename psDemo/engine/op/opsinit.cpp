@@ -7,6 +7,7 @@
 #include "boxblurfilterop.h"
 #include "clonestampdabop.h"
 #include "filterop.h"
+#include "findedgesfilterop.h"
 #include "floodfillop.h"
 #include "focusdabop.h"
 #include "gradientop.h"
@@ -22,6 +23,7 @@
 #include "solidfillop.h"
 #include "stampdabop.h"
 #include "tonedabop.h"
+#include "unsharpmaskfilterop.h"
 
 namespace Ps {
 
@@ -104,6 +106,10 @@ void opsInit()
     // 点滤镜不在此注册 —— 它们无资源，由 FilterEval 直接分发，避免三段式开销。
     registerFilterOp(OpName::BoxBlur,
                      [] { return std::unique_ptr<FilterOp>(new BoxBlurFilterOp); });
+    registerFilterOp(OpName::UnsharpMask,
+                     [] { return std::unique_ptr<FilterOp>(new UnsharpMaskFilterOp); });
+    registerFilterOp(OpName::FindEdges,
+                     [] { return std::unique_ptr<FilterOp>(new FindEdgesFilterOp); });
 }
 
 } // namespace Ps

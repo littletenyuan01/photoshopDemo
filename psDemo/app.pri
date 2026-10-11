@@ -39,6 +39,8 @@ SOURCES += \
     engine/op/layermodeop.cpp \
     engine/op/boxblurfilterop.cpp \
     engine/op/filterop.cpp \
+    engine/op/findedgesfilterop.cpp \
+    engine/op/unsharpmaskfilterop.cpp \
     engine/op/floodfillop.cpp \
     engine/op/gradientop.cpp \
     engine/op/stampdabop.cpp \
@@ -146,6 +148,8 @@ HEADERS += \
     engine/op/layermodeop.h \
     engine/op/boxblurfilterop.h \
     engine/op/filterop.h \
+    engine/op/findedgesfilterop.h \
+    engine/op/unsharpmaskfilterop.h \
     engine/op/floodfillop.h \
     engine/op/gradientop.h \
     engine/op/stampdabop.h \

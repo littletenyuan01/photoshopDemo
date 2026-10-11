@@ -46,6 +46,8 @@ constexpr OpNameInfo kOpNameTable[] = {
     {OpName::GradientMap,          "ps:gradient-map",          "渐变映射"},
     {OpName::SelectiveColor,       "ps:selective-color",       "可选颜色"},
     {OpName::BoxBlur,              "ps:box-blur",              "盒模糊"},
+    {OpName::UnsharpMask,          "ps:unsharp-mask",          "USM 锐化"},
+    {OpName::FindEdges,            "ps:find-edges",            "查找边缘"},
 };
 
 const OpNameInfo *infoFor(OpName name)
@@ -76,8 +78,15 @@ QString opNameTitle(OpName name)
 bool isAdjustmentOp(OpName name)
 {
     // 面积算子暂不作为调整图层（其 ROI 外扩尚未接入共享缓冲合成路径，见 docs/pending-dev）。
-    if (name == OpName::BoxBlur)
+    // 新增面积算子时**必须**加到这里，否则会被当成调整层算子（菜单/新建调整层都会出错）。
+    switch (name) {
+    case OpName::BoxBlur:
+    case OpName::UnsharpMask:
+    case OpName::FindEdges:
         return false;
+    default:
+        break;
+    }
     return name >= OpName::BrightnessContrast && name < OpName::Count;
 }
 

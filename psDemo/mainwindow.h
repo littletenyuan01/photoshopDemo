@@ -115,6 +115,8 @@ private slots:
     void onNewAdjBrightness();
     /** 打开滤镜对话框，对活动像素层非破坏地追加/编辑指定滤镜。 */
     void runFilterDialog(Ps::OpName op);
+    /** 无参数滤镜：直接非破坏地追加到活动像素层（不进对话框）。 */
+    void applyFilterDirect(Ps::OpName op);
     void onEnsureLayerStyle(int kind);
     void onClearLayerStyles();
     void onCopyLayerStyles();

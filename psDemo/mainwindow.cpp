@@ -260,6 +260,18 @@ void MainWindow::setupMenus()
     connect(ui->actionBoxBlur, &QAction::triggered, this,
             [this]() { runFilterDialog(Ps::OpName::BoxBlur); });
 
+    // 滤镜 → 锐化 → USM 锐化（面积算子；复用盒模糊做模糊级）
+    ui->actionUnsharpMask->setEnabled(true);
+    ui->actionUnsharpMask->setToolTip(tr("USM 锐化（非破坏，作用于活动像素层）"));
+    connect(ui->actionUnsharpMask, &QAction::triggered, this,
+            [this]() { runFilterDialog(Ps::OpName::UnsharpMask); });
+
+    // 滤镜 → 风格化 → 查找边缘（无参数 → 直接应用，不进对话框）
+    ui->actionFindEdges->setEnabled(true);
+    ui->actionFindEdges->setToolTip(tr("查找边缘（非破坏，作用于活动像素层）"));
+    connect(ui->actionFindEdges, &QAction::triggered, this,
+            [this]() { applyFilterDirect(Ps::OpName::FindEdges); });
+
     // —— 图层→新建调整图层→亮度/对比度（PS 式：作用于下方合成）——
     ui->actionNewAdjBrightness->setEnabled(true);
     ui->actionNewAdjBrightness->setToolTip(
@@ -1562,8 +1574,7 @@ void MainWindow::onBrightnessContrast()
 }
 
 void MainWindow::runFilterDialog(Ps::OpName op)
-{
-    Ps::ImageDocument *doc = m_session ? m_session->document() : nullptr;
+{    Ps::ImageDocument *doc = m_session ? m_session->document() : nullptr;
     if (!doc)
         return;
 
@@ -1606,6 +1617,27 @@ void MainWindow::runFilterDialog(Ps::OpName op)
     } else {
         doc->removeLayerFilter(li, fi, /*pushUndo=*/false);
     }
+}
+
+void MainWindow::applyFilterDirect(Ps::OpName op)
+{
+    Ps::ImageDocument *doc = m_session ? m_session->document() : nullptr;
+    if (!doc)
+        return;
+
+    const int li = doc->activeLayerIndex();
+    Ps::Layer *layer = doc->layers().layerAt(li);
+    if (!layer || !layer->isVisible() || layer->isAdjustmentLayer()) {
+        flashStatusMessage(tr("请先选中一个像素图层"));
+        return;
+    }
+
+    // 无参数滤镜：直接正式加入（一条撤销正好回到加滤镜之前）
+    const Ps::FilterNode node(op);
+    if (doc->addLayerFilter(node, /*pushUndo=*/true) < 0)
+        flashStatusMessage(tr("无法添加滤镜"));
+    else
+        flashStatusMessage(tr("已应用滤镜（非破坏）"));
 }
 
 void MainWindow::onNewAdjBrightness()

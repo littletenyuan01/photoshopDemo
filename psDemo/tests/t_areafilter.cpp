@@ -88,6 +88,45 @@ QImage naiveSeparableBoxBlur(const QImage &src, int radius)
     return premul;
 }
 
+/**
+ * 朴素 3×3 Sobel（逐像素、abyss=透明）—— 查找边缘算子的**语义 oracle**。
+ * 与算子同一 alpha 口径：采样前反预乘、结果再预乘。
+ * （这层 oracle 正是抓出「FindEdges 漏了直通↔预乘转换」的那面镜子，见缺陷台账 #6）
+ */
+QImage naiveSobel(const QImage &src)
+{
+    const int w = src.width();
+    const int h = src.height();
+    // 用源图格式（引擎缓冲是 ARGB32_Premultiplied；diffCount 对格式不一致会给 -1 哨兵）
+    QImage out(src.size(), src.format());
+    const auto at = [&src, w, h](int x, int y) -> QRgb {
+        if (x < 0 || y < 0 || x >= w || y >= h)
+            return 0u; // abyss = 透明
+        return qUnpremultiply(src.pixel(x, y));
+    };
+    for (int y = 0; y < h; ++y) {
+        for (int x = 0; x < w; ++x) {
+            int gx[3] = {0, 0, 0};
+            int gy[3] = {0, 0, 0};
+            for (int dy = -1; dy <= 1; ++dy) {
+                for (int dx = -1; dx <= 1; ++dx) {
+                    const QRgb p = at(x + dx, y + dy);
+                    const int kx = dx * (dy == 0 ? 2 : 1);
+                    const int ky = dy * (dx == 0 ? 2 : 1);
+                    gx[0] += kx * qRed(p); gx[1] += kx * qGreen(p); gx[2] += kx * qBlue(p);
+                    gy[0] += ky * qRed(p); gy[1] += ky * qGreen(p); gy[2] += ky * qBlue(p);
+                }
+            }
+            const auto mag = [](int a, int b) -> int {
+                return qBound(0, int(std::sqrt(double(a) * a + double(b) * b) + 0.5), 255);
+            };
+            out.setPixel(x, y, qPremultiply(qRgba(mag(gx[0], gy[0]), mag(gx[1], gy[1]),
+                                                  mag(gx[2], gy[2]), qAlpha(at(x, y)))));
+        }
+    }
+    return out;
+}
+
 /** 全幅合成（整幅一次 compositeRegion）。 */
 QImage compositeWhole(ImageDocument *doc)
 {
@@ -219,6 +258,87 @@ int tAreaFilter()
         FilterOp *b = filterOpInstance(OpName::BoxBlur);
         r.check(a != nullptr, QStringLiteral("BoxBlur 已注册为 FilterOp（走三段式）"));
         r.check(a == b, QStringLiteral("同一线程内是常驻实例（临时缓冲跨调用复用）"));
+        r.check(filterOpInstance(OpName::UnsharpMask) != nullptr,
+                QStringLiteral("USM 已注册为 FilterOp"));
+        r.check(filterOpInstance(OpName::FindEdges) != nullptr,
+                QStringLiteral("查找边缘已注册为 FilterOp"));
+    }
+
+    // —— ⑦ USM 锐化：分块(带 pad) == 整幅；强度 0 = 无操作；强度改变结果 ——
+    {
+        const int W = 256, H = 256;
+        auto makeDoc = [&]() {
+            auto d = ImageDocument::createBlank(W, H, Qt::white);
+            d->placeImageAsLayer(PsTests::makeLayerImage(180, 150, 11, 220),
+                                 QStringLiteral("usmL"));
+            d->layers().layerAt(1)->setOffset(30, 40);
+            return d;
+        };
+        auto docPlain = makeDoc();
+        const QImage plain = compositeWhole(docPlain.get());
+
+        auto doc = makeDoc();
+        Layer *layer = doc->layers().layerAt(1);
+        FilterNode node(OpName::UnsharpMask);
+        node.setUsmRadius(3);
+        node.setUsmAmount(1.5);
+        node.setUsmThreshold(0);
+        layer->filters().append(node);
+
+        const QImage whole = compositeWhole(doc.get());
+        const QImage chunked = compositeChunked(doc.get());
+        const long long d = PsTests::diffCount(whole, chunked);
+        r.check(d == 0,
+                QStringLiteral("像素层 USM：分块投影 == 整幅合成，无跨块接缝（diffs=%1）").arg(d));
+        r.check(PsTests::diffCount(plain, whole) > 0, QStringLiteral("USM 强度 1.5 改变了画面"));
+
+        layer->filters().at(0).setUsmAmount(0.0);
+        const QImage noOp = compositeWhole(doc.get());
+        const long long d0 = PsTests::diffCount(plain, noOp);
+        r.check(d0 == 0, QStringLiteral("USM 强度 0 == 未加滤镜（diffs=%1）").arg(d0));
+
+        // 往返：USM 三个新字段都要能存回来（projectio 在固定 512B 块尾部追加）
+        layer->filters().at(0).setUsmRadius(3);
+        layer->filters().at(0).setUsmAmount(2.0);
+        layer->filters().at(0).setUsmThreshold(7);
+        const QString path = PsTests::tempFilePath(QStringLiteral("usm.pslite"));
+        QString err;
+        const bool saved = ProjectIo::save(*doc, path, &err);
+        r.check(saved, QStringLiteral("保存含 USM 的 .pslite"));
+        auto back = saved ? ProjectIo::load(path, &err) : nullptr;
+        r.check(back != nullptr, QStringLiteral("重新打开含 USM 的 .pslite"));
+        if (back && back->layers().count() > 1
+            && back->layers().layerAt(1)->filters().count() > 0) {
+            const FilterNode &n = back->layers().layerAt(1)->filters().at(0);
+            r.check(n.op() == OpName::UnsharpMask && n.usmRadius() == 3
+                        && qAbs(n.usmAmount() - 2.0) < 1e-6 && n.usmThreshold() == 7,
+                    QStringLiteral("往返保住 USM 半径/强度/阈值"));
+        }
+    }
+
+    // —— ⑧ 查找边缘：语义 oracle（朴素 3×3 Sobel）+ 分块 == 整幅（pad=1 漏了就会有接缝）——
+    {
+        const QImage src = PsTests::makeLayerImage(48, 40, 21, 255);
+        QImage got = src;
+        FilterNode node(OpName::FindEdges);
+        FilterEval::applyNode(got, node);
+        const QImage ref = naiveSobel(src);
+        const long long d = PsTests::diffCount(got, ref);
+        r.check(d == 0,
+                QStringLiteral("查找边缘：与朴素 3×3 Sobel 逐像素一致（diffs=%1）").arg(d));
+        r.check(PsTests::diffCount(src, got) > 0, QStringLiteral("查找边缘确实改变了画面"));
+
+        const int W = 256, H = 256;
+        auto doc = ImageDocument::createBlank(W, H, Qt::white);
+        doc->placeImageAsLayer(PsTests::makeLayerImage(180, 150, 13, 220),
+                               QStringLiteral("edgeL"));
+        doc->layers().layerAt(1)->setOffset(30, 40);
+        doc->layers().layerAt(1)->filters().append(FilterNode(OpName::FindEdges));
+        const QImage whole = compositeWhole(doc.get());
+        const QImage chunked = compositeChunked(doc.get());
+        const long long dc = PsTests::diffCount(whole, chunked);
+        r.check(dc == 0,
+                QStringLiteral("像素层查找边缘：分块投影 == 整幅合成，无跨块接缝（diffs=%1）").arg(dc));
     }
 
     return r.fails;
