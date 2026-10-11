@@ -1027,7 +1027,7 @@ void CanvasView::maybeStartAsyncFilterFinalize()
     }
 }
 
-bool CanvasView::startFilterJobFor(int layerIndex, const QRect &want)
+bool CanvasView::startFilterJobFor(int layerIndex, const QRect &want, int previewDivisor)
 {
     if (!m_document || layerIndex < 0 || want.isEmpty())
         return false;
@@ -1043,7 +1043,7 @@ bool CanvasView::startFilterJobFor(int layerIndex, const QRect &want)
             }
         });
     }
-    return m_filterJob->start(m_document, layerIndex, want);
+    return m_filterJob->start(m_document, layerIndex, want, previewDivisor);
 }
 
 void CanvasView::onLayerFilterPreview(int layerIndex, const QRect &regionDoc)
@@ -1059,9 +1059,30 @@ void CanvasView::onLayerFilterPreview(int layerIndex, const QRect &regionDoc)
     //  · 几何算子（位移）走整层专用路径；有样式的层走整层缓存；调整层有自己的 live 通道。
     const bool heavy = strongestPadOfLayer(layer) > 0 && !layer->filters().hasGeometryOp()
                        && !layer->isAdjustmentLayer() && !layer->styles().hasEnabled();
-    if (heavy && startFilterJobFor(layerIndex, regionDoc)) {
+
+    // 【降采样预览】只在「大区域 + 半径够大」时才降，两个条件都必要：
+    //  · 区域小：本来就只有几毫秒，降采样只会白白变糊；
+    //  · 半径小：缩下去后等效半径会走样（r=1 按 4 倍降 → 等效 r=4，那是另一个滤镜了）。
+    // 倍数按半径反推，保证「缩小后的半径 × 倍数 ≈ 原半径」：
+    //  · 半径 ≥ 8 → 1/4（r=8→2、等效仍 8）；半径 ≥ 4 → 1/2（r=6→3、等效仍 6）。
+    // 实测（1600×1200 文档 / 可见区 1200×800 / 中值）：
+    //  · r=3 时**不降**（1/2 实测 50→59 ms，平滑缩放的开销盖过了滤镜省下的，白干）；
+    //  · r=6 时 1/2：138→92 ms；r≥8 用 1/4 才能拿到数倍收益（实测 1/4 可比 16 ms 量级）。
+    constexpr int kDownsampleMinArea = 512 * 512;
+    int divisor = 1;
+    const int maxPad = strongestPadOfLayer(layer);
+    if (regionDoc.width() * regionDoc.height() >= kDownsampleMinArea) {
+        if (maxPad >= 8)
+            divisor = 4;
+        else if (maxPad >= 4)
+            divisor = 2;
+    }
+
+    if (heavy && startFilterJobFor(layerIndex, regionDoc, divisor)) {
         m_filterProgressTimer->start();
-        emit filterFinalizeProgress(tr("滤镜预览：后台求值…"));
+        emit filterFinalizeProgress(divisor > 1
+                                        ? tr("滤镜预览：后台求值（1/%1 降采样）…").arg(divisor)
+                                        : tr("滤镜预览：后台求值…"));
         update(); // 旧投影先顶着，等任务写好缓存再刷新
         return;
     }

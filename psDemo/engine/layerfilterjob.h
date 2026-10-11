@@ -26,6 +26,10 @@
  *      被新任务接替、被 `cancel()`、或层内容变了（`Layer::contentGeneration`）都写不进缓存。
  * 只靠 1 不够（取消有延迟），只靠 2 不够（会白算一份没人要的结果）。
  *
+ * 【降采样预览】`previewDivisor > 1` 时：快照先缩小该倍数、**滤镜的空间参数同步缩小**
+ * （`FilterNode::scaledForDownsampledPreview`）、求值后再放大回 `want` 尺寸。换来的是
+ * 求值量按倍数平方下降（PS 那种「更糊但更快」）。**只用于拖参数预览**，定稿一律传 1。
+ *
  * 【为什么允许「接替」在跑的任务】同一份滤镜改动会**连续触发两次**
  * `contentChanged`（临时节点 + 正式加入、`markDirty` 与属性广播），若第二次因
  * 「上一个还在跑」而拒启，就会出现「第一个被取消、第二个没起来」→ **一次都不写缓存**
@@ -69,9 +73,12 @@ public:
      * @param doc         目标文档（借用；回调前会复查它是否还活着）
      * @param layerIndex  目标图层下标（回调时复查看层是否还在，避免裸指针悬垂）
      * @param want        要产出的**文档矩形**（= 层的 bounds ∩ 画布；结果缓存的覆盖范围）
+     * @param previewDivisor 预览降采样倍数（1 = 原分辨率；>1 = 「更糊但更快」的预览）。
+     *        见 `FilterNode::scaledForDownsampledPreview`：空间参数会同步缩小，
+     *        结果再放大回 `want` 尺寸写进缓存 —— 故**只用于预览**，定稿必须传 1。
      * @return false = 参数不成立 / 已有任务在跑（调用方应退回同步路径）
      */
-    bool start(ImageDocument *doc, int layerIndex, const QRect &want);
+    bool start(ImageDocument *doc, int layerIndex, const QRect &want, int previewDivisor = 1);
 
     /** 是否正在后台求值。 */
     bool isRunning() const { return m_running.load(); }

@@ -13,6 +13,7 @@
 #include "domain/imagedocument.h"
 #include "domain/layer.h"
 #include "engine/compositor.h"
+#include "engine/layerfilterjob.h"
 #include "engine/op/opname.h"
 #include "engine/projection.h"
 #include "testutil.h"
@@ -228,5 +229,105 @@ int tFilterPreviewAsync()
     }
 
     canvas.setDocument(nullptr);
+    return r.fails;
+}
+
+/**
+ * 预览**降采样**：「更糊但更快」。
+ *
+ * 守的契约（见 `FilterNode::scaledForDownsampledPreview` 与 `LayerFilterJob::start`）：
+ *  ① 空间类参数（半径/距离/位移）按倍数缩小，且**最小值钳到 1**、原本为 0 的保持 0；
+ *     非空间参数（强度/阈值/权重…）一律不动；
+ *  ② `previewDivisor > 1` 的任务照常写区域缓存、尺寸正确；
+ *  ③ 降采样结果与原分辨率结果**大体相近**（不是另一个滤镜），且有差异（证明确实降了）；
+ *  ④ 降采样更快（只打印，不作断言 —— 时序噪声大）。
+ */
+int tPreviewDownsample()
+{
+    Reporter r;
+
+    // —— ① 空间参数缩放 ——
+    {
+        FilterNode n(OpName::MedianBlur);
+        n.setMedianRadius(6);
+        n.setBlurRadius(0); // 0 必须保持 0：不能凭空造出效果
+        n.setUsmAmount(1.5);
+        n.setUsmThreshold(20);
+        n.setOffsetDx(7);
+        n.setOffsetDy(-9);
+
+        const FilterNode s2 = n.scaledForDownsampledPreview(2);
+        r.check(s2.medianRadius() == 3, QStringLiteral("中值半径 6 / 2 → 3（实际 %1）").arg(s2.medianRadius()));
+        r.check(s2.blurRadius() == 0, QStringLiteral("半径 0 保持 0（不为 1）"));
+        r.check(qFuzzyCompare(s2.usmAmount(), 1.5) && s2.usmThreshold() == 20,
+                QStringLiteral("非空间参数（强度/阈值）不动"));
+        r.check(s2.offsetDx() == 3 && s2.offsetDy() == -4,
+                QStringLiteral("位移 / 2 截断（7→3、-9→-4）"));
+
+        FilterNode m1(OpName::MedianBlur);
+        m1.setMedianRadius(1);
+        r.check(m1.scaledForDownsampledPreview(2).medianRadius() == 1,
+                QStringLiteral("半径 1 / 2 → 1（钳到最小 1，不为 0）"));
+
+        r.check(n.scaledForDownsampledPreview(1).medianRadius() == 6,
+                QStringLiteral("divisor=1 原样返回"));
+    }
+
+    // —— ②③④ 任务：divisor=1 vs 2 ——
+    const int W = 400, H = 300;
+    auto doc = ImageDocument::createBlank(W, H, Qt::white);
+
+    // 用**平滑**图（渐变）：降采样前后差异才有可比性（makeLayerImage 有取模跳变，边缘会差很多）
+    QImage smooth(W, H, QImage::Format_ARGB32_Premultiplied);
+    for (int y = 0; y < H; ++y)
+        for (int x = 0; x < W; ++x)
+            smooth.setPixel(x, y, qRgba(x * 255 / W, y * 255 / H, 128, 255));
+    doc->placeImageAsLayer(smooth, QStringLiteral("smooth"));
+    Layer *layer = doc->layers().layerAt(1);
+    if (!layer) {
+        r.check(false, QStringLiteral("有活动像素层"));
+        return r.fails;
+    }
+    FilterNode median(OpName::MedianBlur);
+    median.setMedianRadius(4);
+    layer->filters().append(median);
+    layer->invalidateCompositeRaster();
+
+    const QRect region(40, 30, 300, 220); // ≥ 512×512? 不：这里刻意用小区域，只验正确性
+
+    const auto runJob = [&](int divisor, qint64 *msOut) -> QImage {
+        layer->invalidateCompositeRaster();
+        Ps::LayerFilterJob job;
+        bool done = false;
+        QObject::connect(&job, &Ps::LayerFilterJob::finished, &job, [&](bool) { done = true; });
+        QElapsedTimer t;
+        t.start();
+        if (!job.start(doc.get(), 1, region, divisor))
+            return QImage();
+        while (!done && t.elapsed() < 5000)
+            QApplication::processEvents();
+        *msOut = t.elapsed();
+        return layer->regionFilterCovers(region) ? layer->compositeRasterRegion(region).image
+                                                 : QImage();
+    };
+
+    qint64 msFull = 0, msHalf = 0;
+    const QImage full = runJob(1, &msFull);
+    const QImage half = runJob(2, &msHalf);
+
+    r.check(!full.isNull() && full.size() == region.size(),
+            QStringLiteral("divisor=1：写出区域缓存且尺寸正确"));
+    r.check(!half.isNull() && half.size() == region.size(),
+            QStringLiteral("divisor=2：写出区域缓存且尺寸正确（放大回原区域尺寸）"));
+    if (!full.isNull() && !half.isNull()) {
+        const long long d = PsTests::diffCount(full, half);
+        r.check(d > 0, QStringLiteral("divisor=2 确实不同（证明确实降采样了，diffs=%1）").arg(d));
+        const int maxD = PsTests::maxChannelDiff(full, half);
+        r.check(maxD >= 0 && maxD <= 48,
+                QStringLiteral("divisor=2 与原分辨率**大体相近**（平滑图上最大单通道差 %1 ≤ 48）").arg(maxD));
+    }
+    r.info(QStringLiteral("降采样预览耗时：divisor=1 %1 ms / divisor=2 %2 ms（后台墙钟，含事件轮询）")
+               .arg(msFull).arg(msHalf));
+
     return r.fails;
 }

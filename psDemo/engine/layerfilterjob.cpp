@@ -38,7 +38,8 @@ LayerFilterJob::~LayerFilterJob()
         m_cancel->store(true);
 }
 
-bool LayerFilterJob::start(ImageDocument *doc, int layerIndex, const QRect &want)
+bool LayerFilterJob::start(ImageDocument *doc, int layerIndex, const QRect &want,
+                           int previewDivisor)
 {
     if (!doc || layerIndex < 0 || want.isEmpty())
         return false;
@@ -86,9 +87,10 @@ bool LayerFilterJob::start(ImageDocument *doc, int layerIndex, const QRect &want
     m_progress.store(0.0);
 
     QPointer<ImageDocument> docPtr(doc);
+    const int previewDiv = qMax(1, previewDivisor);
 
     auto future = QtConcurrent::run([this, docPtr, layerIndex, stack, snap, srcOrigin, outRect,
-                                     pad, generation, runId, cancelFlag]() {
+                                     pad, generation, runId, cancelFlag, previewDiv]() {
         // 【线程安全】只碰 snap（独立快照）与 cancelFlag（原子）——**不读** doc/layer/瓦片。
         const auto shouldAbort = [cancelFlag]() { return cancelFlag->load(); };
 
@@ -164,10 +166,42 @@ bool LayerFilterJob::start(ImageDocument *doc, int layerIndex, const QRect &want
         };
 
         if (!cancelFlag->load()) {
-            if (strips <= 1)
-                bandWorker(outBands.first());
-            else
-                QtConcurrent::blockingMap(outBands, bandWorker);
+            if (previewDiv <= 1) {
+                if (strips <= 1)
+                    bandWorker(outBands.first());
+                else
+                    QtConcurrent::blockingMap(outBands, bandWorker);
+            } else {
+                // 【降采样预览】「更糊但更快」：快照缩小 previewDiv 倍、**空间参数同步缩小**
+                // （否则效果会强 previewDiv 倍，预览与定稿差得离谱）、求值后再放大回 outSize。
+                // 求值量按 previewDiv² 下降 —— 拖重滤镜参数时预览延迟因此明显变短。
+                // 这里**不切条带**：图已经小了，单线程足够；少一处几何换算就少一个易错点。
+                const QSize smallSize(qMax(1, snap.width() / previewDiv),
+                                      qMax(1, snap.height() / previewDiv));
+                const QImage smallSnap =
+                    snap.scaled(smallSize, Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
+
+                FilterStack smallStack;
+                QVector<FilterNode> nodes = stack.snapshot();
+                for (FilterNode &n : nodes)
+                    n = n.scaledForDownsampledPreview(previewDiv);
+                smallStack.replaceAll(nodes);
+
+                const QImage smallFiltered = smallStack.apply(smallSnap, shouldAbort);
+                if (!cancelFlag->load() && !smallFiltered.isNull()) {
+                    // want 在 snap 本地坐标下的位置 → 缩到 small 域（再 ∩ 一次，吃掉整除误差）
+                    const QRect wantSmall =
+                        QRect(outLocalLeft / previewDiv, outLocalTop / previewDiv,
+                              qMax(1, outSize.width() / previewDiv),
+                              qMax(1, outSize.height() / previewDiv))
+                            .intersected(smallFiltered.rect());
+                    if (!wantSmall.isEmpty()) {
+                        result = smallFiltered.copy(wantSmall)
+                                     .scaled(outSize, Qt::IgnoreAspectRatio,
+                                             Qt::SmoothTransformation);
+                    }
+                }
+            }
         }
 
         m_progress.store(0.5);

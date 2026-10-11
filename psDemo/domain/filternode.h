@@ -220,6 +220,38 @@ public:
     void setMotionAngle(int v) { m_motionAngle = (v == 45 || v == 90) ? v : 0; }
 
     /**
+     * **预览降采样**用：返回一份「空间类参数按 @p divisor 缩小」的副本。
+     *
+     * 【为什么需要】降采样预览（PS 那种「更糊但更快」）是把输入图缩小 @c divisor 倍再求值。
+     * 若半径保持原值，效果会**强 @c divisor 倍**（预览与定稿差得离谱、拖动时像另一个滤镜）。
+     * 所以必须把「与像素距离有关」的参数一起缩：
+     *   · 缩：盒模糊/高斯/USM/中值/最大值最小值/高通半径、运动模糊距离、位移 dx/dy；
+     *   · 不缩：强度、阈值、角度、自定义核权重、缩放/位移偏置、各类颜色参数（与分辨率无关）。
+     *
+     * 半径一律 `max(1, ceil(v/divisor))`：0 会让算子退化成恒等，预览就什么都看不到；
+     * 但原本就是 0 的（例如盒模糊半径 0 = 不处理）保持 0，不能凭空造出效果。
+     */
+    FilterNode scaledForDownsampledPreview(int divisor) const
+    {
+        if (divisor <= 1)
+            return *this;
+        FilterNode n = *this;
+        const auto shrink = [divisor](int v) {
+            return (v <= 0) ? 0 : qMax(1, (v + divisor - 1) / divisor);
+        };
+        n.m_blurRadius = shrink(m_blurRadius);
+        n.m_usmRadius = shrink(m_usmRadius);
+        n.m_gaussRadius = shrink(m_gaussRadius);
+        n.m_medianRadius = shrink(m_medianRadius);
+        n.m_extremumRadius = shrink(m_extremumRadius);
+        n.m_highPassRadius = shrink(m_highPassRadius);
+        n.m_motionDistance = shrink(m_motionDistance);
+        n.m_offsetDx = m_offsetDx / divisor;
+        n.m_offsetDy = m_offsetDy / divisor;
+        return n;
+    }
+
+    /**
      * 该算子需要的输入外扩（像素）：点算子 = 0；盒模糊/USM = 半径；查找边缘/锐化/浮雕 = 1（3×3）；
      * 高斯模糊 = 半径 + 2（**安全上界**：三趟盒模糊半径之和 ≈ 0.98×半径，留 2px 余量，
      * 宁可比需要的外扩多一点，也不要因外扩不足在 64×64 块界留下接缝）；中值 = 半径。

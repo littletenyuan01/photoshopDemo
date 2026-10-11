@@ -202,7 +202,7 @@ private:
      */
     void onLayerFilterPreview(int layerIndex, const QRect &regionDoc);
     /** 起/接替一次后台滤镜任务；返回 false 表示参数不成立（调用方退回同步路径）。 */
-    bool startFilterJobFor(int layerIndex, const QRect &want);
+    bool startFilterJobFor(int layerIndex, const QRect &want, int previewDivisor = 1);
     /** 将 m_offset 钳制到合法范围（含 pasteboard 过滚，对照 PS）。 */
     void clampOffset();
     /** 水平/竖直可平移的 offset 上下限（控件坐标）。 */
