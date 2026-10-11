@@ -38,6 +38,7 @@ SOURCES += \
     engine/layerstyleeval.cpp \
     engine/op/layermodeop.cpp \
     engine/op/boxblurfilterop.cpp \
+    engine/op/embossfilterop.cpp \
     engine/op/filterop.cpp \
     engine/op/findedgesfilterop.cpp \
     engine/op/gaussianblurfilterop.cpp \
@@ -150,6 +151,7 @@ HEADERS += \
     engine/op/paintclip.h \
     engine/op/layermodeop.h \
     engine/op/boxblurfilterop.h \
+    engine/op/embossfilterop.h \
     engine/op/filterop.h \
     engine/op/findedgesfilterop.h \
     engine/op/gaussianblurfilterop.h \

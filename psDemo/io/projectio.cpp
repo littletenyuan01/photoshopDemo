@@ -113,6 +113,7 @@ void writeFilterNodeParams(QDataStream &p, const FilterNode &n)
     p << qint32(n.gaussRadius());
     p << qint32(n.medianRadius());
     p << qint32(n.sharpenStrength());
+    p << qint32(n.embossStrength());
     // —— 预留：后续新参数追加在此注释之后、勿改已有顺序 ——
 }
 
@@ -144,6 +145,7 @@ bool readFilterNodeParams(QDataStream &p, FilterNode *n)
     qint32 gaussRadius = 5;
     qint32 medianRadius = 3;
     qint32 sharpenStrength = 1;
+    qint32 embossStrength = 1;
     p >> brightness >> contrast;
     p >> hue >> saturation >> lightness >> vibrance;
     p >> exposure >> exposureOffset >> gammaCorrection;
@@ -162,6 +164,7 @@ bool readFilterNodeParams(QDataStream &p, FilterNode *n)
     p >> gaussRadius;
     p >> medianRadius;
     p >> sharpenStrength;
+    p >> embossStrength;
     if (p.status() != QDataStream::Ok)
         return false;
     n->setBrightness(brightness);
@@ -220,6 +223,7 @@ bool readFilterNodeParams(QDataStream &p, FilterNode *n)
     n->setGaussRadius(int(gaussRadius));
     n->setMedianRadius(int(medianRadius));
     n->setSharpenStrength(int(sharpenStrength));
+    n->setEmbossStrength(int(embossStrength));
     return true;
 }
 

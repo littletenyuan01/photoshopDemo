@@ -259,6 +259,37 @@ QImage naiveSharpen(const QImage &src, int s)
     return out;
 }
 
+/** 朴素 3×3 浮雕（逐像素、abyss=透明、alpha 原样保留）——浮雕算子的**语义 oracle**。 */
+QImage naiveEmboss(const QImage &src, int s)
+{
+    const int w = src.width();
+    const int h = src.height();
+    QImage out(src.size(), src.format());
+    const auto at = [&src, w, h](int x, int y) -> QRgb {
+        if (x < 0 || y < 0 || x >= w || y >= h)
+            return 0u; // abyss = 透明
+        return qUnpremultiply(src.pixel(x, y));
+    };
+    const auto ch = [](QRgb q, int c) -> int {
+        return (c == 0) ? qRed(q) : ((c == 1) ? qGreen(q) : ((c == 2) ? qBlue(q) : qAlpha(q)));
+    };
+    for (int y = 0; y < h; ++y) {
+        for (int x = 0; x < w; ++x) {
+            const QRgb p = at(x, y);
+            int v[3] = {0, 0, 0};
+            for (int c = 0; c < 3; ++c) {
+                v[c] = qBound(0,
+                              s * (-ch(at(x - 1, y - 1), c) - ch(at(x, y - 1), c) - ch(at(x - 1, y), c)
+                                   + ch(at(x + 1, y), c) + ch(at(x, y + 1), c) + ch(at(x + 1, y + 1), c))
+                                  + 128,
+                              255);
+            }
+            out.setPixel(x, y, qPremultiply(qRgba(v[0], v[1], v[2], qAlpha(p))));
+        }
+    }
+    return out;
+}
+
 /** 全幅合成（整幅一次 compositeRegion）。 */QImage compositeWhole(ImageDocument *doc)
 {
     return Compositor::composite(*doc);
@@ -624,6 +655,48 @@ int tAreaFilter()
                     QStringLiteral("往返保住锐化强度 2"));
         } else {
             r.check(false, QStringLiteral("重新打开含锐化的 .pslite"));
+        }
+    }
+
+    // —— ⑫ 浮雕：语义 oracle（朴素 3×3 方向性核 + 中灰）+ 分块 == 整幅 + 往返 ——
+    {
+        const QImage src = PsTests::makeLayerImage(40, 32, 53, 255);
+        for (int s = 1; s <= 2; ++s) {
+            QImage got = src;
+            FilterNode node(OpName::Emboss);
+            node.setEmbossStrength(s);
+            FilterEval::applyNode(got, node);
+            const QImage ref = naiveEmboss(src, s);
+            const long long d = PsTests::diffCount(got, ref);
+            r.check(d == 0,
+                    QStringLiteral("浮雕 s=%1：与朴素 3×3 方向性核一致（diffs=%2）").arg(s).arg(d));
+        }
+
+        const int W = 256, H = 256;
+        auto doc = ImageDocument::createBlank(W, H, Qt::white);
+        doc->placeImageAsLayer(PsTests::makeLayerImage(180, 150, 59, 220),
+                               QStringLiteral("embossL"));
+        doc->layers().layerAt(1)->setOffset(30, 40);
+        FilterNode enode(OpName::Emboss);
+        enode.setEmbossStrength(2);
+        doc->layers().layerAt(1)->filters().append(enode);
+        const QImage whole = compositeWhole(doc.get());
+        const QImage chunked = compositeChunked(doc.get());
+        const long long dc = PsTests::diffCount(whole, chunked);
+        r.check(dc == 0,
+                QStringLiteral("像素层浮雕：分块投影 == 整幅合成，无跨块接缝（diffs=%1）").arg(dc));
+
+        const QString path = PsTests::tempFilePath(QStringLiteral("emboss.pslite"));
+        QString err;
+        const bool saved = ProjectIo::save(*doc, path, &err);
+        auto back = saved ? ProjectIo::load(path, &err) : nullptr;
+        if (back && back->layers().count() > 1
+            && back->layers().layerAt(1)->filters().count() > 0) {
+            const FilterNode &n = back->layers().layerAt(1)->filters().at(0);
+            r.check(n.op() == OpName::Emboss && n.embossStrength() == 2,
+                    QStringLiteral("往返保住浮雕强度 2"));
+        } else {
+            r.check(false, QStringLiteral("重新打开含浮雕的 .pslite"));
         }
     }
 

@@ -53,6 +53,7 @@ enum class OpName {
     GaussianBlur,           ///< 高斯模糊（面积算子：三次盒模糊逼近）
     MedianBlur,             ///< 中值模糊（面积算子：滑窗直方图）
     Sharpen,                ///< 锐化（面积算子：3×3 线性核）
+    Emboss,                 ///< 浮雕（面积算子：3×3 方向性核 + 中灰偏置）
     Count                   ///< 哨兵，勿当作真实算子
 };
 

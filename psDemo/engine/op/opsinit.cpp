@@ -6,6 +6,7 @@
 #include "opsinit.h"
 #include "boxblurfilterop.h"
 #include "clonestampdabop.h"
+#include "embossfilterop.h"
 #include "filterop.h"
 #include "findedgesfilterop.h"
 #include "floodfillop.h"
@@ -119,6 +120,8 @@ void opsInit()
                      [] { return std::unique_ptr<FilterOp>(new MedianBlurFilterOp); });
     registerFilterOp(OpName::Sharpen,
                      [] { return std::unique_ptr<FilterOp>(new SharpenFilterOp); });
+    registerFilterOp(OpName::Emboss,
+                     [] { return std::unique_ptr<FilterOp>(new EmbossFilterOp); });
 }
 
 } // namespace Ps

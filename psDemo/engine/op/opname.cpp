@@ -51,6 +51,7 @@ constexpr OpNameInfo kOpNameTable[] = {
     {OpName::GaussianBlur,         "ps:gaussian-blur",         "高斯模糊"},
     {OpName::MedianBlur,           "ps:median-blur",           "中间值"},
     {OpName::Sharpen,              "ps:sharpen",               "锐化"},
+    {OpName::Emboss,               "ps:emboss",                "浮雕效果"},
 };
 
 const OpNameInfo *infoFor(OpName name)
@@ -89,6 +90,7 @@ bool isAdjustmentOp(OpName name)
     case OpName::GaussianBlur:
     case OpName::MedianBlur:
     case OpName::Sharpen:
+    case OpName::Emboss:
         return false;
     default:
         break;

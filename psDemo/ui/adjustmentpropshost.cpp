@@ -426,6 +426,16 @@ void AdjustmentPropsHost::ensurePages()
         wireSliderSpin(strength.slider, strength.spin, [this](int v) { m_node.setSharpenStrength(v); });
         add(Ps::OpName::Sharpen, page);
     }
+    {
+        // 浮雕效果（面积算子）：无 .ui，一页一个强度滑块（1..4）
+        auto *page = new QWidget(m_stack);
+        auto *col = new QVBoxLayout(page);
+        col->setContentsMargins(0, 0, 0, 0);
+        const SliderRow strength = makeSliderRow(page, QStringLiteral("强度"), QStringLiteral("emboss_strength"), 1, 4);
+        col->addWidget(strength.row);
+        wireSliderSpin(strength.slider, strength.spin, [this](int v) { m_node.setEmbossStrength(v); });
+        add(Ps::OpName::Emboss, page);
+    }
 }
 
 void AdjustmentPropsHost::showPageFor(Ps::OpName op)
@@ -548,6 +558,9 @@ void AdjustmentPropsHost::loadControlsFromNode()
         break;
     case Ps::OpName::Sharpen:
         setPair("slider_sharpen_strength", "spin_sharpen_strength", m_node.sharpenStrength());
+        break;
+    case Ps::OpName::Emboss:
+        setPair("slider_emboss_strength", "spin_emboss_strength", m_node.embossStrength());
         break;
     default:
         break;

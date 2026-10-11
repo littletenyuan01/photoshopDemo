@@ -284,6 +284,12 @@ void MainWindow::setupMenus()
     connect(ui->actionUnsharpMask, &QAction::triggered, this,
             [this]() { runFilterDialog(Ps::OpName::UnsharpMask); });
 
+    // 滤镜 → 风格化 → 浮雕效果（3×3 方向性核 + 中灰偏置）
+    ui->actionEmboss->setEnabled(true);
+    ui->actionEmboss->setToolTip(tr("浮雕效果（3×3 方向性核，非破坏，作用于活动像素层）"));
+    connect(ui->actionEmboss, &QAction::triggered, this,
+            [this]() { runFilterDialog(Ps::OpName::Emboss); });
+
     // 滤镜 → 风格化 → 查找边缘（无参数 → 直接应用，不进对话框）
     ui->actionFindEdges->setEnabled(true);
     ui->actionFindEdges->setToolTip(tr("查找边缘（非破坏，作用于活动像素层）"));
