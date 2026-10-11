@@ -27,6 +27,7 @@ int tBlendParallel();
 int tTransformLive();
 int tDirtyBudget();
 int tAreaFilter();
+int tFilterUndo();
 
 namespace {
 
@@ -43,6 +44,7 @@ const Case kCases[] = {
     { "transformlive", "自由变换 live 投影与提交后合成一致", tTransformLive },
     { "dirtybudget", "带滤镜层的小脏区重投影受时间预算约束（回归护栏）", tDirtyBudget },
     { "areafilter", "面积算子 BoxBlur：ROI 外扩打通 + 分块无接缝 + 往返", tAreaFilter },
+    { "filterundo", "滤镜对话框的撤销原子性：确定=一条撤销、取消=不留痕", tFilterUndo },
 };
 
 } // namespace

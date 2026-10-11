@@ -111,11 +111,14 @@ public:
      */
     int addBrightnessContrastFilter(qreal brightness = 0.12, qreal contrast = 0.18);
     /**
-     * 给活动像素层追加一个滤镜节点（非破坏、可开关、可撤销）。
+     * 给活动像素层追加一个滤镜节点（非破坏、可开关）。
      * 无可见活动层、或活动层是调整层时失败返回 -1。
+     *
+     * @param pushUndo false = **临时节点**（滤镜对话框的实时预览用），不进撤销栈；
+     *        对话框确定时再以 true 正式加入，从而让「一次滤镜操作 = 一条撤销」。
      * @return 新滤镜在层滤镜栈中的下标。
      */
-    int addLayerFilter(const FilterNode &node);
+    int addLayerFilter(const FilterNode &node, bool pushUndo = true);
     /**
      * 新建调整图层（对照 PS：独立层种 + 默认白色蒙版 + 属性面板调参）。
      * GIMP 原生无此层种，等价物是 drawable filter；本 Demo 按 PS 语义。
@@ -135,8 +138,8 @@ public:
                             bool pushUndo);
     /** 开关指定滤镜；index 越界返回 false。 */
     bool setLayerFilterEnabled(int layerIndex, int filterIndex, bool enabled);
-    /** 移除指定滤镜。 */
-    bool removeLayerFilter(int layerIndex, int filterIndex);
+    /** 移除指定滤镜。@param pushUndo false = 移除临时节点（对话框取消），不进撤销栈。 */
+    bool removeLayerFilter(int layerIndex, int filterIndex, bool pushUndo = true);
 
     /**
      * 给活动层确保一条图层样式（无则追加默认并启用；已有则打开）。

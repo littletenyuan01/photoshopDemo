@@ -50,7 +50,8 @@
   - `ui/canvassizedialog.ui`：当前大小 / 新建大小 / 相对 / 定位锚点 / 扩展颜色；确认后调用 `ImageDocument::resizeCanvas`。
   - 快捷键对齐 PS：`Ctrl+Alt+I` / `Ctrl+Alt+C`。
 - **滤镜菜单（已接线 1 项）**：`滤镜 → 模糊 → 方框模糊…` 打开参数对话框（半径 0..128），
-  拖动即时预览（写回层滤镜节点并重合成）、确定应用（非破坏、进 undo）、取消则删除该滤镜节点。
+  拖动即时预览（写回层滤镜节点并重合成）；**确定**应用（非破坏，**一次操作 = 一条撤销**）；
+  **取消**则摘掉临时节点、撤销栈不留痕。对话框内 `Ctrl+Z` 可**逐步回退参数**（模态框会吞掉主窗口的撤销键）。
   实现：`FilterDialog`（复用 `AdjustmentPropsHost` 参数面板）+ `ImageDocument::addLayerFilter` / `setLayerFilterNode` / `removeLayerFilter`。
   **其余滤镜分类仍为灰显占位**（tooltip 写「UI 占位，功能尚未接入」）。
 - **菜单下拉**：顶层与 Photoshop 中文版对齐（文件 / 编辑 / 图像 / 图层 / 文字 / 选择 / 滤镜 / 3D / 视图 / 窗口 / 帮助），

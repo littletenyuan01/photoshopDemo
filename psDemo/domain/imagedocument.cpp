@@ -428,13 +428,14 @@ int ImageDocument::addBrightnessContrastFilter(qreal brightness, qreal contrast)
     return index;
 }
 
-int ImageDocument::addLayerFilter(const FilterNode &node)
+int ImageDocument::addLayerFilter(const FilterNode &node, bool pushUndo)
 {
     Layer *layer = activeLayer();
     if (!layer || !layer->isVisible() || layer->isAdjustmentLayer())
         return -1;
 
-    pushLayerPropUndo(m_activeLayerIndex, tr("添加滤镜"));
+    if (pushUndo)
+        pushLayerPropUndo(m_activeLayerIndex, tr("添加滤镜"));
     const int index = layer->filters().append(node);
     layer->invalidateCompositeRaster();
     markDirty(layer->boundsInDocument().intersected(QRect(0, 0, m_width, m_height)));
@@ -534,13 +535,14 @@ bool ImageDocument::setLayerFilterEnabled(int layerIndex, int filterIndex, bool 
     return true;
 }
 
-bool ImageDocument::removeLayerFilter(int layerIndex, int filterIndex)
+bool ImageDocument::removeLayerFilter(int layerIndex, int filterIndex, bool pushUndo)
 {
     Layer *layer = m_layers.layerAt(layerIndex);
     if (!layer || filterIndex < 0 || filterIndex >= layer->filters().count())
         return false;
 
-    pushLayerPropUndo(layerIndex, tr("删除滤镜"));
+    if (pushUndo)
+        pushLayerPropUndo(layerIndex, tr("删除滤镜"));
     if (!layer->filters().removeAt(filterIndex))
         return false;
     layer->invalidateCompositeRaster();

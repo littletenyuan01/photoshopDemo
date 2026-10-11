@@ -1579,8 +1579,10 @@ void MainWindow::runFilterDialog(Ps::OpName op)
     if (op == Ps::OpName::BoxBlur)
         node.setBlurRadius(5);
 
-    // 先非破坏地加到图层（进入 undo）；对话框改的是这个节点
-    const int fi = doc->addLayerFilter(node);
+    // 先把节点**临时**加到图层（pushUndo=false，不进撤销栈），供对话框实时预览；
+    // 确定时才「摘掉临时节点 + 正式加入」——这样一次滤镜操作正好是一条撤销
+    // （撤销点 = 加滤镜之前）。取消则摘掉临时节点，撤销栈不留痕。
+    const int fi = doc->addLayerFilter(node, /*pushUndo=*/false);
     if (fi < 0) {
         flashStatusMessage(tr("无法添加滤镜"));
         return;
@@ -1595,11 +1597,14 @@ void MainWindow::runFilterDialog(Ps::OpName op)
             });
 
     if (dlg.exec() == QDialog::Accepted) {
-        doc->setLayerFilterNode(li, fi, dlg.node(), /*pushUndo=*/true);
-        flashStatusMessage(tr("已应用滤镜（非破坏）"));
+        const Ps::FilterNode finalNode = dlg.node();
+        doc->removeLayerFilter(li, fi, /*pushUndo=*/false);
+        if (doc->addLayerFilter(finalNode, /*pushUndo=*/true) < 0)
+            flashStatusMessage(tr("无法添加滤镜"));
+        else
+            flashStatusMessage(tr("已应用滤镜（非破坏）"));
     } else {
-        // 取消：删掉刚加的节点（undo 栈里是「添加 + 删除」两步，各自可撤销）
-        doc->removeLayerFilter(li, fi);
+        doc->removeLayerFilter(li, fi, /*pushUndo=*/false);
     }
 }
 

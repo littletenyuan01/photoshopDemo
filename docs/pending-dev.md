@@ -671,7 +671,7 @@ sliderReleased → setLayerFilterNode(..., pushUndo=true)
 | 加滤镜的通用入口 | 新增 `ImageDocument::addLayerFilter(const FilterNode&)`（push undo + 失效栅格 + markDirty，返回下标） | 原先只有 `addBrightnessContrastFilter` 一个硬编码入口，加不了别的算子 |
 | 参数面板 | `AdjustmentPropsHost` 增一页「盒模糊：半径 0..128」，该页**程序化建**（无 .ui） | 它已有「按 OpName 切页 + 预览/提交信号」，复用它比新写面板省；程序化建页避免为一个滑块新增 .ui + FORMS |
 | 对话框 | 新增 `ui/filterdialog.{h,cpp}`：`QDialog` = 参数面板 + OK/Cancel，只转发 `previewChanged`，**自身无状态、不碰文档** | 「应用/取消」的语义属于文档层，放 `MainWindow`；对话框做成哑组件才能被复用（将来调整类滤镜也能挂） |
-| 应用语义 | 先 `addLayerFilter`（进 undo）→ 对话框编辑该节点 → 确定 `setLayerFilterNode(..., pushUndo=true)`；取消 `removeLayerFilter` | 与调整层那套「预览不 push / 定稿才 push」一致 |
+| 应用语义 | 节点先以 `pushUndo=false` **临时**加入（供预览）→ 确定时「摘掉临时节点 + 正式加入（`pushUndo=true`）」；取消则摘掉临时节点 | 让**一次滤镜操作 = 一条撤销**：撤销点恰是「加滤镜之前」；取消不留痕 |
 | 菜单 | 「滤镜 → 模糊 → 方框模糊…」置 enabled + 连 `runFilterDialog(OpName::BoxBlur)` | 其余分类保持占位，不假装有功能 |
 
 **预览的取舍（已知限制）**：像素层滤镜的预览是**整区重合成**（`setLayerFilterNode(..., false)` → markDirty），
@@ -683,9 +683,22 @@ sliderReleased → setLayerFilterNode(..., pushUndo=true)
 
 全套 12/12；主程序干净重建 0 warning / 0 error。
 
+**撤销原子性（实测反馈后修正）**：用户反馈「点确定后撤销能撤回；**没点确定按撤销撤不回来**」。
+离线复现出两个真实问题：
+
+1. **打开对话框就 push 了一条「添加滤镜」**，取消时又 push 一条「删除滤镜」→ 取消后按 Ctrl+Z
+   会把刚取消掉的滤镜**撤回来**（用户感受就是「撤不回来 / 反了」）；确定也要按**两次** Ctrl+Z 才干净。
+   改法：`addLayerFilter` / `removeLayerFilter` 增 `pushUndo` 参数，对话框流程用临时节点，
+   确定时才正式加入 —— 一次操作恰好一条撤销。
+2. **模态对话框会吞掉主窗口的 Ctrl+Z**，拖动参数后按 Ctrl+Z 毫无反应。
+   改法：`FilterDialog` 自带一条 Ctrl+Z，**逐步回退参数**（每次参数提交记一份「提交前」的节点，
+   回退后发 `previewChanged` 让画布跟着退）。它只动参数、不碰文档撤销栈 —— 文档级撤销仍由确定/取消决定。
+
+**验证**：新增常驻用例 `filterundo` 离线复刻整条流程 —— 确定 → **一次**撤销即 filters=0 且画面与原样逐像素相同；
+取消 → 状态原样且不改变撤销栈可用性。全套 13/13；主程序干净重建 0 warning / 0 error。
+
 **仍欠**：① 大文档的滤镜预览仍是同步整区重合成（需异步/降采样，与 Roadmap 9.2 同一条）；
-② 取消会留「添加 + 删除」两条 undo（各自可撤销，但不是单条原子操作）；
-③ 对话框还没有「预览」勾选框与前后对比视图。
+② 对话框还没有「预览」勾选框与前后对比视图；③ `HistoryStack` 未暴露深度，测试只能断言行为、无法断言条目数。
 
 ---
 

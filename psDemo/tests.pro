@@ -32,7 +32,8 @@ SOURCES += \
     tests/t_blendparallel.cpp \
     tests/t_transform.cpp \
     tests/t_dirtybudget.cpp \
-    tests/t_areafilter.cpp
+    tests/t_areafilter.cpp \
+    tests/t_filterundo.cpp
 
 HEADERS += \
     tests/testutil.h
