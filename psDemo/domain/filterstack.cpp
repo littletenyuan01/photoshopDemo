@@ -67,6 +67,19 @@ bool FilterStack::hasPositionalOp() const
     return false;
 }
 
+QRect FilterStack::requiredInputRect(const QRect &output) const
+{
+    // 见头文件：自栈顶往栈底倒推（栈按顺序作用，后一个算子的输入需求 = 前一个的输出需求）。
+    QRect r = output;
+    for (int i = m_nodes.count() - 1; i >= 0; --i) {
+        const FilterNode &n = m_nodes.at(i);
+        if (!n.isEnabled())
+            continue;
+        r = n.requiredInputs(r);
+    }
+    return r;
+}
+
 /** 对 source 拷贝自底向顶应用已启用节点；无启用节点时原样返回。 */
 QImage FilterStack::apply(const QImage &source) const
 {

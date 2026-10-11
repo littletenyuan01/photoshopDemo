@@ -13,6 +13,7 @@
 #include "domain/imagedocument.h"
 #include "domain/layer.h"
 #include "engine/compositor.h"
+#include "engine/filtereval.h"
 #include "engine/layerfilterjob.h"
 #include "engine/op/opname.h"
 #include "engine/projection.h"
@@ -329,5 +330,120 @@ int tPreviewDownsample()
     r.info(QStringLiteral("降采样预览耗时：divisor=1 %1 ms / divisor=2 %2 ms（后台墙钟，含事件轮询）")
                .arg(msFull).arg(msHalf));
 
+    return r.fails;
+}
+
+/**
+ * 任务对象的**析构安全性** —— 钉住一条曾经写错的不变量。
+ *
+ * 后台 lambda 捕获了 `this`（写 `m_progress`、`QMetaObject::invokeMethod(this,…)`），
+ * 所以「对象先走、任务还在跑」是实打实的 use-after-free。症状极具迷惑性：
+ * 单跑用例几十次全过，只有**全量连跑**（堆布局与时序不同）才偶发
+ * `0xC0000374`（STATUS_HEAP_CORRUPTION），而且崩在**别的**用例里。
+ *
+ * 本用例反复「起了重任务立刻析构」，用来守住 `~LayerFilterJob` 必须等在途 future。
+ * 它**不是**确定性证明（崩溃本来就是概率性的），但把那条路径每次都走一遍。
+ */
+int tFilterJobTeardown()
+{
+    Reporter r;
+    const int W = 400, H = 300;
+    bool startedAll = true;
+    for (int i = 0; i < 6; ++i) {
+        auto doc = ImageDocument::createBlank(W, H, Qt::white);
+        doc->placeImageAsLayer(PsTests::makeLayerImage(W, H, 29, 255), QStringLiteral("t"));
+        Layer *layer = doc->layers().layerAt(1);
+        if (!layer) {
+            r.check(false, QStringLiteral("有活动像素层"));
+            return r.fails;
+        }
+        FilterNode m(OpName::MedianBlur);
+        m.setMedianRadius(6);
+        layer->filters().append(m);
+        {
+            Ps::LayerFilterJob job; // 栈上：离开作用域就析构（**不等**它跑完）
+            startedAll = job.start(doc.get(), 1, QRect(0, 0, W, H)) && startedAll;
+        }
+    }
+    r.check(startedAll, QStringLiteral("六次「起重任务后立刻析构」都真的起了任务（否则测不到东西）"));
+    r.check(true, QStringLiteral("起任务后立即析构未崩溃（析构等在了途 future）"));
+    return r.fails;
+}
+
+/**
+ * **位置相关算子**（添加杂色）的预览也走后台。
+ *
+ * 它 `inputPad()==0`，按「有没有 pad」的老判据不会被异步化 —— 而它恰恰是**同步代价最大**的
+ * 那一类：必须整层求值，且整层路径走的是 `ensureCompositeRaster`（不受投影时间预算约束），
+ * 8.7 Mpx 高斯彩噪实测 200 ms 一次。本用例钉住三件事：
+ *  ① 预览的 want 被放大成**整层**（噪声才不会随请求漂移）；
+ *  ② 任务把**整层**写进区域缓存（而不是请求的那一小块）；
+ *  ③ 域层走缓存把结果还给请求方（否则等于在 UI 线程上再整层重算一遍）。
+ */
+int tPositionalPreviewAsync()
+{
+    Reporter r;
+
+    const int W = 320, H = 240;
+    auto doc = ImageDocument::createBlank(W, H, Qt::white);
+    doc->placeImageAsLayer(PsTests::makeLayerImage(W, H, 23, 255), QStringLiteral("noisy"));
+    Layer *layer = doc->layers().layerAt(1);
+    if (!layer) {
+        r.check(false, QStringLiteral("有活动像素层"));
+        return r.fails;
+    }
+
+    FilterNode n(OpName::AddNoise);
+    n.setNoiseAmount(20);
+    n.setNoiseSeed(4242u);
+    doc->addLayerFilter(n, /*pushUndo=*/false); // 无人订阅时装好，避免 setup 触发任务
+
+    int contentSignals = 0;
+    QObject::connect(doc.get(), &ImageDocument::contentChanged, doc.get(),
+                     [&]() { ++contentSignals; });
+
+    CanvasView canvas;
+    canvas.resize(400, 300);
+    canvas.setDocument(doc.get());
+    contentSignals = 0;
+
+    // 预览：改数量（只给一小块可见区，位置相关算子必须把它放大成整层）
+    FilterNode n2 = n;
+    n2.setNoiseAmount(35);
+    const QRect region(60, 50, 100, 80);
+    doc->setLayerFilterNodePreview(1, 0, n2, region);
+
+    r.check(contentSignals == 0,
+            QStringLiteral("预览仍是静默标脏（不发 contentChanged；实际 %1 次）").arg(contentSignals));
+
+    const QRect whole(0, 0, W, H);
+    QElapsedTimer t;
+    t.start();
+    bool cached = false;
+    while (t.elapsed() < 5000 && !cached) {
+        QApplication::processEvents();
+        cached = layer->regionFilterCovers(whole);
+    }
+    r.check(cached, QStringLiteral("位置相关算子：后台任务把**整层**写进了区域缓存（等待 %1 ms）")
+                        .arg(t.elapsed()));
+    r.check(layer->regionFilterCovers(region),
+            QStringLiteral("整层缓存天然覆盖原来请求的那一小块"));
+
+    // 走缓存的请求应返回整层图，且内容 == 直接对整层内容加噪声
+    {
+        QImage direct = layer->materialize();
+        FilterEval::applyNode(direct, n2);
+        const Layer::CompositeRegion reg = layer->compositeRasterRegion(region);
+        r.check(reg.image.size() == QSize(W, H),
+                QStringLiteral("域层复用缓存：请求小区块也拿到整层图（%1×%2，而非 %3×%4）")
+                    .arg(reg.image.width()).arg(reg.image.height())
+                    .arg(region.width()).arg(region.height()));
+        const long long d = PsTests::diffCount(reg.image, direct);
+        r.check(d == 0, QStringLiteral("缓存内容 == 直接对整层内容加噪声（diffs=%1）").arg(d));
+        r.check(reg.docX == 0 && reg.docY == 0,
+                QStringLiteral("文档原点正确（%1,%2）").arg(reg.docX).arg(reg.docY));
+    }
+
+    canvas.setDocument(nullptr);
     return r.fails;
 }

@@ -213,6 +213,25 @@ Layer::CompositeRegion Layer::compositeRasterRegion(const QRect &regionDoc) cons
     // 三者都退回「整层求值一次，再按请求区裁」，见 docs/engine/roi.md §5。
     // 也因此**不**吃下面的区域滤镜缓存（那个是逐块几何）。
     if (m_styles.hasEnabled() || m_filters.hasGeometryOp() || m_filters.hasPositionalOp()) {
+        // 【异步预览/定稿复用的落点】位置相关算子的后台任务算的就是**整层**，并把它写进
+        // 区域滤镜缓存。这里优先复用它 —— 否则会再同步整层重算一遍，等于把刚挪到后台的活
+        // 又在 UI 线程上做一次（与台账 #13 是同一类「缓存写给谁看」的问题）。
+        // 只对「纯位置相关」开放：有样式时算的不是同一张图；有几何算子时缓存语义不同。
+        if (!m_styles.hasEnabled() && !m_filters.hasGeometryOp() && m_filters.hasPositionalOp()) {
+            const QRect layerDoc(offsetX(), offsetY(), m_tiles.width(), m_tiles.height());
+            if (regionFilterCovers(layerDoc)) {
+                // 缓存正好是这一块时**直接隐式共享**（不深拷贝）：8.7 Mpx 层的一次
+                // `QImage::copy` 实测 ~14 ms，而这条路径每次请求都会走
+                //（投影逐块请求，块界处都会命中这里）。
+                out.image = (m_regionFilterRect == layerDoc)
+                                ? m_regionFilterImage
+                                : m_regionFilterImage.copy(
+                                      layerDoc.translated(-m_regionFilterRect.topLeft()));
+                out.docX = layerDoc.left();
+                out.docY = layerDoc.top();
+                return out;
+            }
+        }
         const CompositeRaster whole = ensureCompositeRaster();
         out.image = whole.image;
         out.docX = offsetX() + whole.originDx;
@@ -236,15 +255,16 @@ Layer::CompositeRegion Layer::compositeRasterRegion(const QRect &regionDoc) cons
         return out;
     }
 
-    // 面积算子要读「请求区外扩 totalPad」的真实像素，再裁回 want：
-    // 只取 want+pad（越出层范围的由 extract 填透明 = 层外即透明的 abyss），
-    // 求值后裁回 want。点滤镜 totalPad()==0 时退化为原路径。
-    const int pad = m_filters.totalPad();
-    const QRect srcWant = want.adjusted(-pad, -pad, pad, pad).intersected(layerRect);
+    // ROI 通用化第 ② 步：输入需求改由**链自己**声明（`FilterStack::requiredInputRect`），
+    // 而不是调用方按「对称 pad」猜。对称算子的结果与旧的 `want ± totalPad()` 完全一致；
+    // 不对称算子（运动模糊 0°/90°）则能少取一整个方向的像素。
+    // 只取所需输入区（越出层范围的由 extract 填透明 = 层外即透明的 abyss），求值后**按几何裁回**
+    // （裁剪点 = `want.topLeft() - srcWant.topLeft()`，不再假设「pad 一定对称」）。
+    const QRect srcWant = m_filters.requiredInputRect(want).intersected(layerRect);
     QImage base = TilePatch::extract(m_tiles, srcWant);
     if (m_filters.hasEnabled()) {
         // ROI 通用化第 ① 步：把「请求区 / 所需输入区」按**本文档坐标**告诉滤镜链。
-        // 本例里 srcWant 比 want 大一圈 pad（面积算子外扩），算子据此知道多出的边在哪。
+        // 本例里 srcWant 通常比 want 大一圈（面积算子外扩），算子据此知道多出的边在哪。
         const QRect srcDoc = srcWant.translated(offsetX(), offsetY());
         const QRect outDoc = want.translated(offsetX(), offsetY());
         base = m_filters.apply(base, srcDoc, outDoc, nullptr);

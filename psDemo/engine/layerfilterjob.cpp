@@ -32,10 +32,18 @@ LayerFilterJob::LayerFilterJob(QObject *parent)
 
 LayerFilterJob::~LayerFilterJob()
 {
-    // 析构时先取消：后台任务不持有 this，所以它不会回调到已析构的对象；
-    // 置旗标只是让谓词尽快为 true，少算一点是一点。
+    // 【必须等后台收工 —— 这条曾经是错的，并真的炸过】
+    // 后台 lambda 捕获了 `this`（`m_progress.store(...)` 与 `QMetaObject::invokeMethod(this,…)`），
+    // 所以**对象不能在任务跑完前析构**，否则就是往已释放内存里写 → 堆损坏。
+    // 症状极具迷惑性：单跑用例 30 次全过，只有全量连跑（堆布局+时序不同）才偶发
+    // `0xC0000374`（STATUS_HEAP_CORRUPTION），崩在**别的**用例里。
+    //
+    // 顺序：先置取消旗标（让面积算子的协作式谓词尽快为真、少等一会儿）→ 再等在途 future。
+    // 等完以后，回调若已排队也**不会**再执行到本对象上：~QObject 会清掉目标为它的待派发事件。
     if (m_cancel)
         m_cancel->store(true);
+    if (m_future.isRunning())
+        m_future.waitForFinished();
 }
 
 bool LayerFilterJob::start(ImageDocument *doc, int layerIndex, const QRect &want,
@@ -58,14 +66,23 @@ bool LayerFilterJob::start(ImageDocument *doc, int layerIndex, const QRect &want
     cancel();
     const quint32 runId = ++m_runId;
 
-    // —— 主线程：算好「请求区 + pad」的层内矩形，抽出独立快照 ——
-    const int pad = layer->filters().totalPad();
+    // —— 主线程：算好「请求区 + 所需输入区」的层内矩形，抽出独立快照 ——
     const QRect layerRect(0, 0, layer->width(), layer->height());
     const QRect wantLocal =
         want.translated(-layer->offsetX(), -layer->offsetY()).intersected(layerRect);
     if (wantLocal.isEmpty())
         return false;
-    const QRect srcLocal = wantLocal.adjusted(-pad, -pad, pad, pad).intersected(layerRect);
+    // ROI 通用化第 ② 步：输入需求由**链自己声明**（可不对称，如运动模糊 0°/90°）。
+    // 用**未裁剪**的需求求各侧 pad，再裁剪成实际取得到的 srcLocal：
+    //  · 条带边界要用前者 —— 层边缘会把 srcLocal 裁掉，但条带仍需向外多取（靠 ∩ snap.rect() 兜住）；
+    //  · `outLocalLeft/Top` 仍由**裁剪后**的 srcLocal 得出（它描述的是 want 在 snap 里的真实位置）。
+    const QRect reqLocal = layer->filters().requiredInputRect(wantLocal);
+    const QRect srcLocal = reqLocal.intersected(layerRect);
+    const int padLeft = wantLocal.left() - reqLocal.left();
+    const int padTop = wantLocal.top() - reqLocal.top();
+    const int padRight = reqLocal.right() - wantLocal.right();
+    const int padBottom = reqLocal.bottom() - wantLocal.bottom();
+    const int padV = qMax(padTop, padBottom); // 条带是横向切的，只有纵向 pad 限制条带数
     const QImage snap = TilePatch::extract(layer->tiles(), srcLocal);
     if (snap.isNull())
         return false;
@@ -89,8 +106,9 @@ bool LayerFilterJob::start(ImageDocument *doc, int layerIndex, const QRect &want
     QPointer<ImageDocument> docPtr(doc);
     const int previewDiv = qMax(1, previewDivisor);
 
-    auto future = QtConcurrent::run([this, docPtr, layerIndex, stack, snap, srcOrigin, outRect,
-                                     pad, generation, runId, cancelFlag, previewDiv]() {
+    m_future = QtConcurrent::run([this, docPtr, layerIndex, stack, snap, srcOrigin, outRect,
+                                  padLeft, padTop, padRight, padBottom, padV, generation, runId,
+                                  cancelFlag, previewDiv]() {
         // 【线程安全】只碰 snap（独立快照）与 cancelFlag（原子）——**不读** doc/layer/瓦片。
         const auto shouldAbort = [cancelFlag]() { return cancelFlag->load(); };
 
@@ -106,10 +124,15 @@ bool LayerFilterJob::start(ImageDocument *doc, int layerIndex, const QRect &want
         // 所以这里自己也切条带：每条带取「输出行 ± pad」的输入、求值后裁回本带输出行，
         // 条带之间**互不相交**（与 `Compositor::blendLayerRangeParallel` 同一套路）。
         // pad 是硬约束：条带太薄时 pad 会把相邻条带的输入吃光，故按 pad 反推条带数上限。
-        const int maxStripsByPad = (pad > 0) ? qMax(1, outSize.height() / (4 * pad)) : 64;
+        const int maxStripsByPad = (padV > 0) ? qMax(1, outSize.height() / (4 * padV)) : 64;
         const int threads = qMax(1, QThreadPool::globalInstance()->maxThreadCount());
-        const int strips =
-            qBound(1, qMin(threads, qMax(1, outSize.height() / 64)), maxStripsByPad);
+        int strips = qBound(1, qMin(threads, qMax(1, outSize.height() / 64)), maxStripsByPad);
+        // 【位置相关算子不能切条带】它按**输入图本地坐标**取噪声（见 filtereval.cpp 的
+        // `applyAddNoise`）。条带会把 snap 裁成一条条子图，每条子图的 (0,0) 都不同 →
+        // 噪声在条带界错位/重复。故退化为整幅一次求值（strips=1 ⇒ work 就是整张 snap）。
+        // 前提是调用方传的是**整层** want，这样 snap 的本地坐标才等于层内坐标。
+        if (stack.hasPositionalOp())
+            strips = 1;
 
         QVector<QRect> outBands;
         outBands.reserve(strips);
@@ -136,7 +159,7 @@ bool LayerFilterJob::start(ImageDocument *doc, int layerIndex, const QRect &want
             if (cancelFlag->load())
                 return;
             const QRect srcBand = band.translated(outLocalLeft, outLocalTop)
-                                      .adjusted(-pad, -pad, pad, pad)
+                                      .adjusted(-padLeft, -padTop, padRight, padBottom)
                                       .intersected(QRect(0, 0, snap.width(), snap.height()));
             if (srcBand.isEmpty())
                 return;
@@ -243,7 +266,6 @@ bool LayerFilterJob::start(ImageDocument *doc, int layerIndex, const QRect &want
             },
             Qt::QueuedConnection);
     });
-    Q_UNUSED(future);
     return true;
 }
 

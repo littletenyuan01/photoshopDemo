@@ -1054,11 +1054,18 @@ void CanvasView::onLayerFilterPreview(int layerIndex, const QRect &regionDoc)
     if (!layer)
         return;
 
-    // 只有**重滤镜**（面积算子 `inputPad()>0`）值得挪到后台：
+    // 只有**重滤镜**（面积算子 `inputPad()>0`）或**位置相关算子**（添加杂色）值得挪到后台：
     //  · 纯点滤镜逐像素，可见区也就几毫秒 → 退回同步，异步化只是徒增复杂度；
     //  · 几何算子（位移）走整层专用路径；有样式的层走整层缓存；调整层有自己的 live 通道。
-    const bool heavy = strongestPadOfLayer(layer) > 0 && !layer->filters().hasGeometryOp()
-                       && !layer->isAdjustmentLayer() && !layer->styles().hasEnabled();
+    const bool positional = layer->filters().hasPositionalOp();
+    const bool heavy = (strongestPadOfLayer(layer) > 0 || positional)
+                       && !layer->filters().hasGeometryOp() && !layer->isAdjustmentLayer()
+                       && !layer->styles().hasEnabled();
+
+    // 【位置相关算子必须整层求值】噪声按输入图本地坐标取；只有整层一次求值，
+    // 本地坐标才等于层内坐标（逐块/按区域都会让图案漂移）。所以 want 用**整层**，
+    // 且**绝不能降采样**（降采样会把坐标一起缩掉）。
+    const QRect want = positional ? layer->boundsInDocument() : regionDoc;
 
     // 【降采样预览】只在「大区域 + 半径够大」时才降，两个条件都必要：
     //  · 区域小：本来就只有几毫秒，降采样只会白白变糊；
@@ -1071,14 +1078,14 @@ void CanvasView::onLayerFilterPreview(int layerIndex, const QRect &regionDoc)
     constexpr int kDownsampleMinArea = 512 * 512;
     int divisor = 1;
     const int maxPad = strongestPadOfLayer(layer);
-    if (regionDoc.width() * regionDoc.height() >= kDownsampleMinArea) {
+    if (!positional && want.width() * want.height() >= kDownsampleMinArea) {
         if (maxPad >= 8)
             divisor = 4;
         else if (maxPad >= 4)
             divisor = 2;
     }
 
-    if (heavy && startFilterJobFor(layerIndex, regionDoc, divisor)) {
+    if (heavy && startFilterJobFor(layerIndex, want, divisor)) {
         m_filterProgressTimer->start();
         emit filterFinalizeProgress(divisor > 1
                                         ? tr("滤镜预览：后台求值（1/%1 降采样）…").arg(divisor)

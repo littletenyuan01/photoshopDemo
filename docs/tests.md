@@ -25,10 +25,10 @@ release\psdemo_tests.exe composite regionraster   :: 只跑指定用例
 
 ## 用例
 
-> 当前 **22 个用例**：`pixelprim / filterchain / regionraster / composite / graphcheck / projectio /
+> 当前 **24 个用例**：`pixelprim / filterchain / regionraster / composite / graphcheck / projectio /
 > adjustpanel / adjustapply / blendparallel / transformlive / dirtybudget / areafilter /
-> filterundo / filterpanel / filterasync / filterpreview / previewdown / roictx / offset /
-> morefilters / hpblur / noise`。
+> filterundo / filterpanel / filterasync / filterpreview / previewdown / posasync / jobteardown /
+> roictx / offset / morefilters / hpblur / noise`。
 
 | 名字 | 守住什么 |
 |---|---|
@@ -53,7 +53,9 @@ release\psdemo_tests.exe composite regionraster   :: 只跑指定用例
 | `roictx` | ROI 第①步：用**测试探针**钉住两条求值路径的几何真值（直接/图路径 = 整张图；像素层路径 = 文档坐标下的「所需输入区/请求区」换算成本地坐标）；几何如实描述手里那张图；**带几何 + 裁回 == 不带几何求值后裁回**（逐像素） |
 | `offset` | 位移（**几何算子**）：wrap / 透明各 7 组参数 == **朴素取模 oracle**；dx=dy=0 不改画面；**分块投影 == 整幅合成**（几何算子若被逐块求值必在块界错位，这是最要紧的护栏）；栈被识别为「含几何算子」；往返保住 dx/dy/wrap |
 | `morefilters` | 最大值/最小值 == 朴素极值 oracle、自定 == 朴素 3×3 卷积（含 scale=0）；三者**分块投影 == 整幅**（无块界接缝）；参数往返保真 |
-| `hpblur` | 高通 == `clamp(src - 盒模糊 + 128)`（用生产盒模糊做参照）；运动模糊 0°/45°/90° == 朴素一维盒；两者**分块投影 == 整幅**；参数往返保真 |
+| `hpblur` | 高通 == `clamp(src - 盒模糊 + 128)`（用生产盒模糊做参照）；运动模糊 0°/45°/90° == 朴素一维盒；**三档各自的「分块投影 == 整幅」**（0°/90° 走的是不对称输入需求，条带边界最容易在这里错）；直接断言 `requiredInputs` 只扩该扩的方向、而对称算子仍四边各扩；参数往返保真 |
+| `posasync` | **位置相关算子**（添加杂色）的预览异步化：want 被放大成**整层**、任务把整层写进区域缓存、域层复用该缓存把结果还给请求方（否则等于在 UI 线程上再整层重算一遍） |
+| `jobteardown` | **异步任务的析构安全**：反复「起了重任务立刻析构」，守住 `~LayerFilterJob` 必须等在途 future（曾因注释写了假不变量而偶发堆损坏，见缺陷台账 #21） |
 
 ## 约定
 

@@ -32,6 +32,8 @@ int tFilterPanel();
 int tFilterAsync();
 int tFilterPreviewAsync();
 int tPreviewDownsample();
+int tFilterJobTeardown();
+int tPositionalPreviewAsync();
 int tRoi();
 int tOffset();
 int tMoreFilters();
@@ -58,6 +60,8 @@ const Case kCases[] = {
     { "filterasync", "滤镜定稿的异步/可取消链路：协作式取消、区域缓存命中且与同步一致、世代号失效", tFilterAsync },
     { "filterpreview", "滤镜预览的异步化：静默标脏不发 contentChanged、后台只算给定区域、结果与整层裁块一致", tFilterPreviewAsync },
     { "previewdown", "预览降采样：空间参数按倍数缩小（0 保持 0、钳到 1）、任务照常写缓存、结果与原分辨率大体相近", tPreviewDownsample },
+    { "posasync", "位置相关算子（添加杂色）的预览异步化：want 放大成整层、任务写整层缓存、域层复用该缓存", tPositionalPreviewAsync },
+    { "jobteardown", "异步任务的析构安全：起了重任务立刻析构（守住 ~LayerFilterJob 必须等在途 future）", tFilterJobTeardown },
     { "roictx", "ROI 第①步：两条求值路径都按坐标空间填 src/out 几何，且退回本地坐标时结果不变", tRoi },
     { "offset", "位移（几何算子）：wrap/透明语义 oracle、分块投影无块界错位、全幅求值护栏、往返", tOffset },
     { "morefilters", "最大值/最小值/自定滤镜：语义 oracle、分块投影无接缝、参数往返", tMoreFilters },

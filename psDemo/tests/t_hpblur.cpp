@@ -183,21 +183,57 @@ int tHighPassMotion()
         }
 
         // 分块投影 == 整幅（45° 最吃 pad：水平 + 垂直都要够）
-        const int DW = 256, DH = 192;
-        auto doc = ImageDocument::createBlank(DW, DH, Qt::white);
-        doc->placeImageAsLayer(PsTests::makeLayerImage(200, 160, 53, 220), QStringLiteral("mb"));
-        doc->layers().layerAt(1)->setOffset(20, 10);
-        FilterNode n(OpName::MotionBlur);
-        n.setMotionDistance(9);
-        n.setMotionAngle(45);
-        doc->layers().layerAt(1)->filters().append(n);
-        const long long dc =
-            PsTests::diffCount(Compositor::composite(*doc), chunkedProjection(doc.get()));
-        r.check(dc == 0, QStringLiteral("运动模糊 45°：分块投影 == 整幅合成（diffs=%1）").arg(dc));
+        // **0°/90° 也必须测**：它们走的是 ROI 通用化第 ② 步的**不对称**输入需求
+        //（只扩一个方向），条带并行的边界取法一旦算错，就会在这里暴露成块界接缝。
+        for (int angle : {0, 90, 45}) {
+            const int DW = 256, DH = 192;
+            auto doc = ImageDocument::createBlank(DW, DH, Qt::white);
+            doc->placeImageAsLayer(PsTests::makeLayerImage(200, 160, 53, 220), QStringLiteral("mb"));
+            doc->layers().layerAt(1)->setOffset(20, 10);
+            FilterNode n(OpName::MotionBlur);
+            n.setMotionDistance(9);
+            n.setMotionAngle(angle);
+            doc->layers().layerAt(1)->filters().append(n);
+            const long long dc =
+                PsTests::diffCount(Compositor::composite(*doc), chunkedProjection(doc.get()));
+            r.check(dc == 0, QStringLiteral("运动模糊 %1°：分块投影 == 整幅合成（diffs=%2）")
+                                .arg(angle).arg(dc));
+        }
+
+        // 输入需求：0°/90° 必须只扩一个方向（这是第 ② 步换来的收益，别被人改回对称）
+        {
+            FilterNode h(OpName::MotionBlur);
+            h.setMotionDistance(10);
+            h.setMotionAngle(0);
+            const QRect want(100, 100, 64, 64);
+            r.check(h.requiredInputs(want) == QRect(90, 100, 84, 64),
+                    QStringLiteral("0° 的输入需求只向左扩、上下不扩（实际 %1,%2 %3×%4）")
+                        .arg(h.requiredInputs(want).left()).arg(h.requiredInputs(want).top())
+                        .arg(h.requiredInputs(want).width()).arg(h.requiredInputs(want).height()));
+            h.setMotionAngle(90);
+            r.check(h.requiredInputs(want) == QRect(100, 90, 64, 84),
+                    QStringLiteral("90° 的输入需求只向上扩、左右不扩"));
+            h.setMotionAngle(45);
+            r.check(h.requiredInputs(want) == QRect(90, 90, 84, 84),
+                    QStringLiteral("45° 两向都扩"));
+            // 默认（面积算子）仍是对称外扩 —— 与旧行为逐像素一致
+            FilterNode med(OpName::MedianBlur);
+            med.setMedianRadius(4);
+            r.check(med.requiredInputs(want) == want.adjusted(-4, -4, 4, 4),
+                    QStringLiteral("对称算子（中值）仍是四边各扩半径"));
+        }
+
+        // 往返（单独一份文档，避免和上面循环的作用域纠缠）
+        auto rdoc = ImageDocument::createBlank(120, 90, Qt::white);
+        rdoc->placeImageAsLayer(PsTests::makeLayerImage(100, 80, 61, 220), QStringLiteral("mb2"));
+        FilterNode rn(OpName::MotionBlur);
+        rn.setMotionDistance(9);
+        rn.setMotionAngle(45);
+        rdoc->layers().layerAt(1)->filters().append(rn);
 
         const QString path = PsTests::tempFilePath(QStringLiteral("motionblur.pslite"));
         QString err;
-        const bool saved = ProjectIo::save(*doc, path, &err);
+        const bool saved = ProjectIo::save(*rdoc, path, &err);
         auto back = saved ? ProjectIo::load(path, &err) : nullptr;
         if (back && back->layers().count() > 1 && back->layers().layerAt(1)->filters().count() > 0) {
             const FilterNode &bn = back->layers().layerAt(1)->filters().at(0);

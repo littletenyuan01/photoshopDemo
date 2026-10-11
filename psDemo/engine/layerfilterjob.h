@@ -40,6 +40,7 @@
 
 #include "domain/filterstack.h"
 
+#include <QFuture>
 #include <QImage>
 #include <QObject>
 #include <QPoint>
@@ -97,6 +98,11 @@ signals:
     void finished(bool wroteCache);
 
 private:
+    /**
+     * 在途 future。**析构必须等它**（见 `~LayerFilterJob`）：后台 lambda 捕获了 `this`
+     * 并会写 `m_progress`，所以对象不能先走。
+     */
+    QFuture<void> m_future;
     std::shared_ptr<std::atomic<bool>> m_cancel; ///< 与后台共享的取消旗标
     /**
      * 在途任务令牌：0 = 无；>0 = 该号任务在跑。

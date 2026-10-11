@@ -8,6 +8,7 @@
 
 #include "engine/op/opname.h"
 
+#include <QRect>
 #include <QString>
 #include <QtGlobal>
 
@@ -233,6 +234,36 @@ public:
      */
     quint32 noiseSeed() const { return m_noiseSeed; }
     void setNoiseSeed(quint32 v) { m_noiseSeed = v; }
+
+    /**
+     * 「想算出 `output` 这块像素，输入至少要有哪一块」—— **层内坐标**（与 output 同一空间）。
+     *
+     * 这是 `inputPad()`（一个 int）的**泛化**：pad 只能表达**对称**外扩，而有些算子的需求
+     * 是**不对称**的 —— 运动模糊 0° 只要左右邻居、上下一个都不用。用对称外扩会把上下也各扩
+     * `distance`，distance=128、块 64 时等于多取 25 倍像素（这正是 ROI 通用化第 ② 步要治的浪费）。
+     *
+     * 【默认实现】对称外扩 `inputPad()` —— 与旧行为**逐像素一致**，所以七个面积算子的调用方
+     * 观感不变（只做 ② 时全套测试必须保持绿，这是本步的验收标准）。
+     *
+     * 【几何算子（位移）】它的输入需求是「整层」，单矩形根本表达不了 —— 由 `hasGeometryOp()`
+     * 走整层专用路径，这里返回 output 即可（那条路径不会用到本函数）。
+     */
+    QRect requiredInputs(const QRect &output) const
+    {
+        if (op() == OpName::MotionBlur) {
+            const int d = m_motionDistance;
+            switch (m_motionAngle) {
+            case 0:
+                return output.adjusted(-d, 0, d, 0); // 水平：只要左右
+            case 90:
+                return output.adjusted(0, -d, 0, d); // 垂直：只要上下
+            default:
+                return output.adjusted(-d, -d, d, d); // 45°：两向都要
+            }
+        }
+        const int p = inputPad();
+        return (p > 0) ? output.adjusted(-p, -p, p, p) : output;
+    }
 
     /**
      * **预览降采样**用：返回一份「空间类参数按 @p divisor 缩小」的副本。
