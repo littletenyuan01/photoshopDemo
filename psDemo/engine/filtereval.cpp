@@ -465,6 +465,17 @@ void applyPointNode(QImage &image, const FilterNode &node)
 
 void applyNode(QImage &image, const FilterNode &node)
 {
+    applyNode(image, node, nullptr);
+}
+
+void applyNode(QImage &image, const FilterNode &node, const std::function<bool()> &shouldAbort)
+{
+    applyNode(image, node, image.rect(), image.rect(), shouldAbort);
+}
+
+void applyNode(QImage &image, const FilterNode &node, const QRect &srcRect, const QRect &outRect,
+               const std::function<bool()> &shouldAbort)
+{
     if (image.isNull())
         return;
 
@@ -474,6 +485,17 @@ void applyNode(QImage &image, const FilterNode &node)
         FilterContext ctx;
         ctx.node = &node;
         ctx.size = image.size();
+        // 几何按**传入值**填；两个矩形都必须在 image 自己的坐标系里（调用方契约）。
+        ctx.srcRect = srcRect.isNull() ? image.rect() : srcRect;
+        ctx.outRect = outRect.isNull() ? image.rect() : outRect;
+        ctx.shouldAbort = shouldAbort;
+        Q_ASSERT_X(image.rect().contains(ctx.srcRect) && image.rect().contains(ctx.outRect)
+                       && ctx.srcRect.contains(ctx.outRect),
+                   "FilterEval::applyNode",
+                   "srcRect/outRect 必须落在输入图内且 srcRect 包住 outRect（见 FilterContext 注释）");
+        // 测试探针：证明几何真的传到了算子（生产不挂 = 一次空指针判断）
+        if (auto *probe = filterGeometryProbe())
+            probe(FilterGeometryProbe {ctx.srcRect, ctx.outRect, image.size()});
         if (op->prepare(ctx))
             op->process(image, ctx);
         op->finish(ctx);

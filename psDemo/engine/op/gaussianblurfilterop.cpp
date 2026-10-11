@@ -49,6 +49,8 @@ void GaussianBlurFilterOp::process(QImage &image, const FilterContext &ctx)
     if (!box)
         return; // 盒模糊未注册（漏调 opsInit）：宁可不处理，也不产出半成品
     for (int i = 0; i < 3; ++i) {
+        if (aborted(ctx))
+            return; // 取消：三趟之间是本算子唯一的检查点（每趟内部由 BoxBlur 自己查）
         if (radii[i] <= 0)
             continue; // 盒宽 1 = 恒等，跳过（半径 1 时三趟可能全为恒等）
         FilterNode blurNode(OpName::BoxBlur);
@@ -56,6 +58,7 @@ void GaussianBlurFilterOp::process(QImage &image, const FilterContext &ctx)
         FilterContext bctx;
         bctx.node = &blurNode;
         bctx.size = image.size();
+        bctx.shouldAbort = ctx.shouldAbort; // 取消谓词往下传，否则三趟都无法中断
         if (box->prepare(bctx))
             box->process(image, bctx);
         box->finish(bctx);

@@ -53,6 +53,12 @@ void CanvasDocStatusBar::setDocument(Ps::ImageDocument *document)
     refreshDocInfo();
 }
 
+void CanvasDocStatusBar::setFilterProgressText(const QString &text)
+{
+    // 空串 = 无后台任务：清掉提示（不隐藏控件本身，避免底栏宽度跳动）
+    ui->filterProgressLabel->setText(text);
+}
+
 void CanvasDocStatusBar::onZoomEditingFinished()
 {
     if (m_updatingZoomText)

@@ -29,6 +29,9 @@ int tDirtyBudget();
 int tAreaFilter();
 int tFilterUndo();
 int tFilterPanel();
+int tFilterAsync();
+int tRoi();
+int tOffset();
 
 namespace {
 
@@ -47,6 +50,9 @@ const Case kCases[] = {
     { "areafilter", "面积算子（盒模糊 / 高斯 / 中值 / 锐化 / 浮雕 / USM / 查找边缘）：ROI 外扩、分块无接缝、语义 oracle、精度量化、往返", tAreaFilter },
     { "filterundo", "滤镜对话框的撤销原子性：确定=一条撤销、取消=不留痕", tFilterUndo },
     { "filterpanel", "图层滤镜栈面板：列出/开关/换序/删除都真的驱动 domain，且各留一条 undo", tFilterPanel },
+    { "filterasync", "滤镜定稿的异步/可取消链路：协作式取消、区域缓存命中且与同步一致、世代号失效", tFilterAsync },
+    { "roictx", "ROI 第①步：两条求值路径都按坐标空间填 src/out 几何，且退回本地坐标时结果不变", tRoi },
+    { "offset", "位移（几何算子）：wrap/透明语义 oracle、分块投影无块界错位、全幅求值护栏、往返", tOffset },
 };
 
 } // namespace

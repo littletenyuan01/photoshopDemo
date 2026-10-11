@@ -15,6 +15,7 @@
 #include "gradientop.h"
 #include "layermodeop.h"
 #include "medianblurfilterop.h"
+#include "offsetfilterop.h"
 #include "opname.h"
 #include "oppad.h"
 #include "opregistry.h"
@@ -122,6 +123,9 @@ void opsInit()
                      [] { return std::unique_ptr<FilterOp>(new SharpenFilterOp); });
     registerFilterOp(OpName::Emboss,
                      [] { return std::unique_ptr<FilterOp>(new EmbossFilterOp); });
+    // 几何算子（非面积算子：inputPad()==0，但只能整幅求值）
+    registerFilterOp(OpName::Offset,
+                     [] { return std::unique_ptr<FilterOp>(new OffsetFilterOp); });
 }
 
 } // namespace Ps

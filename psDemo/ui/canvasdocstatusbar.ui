@@ -43,6 +43,11 @@ QLabel#docInfoLabel {
   color: #e0e0e0;
   padding-left: 6px;
 }
+QLabel#filterProgressLabel {
+  color: #cfe4ff;
+  padding-left: 6px;
+  min-width: 96px;
+}
 QToolButton#infoMenuButton {
   color: #ccc;
   border: none;
@@ -103,6 +108,16 @@ QToolButton#infoMenuButton:hover {
      </property>
      <property name="toolTip">
       <string>文档尺寸与分辨率</string>
+     </property>
+    </widget>
+   </item>
+   <item>
+    <widget class="QLabel" name="filterProgressLabel">
+     <property name="text">
+      <string/>
+     </property>
+     <property name="toolTip">
+      <string>滤镜定稿进度（重滤镜在后台线程求值，可取消）</string>
      </property>
     </widget>
    </item>

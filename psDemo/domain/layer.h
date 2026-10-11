@@ -123,6 +123,16 @@ public:
     const FilterStack &filters() const { return m_filters; }
 
     /**
+     * 按本层滤镜栈对一张独立图像求值（带可选取消谓词）。
+     * 测试与异步定稿都用它；传入空谓词与 `filters().apply()` 等价。
+     */
+    QImage applyFiltersTo(const QImage &source,
+                          const std::function<bool()> &shouldAbort = nullptr) const
+    {
+        return m_filters.apply(source, shouldAbort);
+    }
+
+    /**
      * 图层样式栈（非破坏 fx）。对照 GIMP drawable filters / PS 图层样式；
      * 合成时求值，不写回 tiles。
      */
@@ -174,6 +184,35 @@ public:
         int docY = 0; ///< image 左上角的文档 y
     };
     CompositeRegion compositeRasterRegion(const QRect &regionDoc) const;
+
+    /**
+     * 把**后台异步**算好的区域滤镜结果交给本层缓存（见 engine/layerfilterjob.*）。
+     *
+     * 为什么要这一步：滤镜的「定稿」（整层重算）在重滤镜下是秒级，必须挪到工作线程；
+     * 但线程里不能安全读 `TileBuffer`（主线程随时可能写瓦片）。所以异步任务先由**主线程**
+     * 快照出层栅格，任务只在这份独立快照上求值，算完后由主线程把结果写进这里 ——
+     * 随后 `Projection::sync` 逐块合成时，`compositeRasterRegion` 命中缓存、**不再同步跑滤镜**，
+     * 于是「定稿」从「每块现场算滤镜」变成「查表 + 混合」。
+     *
+     * @param regionDoc  结果覆盖的**文档矩形**（通常 = 层的 bounds ∩ 画布）
+     * @param image      该矩形的滤镜求值结果（预乘 ARGB32）
+     * 调用方在写入后必须 `ImageDocument::markDirty(regionDoc)`。
+     */
+    void setRegionFilterResult(const QRect &regionDoc, const QImage &image);
+    /** 丢弃区域滤镜缓存（像素/滤镜/样式变更时由 invalidateCompositeRaster 统一调用）。 */
+    void clearRegionFilterResult();
+
+    /** 区域滤镜缓存是否覆盖 @p regionDoc（内部用；测试也可读）。 */
+    bool regionFilterCovers(const QRect &regionDoc) const;
+
+    /**
+     * 「层内容状态」世代号：**任何让层内容缓存失效的改动**都会 +1（见 invalidateCompositeRaster）。
+     *
+     * 异步定稿任务在开始时记下它，算完回主线程时**比对**：不一致就丢弃结果。
+     * 这比「依赖信号到达顺序去 cancel」可靠得多 —— 只要中间发生过任何层改动
+     * （画笔、撤销、改参数、换尺寸），世代号必然已经变了，于是过期结果**一定**写不进去。
+     */
+    quint32 contentGeneration() const { return m_contentGeneration; }
 
     /**
      * 链接图层（对照 GIMP GimpLinkLayer / GimpLink 瘦身版）。
@@ -282,6 +321,23 @@ private:
     mutable int m_compositeOriginDx = 0;
     mutable int m_compositeOriginDy = 0;
     mutable bool m_compositeRasterValid = false;
+
+    /**
+     * 异步区域滤镜结果缓存（**文档坐标**，只用在「无启用样式」的层上）。
+     *
+     * 与上面的 `m_compositeRaster` 是两种粒度：那个是整层（样式要外扩 halo，只能整层算），
+     * 这个是**任意矩形**、由后台任务填。命中时 `compositeRasterRegion` 直接返回它。
+     *
+     * 单独一个字段而不复用 `m_compositeRaster`，是为了让「有没有缓存」的判定各自独立 ——
+     * 命中的条件（覆盖请求区、且层内容世代未变）比整层缓存简单得多。
+     * 两个字段与世代号都是 `mutable`：失效发生在 `const` 的求值路径上
+     * （`invalidateCompositeRaster()` 是 const，见其声明）。
+     */
+    mutable QRect m_regionFilterRect;   ///< 缓存覆盖的文档矩形；空 = 无缓存
+    mutable QImage m_regionFilterImage; ///< 该矩形的滤镜求值结果（预乘 ARGB32）
+
+    /** 见 contentGeneration()；只在 invalidateCompositeRaster 里自增。 */
+    mutable quint32 m_contentGeneration = 0;
 };
 
 } // namespace Ps

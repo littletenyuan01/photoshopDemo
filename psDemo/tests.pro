@@ -34,7 +34,10 @@ SOURCES += \
     tests/t_dirtybudget.cpp \
     tests/t_areafilter.cpp \
     tests/t_filterundo.cpp \
-    tests/t_filterpanel.cpp
+    tests/t_filterpanel.cpp \
+    tests/t_filterasync.cpp \
+    tests/t_roi.cpp \
+    tests/t_offset.cpp
 
 HEADERS += \
     tests/testutil.h

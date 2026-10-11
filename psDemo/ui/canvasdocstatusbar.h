@@ -41,6 +41,12 @@ public:
 public slots:
     void setZoomFactor(qreal zoom); // 1.0 = 100%
     void setDocument(Ps::ImageDocument *document);
+    /**
+     * 滤镜定稿进度文案（空串 = 隐藏）。
+     * 重滤镜（中值/高斯…）的整层定稿在后台线程求值，这里显示「滤镜：45%」之类的提示，
+     * 让「画布一块块慢慢变」有个解释；完成后由画布发空串清掉。
+     */
+    void setFilterProgressText(const QString &text);
 
 signals:
     /** 用户在缩放框回车后发出；1.0 = 100%。 */

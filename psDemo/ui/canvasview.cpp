@@ -11,6 +11,7 @@
 #include "domain/layermask.h"
 #include "domain/selection.h"
 #include "engine/compositor.h"
+#include "engine/layerfilterjob.h"
 #include "engine/premul.h"
 #include "pixmaputils.h"
 #include "tools/handtool.h"
@@ -44,6 +45,7 @@ CanvasView::CanvasView(QWidget *parent)
     , m_antsTimer(new QTimer(this))
     , m_projIdleTimer(new QTimer(this))
     , m_adjPreviewTimer(new QTimer(this))
+    , m_filterProgressTimer(new QTimer(this))
 {
     setMouseTracking(true);
     setFocusPolicy(Qt::StrongFocus);
@@ -92,11 +94,23 @@ CanvasView::CanvasView(QWidget *parent)
     m_adjPreviewTimer->setInterval(32);
     connect(m_adjPreviewTimer, &QTimer::timeout, this, &CanvasView::flushAdjustmentPreview);
 
+    // 滤镜定稿进度：轮询后台任务（原子读，不跨线程发信号），只在有任务时跑
+    m_filterProgressTimer->setInterval(100);
+    connect(m_filterProgressTimer, &QTimer::timeout,
+            this, &CanvasView::updateFilterFinalizeProgress);
+
     refreshToolContext();
     updateToolCursor();
 }
 
-CanvasView::~CanvasView() = default;
+CanvasView::~CanvasView()
+{
+    // 后台滤镜任务可能在跑：先取消（谓词），再析构任务对象 —— 任务的回调不持有 this
+    // 以外的 Qt 对象，故取消后即可安全销毁。
+    cancelFilterFinalize();
+    delete m_filterJob;
+    m_filterJob = nullptr;
+}
 
 void CanvasView::setDocument(Ps::ImageDocument *document)
 {
@@ -136,6 +150,10 @@ void CanvasView::setDocument(Ps::ImageDocument *document)
                 this, &CanvasView::onAdjustmentPreview);
         connect(m_document, &Ps::ImageDocument::adjustmentPreviewCommit,
                 this, &CanvasView::onAdjustmentPreviewCommit);
+        // 滤镜「定稿」：内容一变就看看这次是不是「给活动层新加了重滤镜」——
+        // 是则把整层滤镜求值交给后台（结果写入层的区域缓存），投影随后只做取子图 + 混合。
+        connect(m_document, &Ps::ImageDocument::contentChanged,
+                this, &CanvasView::maybeStartAsyncFilterFinalize);
         // 选区单独订阅：只重画蚂蚁线，不重合成
         connect(m_document, &Ps::ImageDocument::selectionChanged, this, [this]() {
             rebuildSelectionOutlinePath();
@@ -912,6 +930,120 @@ const QImage *CanvasView::activeLiveProjection() const
         return &m_adjLive;
     Ps::Tool *tool = m_toolManager ? m_toolManager->activeTool() : nullptr;
     return tool ? tool->liveProjection() : nullptr;
+}
+
+// —— 滤镜定稿的异步链路（engine/layerfilterjob.h）——
+//
+// 【为什么值得】重滤镜（中值/高斯…）的「定稿」是整层求值：演示文档 2480×3508 下
+// 中值一次整层要秒级，而它原本发生在**合成路径**里（每块现场跑滤镜链），于是表现为
+// 「画布一块一块慢慢糊」且无法取消。这里把整层求值挪到后台线程，结果按矩形交给层缓存，
+// 投影随后只做「取子图 + 混合」——用户看到的仍是分块渐进，但每一块都很便宜。
+//
+// 【谁来取消】任何新的改动都会让 Layer 的 contentGeneration 自增（见 invalidateCompositeRaster），
+// 后台结果回来时世代号不一致就**直接丢弃**；这里的 cancel() 只是为了让后台**早点**停手。
+
+int CanvasView::strongestPadOfLayer(const Ps::Layer *layer)
+{
+    if (!layer)
+        return 0;
+    const Ps::FilterStack &stack = layer->filters();
+    int pad = 0;
+    for (int i = 0; i < stack.count(); ++i) {
+        const Ps::FilterNode &n = stack.at(i);
+        if (n.isEnabled())
+            pad = qMax(pad, n.inputPad());
+    }
+    return pad;
+}
+
+void CanvasView::cancelFilterFinalize()
+{
+    if (m_filterJob)
+        m_filterJob->cancel();
+    if (m_filterProgressTimer)
+        m_filterProgressTimer->stop();
+    m_filterJobLayer = -1;
+    m_filterJobHavePrint = false;
+    emit filterFinalizeProgress(QString());
+}
+
+void CanvasView::maybeStartAsyncFilterFinalize()
+{
+    if (!m_document)
+        return;
+
+    const int active = m_document->activeLayerIndex();
+    Ps::Layer *layer = m_document->layers().layerAt(active);
+    if (!layer || active < 0) {
+        cancelFilterFinalize();
+        return;
+    }
+
+    // 「重滤镜」判据：有启用节点且最大 inputPad > 0（= 面积算子）。
+    // 纯点滤镜（亮度/对比度…）逐像素、整层也就几毫秒，异步化只是徒增复杂度。
+    const int pad = strongestPadOfLayer(layer);
+    if (pad <= 0 || layer->isAdjustmentLayer() || !layer->isVisible()
+        || layer->styles().hasEnabled()) {
+        // 上一次若为这层跑过任务，就取消掉（滤镜已删/关掉/换了目标层）
+        if (m_filterJobLayer == active)
+            cancelFilterFinalize();
+        return;
+    }
+
+    // 指纹：只关心「滤镜栈有没有变」。层移动 / 显隐等其它 contentChanged 不该重启任务。
+    quint32 print = qHash(static_cast<uint>(active));
+    for (int i = 0; i < layer->filters().count(); ++i) {
+        const Ps::FilterNode &n = layer->filters().at(i);
+        print = print * 16777619u ^ qHash(static_cast<uint>(n.op()));
+        print = print * 16777619u ^ qHash(n.isEnabled() ? 1u : 0u);
+        print = print * 16777619u ^ qHash(static_cast<uint>(n.inputPad()));
+        print = print * 16777619u ^ qHash(static_cast<uint>(n.medianRadius()));
+        print = print * 16777619u ^ qHash(static_cast<uint>(n.gaussRadius()));
+        print = print * 16777619u ^ qHash(static_cast<uint>(n.blurRadius()));
+        print = print * 16777619u ^ qHash(static_cast<uint>(n.usmRadius()));
+    }
+    if (m_filterJobHavePrint && m_filterJobLayer == active && m_filterJobFilterPrint == print) {
+        // 同一份滤镜（比如只是拖了图层显隐）→ 不重复起任务；但若缓存已被清掉，
+        // 说明确实需要重算（例如刚撤销过）—— 那时 Layer 的世代号也变了，让后台重跑即可。
+        if (layer->regionFilterCovers(layer->boundsInDocument().intersected(
+                QRect(0, 0, m_document->width(), m_document->height()))))
+            return;
+    }
+
+    // 已经在跑：直接接替（LayerFilterJob::start 内部会作废旧的一代）。
+    // 这里不再「先 cancel 再 start」——那会让旧任务白取消、新任务又被拒启。
+    if (!m_filterJob) {
+        m_filterJob = new Ps::LayerFilterJob(this);
+        connect(m_filterJob, &Ps::LayerFilterJob::finished, this, [this](bool wrote) {
+            m_filterProgressTimer->stop();
+            emit filterFinalizeProgress(QString());
+            if (wrote) {
+                // 缓存已写入且文档已 markDirty：contentChanged 会把脏区交给投影，
+                // 此处只需重画一次（那条链可能已经同步跑过了）。
+                update();
+            }
+        });
+    }
+
+    const QRect want = layer->boundsInDocument().intersected(
+        QRect(0, 0, m_document->width(), m_document->height()));
+    if (m_filterJob->start(m_document, active, want)) {
+        m_filterJobLayer = active;
+        m_filterJobFilterPrint = print;
+        m_filterJobHavePrint = true;
+        m_filterProgressTimer->start();
+        // 先给一行占位文案：重滤镜第一次求值前没有任何进度可报
+        emit filterFinalizeProgress(tr("滤镜定稿：后台求值…"));
+    }
+}
+
+void CanvasView::updateFilterFinalizeProgress()
+{
+    if (!m_filterJob || !m_filterJob->isRunning()) {
+        m_filterProgressTimer->stop();
+        return;
+    }
+    emit filterFinalizeProgress(tr("滤镜定稿：%1%").arg(int(m_filterJob->progress() * 100.0)));
 }
 
 void CanvasView::clearAdjustmentLive()

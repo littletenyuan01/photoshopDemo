@@ -25,7 +25,6 @@ void SharpenFilterOp::finish(const FilterContext &ctx)
 
 void SharpenFilterOp::process(QImage &image, const FilterContext &ctx)
 {
-    Q_UNUSED(ctx);
     const int w = image.width();
     const int h = image.height();
     if (w <= 0 || h <= 0)
@@ -54,6 +53,8 @@ void SharpenFilterOp::process(QImage &image, const FilterContext &ctx)
     loadRow(cur, image, 0);
 
     for (int y = 0; y < h; ++y) {
+        if ((y & 31) == 0 && aborted(ctx))
+            return; // 协作式取消（见 filterop.h 的 FilterContext::shouldAbort）
         const bool hasPrev = (y > 0);
         const bool hasNext = (y + 1 < h);
         if (hasNext)

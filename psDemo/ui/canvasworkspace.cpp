@@ -41,6 +41,9 @@ CanvasWorkspace::CanvasWorkspace(QWidget *parent)
             this, &CanvasWorkspace::onVScroll);
     connect(ui->docStatusBar, &CanvasDocStatusBar::zoomCommitted,
             this, &CanvasWorkspace::onStatusZoomCommitted);
+    // 重滤镜的异步定稿进度 → 底栏一行提示（空串 = 清除）
+    connect(ui->canvasView, &CanvasView::filterFinalizeProgress,
+            ui->docStatusBar, &CanvasDocStatusBar::setFilterProgressText);
 
     syncRulersAndScrollBars();
     syncDocStatus();

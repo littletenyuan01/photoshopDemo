@@ -434,7 +434,31 @@ void AdjustmentPropsHost::ensurePages()
         const SliderRow strength = makeSliderRow(page, QStringLiteral("强度"), QStringLiteral("emboss_strength"), 1, 4);
         col->addWidget(strength.row);
         wireSliderSpin(strength.slider, strength.spin, [this](int v) { m_node.setEmbossStrength(v); });
+        col->addWidget(strength.row);
         add(Ps::OpName::Emboss, page);
+    }
+    {
+        // 位移（**几何算子**）：无 .ui，一页两个偏移滑块 + 环绕勾选。
+        // 范围取 ±512（够覆盖常见画布；`FilterNode` 内部钳到 ±2048）。
+        auto *page = new QWidget(m_stack);
+        auto *col = new QVBoxLayout(page);
+        col->setContentsMargins(0, 0, 0, 0);
+        const SliderRow dx = makeSliderRow(page, QStringLiteral("水平"), QStringLiteral("offset_dx"), -512, 512);
+        const SliderRow dy = makeSliderRow(page, QStringLiteral("垂直"), QStringLiteral("offset_dy"), -512, 512);
+        col->addWidget(dx.row);
+        col->addWidget(dy.row);
+        wireSliderSpin(dx.slider, dx.spin, [this](int v) { m_node.setOffsetDx(v); });
+        wireSliderSpin(dy.slider, dy.spin, [this](int v) { m_node.setOffsetDy(v); });
+        auto *wrap = new QCheckBox(QStringLiteral("环绕（移出的像素从另一侧回来）"), page);
+        wrap->setObjectName(QStringLiteral("check_offset_wrap"));
+        col->addWidget(wrap);
+        connect(wrap, &QCheckBox::toggled, this, [this](bool on) {
+            if (m_block)
+                return;
+            m_node.setOffsetWrap(on);
+            emitPreview();
+        });
+        add(Ps::OpName::Offset, page);
     }
 }
 
@@ -561,6 +585,12 @@ void AdjustmentPropsHost::loadControlsFromNode()
         break;
     case Ps::OpName::Emboss:
         setPair("slider_emboss_strength", "spin_emboss_strength", m_node.embossStrength());
+        break;
+    case Ps::OpName::Offset:
+        setPair("slider_offset_dx", "spin_offset_dx", m_node.offsetDx());
+        setPair("slider_offset_dy", "spin_offset_dy", m_node.offsetDy());
+        if (auto *c = findChild<QCheckBox *>(QStringLiteral("check_offset_wrap")))
+            c->setChecked(m_node.offsetWrap());
         break;
     default:
         break;

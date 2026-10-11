@@ -296,6 +296,12 @@ void MainWindow::setupMenus()
     connect(ui->actionFindEdges, &QAction::triggered, this,
             [this]() { applyFilterDirect(Ps::OpName::FindEdges); });
 
+    // 滤镜 → 其它 → 位移（**几何算子**：把像素整体搬 (dx,dy)，可选环绕）
+    ui->actionOffset->setEnabled(true);
+    ui->actionOffset->setToolTip(tr("位移（几何算子：整体搬运像素，可选环绕；非破坏）"));
+    connect(ui->actionOffset, &QAction::triggered, this,
+            [this]() { runFilterDialog(Ps::OpName::Offset); });
+
     // —— 图层→新建调整图层→亮度/对比度（PS 式：作用于下方合成）——
     ui->actionNewAdjBrightness->setEnabled(true);
     ui->actionNewAdjBrightness->setToolTip(

@@ -52,6 +52,7 @@ constexpr OpNameInfo kOpNameTable[] = {
     {OpName::MedianBlur,           "ps:median-blur",           "中间值"},
     {OpName::Sharpen,              "ps:sharpen",               "锐化"},
     {OpName::Emboss,               "ps:emboss",                "浮雕效果"},
+    {OpName::Offset,               "ps:offset",                "位移"},
 };
 
 const OpNameInfo *infoFor(OpName name)
@@ -83,6 +84,7 @@ bool isAdjustmentOp(OpName name)
 {
     // 面积算子暂不作为调整图层（其 ROI 外扩尚未接入共享缓冲合成路径，见 docs/pending-dev）。
     // 新增面积算子时**必须**加到这里，否则会被当成调整层算子（菜单/新建调整层都会出错）。
+    // 几何算子（Offset）同理：它滤的是层自己的像素，不是下方合成结果。
     switch (name) {
     case OpName::BoxBlur:
     case OpName::UnsharpMask:
@@ -91,6 +93,7 @@ bool isAdjustmentOp(OpName name)
     case OpName::MedianBlur:
     case OpName::Sharpen:
     case OpName::Emboss:
+    case OpName::Offset:
         return false;
     default:
         break;

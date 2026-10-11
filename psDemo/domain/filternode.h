@@ -188,6 +188,15 @@ public:
     int embossStrength() const { return m_embossStrength; }
     void setEmbossStrength(int v) { m_embossStrength = qBound(1, v, 4); }
 
+    // —— 位移（几何算子）：水平/垂直像素偏移 + 环绕策略 ——
+    int offsetDx() const { return m_offsetDx; }
+    void setOffsetDx(int v) { m_offsetDx = qBound(-2048, v, 2048); }
+    int offsetDy() const { return m_offsetDy; }
+    void setOffsetDy(int v) { m_offsetDy = qBound(-2048, v, 2048); }
+    /** true（默认，对齐 PS）= 环绕（移出的像素从另一侧回来）；false = 移出即丢、空出透明。 */
+    bool offsetWrap() const { return m_offsetWrap; }
+    void setOffsetWrap(bool on) { m_offsetWrap = on; }
+
     /**
      * 该算子需要的输入外扩（像素）：点算子 = 0；盒模糊/USM = 半径；查找边缘/锐化/浮雕 = 1（3×3）；
      * 高斯模糊 = 半径 + 2（**安全上界**：三趟盒模糊半径之和 ≈ 0.98×半径，留 2px 余量，
@@ -267,6 +276,9 @@ private:
     int m_medianRadius = 3;
     int m_sharpenStrength = 1;
     int m_embossStrength = 1;
+    int m_offsetDx = 0;
+    int m_offsetDy = 0;
+    bool m_offsetWrap = true;
 };
 
 } // namespace Ps

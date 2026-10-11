@@ -43,7 +43,24 @@ std::unordered_map<int, std::unique_ptr<FilterOp>> &instanceTable()
     return *t;
 }
 
+/** 几何探针（默认 null = 生产路径上一次空指针判断；见 filterop.h）。 */
+FilterGeometryProbeFn &geometryProbeSlot()
+{
+    static FilterGeometryProbeFn fn = nullptr;
+    return fn;
+}
+
 } // namespace
+
+void setFilterGeometryProbe(FilterGeometryProbeFn fn)
+{
+    geometryProbeSlot() = fn;
+}
+
+FilterGeometryProbeFn filterGeometryProbe()
+{
+    return geometryProbeSlot();
+}
 
 void registerFilterOp(OpName name, FilterOpFactory factory)
 {

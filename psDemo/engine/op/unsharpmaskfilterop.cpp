@@ -42,7 +42,6 @@ void UnsharpMaskFilterOp::finish(const FilterContext &ctx)
 
 void UnsharpMaskFilterOp::process(QImage &image, const FilterContext &ctx)
 {
-    Q_UNUSED(ctx);
     if (m_radius <= 0 || m_amount <= 0.0)
         return;
 
@@ -65,9 +64,12 @@ void UnsharpMaskFilterOp::process(QImage &image, const FilterContext &ctx)
     FilterContext bctx;
     bctx.node = &blurNode;
     bctx.size = blurred.size();
+    bctx.shouldAbort = ctx.shouldAbort; // 取消谓词往下传（模糊级是这里最贵的部分）
     if (box->prepare(bctx))
         box->process(blurred, bctx);
     box->finish(bctx);
+    if (aborted(ctx))
+        return; // 模糊级已取消：不要再做合并
 
     // 2) 合并：|diff| > threshold 才锐化
     const int w = image.width();
@@ -75,6 +77,8 @@ void UnsharpMaskFilterOp::process(QImage &image, const FilterContext &ctx)
     const qreal threshold = m_threshold;
     const qreal amount = m_amount;
     for (int y = 0; y < h; ++y) {
+        if ((y & 31) == 0 && aborted(ctx))
+            return;
         QRgb *d = reinterpret_cast<QRgb *>(image.scanLine(y));
         const QRgb *b = reinterpret_cast<const QRgb *>(blurred.constScanLine(y));
         for (int x = 0; x < w; ++x) {

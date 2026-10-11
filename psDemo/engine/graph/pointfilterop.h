@@ -12,6 +12,7 @@
 #include "domain/filternode.h"
 #include "engine/filtereval.h"
 
+#include <functional>
 #include <utility>
 
 namespace Ps {
@@ -39,7 +40,11 @@ public:
     {
         QImage result = ins.value(0);
         if (!result.isNull()) {
-            FilterEval::applyNode(result, m_node);
+            // 见 toLocalOutput()：`m_srcRect`/`m_outRect` 是**文档坐标**，
+            // 手里这张图（每个样本一个图）以它的左上角为本地原点。
+            const QPoint origin = m_srcRect.topLeft();
+            FilterEval::applyNode(result, m_node, m_srcRect.translated(-origin),
+                                  m_outRect.translated(-origin), m_shouldAbort);
             // 面积算子：ins[0] 覆盖 out 外扩 pad，求值后裁回 out。
             // 按对称外扩取中心（要求图未在文档边界裁剪输入，内部区域恒成立）。
             const int p = m_node.inputPad();
@@ -59,15 +64,45 @@ public:
     {
         Q_UNUSED(out);
         QImage result = std::move(ins[0]); // 移走句柄（非深拷贝）
-        if (!result.isNull())
-            FilterEval::applyNode(result, m_node);
+        if (!result.isNull()) {
+            const QPoint origin = m_srcRect.topLeft();
+            FilterEval::applyNode(result, m_node, m_srcRect.translated(-origin),
+                                  m_outRect.translated(-origin), m_shouldAbort);
+        }
         return result;
     }
 
     const FilterNode &node() const { return m_node; }
 
+    /**
+     * 协作式取消谓词（见 engine/op/filterop.h 的 FilterContext::shouldAbort）。
+     *
+     * 【为什么是可变成员 + 由调用方 set】`process()` 签名是 `const`（图算子是纯函数），
+     * 而取消谓词属于**本次求值**的上下文、不属于算子参数。图节点由 `PsGraph` 内部持有，
+     * 没有「每节点上下文」的口子；这里用一个只在**求值前**写入的小字段绕开，
+     * 代价是同一个 `PointFilterOp` 实例不能并发求值 —— 本项目的图是**每次调用现建**的
+     * （见 FilterStack::apply），故不成立共享。
+     */
+    void setShouldAbort(std::function<bool()> fn) { m_shouldAbort = std::move(fn); }
+
+    /**
+     * 本次求值的 ROI 几何（见 FilterContext 的坐标说明），**文档坐标**：
+     * `srcRect` = 所需输入区（= `requiredInputs(out)` 那块）、`outRect` = 要产出的输出区。
+     * 空 = 退化为整张图（本地坐标语义）。
+     *
+     * 与 `setShouldAbort` 同理：属于「本次求值」的上下文而非算子参数，故在求值前写入。
+     */
+    void setGeometry(const QRect &srcRect, const QRect &outRect)
+    {
+        m_srcRect = srcRect;
+        m_outRect = outRect;
+    }
+
 private:
     FilterNode m_node; ///< 滤镜参数（只读）
+    std::function<bool()> m_shouldAbort; ///< 本次求值的取消谓词（可为空）
+    QRect m_srcRect; ///< 所需输入区（文档坐标；空 = 整张图）
+    QRect m_outRect; ///< 请求输出区（文档坐标；空 = 整张图）
 };
 
 } // namespace Ps

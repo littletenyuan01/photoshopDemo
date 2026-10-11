@@ -551,16 +551,29 @@ int tAreaFilter()
 
     // —— ⑩ 中值：语义 oracle（朴素排序中值）+ 分块 == 整幅 + 往返 ——
     {
-        const int SW = 40, SH = 32, R = 2;
+        const int SW = 40, SH = 32;
+        // oracle 要覆盖**多个半径**：增量 cum 的边界（中值落在 bin 0 / 255、环形槽回绕）
+        // 只在某些半径与窗口位置才出现。本轮三个真实 bug（槽号未夹紧、abyss 计数口径、
+        // bin 0 下界）里有两个只在 r≥2 的特定像素暴露 —— 单一半径的 oracle 抓不全。
+        for (int R = 1; R <= 4; ++R) {
+            const QImage src = PsTests::makeLayerImage(SW, SH, 29, 255);
+            QImage got = src;
+            FilterNode node(OpName::MedianBlur);
+            node.setMedianRadius(R);
+            FilterEval::applyNode(got, node);
+            const QImage ref = naiveMedian(src, R);
+            const long long d = PsTests::diffCount(got, ref);
+            r.check(d == 0,
+                    QStringLiteral("中值 r=%1：滑窗直方图 == 朴素排序中值（语义 oracle，diffs=%2）")
+                        .arg(R).arg(d));
+        }
+
+        const int R = 2;
         const QImage src = PsTests::makeLayerImage(SW, SH, 29, 255);
         QImage got = src;
         FilterNode node(OpName::MedianBlur);
         node.setMedianRadius(R);
         FilterEval::applyNode(got, node);
-        const QImage ref = naiveMedian(src, R);
-        const long long d = PsTests::diffCount(got, ref);
-        r.check(d == 0,
-                QStringLiteral("中值：滑窗直方图 == 朴素排序中值（语义 oracle，diffs=%1）").arg(d));
         r.check(PsTests::diffCount(src, got) > 0, QStringLiteral("中值确实改变了画面"));
 
         const int W = 256, H = 256;

@@ -35,6 +35,7 @@ SOURCES += \
     engine/projection.cpp \
     engine/paintengine.cpp \
     engine/filtereval.cpp \
+    engine/layerfilterjob.cpp \
     engine/layerstyleeval.cpp \
     engine/op/layermodeop.cpp \
     engine/op/boxblurfilterop.cpp \
@@ -43,6 +44,7 @@ SOURCES += \
     engine/op/findedgesfilterop.cpp \
     engine/op/gaussianblurfilterop.cpp \
     engine/op/medianblurfilterop.cpp \
+    engine/op/offsetfilterop.cpp \
     engine/op/sharpenfilterop.cpp \
     engine/op/unsharpmaskfilterop.cpp \
     engine/op/floodfillop.cpp \
@@ -139,6 +141,7 @@ HEADERS += \
     engine/projection.h \
     engine/paintengine.h \
     engine/filtereval.h \
+    engine/layerfilterjob.h \
     engine/layerstyleeval.h \
     engine/paintselectionclip.h \
     engine/painttypes.h \
@@ -157,6 +160,7 @@ HEADERS += \
     engine/op/findedgesfilterop.h \
     engine/op/gaussianblurfilterop.h \
     engine/op/medianblurfilterop.h \
+    engine/op/offsetfilterop.h \
     engine/op/sharpenfilterop.h \
     engine/op/unsharpmaskfilterop.h \
     engine/op/floodfillop.h \

@@ -139,6 +139,9 @@ CMakeLists.txt.user*
 !.vscode/extensions.json
 !.vscode/settings.json.example
 *.code-workspace
+# clangd 配置含**本机绝对路径**（Qt 安装位置），换机即失效 → 不入库
+.clangd
+.cache/clangd/
 
 # ---------------------------------------------------------------------------
 # vcpkg / package managers

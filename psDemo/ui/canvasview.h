@@ -23,6 +23,8 @@ class QDropEvent;
 
 namespace Ps {
 class ImageDocument;
+class Layer;
+class LayerFilterJob;
 class ToolManager;
 struct ToolContext;
 struct ToolEvent;
@@ -140,6 +142,12 @@ signals:
      */
     void filesDropped(const QStringList &paths);
 
+    /**
+     * 滤镜定稿（重滤镜整层求值）的进度文案；空串 = 无后台任务。
+     * 由底栏状态条显示（`CanvasDocStatusBar::setFilterProgressText`）。
+     */
+    void filterFinalizeProgress(const QString &text);
+
 protected:
     bool event(QEvent *event) override;
     void dragEnterEvent(QDragEnterEvent *event) override;
@@ -172,6 +180,18 @@ private:
     void flushAdjustmentPreview();
     void clearAdjustmentLive();
     const QImage *activeLiveProjection() const;
+
+    /**
+     * 滤镜「定稿」的**异步链路**（见 engine/layerfilterjob.h）：
+     *  `contentChanged` → 判断这次改动是否给活动层**新加了重滤镜** → 后台跑整层滤镜 →
+     *  结果写入层的区域缓存 → 再 markDirty 让投影逐块合成（此时只做取子图 + 混合）。
+     */
+    void maybeStartAsyncFilterFinalize();
+    void updateFilterFinalizeProgress();
+    /** 取消并丢弃在跑的定稿任务（任何新改动/换文档时调用）。 */
+    void cancelFilterFinalize();
+    /** 活动层滤镜栈里最强算子的外扩（0 = 纯点滤镜，不值得异步）。 */
+    static int strongestPadOfLayer(const Ps::Layer *layer);
     /** 将 m_offset 钳制到合法范围（含 pasteboard 过滚，对照 PS）。 */
     void clampOffset();
     /** 水平/竖直可平移的 offset 上下限（控件坐标）。 */
@@ -266,6 +286,14 @@ private:
     QImage m_adjBelow;  ///< 下方合成缓存（拖中为 ROI 尺寸；GEGL input）
     QImage m_adjAbove;  ///< 调整层之上（同上）
     QImage m_adjLive;   ///< 画布预览（文档全尺寸）
+
+    // —— 滤镜定稿：异步任务（engine/layerfilterjob.h）——
+    Ps::LayerFilterJob *m_filterJob = nullptr; ///< 惰性创建，归本控件
+    QTimer *m_filterProgressTimer = nullptr;   ///< 轮询进度 → 底栏文案
+    int m_filterJobLayer = -1;                 ///< 在跑的定稿任务目标层；-1 = 无
+    /** 最近一次「看见的层滤镜栈状态」指纹：变了才值得再起一次异步定稿。 */
+    quint32 m_filterJobFilterPrint = 0;
+    bool m_filterJobHavePrint = false;
 };
 
 #endif // CANVASVIEW_H

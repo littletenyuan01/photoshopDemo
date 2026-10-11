@@ -119,10 +119,37 @@ QRect Layer::styleBoundsInDocument() const
 
 void Layer::invalidateCompositeRaster() const
 {
+    ++m_contentGeneration; // 见 contentGeneration()：异步定稿结果的**确定性**有效性判据
     m_compositeRasterValid = false;
     m_compositeRaster = QImage();
     m_compositeOriginDx = 0;
     m_compositeOriginDy = 0;
+    // 区域滤镜缓存与整层缓存**同源失效**：像素写入 / 滤镜参数 / 样式 / 尺寸变更都汇聚到
+    // 这个方法，所以它一并清掉即可，无需在别处再挂失效点（少一处漏挂的机会）。
+    m_regionFilterRect = QRect();
+    m_regionFilterImage = QImage();
+}
+
+void Layer::setRegionFilterResult(const QRect &regionDoc, const QImage &image)
+{
+    if (regionDoc.isEmpty() || image.isNull() || image.size() != regionDoc.size())
+        return; // 契约不符就不写：宁可没有缓存（退回同步求值），也不要贴错位置
+    m_regionFilterRect = regionDoc;
+    m_regionFilterImage = image;
+}
+
+void Layer::clearRegionFilterResult()
+{
+    if (m_regionFilterRect.isNull() && m_regionFilterImage.isNull())
+        return;
+    m_regionFilterRect = QRect();
+    m_regionFilterImage = QImage();
+}
+
+bool Layer::regionFilterCovers(const QRect &regionDoc) const
+{
+    return !m_regionFilterImage.isNull() && !regionDoc.isEmpty()
+           && m_regionFilterRect.contains(regionDoc);
 }
 
 void Layer::setCompositePreview(const QImage &image, int docX, int docY)
@@ -181,8 +208,10 @@ Layer::CompositeRegion Layer::compositeRasterRegion(const QRect &regionDoc) cons
     CompositeRegion out;
 
     // 有启用样式：样式要外扩 halo（投影/描边…），区域化必须带 pad 再裁回。
-    // 这块暂沿用整层缓存（正确性优先），见 docs/pending-dev.md 的「仍欠」。
-    if (m_styles.hasEnabled()) {
+    // 有**几何算子**（位移）：它读「别处」的输入，逐块求值会在块界错位。
+    // 两者都退回「整层求值一次，再按请求区裁」，见 docs/engine/roi.md §5。
+    // 也因此**不**吃下面的区域滤镜缓存（那个是逐块几何）。
+    if (m_styles.hasEnabled() || m_filters.hasGeometryOp()) {
         const CompositeRaster whole = ensureCompositeRaster();
         out.image = whole.image;
         out.docX = offsetX() + whole.originDx;
@@ -197,14 +226,28 @@ Layer::CompositeRegion Layer::compositeRasterRegion(const QRect &regionDoc) cons
     if (want.isEmpty())
         return out; // 空图 → 调用方跳过该层
 
+    // 异步「定稿」结果命中：后台已按 (want + pad) 求值过，这里只裁出 want ——
+    // 于是重滤镜的整层重算不再发生在合成路径上（这是「异步/可取消定稿」的落点）。
+    if (regionFilterCovers(regionDoc)) {
+        out.image = m_regionFilterImage.copy(regionDoc.translated(-m_regionFilterRect.topLeft()));
+        out.docX = regionDoc.left();
+        out.docY = regionDoc.top();
+        return out;
+    }
+
     // 面积算子要读「请求区外扩 totalPad」的真实像素，再裁回 want：
     // 只取 want+pad（越出层范围的由 extract 填透明 = 层外即透明的 abyss），
     // 求值后裁回 want。点滤镜 totalPad()==0 时退化为原路径。
     const int pad = m_filters.totalPad();
     const QRect srcWant = want.adjusted(-pad, -pad, pad, pad).intersected(layerRect);
     QImage base = TilePatch::extract(m_tiles, srcWant);
-    if (m_filters.hasEnabled())
-        base = m_filters.apply(base);
+    if (m_filters.hasEnabled()) {
+        // ROI 通用化第 ① 步：把「请求区 / 所需输入区」按**本文档坐标**告诉滤镜链。
+        // 本例里 srcWant 比 want 大一圈 pad（面积算子外扩），算子据此知道多出的边在哪。
+        const QRect srcDoc = srcWant.translated(offsetX(), offsetY());
+        const QRect outDoc = want.translated(offsetX(), offsetY());
+        base = m_filters.apply(base, srcDoc, outDoc, nullptr);
+    }
     if (srcWant != want) {
         const int dx = want.left() - srcWant.left();
         const int dy = want.top() - srcWant.top();

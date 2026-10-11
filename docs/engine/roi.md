@@ -62,8 +62,9 @@ ROI 反向传播就是让「小块脏区」只重算必要输入的那套机制�
 |---|---|
 | 标量外扩 | `FilterNode::inputPad()` → `int` |
 | 滤镜栈求和 | `FilterStack::totalPad()` |
-| 像素层路径 | `Layer::compositeRasterRegion(want)`：`srcWant = want.adjusted(-pad,-pad,pad,pad) ∩ 层范围`，之后**按 pad 取中心裁回** |
-| 图路径 | `PointFilterOp::requiredInputs(out)` → `{ out.adjusted(-p,-p,p,p) }` |
+| 像素层路径 | `Layer::compositeRasterRegion(want)`：`srcWant = want.adjusted(-pad,-pad,pad,pad) ∩ 层范围`，之后**按 pad 取中心裁回**；并把 `(srcWant, want)` 按文档坐标交给 `FilterStack::apply(source, srcRect, outRect, shouldAbort)` |
+| 图路径 | `PointFilterOp::requiredInputs(out)` → `{ out.adjusted(-p,-p,p,p) }`（**输出仍与输入同尺寸**，不做裁回 —— 见 §5 的 ② 步骤） |
+| 几何去向 | `FilterContext::srcRect / outRect`（**输入图本地坐标**；由 `PointFilterOp` 从文档坐标换算） |
 
 ## 4. 与 GIMP / GEGL 的对照
 
@@ -83,15 +84,42 @@ ROI 反向传播就是让「小块脏区」只重算必要输入的那套机制�
 偏移 500px 时是 `(64+1000)² ≈ 113 万`像素，而真正需要的只有 `4096` —— **276 倍**无用功。
 更麻烦的是 PS 默认的 **wrap-around**：它是**多矩形**依赖（区域在右边缘时要读最左边），单矩形机制无从表达。
 
-## 5. 迁移设计（三步，每步可单独验证）
+## 5. 迁移设计（三步）—— **第 ① 步已落地，②③ 与 offset 绑定后置**
 
-| 步骤 | 内容 | 验收标准 |
-|---|---|---|
-| ① 契约带几何 | `FilterContext` 增 `QRect srcRect; QRect outRect;`（层/文档坐标）；两条路径填真值；`FilterEval::applyNode(image, node)` 直调路径保持「src = out = 图像自身」语义 | **七个面积算子行为完全不变 ⇒ 全套测试保持绿** |
-| ② 裁剪按几何 | `compositeRasterRegion` 改用 `FilterStack::requiredInputRect(want)`；裁剪点由「按 pad 取中心」改为 `want.topLeft() - srcWant.topLeft()` | 测试仍绿 |
-| ③ 算子契约改 `process(const QImage &src, QImage &out, ctx)` | 算子从 ctx 读映射、自己写输出 | 破坏性：七处内环取样基准都要改 |
+| 步骤 | 内容 | 验收标准 | 状态 |
+|---|---|---|---|
+| ① 契约带几何 | `FilterContext` 增 `QRect srcRect; QRect outRect;`（**文档坐标**）；两条路径填真值；`FilterEval::applyNode(image, node)` 直调路径保持「src = out = 图像自身」语义 | **七个面积算子行为完全不变 ⇒ 全套测试保持绿** | ✅ **已落地**（见下「① 落地说明」） |
+| ② 裁剪按几何 | `compositeRasterRegion` 改用新的 `FilterStack::requiredInputRect(want)`；裁剪点由「按 pad 取中心」改为 `want.topLeft() - srcWant.topLeft()` | 测试仍绿 | ⏸ **未做**（理由见下） |
+| ③ 算子契约改 `process(const QImage &src, QImage &out, ctx)` | 算子从 ctx 读映射、自己写输出 | 破坏性：七处内环取样基准都要改 | ⏸ **未做**（理由见下） |
 
-### 多算子栈的额外门槛（别低估）
+### ① 落地说明（实际做了什么、几何用哪个坐标系）
+
+- `FilterContext` 新增 `srcRect` / `outRect`，**一律用「输入图本地坐标」**（输入图 `(0,0)` 为原点）；
+- `FilterStack::apply(source, srcRect, outRect, shouldAbort)` 的入参用**文档坐标**（与
+  `Layer::compositeRasterRegion` 里 want/srcWant 同一空间），由 `PointFilterOp` 负责
+  减掉 `srcRect.topLeft()` 换算成本地坐标 —— 调用方不必关心坐标系；
+- `Layer::compositeRasterRegion` 现在真的把「请求区 / 所需输入区」按文档坐标传下去；
+- **七个面积算子一行未改**（它们本来就只依赖「手里这张图」与 `inputPad`），全套测试保持绿。
+
+> 坐标系为什么选这一套：`srcRect` 只描述「手里这张图里，哪一块是合法的输出区」，
+> 所以它必须是本地坐标；而调用方（像素层）手里只有文档坐标。把换算收在
+> `PointFilterOp` 一处，比让每个调用方各算一遍更不容易错 —— 本轮实测就错了两次（见缺陷台账 #16/#17）。
+
+### ②③ 为什么后置（**一个明确的决策，不是遗漏**）
+
+把三步全做完的代价是 **12 个代码文件**（含 7 个已正确的面积算子内环）＋测试与文档；而收益只有一个
+「以后几何算子能装进来」。更关键的是，按本文 §4 的结论，通用化之后：
+
+- **wrap-around 仍装不下**：PS 默认的位移是**多矩形**依赖（右边缘读最左边），单矩形机制无从表达；
+- 单矩形下 offset 若用对称外扩逼近，偏移 500px 时每个 64×64 块要取 ~113 万像素（276 倍无用功）——
+  也就是说「只做 ①②③ 而不做多矩形」并不能让 offset 变得可用；
+- 栈里仍只能有**一个几何算子且必须在最后**（§5 末尾那条限制依旧）。
+
+所以决策是：**②③ 与「真的要做 offset」一起做**，届时有真实需求驱动，也能顺手把
+「几何算子直接吃整层栅格」这条**专用路径**与通用路径对比着选。在那之前，① 已经把
+「几何能表达」这件事钉在契约里（并有 `roictx` 用例守着），不阻塞任何现有功能。
+
+### 多算子栈的额外门槛（别低估，也是 ②③ 后置的理由之一）
 
 栈里若含非 pad 类算子（如 offset），**每个算子都需要各自的中间缓冲与几何**，
 不能像现在这样「所有滤镜依次作用在同一张补边图上」：

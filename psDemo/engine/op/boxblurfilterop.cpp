@@ -50,7 +50,6 @@ void BoxBlurFilterOp::finish(const FilterContext &ctx)
 
 void BoxBlurFilterOp::process(QImage &image, const FilterContext &ctx)
 {
-    Q_UNUSED(ctx);
     const int w = image.width();
     const int h = image.height();
     const int radius = m_radius;
@@ -79,6 +78,8 @@ void BoxBlurFilterOp::process(QImage &image, const FilterContext &ctx)
 
     // 1) 预乘 → 直通
     for (int y = 0; y < h; ++y) {
+        if ((y & 31) == 0 && aborted(ctx))
+            return; // 协作式取消：每 32 行查一次（见 filterop.h 的 FilterContext::shouldAbort）
         const QRgb *s = reinterpret_cast<const QRgb *>(image.constScanLine(y));
         QRgb *d = reinterpret_cast<QRgb *>(straight.scanLine(y));
         for (int x = 0; x < w; ++x)
@@ -87,6 +88,8 @@ void BoxBlurFilterOp::process(QImage &image, const FilterContext &ctx)
 
     // 2) 水平趟 → tmp
     for (int y = 0; y < h; ++y) {
+        if ((y & 31) == 0 && aborted(ctx))
+            return;
         const QRgb *s = reinterpret_cast<const QRgb *>(straight.constScanLine(y));
         QRgb *d = reinterpret_cast<QRgb *>(tmp.scanLine(y));
         quint32 r = 0, g = 0, b = 0, a = 0;
@@ -109,6 +112,8 @@ void BoxBlurFilterOp::process(QImage &image, const FilterContext &ctx)
     QVector<const QRgb *> srcRows(h);
     QVector<QRgb *> dstRows(h);
     for (int y = 0; y < h; ++y) {
+        if ((y & 31) == 0 && aborted(ctx))
+            return;
         srcRows[y] = reinterpret_cast<const QRgb *>(tmp.constScanLine(y));
         dstRows[y] = reinterpret_cast<QRgb *>(straight.scanLine(y));
     }
@@ -137,6 +142,8 @@ void BoxBlurFilterOp::process(QImage &image, const FilterContext &ctx)
                 }
             }
             for (int y = 0; y < h; ++y) {
+                if ((y & 31) == 0 && aborted(ctx))
+                    return;
                 QRgb *drow = dstRows[y] + x0;
                 for (int i = 0; i < bw; ++i)
                     drow[i] = qRgba(norm(sumR[i]), norm(sumG[i]), norm(sumB[i]), norm(sumA[i]));
@@ -170,6 +177,8 @@ void BoxBlurFilterOp::process(QImage &image, const FilterContext &ctx)
                 r += qRed(p); g += qGreen(p); b += qBlue(p); a += qAlpha(p);
             }
             for (int y = 0; y < h; ++y) {
+                if ((y & 31) == 0 && aborted(ctx))
+                    return;
                 dstRows[y][x] = qRgba(norm(r), norm(g), norm(b), norm(a));
                 const int add = y + radius + 1;
                 const int del = y - radius;
@@ -181,6 +190,8 @@ void BoxBlurFilterOp::process(QImage &image, const FilterContext &ctx)
 
     // 4) 直通 → 预乘写回
     for (int y = 0; y < h; ++y) {
+        if ((y & 31) == 0 && aborted(ctx))
+            return;
         const QRgb *s = reinterpret_cast<const QRgb *>(straight.constScanLine(y));
         QRgb *d = reinterpret_cast<QRgb *>(image.scanLine(y));
         for (int x = 0; x < w; ++x)
