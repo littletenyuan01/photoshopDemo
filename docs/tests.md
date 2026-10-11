@@ -1,0 +1,58 @@
+# tests — 常驻测试
+
+无 GUI 断言：不需要人工看画面，跑完给退出码。代码有更新时同步本文件（见 `docs/README.md` 维护约定）。
+
+## 定位
+
+守住几类**容易被后续改动悄悄破坏**的性质：逐像素等价、存读保真、并行与串行一致、时间上界。
+
+不做的事：不替代人工手感验收（拖拽跟手度、渲染观感）；不做像素级 UI 视觉回归。
+
+## 构建与运行
+
+```bat
+mkdir build-tests && cd build-tests
+qmake <repo>\psDemo\tests.pro && mingw32-make -j4
+release\psdemo_tests.exe                          :: 跑全部
+release\psdemo_tests.exe composite regionraster   :: 只跑指定用例
+```
+
+退出码 = **失败用例数**（0 = 全过，便于脚本 / CI 判定）。构建目录 `.build-tests/` 已在 `.gitignore`。
+
+> **工程文件为什么在 `psDemo/` 而不是 `psDemo/tests/`**：qmake 里 `.pri` 的**相对路径按「包含它的 `.pro` 所在目录」解析**（不是 `.pri` 自己的目录），
+> `app.pri` 里 `domain/layer.cpp` 这类路径只有在 `.pro` 与 `app.pri` 同目录时才成立。
+> 测试**源文件**仍在 `psDemo/tests/`。
+
+## 用例
+
+| 名字 | 守住什么 |
+|---|---|
+| `pixelprim` | 逐像素合成原语的 Normal 内联快路径与改动前旧实现**位等价**：穷举 27 模式 × 56×56 像素对 × 3 不透明度 × 4 蒙版 × 2 坐标 = **2,032,128 组** |
+| `filterchain` | 滤镜链走图（就地求值）与直接 `FilterEval` 循环逐像素一致；附带打印建图成本 |
+| `regionraster` | 层复合栅格「按区域滤镜」与「整层滤镜后裁剪」逐像素一致 |
+| `composite` | 投影分块**并行**合成与单次整体合成逐像素一致（文档含调整层 + 带滤镜层：守住曾导致并行访问冲突崩溃的分支） |
+| `graphcheck` | 图引擎自检（结构 / 缓存复用 / 脏传播 / 与直接合成交叉校验） |
+| `projectio` | `.pslite` 存读往返：层 kind / 属性 / 调整层与滤镜参数逐项一致，且**整幅合成逐像素一致** |
+| `adjustpanel` | 调整层面板：已存参数回填滑动条（含 gamma 量程）；改值只预览、交互结束提交一次且不重复 |
+| `adjustapply` | 调整层参数落盘后重新打开**仍作用于画面** |
+| `blendparallel` | `blendLayerRangeParallel` 与串行版逐像素一致（移动工具逐帧路径） |
+| `transformlive` | 自由变换 live 投影与提交后合成一致（identity 严格相等 / 缩小 50% 千分之一内） |
+| `dirtybudget` | 带滤镜层上 64×64 脏区重投影的时间上界（区域化前约 280ms → 现在约 2ms） |
+
+## 约定
+
+- 每个用例实现为 `int tXxx()`，返回**失败项数**；断言用 `PsTests::Reporter::check`，
+  机器相关的量（耗时 / 帧率）用 `info` 只打印、不断言。
+- 时间类断言只作**粗护栏**（阈值留十几倍余量）：本机单次运行噪声可达 ±2×。
+- 需要 QApplication 的用例：`testmain.cpp` 在未指定 `QT_QPA_PLATFORM` 时自动设 `offscreen`，
+  保证无桌面环境也能跑。
+- fixture 一律**自建**，不依赖仓库外的文件。
+
+## 写测试时踩过的坑（别重犯）
+
+1. **同名控件要按「当前页」查**：调整层面板多个页面都有 `slider_gamma`（色阶 / 曝光），
+   对 host 全树 `findChild` 会命中别的页，测出假值。
+2. **信号 lambda 别每轮重连 + 按引用捕获局部计数器**：旧 lambda 会写悬垂引用，计数翻倍。
+   要么只连一次，要么按增量断言。
+3. **别用「初值表示失败」的哨兵再只在失败时更新**：例如 `int worst = -1; if (d) worst = d;`
+   在全通过时会残留 −1 被误判为失败（本套件的 `composite` 就踩过，现用 `anyBad` 布尔）。

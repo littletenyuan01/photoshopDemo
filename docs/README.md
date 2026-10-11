@@ -27,6 +27,7 @@
 | [graph-engine.md](graph-engine.md) | **图引擎（engine/graph）**：DAG / ROI 反向传播 / 节点缓存与脏传播 / 合成入图，对照 GEGL |
 | [features.md](features.md) | 功能清单与使用说明 |
 | [pending-dev.md](pending-dev.md) | **待开发**：已有功能的已知风险与完善方向 |
+| [tests.md](tests.md) | **常驻测试**：11 个无 GUI 断言用例、构建运行方式、写测试的约定与坑 |
 | [code-map.md](code-map.md) | 重点代码与文件索引 |
 | [tech-notes.md](tech-notes.md) | 技术点与设计决策 |
 | [ui/ui-review.md](ui/ui-review.md) | UI 结构审查与收口 |
