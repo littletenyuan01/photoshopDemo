@@ -10,6 +10,7 @@
    <property name="bottomMargin"><number>0</number></property>
    <item>
     <widget class="QLabel" name="labelTitle">
+             <property name="visible"><bool>false</bool></property>
      <property name="text"><string>渐变映射</string></property>
     </widget>
    </item>
@@ -21,9 +22,10 @@
    </item>
    <item>
     <layout class="QGridLayout" name="grid">
+
      <item row="0" column="0"><widget class="QLabel" name="label_strength"><property name="text"><string>强度</string></property></widget></item>
-     <item row="0" column="1"><widget class="QSlider" name="slider_strength"><property name="orientation"><enum>Qt::Orientation::Horizontal</enum></property><property name="minimum"><number>0</number></property><property name="maximum"><number>100</number></property><property name="value"><number>100</number></property></widget></item>
-     <item row="0" column="2"><widget class="QSpinBox" name="spin_strength"><property name="minimum"><number>0</number></property><property name="maximum"><number>100</number></property><property name="value"><number>100</number></property></widget></item>
+     <item row="0" column="1"><widget class="QSlider" name="slider_strength"><property name="sizePolicy"><sizepolicy hsizetype="Expanding" vsizetype="Fixed"><horstretch>1</horstretch><verstretch>0</verstretch></sizepolicy></property><property name="orientation"><enum>Qt::Orientation::Horizontal</enum></property><property name="minimum"><number>0</number></property><property name="maximum"><number>100</number></property><property name="value"><number>100</number></property></widget></item>
+     <item row="0" column="2"><widget class="QSpinBox" name="spin_strength"><property name="sizePolicy"><sizepolicy hsizetype="Fixed" vsizetype="Fixed"><horstretch>0</horstretch><verstretch>0</verstretch></sizepolicy></property><property name="minimumSize"><size><width>80</width><height>0</height></size></property><property name="maximumSize"><size><width>96</width><height>16777215</height></size></property><property name="alignment"><set>Qt::AlignmentFlag::AlignRight|Qt::AlignmentFlag::AlignVCenter</set></property><property name="minimum"><number>0</number></property><property name="maximum"><number>100</number></property><property name="value"><number>100</number></property></widget></item>
     </layout>
    </item>
    <item>

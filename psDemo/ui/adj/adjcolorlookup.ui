@@ -10,6 +10,7 @@
    <property name="bottomMargin"><number>0</number></property>
    <item>
     <widget class="QLabel" name="labelTitle">
+             <property name="visible"><bool>false</bool></property>
      <property name="text"><string>颜色查找</string></property>
     </widget>
    </item>
