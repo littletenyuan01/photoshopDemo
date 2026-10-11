@@ -14,8 +14,9 @@
  * `prepare/process/finish`（纯虚接口，不需要知道对方类型）。
  *
  * 【为什么模糊结果留成「预乘」再逐像素反预乘】
- * 盒模糊算子内部会做直通↔预乘转换；若这边先转直通再喂给它，就会**二次往返**
- * （低 alpha 下不可逆、会掉色）。故模糊缓冲保持预乘，只在合并那一步逐像素 `qUnpremultiply`。
+ * 盒模糊算子内部会做直通↔预乘转换；若这边先转直通再喂给它，就会多一次**不必要的往返**
+ * （每次往返在低 alpha 下有 ±1 LSB 舍入损失，且多一趟全图读改写）。故模糊缓冲保持预乘，
+ * 只在合并那一步逐像素 `qUnpremultiply`。
  */
 #ifndef ENGINE_OP_UNSHARPMASKFILTEROP_H
 #define ENGINE_OP_UNSHARPMASKFILTEROP_H

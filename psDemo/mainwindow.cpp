@@ -260,6 +260,12 @@ void MainWindow::setupMenus()
     connect(ui->actionBoxBlur, &QAction::triggered, this,
             [this]() { runFilterDialog(Ps::OpName::BoxBlur); });
 
+    // 滤镜 → 模糊 → 高斯模糊（面积算子；三次盒模糊逼近）
+    ui->actionGaussianBlur->setEnabled(true);
+    ui->actionGaussianBlur->setToolTip(tr("高斯模糊（非破坏，作用于活动像素层）"));
+    connect(ui->actionGaussianBlur, &QAction::triggered, this,
+            [this]() { runFilterDialog(Ps::OpName::GaussianBlur); });
+
     // 滤镜 → 锐化 → USM 锐化（面积算子；复用盒模糊做模糊级）
     ui->actionUnsharpMask->setEnabled(true);
     ui->actionUnsharpMask->setToolTip(tr("USM 锐化（非破坏，作用于活动像素层）"));

@@ -396,6 +396,16 @@ void AdjustmentPropsHost::ensurePages()
         wireSliderSpin(threshold.slider, threshold.spin, [this](int v) { m_node.setUsmThreshold(v); });
         add(Ps::OpName::UnsharpMask, page);
     }
+    {
+        // 高斯模糊（面积算子）：无 .ui，一页一个半径滑块（σ = 半径/3，见 gaussianblurfilterop.h）
+        auto *page = new QWidget(m_stack);
+        auto *col = new QVBoxLayout(page);
+        col->setContentsMargins(0, 0, 0, 0);
+        const SliderRow radius = makeSliderRow(page, QStringLiteral("半径"), QStringLiteral("gauss_radius"), 1, 64);
+        col->addWidget(radius.row);
+        wireSliderSpin(radius.slider, radius.spin, [this](int v) { m_node.setGaussRadius(v); });
+        add(Ps::OpName::GaussianBlur, page);
+    }
 }
 
 void AdjustmentPropsHost::showPageFor(Ps::OpName op)
@@ -509,6 +519,9 @@ void AdjustmentPropsHost::loadControlsFromNode()
         setPair("slider_usm_radius", "spin_usm_radius", m_node.usmRadius());
         setPair("slider_usm_amount", "spin_usm_amount", int(m_node.usmAmount() * 100.0 + 0.5));
         setPair("slider_usm_threshold", "spin_usm_threshold", m_node.usmThreshold());
+        break;
+    case Ps::OpName::GaussianBlur:
+        setPair("slider_gauss_radius", "spin_gauss_radius", m_node.gaussRadius());
         break;
     default:
         break;

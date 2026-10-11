@@ -50,6 +50,7 @@ enum class OpName {
     BoxBlur,                ///< 盒模糊（面积算子；暂仅像素层滤镜，非调整层）
     UnsharpMask,            ///< USM 锐化（面积算子：以盒模糊为模糊级）
     FindEdges,              ///< 查找边缘（面积算子：3×3 Sobel）
+    GaussianBlur,           ///< 高斯模糊（面积算子：三次盒模糊逼近）
     Count                   ///< 哨兵，勿当作真实算子
 };
 

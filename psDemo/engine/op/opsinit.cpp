@@ -9,6 +9,7 @@
 #include "filterop.h"
 #include "findedgesfilterop.h"
 #include "floodfillop.h"
+#include "gaussianblurfilterop.h"
 #include "focusdabop.h"
 #include "gradientop.h"
 #include "layermodeop.h"
@@ -110,6 +111,8 @@ void opsInit()
                      [] { return std::unique_ptr<FilterOp>(new UnsharpMaskFilterOp); });
     registerFilterOp(OpName::FindEdges,
                      [] { return std::unique_ptr<FilterOp>(new FindEdgesFilterOp); });
+    registerFilterOp(OpName::GaussianBlur,
+                     [] { return std::unique_ptr<FilterOp>(new GaussianBlurFilterOp); });
 }
 
 } // namespace Ps

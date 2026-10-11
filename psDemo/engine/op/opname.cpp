@@ -48,6 +48,7 @@ constexpr OpNameInfo kOpNameTable[] = {
     {OpName::BoxBlur,              "ps:box-blur",              "盒模糊"},
     {OpName::UnsharpMask,          "ps:unsharp-mask",          "USM 锐化"},
     {OpName::FindEdges,            "ps:find-edges",            "查找边缘"},
+    {OpName::GaussianBlur,         "ps:gaussian-blur",         "高斯模糊"},
 };
 
 const OpNameInfo *infoFor(OpName name)
@@ -83,6 +84,7 @@ bool isAdjustmentOp(OpName name)
     case OpName::BoxBlur:
     case OpName::UnsharpMask:
     case OpName::FindEdges:
+    case OpName::GaussianBlur:
         return false;
     default:
         break;

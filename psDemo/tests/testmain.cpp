@@ -43,7 +43,7 @@ const Case kCases[] = {
     { "blendparallel", "blendLayerRangeParallel 与串行版逐像素一致", tBlendParallel },
     { "transformlive", "自由变换 live 投影与提交后合成一致", tTransformLive },
     { "dirtybudget", "带滤镜层的小脏区重投影受时间预算约束（回归护栏）", tDirtyBudget },
-    { "areafilter", "面积算子（盒模糊 / USM 锐化 / 查找边缘）：ROI 外扩、分块无接缝、语义 oracle、往返", tAreaFilter },
+    { "areafilter", "面积算子（盒模糊 / USM / 查找边缘 / 高斯）：ROI 外扩、分块无接缝、语义 oracle、精度量化、往返", tAreaFilter },
     { "filterundo", "滤镜对话框的撤销原子性：确定=一条撤销、取消=不留痕", tFilterUndo },
 };
 

@@ -172,9 +172,14 @@ public:
     int usmThreshold() const { return m_usmThreshold; }
     void setUsmThreshold(int v) { m_usmThreshold = qBound(0, v, 255); }
 
+    // —— 高斯模糊（面积算子）：半径（UI 口径，映射见 gaussianblurfilterop.h）——
+    int gaussRadius() const { return m_gaussRadius; }
+    void setGaussRadius(int v) { m_gaussRadius = qBound(1, v, 64); }
+
     /**
-     * 该算子需要的输入外扩（像素）：点算子 = 0；盒模糊/USM = 半径；查找边缘 = 1（3×3）。
-     * 面积算子要在「请求区外扩」上取输入，再裁回请求区。
+     * 该算子需要的输入外扩（像素）：点算子 = 0；盒模糊/USM = 半径；查找边缘 = 1（3×3）；
+     * 高斯模糊 = 半径 + 2（**安全上界**：三趟盒模糊半径之和 ≈ 0.98×半径，留 2px 余量，
+     * 宁可比需要的外扩多一点，也不要因外扩不足在 64×64 块界留下接缝）。
      */
     int inputPad() const
     {
@@ -185,6 +190,8 @@ public:
             return m_usmRadius;
         case OpName::FindEdges:
             return 1; // 3×3 Sobel
+        case OpName::GaussianBlur:
+            return m_gaussRadius + 2;
         default:
             return 0;
         }
@@ -236,6 +243,7 @@ private:
     int m_usmRadius = 2;
     qreal m_usmAmount = 1.0;   ///< 1.0 = 100%（PS 默认量级）
     int m_usmThreshold = 0;    ///< 0 = 全像素参与（PS 默认 0）
+    int m_gaussRadius = 5;
 };
 
 } // namespace Ps

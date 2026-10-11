@@ -75,8 +75,28 @@ inline long long diffCount(const QImage &a, const QImage &b)
     return d;
 }
 
-/** 临时文件路径（放系统临时目录，避免污染工作区）。 */
-inline QString tempFilePath(const QString &name)
+/**
+ * 最大单通道绝对差（RGB 三通道；尺寸/格式不同返回 -1）。
+ * 用于量化「逼近算法 vs 精确算法」的误差 —— 比「看起来差不多」可验证。
+ */
+inline int maxChannelDiff(const QImage &a, const QImage &b)
+{
+    if (a.size() != b.size() || a.format() != b.format())
+        return -1;
+    int worst = 0;
+    for (int y = 0; y < a.height(); ++y) {
+        const QRgb *pa = reinterpret_cast<const QRgb *>(a.constScanLine(y));
+        const QRgb *pb = reinterpret_cast<const QRgb *>(b.constScanLine(y));
+        for (int x = 0; x < a.width(); ++x) {
+            worst = qMax(worst, qAbs(qRed(pa[x]) - qRed(pb[x])));
+            worst = qMax(worst, qAbs(qGreen(pa[x]) - qGreen(pb[x])));
+            worst = qMax(worst, qAbs(qBlue(pa[x]) - qBlue(pb[x])));
+        }
+    }
+    return worst;
+}
+
+/** 临时文件路径（放系统临时目录，避免污染工作区）。 */inline QString tempFilePath(const QString &name)
 {
     return QDir(QDir::tempPath()).filePath(QStringLiteral("psdemo_test_") + name);
 }

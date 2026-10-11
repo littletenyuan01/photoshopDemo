@@ -127,8 +127,67 @@ QImage naiveSobel(const QImage &src)
     return out;
 }
 
-/** 全幅合成（整幅一次 compositeRegion）。 */
-QImage compositeWhole(ImageDocument *doc)
+/**
+ * 朴素**精确**高斯（可分离、直通空间、越界当透明、核归一化到 1）——
+ * 高斯模糊算子的**精度参照**。只用来比内部区域（边缘受 abyss 影响，不是逼近误差）。
+ */
+QImage naiveGaussian(const QImage &src, double sigma)
+{
+    const int w = src.width();
+    const int h = src.height();
+    const int r = int(std::ceil(3.0 * sigma));
+    QVector<double> k(2 * r + 1);
+    double sum = 0.0;
+    for (int i = -r; i <= r; ++i) {
+        k[i + r] = std::exp(-(double(i) * i) / (2.0 * sigma * sigma));
+        sum += k[i + r];
+    }
+    for (double &v : k)
+        v /= sum;
+
+    const auto chan = [](const QImage &img, int x, int y, int c) -> double {
+        const QRgb p = qUnpremultiply(img.pixel(x, y));
+        return (c == 0) ? qRed(p) : ((c == 1) ? qGreen(p) : ((c == 2) ? qBlue(p) : qAlpha(p)));
+    };
+
+    QVector<double> mid(size_t(w) * size_t(h) * 4, 0.0);
+    for (int y = 0; y < h; ++y) {
+        for (int x = 0; x < w; ++x) {
+            for (int c = 0; c < 4; ++c) {
+                double acc = 0.0;
+                for (int i = -r; i <= r; ++i) {
+                    const int sx = x + i;
+                    if (sx < 0 || sx >= w)
+                        continue; // abyss = 透明
+                    acc += k[i + r] * chan(src, sx, y, c);
+                }
+                mid[(size_t(y) * size_t(w) + size_t(x)) * 4 + size_t(c)] = acc;
+            }
+        }
+    }
+
+    QImage out(src.size(), src.format());
+    for (int y = 0; y < h; ++y) {
+        for (int x = 0; x < w; ++x) {
+            int v[4] = {0, 0, 0, 0};
+            for (int c = 0; c < 4; ++c) {
+                double acc = 0.0;
+                for (int i = -r; i <= r; ++i) {
+                    const int sy = y + i;
+                    if (sy < 0 || sy >= h)
+                        continue;
+                    acc += k[i + r] * mid[(size_t(sy) * size_t(w) + size_t(x)) * 4 + size_t(c)];
+                }
+                v[c] = qBound(0, int(acc + 0.5), 255);
+            }
+            // 与算子同口径：alpha 也参与滤波，RGB 用滤波后的直通值再预乘
+            out.setPixel(x, y, qPremultiply(qRgba(v[0], v[1], v[2], v[3])));
+        }
+    }
+    return out;
+}
+
+/** 全幅合成（整幅一次 compositeRegion）。 */QImage compositeWhole(ImageDocument *doc)
 {
     return Compositor::composite(*doc);
 }
@@ -339,6 +398,52 @@ int tAreaFilter()
         const long long dc = PsTests::diffCount(whole, chunked);
         r.check(dc == 0,
                 QStringLiteral("像素层查找边缘：分块投影 == 整幅合成，无跨块接缝（diffs=%1）").arg(dc));
+    }
+
+    // —— ⑨ 高斯模糊：分块(带 pad) == 整幅；与精确高斯的量化误差；往返 ——
+    {
+        const int W = 256, H = 256;
+        auto doc = ImageDocument::createBlank(W, H, Qt::white);
+        doc->placeImageAsLayer(PsTests::makeLayerImage(180, 150, 17, 220),
+                               QStringLiteral("gaussL"));
+        doc->layers().layerAt(1)->setOffset(30, 40);
+        FilterNode node(OpName::GaussianBlur);
+        node.setGaussRadius(8);
+        doc->layers().layerAt(1)->filters().append(node);
+
+        const QImage whole = compositeWhole(doc.get());
+        const QImage chunked = compositeChunked(doc.get());
+        const long long d = PsTests::diffCount(whole, chunked);
+        r.check(d == 0,
+                QStringLiteral("像素层高斯：分块投影 == 整幅合成，无跨块接缝（diffs=%1）").arg(d));
+
+        // 与「朴素精确高斯」的误差（σ = 半径/3，与算子同一口径）
+        const int SW = 64, SH = 64, R = 9;
+        const QImage src = PsTests::makeLayerImage(SW, SH, 23, 255);
+        QImage got = src;
+        FilterNode gnode(OpName::GaussianBlur);
+        gnode.setGaussRadius(R);
+        FilterEval::applyNode(got, gnode);
+        const QImage ref = naiveGaussian(src, R / 3.0);
+        const QRect inner(2 * R, 2 * R, SW - 4 * R, SH - 4 * R);
+        const int worst = PsTests::maxChannelDiff(got.copy(inner), ref.copy(inner));
+        r.info(QStringLiteral("三次盒模糊 vs 精确高斯：内部最大单通道误差 %1/255").arg(worst));
+        r.check(worst >= 0 && worst <= 8,
+                QStringLiteral("高斯：三次盒模糊逼近精确高斯，内部误差 ≤ 8/255（实测 %1）").arg(worst));
+
+        // 往返：gaussRadius 要能存回来
+        const QString path = PsTests::tempFilePath(QStringLiteral("gauss.pslite"));
+        QString err;
+        const bool saved = ProjectIo::save(*doc, path, &err);
+        auto back = saved ? ProjectIo::load(path, &err) : nullptr;
+        if (back && back->layers().count() > 1
+            && back->layers().layerAt(1)->filters().count() > 0) {
+            const FilterNode &n = back->layers().layerAt(1)->filters().at(0);
+            r.check(n.op() == OpName::GaussianBlur && n.gaussRadius() == 8,
+                    QStringLiteral("往返保住高斯半径 8"));
+        } else {
+            r.check(false, QStringLiteral("重新打开含高斯的 .pslite"));
+        }
     }
 
     return r.fails;
