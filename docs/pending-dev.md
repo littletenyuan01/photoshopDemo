@@ -288,6 +288,275 @@ sliderReleased → setLayerFilterNode(..., pushUndo=true)
 - `engine/compositor.cpp`：预览覆盖叠层
 - `engine/op/freetransformop.cpp`：栅格化算子
 
+### 已缓解：拖中每帧投影重合成（第 2 档）
+
+**曾有问题**：拖中 `updateLayerPreview` 每帧 `markDirty` → `contentChanged` → `Projection::sync()`
+（分块重合成整个预览脏区），叠加栅格化后实测约 **2~5 FPS**。
+
+#### 改后（照搬 MoveTool 的 live 图章思路）
+
+- `TransformTool` 新增 `liveProjection()`：会话开始时用 `ctx.projectionSnapshot` 建
+  「本层之下全文档合成」（先清空本层占位再叠下方栈）；拖中每帧把 patch 还原到 below，
+  再从**本层到顶** `blendLayerRange`（含 `compositePreview`）。
+- 画布 `contentChanged` 见 `activeLiveProjection()` 非空即**跳过** `syncProjection`
+  （与移动工具同一短路，[`ui/canvasview.cpp`](../psDemo/ui/canvasview.cpp)）。
+- 提交：先 `emit liveProjectionCommitted(m_live)`（→ `Projection::adoptImage`，避免回落到旧投影再重算），
+  再 `clearLive()` + 正式 `freeTransform` + `markDirty`。
+- 取消：`clearLive()` 后还原 —— 取消回到会话前状态，旧投影本就正确，无闪断。
+
+**验证（无 GUI）**：断言 identity 与 scale-50 下 `liveProjection() == 提交后合成`，**diffs=0**。
+
+#### 仍欠（实测已定位）
+
+栅格化仍是最大单项：1400×1100 目标、2000×1500 源下实测
+**Nearest 212ms / 双线性 418ms / 双三次 1035ms**。即 **>50% 的成本不在插值**，
+而在 `TileBuffer` → `patch` → `TilePatch::blit` → `TilePatch::extract` 的往返与逐像素记账。
+
+已试「仿射增量映射 + 去掉逐像素 `destPoly.containsPoint` + 不透明像素跳过除法」：
+**A/B 交替实测无收益（差异全在机器噪声内），已回退**。
+真正的下一步是**去掉中间缓冲直接写目标**，或并行化（不是改像素映射数学）。
+
+---
+
+## 投影刷新的时间预算（第 2 档）
+
+`Projection::sync` / `flushPriority` / `processPendingChunks` 新增 `maxMs` 时间预算
+（`sync` 的两阶段**共用同一时钟**，故总耗时 ≤ maxMs）；`CanvasView` 每帧给
+`sync` 与 `flushPriority` 各 8ms，idle 每 tick 8ms。
+
+**为什么**：旧行为里大面积脏（新建调整层、层级显隐）走 `flushPriority()` **无上限**
+同步刷完整个视口 —— 实测单帧 **471ms**（2000×1500 / 6 层 / 视口 1200×800）。
+
+| | 旧（无预算） | 新（8+8ms 预算） |
+|---|---|---|
+| 单帧最坏 | **471 ms** | **18.5 ms** |
+| 稳态每帧 | — | **16.7 ms** |
+| 收尾 | 同一帧内完成 | idle 分帧（163 帧 ≈ 1.5s 后台补完） |
+
+代价：视口分 2~3 帧渐进填满，而非一次到位；换来 UI 不冻结。
+
+---
+
+## 合成器热路径优化（第 2 档）
+
+两处**逐 chunk 固定开销**（受控交替 A/B：分块路径稳定 **15~25%**）：
+
+1. `Compositor::compositeRegion` 的清屏：旧写法每 chunk 建一次 `QPainter` + `fillRect`；
+   改为逐行 `memset`（预乘透明 = 全 0，等价）。
+2. 栅格层瓦片遍历：旧写法 `forEachAllocatedTile` —— 遍历该层**全部**瓦片再逐个判交，
+   分块重算时是 O(块数 × 层数 × 总瓦片数)；改用新增的**只读** `TileBuffer::forEachTileInRect(rect, fn)`，
+   只走「与矩形相交且已分配」的瓦片格。
+
+**行为等价验证**：`graphSelfCheck()` 的 `checkCompositeGraph` 用**独立的图合成路径**
+交叉校验分块合成结果 —— 改动后仍 PASSED（逐像素一致）。
+
+> ⚠️ **度量纪律**：本轮曾据两次非受控运行误判「memset 带来 2.3~2.6×」，
+> 交替 A/B 后修正为 **15~25%**。本机单次运行噪声可达 ±2×，
+> **凡性能结论必须来自交替 A/B（或多轮 min）**，不能拿前后两次运行直接相减。
+
+---
+
+## 分块合成并行化（第 2 档）
+
+`Projection::recomposeInvalidChunks` 改为「收集候选 chunk → 分批 `QtConcurrent::blockingMap`
+并行合成」，各 worker 只写投影缓冲的**不相交区域**。
+
+### 三处线程安全前置（不做就是数据竞争）
+
+| 前置 | 处理 |
+|---|---|
+| `Layer::ensureCompositeRaster()` 是 `mutable` 缓存 | 并行前在**主线程** `warmLayerCachesForParallel()` 预热；只预热**有启用样式**的层（纯滤镜层后来改为按区域求值、不碰该缓存，见下节），调整层不走这条 |
+| `LayerMask::isFullyOpaque()` 是 `mutable` 缓存 | 同上预热 |
+| `PointOpRegistry` 常驻 `LayerModeOp` 实例是**共享可变**（`setMode` 写 `m_mode`，两线程不同图层会互踩） | 合成器不再取实例：`blendTileOnto` 改收 **`BlendMode` 按值**；注册表只保留只读的 `find()` 校验 |
+| 同一 `QImage` 被多线程 `scanLine` 触发 detach | 并行前 `(void)m_buffer.bits()` 确保独占 |
+| `QPainter` 对同一 paint device 不可同时绘制 | 清屏改 `memset`；调整层「整区替换」改逐行 `memcpy` |
+
+### 自适应批大小
+
+一次 `blockingMap` 有数 ms 固定开销（唤醒 + 汇总），故按
+`(时间预算 − 批次固定开销) / 单块耗时估计` 折算批量。单块耗时用 EMA，
+且**只由「足够大的批次」更新** —— 否则小批次被固定开销主导，会把估计越推越高（正反馈）。
+
+### 受控交替 A/B（16 逻辑核）
+
+| 测量 | 串行 | 并行 | 提升 |
+|---|---|---|---|
+| 整幅脏 sync + 全部 pending | 482~800 ms | **105~121 ms** | ~4.6~7× |
+| 摊帧到完成（含 idle） | 103~105 帧 / 1171~1200 ms | **15 帧 / 154 ms** | ~7.8× |
+| 无预算到完成 | 564~609 ms | **60~64 ms** | ~9× |
+| 预算单帧（8+8ms） | 16.7~24 ms | 17~20 ms | 持平 |
+
+**行为等价验证**：`partest`（2000×1500 / 6 层 / 含 Multiply·Screen·蒙版）断言
+「分块并行合成 == 单次整体合成」，**5 轮 diffs=0**。
+
+> ⚠️ **本项由测试抓到真 bug**：并行后 `bench` 的调整层用例**访问冲突崩溃**，
+> 报 `QPainter::begin: A paint device can only be painted by one painter at a time` ——
+> `blendLayerRange` 的调整层分支还残留 `QPainter`。
+> 而 `partest` / `transformtest` 因**不含调整层**全程未暴露。
+> 教训：等价性测试的**分支覆盖不足会漏掉整条路径**；性能用例（含调整层）反而充当了崩溃探测器。
+
+---
+
+## 逐像素原语：Normal 快路径（第 2 档）
+
+**先量后改**（`micropix` 微基准，102 万像素；ns/px）：
+
+| 步骤 | 改前 | 改后 |
+|---|---|---|
+| 基线（纯读 src） | 0.7~0.9 | — |
+| `unpremul` 不透明 / 半透明 | 1.8 / 6.4 | 未改 |
+| `Blend::pixel` Normal（**跨 TU 调用**） | 7.5~9.6 | 未改 |
+| **`compositePixelOnto` Normal 不透明** | **30~36** | **19.1** |
+| `compositePixelOnto` Normal 蒙版 128 | 33.7 | 19.3 |
+| `compositePixelOnto` Multiply 不透明 | 34.5 | 30.8 |
+
+**根因**：`Blend::pixel` 定义在 `blend.cpp` —— 没有 LTO 时**跨 TU 不内联**；
+而 Normal 下 `Blend::pixel` 恒返回 source，使合成公式里的 `(comp/255 − cs)` 项**恒为 0**，
+编译器看不见、白算一遍。
+
+**改法**：`compositePixelOnto` 为 `BlendMode::Normal` 加内联快路径，公式化简为
+`ratio*(cs − cb) + cb`。
+
+**精确性前提**（已实测校验）：`(n/255)*255 == n` 对 n∈[0,255] 全部成立，
+且 `comp/255 == cs` —— 故化简是**位等价**，不是近似。
+
+**等价性验证**：`pixeq` 穷举 **27 模式 × 56×56 像素对 × 3 不透明度 × 4 蒙版 × 2 坐标
+= 2,032,128 组**，与「改动前逐字复制的旧实现」对比 → **0 处不一致**。
+
+**端到端**（同机，与前面几轮可比）：
+
+| 测量 | 改前 | 改后 |
+|---|---|---|
+| 全幅合成（5 层） | ~470~565 ms | **~324 ms** |
+| 整幅脏 sync + 全部 pending | 105~121 ms | **73 ms** |
+| 摊帧到完成 | 15 帧 / 154 ms | **8 帧 / 89 ms** |
+| 无预算到完成 | 60~64 ms | **36 ms** |
+
+**仍欠**：非 Normal 模式（Multiply 等）仍付 `Blend::pixel` 的跨 TU 调用（30.8 ns/px）。
+可选后续：把 `blendPerChannel` / `pixel` 移入 `blend.h` 内联，或开 LTO ——
+两者都会放大编译面与构建时间，需先量收益再决定。
+
+---
+
+## 图引擎就地链路（第 2 档）
+
+**问题**：`FilterStack::apply` 走图求值时，**每个节点各持一份输出缓冲** ——
+`ImageSourceOp::process` 的 `copy()` 加每级 `PointFilterOp` 的 `applyNode` 触发 detach 拷贝，
+线性 3 节点链共 **4 次整图拷贝**（直接循环只需 1 次）。
+
+**改法**：`GraphOp` 增加 `canProcessInPlace()` / `processInPlace()`；
+`PsGraph::evaluate` 在「算子声明可就地 **且** 该输入只被本节点消费（`consumerCount()==1`）」时，
+先放掉上游缓存持有的引用（使缓冲独占），再把栅格交给 `processInPlace` **就地改写**。
+放缓存只损失一次可重算的缓存，不改变正确性；有分叉（多个消费者）时自动退回拷贝路径。
+
+**受控 A/B（2000×1500，3 节点滤镜链，各 3 轮）**：
+
+| | 走图耗时 |
+|---|---|
+| 无就地 | 475.8 / 493.7 / 473.3 ms（均 481） |
+| **有就地** | 484.1 / 452.3 / 453.3 ms（均 **463**） |
+
+→ 省下约 **18 ms**（即 3 次 12 MB 拷贝），与预估一致；每轮 `diffs=0`。
+
+### 「图持久化」经测量判定为**不必要**
+
+只建图不求值（4 节点 + 3 连接）实测 **0.0017 ms/次（1.7 µs）**，占 475 ms 的 **0.0004%**。
+持久化不会带来可测收益，反而要为「源图随每次调用变化」引入额外状态（或被迫加一层
+`setSource` 协议）。故**不做**，理由与数据记录于此。
+
+> 这条是「先量后改」的正面样本：若按直觉去「持久化图」，会写一堆状态而收益约等于 0。
+
+---
+
+## 层复合栅格区域化（修掉一条 **447ms** 的无界停顿）
+
+**问题（实测）**：在带滤镜的**像素层**上画一笔（64×64 脏区），UI 线程停 **447 ms**：
+
+| 场景（2000×1500，某层带 3 个点滤镜） | 改前 | 改后 |
+|---|---|---|
+| 首次 `sync(预算 8ms)` | 416.6 ms | **12.4 ms** |
+| 整幅脏（栅格已缓存） | 421.6 ms | **8.9 ms** |
+| **64×64 小脏区（≈一笔）** | **447.2 ms** | **8.9 ms** |
+| 全量排空（整幅重投影） | ~500 ms | **93.5 ms** |
+
+链路：`painttool` → `Tool::markDocumentDirty` → `ImageDocument::markDirty` →
+**清掉活动层的整层复合栅格** → `contentChanged` → 投影里 `ensureCompositeRaster()`
+缓存未命中 → **整层 materialize + 整条滤镜链 + 样式**，全幅且**不受时间预算约束**。
+
+**改法**：新增 `Layer::compositeRasterRegion(regionDoc)` —— 只 `TilePatch::extract`
+请求区、只对那块跑滤镜；合成器改为按块（`area`）请求。点滤镜逐像素，故
+「按区域滤镜」与「整层滤镜后裁剪」**逐像素等价**。同时把
+`warmLayerCachesForParallel()` 收窄为「只预热**有样式**的层」，否则它会把
+「整层一次建完」重新引回来。
+
+**为什么区域化该排在异步之前**：异步只是把 447 ms 挪到后台 —— UI 不冻了，但该层
+每帧仍滞后 ~0.45 s，画笔照样跟不上（吞吐没变）。区域化把工作量本身降到与脏区成正比，
+并让工作可分块 → 时间预算才真正生效、并行才吃得上（全量排空 500 → 93.5 ms）。
+
+**等价性验证**：`regionfeq` 构造「某层带 3 点滤镜 + Multiply」的文档，断言
+「分块投影（区域化滤镜）」== 「`Compositor::compositeViaGraph`（整层栅格）」→ **diffs=0**。
+
+**仍欠**：**有启用样式**的层仍走整层缓存（样式要外扩 halo，区域化须带 pad 再裁回），
+故这类层仍可能有同类停顿（**未实测**）。可选解法：带 pad 的区域化样式求值，
+或异步 + 双缓冲投影。
+
+---
+
+## 移动工具逐帧路径并行化（真实文档实测）
+
+**问题**：`演示2.pslite`（2480×3508，8.7 Mpx）里 tempGirl 层上方有「图层 4」+ 两个调整层。
+关掉调整层时移动很跟手；**打开后每帧卡**。
+
+**根因**（`tools/movetool.cpp` 的 `rebuildLive`）：上方有调整层时 `m_liveApplyAbove == true`，
+每帧必须重跑**上方全部层**（调整层依赖移动后的下方结果），而这条调用是**单次串行**
+`Compositor::blendLayerRange` —— 并行只加在 `Projection` 里，**工具层绕过了它**。
+
+**改法**：新增 `Compositor::blendLayerRangeParallel()` —— 把 rect 切 64×64 块交
+`QtConcurrent::blockingMap`；各块只读写自己那块 dst 区域（栅格层读层瓦片、调整层
+`dst.copy(area)` 后写回同区），互不相交。`MoveTool` 的逐帧与按下路径改用它。
+顺带把预热逻辑上提为 `Compositor::warmLayerCaches()`（原 `Projection::warmLayerCachesForParallel`）。
+
+**实测（同一文档、同进程交替 A/B）**：
+
+| | 串行 | 并行 | 提升 |
+|---|---|---|---|
+| 每帧上方层合成 | 30.2 ms (33 fps) | **3.5 ms (283 fps)** | **8.5×** |
+| 端到端每帧（贴 below 补丁 + 贴 stamp + 上方层） | 71.2 ms (14.0 fps) | **13.7 ms (73.1 fps)** | **5.2×** |
+
+**等价性**：串行 vs 并行整幅合成 **diffs=0**。
+
+**仍欠**：端到端剩下的 ~10 ms 是两处 `QPainter::drawImage`（贴 below 补丁 / 贴 stamp）；
+要再快就得把它们换成分块 `memcpy` 并与上面一起并行。
+
+---
+
+## 调整层参数持久化：核对结论是「本来就对」，但补掉一个真实缺口
+
+用户报告「重新打开文档后滑动条回到 0」。逐环节核对（用其真实文件 `演示2.pslite`）：
+
+| 环节 | 结论 | 证据（本轮新增的验证程序） |
+|---|---|---|
+| 文件里有没有参数 | **有** | `dumppslite`：亮度/对比度 `bri=0.08 con=0.10`；色阶 `levels=137/168/4.79` |
+| 存读往返 | **OK** | `roundtrip`：kind + 全部参数逐项一致 → `ROUNDTRIP OK` |
+| 回填到滑动条 | **OK** | `adjui`（离屏实例化面板）→ 8 / 10 / 137 / 168 / 479 |
+| 重开后是否作用到画面 | **是** | `adjapply`：关掉两个调整层前后，视口 600×600 有 **99.17%** 像素不同 |
+
+所以「参数丢失」在当前代码里**不复现**。但核对中发现一个**真实缺口**并已修：
+`AdjustmentPropsHost` 的提交信号只挂在 `QSlider::sliderReleased` —— 在**数值框里输入/回车/
+滚轮**改值时只走预览，**不产生 undo、也不把文档标记为已修改**，关窗时可能不提示保存，
+用户的改动就丢了。
+
+**改法**：加 `m_pendingPreview` 标记「有未提交的预览」；`sliderReleased` 与数值框
+`editingFinished` 都调 `emitCommit`，无待提交改动时不提交（避免重复 undo 条目）。
+
+**验证**（`adjui` 离屏）：改数值框 → `preview+1 commit+0`；回车 → `preview+2 commit+1`。
+
+> 两条测试自身的坑（记下来免得再犯）：
+> ① `host.findChild<QSlider*>("slider_gamma")` 会**全树**搜索 —— 色阶页与曝光页同名，
+> 必须按「当前页」查找，否则测出假值；
+> ② 信号 lambda 若每轮重新 `connect` 且按引用捕获**局部**计数器，旧 lambda 会写悬垂引用 →
+> 计数翻倍。要么只连一次，要么按增量断言。
+
 ---
 
 ## 未排期：进一步对齐 GIMP 时可按模块补
