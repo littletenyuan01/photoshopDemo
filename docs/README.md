@@ -28,6 +28,7 @@
 | [features.md](features.md) | 功能清单与使用说明 |
 | [pending-dev.md](pending-dev.md) | **待开发**：已有功能的已知风险与完善方向 |
 | [dev-plan.md](dev-plan.md) | **开发计划**：异步定稿 / 中值增量 cum / ROI 通用化 / 位移算子四条需求的可验证开发步骤、验收标准与踩坑 |
+| [filter-roadmap.md](filter-roadmap.md) | **滤镜现状与开发计划**：68 项菜单项逐项状态（已接线 14 / 未做 54）、优先级判断标准、A–F 六档分批与「不做的项及其理由」 |
 | [tests.md](tests.md) | **常驻测试**：11 个无 GUI 断言用例、构建运行方式、写测试的约定与坑 |
 | [code-map.md](code-map.md) | 重点代码与文件索引 |
 | [tech-notes.md](tech-notes.md) | 技术点与设计决策 |
