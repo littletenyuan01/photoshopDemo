@@ -658,6 +658,37 @@ sliderReleased → setLayerFilterNode(..., pushUndo=true)
 
 ---
 
+## 滤镜接 UI：方框模糊从菜单可用（第 3 步）
+
+**为什么现在做**：引擎侧（面积算子 + ROI 外扩 + `FilterOp` 三段式）已就位，但「滤镜(&R)」菜单里
+~50 个 action 全是**灰显占位**、`BoxBlur` 只能从代码调用 —— 前面几轮的性能与正确性工作对用户完全不可见。
+这一步先把「菜单 → 参数对话框 → 非破坏应用到图层」这条闭环打通。
+
+**改法**：
+
+| 环节 | 做法 | 为什么 |
+|---|---|---|
+| 加滤镜的通用入口 | 新增 `ImageDocument::addLayerFilter(const FilterNode&)`（push undo + 失效栅格 + markDirty，返回下标） | 原先只有 `addBrightnessContrastFilter` 一个硬编码入口，加不了别的算子 |
+| 参数面板 | `AdjustmentPropsHost` 增一页「盒模糊：半径 0..128」，该页**程序化建**（无 .ui） | 它已有「按 OpName 切页 + 预览/提交信号」，复用它比新写面板省；程序化建页避免为一个滑块新增 .ui + FORMS |
+| 对话框 | 新增 `ui/filterdialog.{h,cpp}`：`QDialog` = 参数面板 + OK/Cancel，只转发 `previewChanged`，**自身无状态、不碰文档** | 「应用/取消」的语义属于文档层，放 `MainWindow`；对话框做成哑组件才能被复用（将来调整类滤镜也能挂） |
+| 应用语义 | 先 `addLayerFilter`（进 undo）→ 对话框编辑该节点 → 确定 `setLayerFilterNode(..., pushUndo=true)`；取消 `removeLayerFilter` | 与调整层那套「预览不 push / 定稿才 push」一致 |
+| 菜单 | 「滤镜 → 模糊 → 方框模糊…」置 enabled + 连 `runFilterDialog(OpName::BoxBlur)` | 其余分类保持占位，不假装有功能 |
+
+**预览的取舍（已知限制）**：像素层滤镜的预览是**整区重合成**（`setLayerFilterNode(..., false)` → markDirty），
+没有「调整层拖参」那种降采样 + 异步 + 单飞的路线。小文档流畅；大文档拖半径会重合成整层。
+
+**验证**：`adjustpanel` 增一条「盒模糊半径 7 → 回填 7」（守住新页的控件命名与回填契约）。
+> 这条断言还暴露过一个**测试自身的坑**：`setNode` 会切换「当前页」，把断言插在别的页的断言之间
+> 会让后续 `findChild` 落空 —— 现已把盒模糊断言放到用例末尾。
+
+全套 12/12；主程序干净重建 0 warning / 0 error。
+
+**仍欠**：① 大文档的滤镜预览仍是同步整区重合成（需异步/降采样，与 Roadmap 9.2 同一条）；
+② 取消会留「添加 + 删除」两条 undo（各自可撤销，但不是单条原子操作）；
+③ 对话框还没有「预览」勾选框与前后对比视图。
+
+---
+
 ## 未排期：进一步对齐 GIMP 时可按模块补
 
 若要以 GIMP Unified Transform 为齐，建议分轮，不必与上面绑在一起：

@@ -22,6 +22,7 @@
 
 #include <QCheckBox>
 #include <QComboBox>
+#include <QHBoxLayout>
 #include <QLabel>
 #include <QSlider>
 #include <QSpinBox>
@@ -342,6 +343,23 @@ void AdjustmentPropsHost::ensurePages()
         wireSliderSpin(ui->slider_k, ui->spin_k, [this](int v) { m_node.setSelectiveBlack(v); });
         add(Ps::OpName::SelectiveColor, page);
     }
+    {
+        // 盒模糊（面积算子）：无 .ui，程序化建一页（半径 0..128）
+        auto *page = new QWidget(m_stack);
+        auto *row = new QHBoxLayout(page);
+        row->setContentsMargins(0, 0, 0, 0);
+        auto *slider = new QSlider(Qt::Horizontal, page);
+        slider->setRange(0, 128);
+        slider->setObjectName(QStringLiteral("slider_radius"));
+        auto *spin = new QSpinBox(page);
+        spin->setRange(0, 128);
+        spin->setObjectName(QStringLiteral("spin_radius"));
+        row->addWidget(new QLabel(QStringLiteral("半径"), page));
+        row->addWidget(slider, 1);
+        row->addWidget(spin);
+        wireSliderSpin(slider, spin, [this](int v) { m_node.setBlurRadius(v); });
+        add(Ps::OpName::BoxBlur, page);
+    }
 }
 
 void AdjustmentPropsHost::showPageFor(Ps::OpName op)
@@ -447,6 +465,9 @@ void AdjustmentPropsHost::loadControlsFromNode()
         setPair("slider_m", "spin_m", int(m_node.selectiveMagenta()));
         setPair("slider_y", "spin_y", int(m_node.selectiveYellow()));
         setPair("slider_k", "spin_k", int(m_node.selectiveBlack()));
+        break;
+    case Ps::OpName::BoxBlur:
+        setPair("slider_radius", "spin_radius", m_node.blurRadius());
         break;
     default:
         break;

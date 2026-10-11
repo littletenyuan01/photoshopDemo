@@ -114,5 +114,15 @@ int tAdjustPanel()
                .arg(previews - p1)
                .arg(commits - c1));
     r.check(commits == c1, QStringLiteral("无新改动时重复回车不再提交"));
+
+    // —— 盒模糊页（面积算子，程序化建页、无 .ui）——
+    // 放在最后：setNode 会切换「当前页」，不能插在色阶页断言之间
+    FilterNode bl(OpName::BoxBlur);
+    bl.setBlurRadius(7);
+    host.setNode(bl);
+    QWidget *blPage = currentPage(host);
+    r.check(sliderValue(blPage, "slider_radius") == 7
+                && spinValue(blPage, "spin_radius") == 7,
+            QStringLiteral("盒模糊半径 7 → 回填 7"));
     return r.fails;
 }

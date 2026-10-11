@@ -8,6 +8,7 @@
 #include "app/historystack.h"
 #include "app/recentdocuments.h"
 #include "domain/imagedocument.h"
+#include "domain/filternode.h"
 #include "domain/layer.h"
 #include "domain/layermask.h"
 #include "domain/layerstyle.h"
@@ -16,6 +17,7 @@
 #include "ui/canvasview.h"
 #include "ui/canvasworkspace.h"
 #include "ui/dockpanel.h"
+#include "ui/filterdialog.h"
 #include "engine/compositor.h"
 #include "io/projectio.h"
 #include "io/psdio.h"
@@ -251,6 +253,12 @@ void MainWindow::setupMenus()
     ui->actionAdjBrightness->setEnabled(true);
     ui->actionAdjBrightness->setToolTip(tr("给活动层追加亮度/对比度滤镜（非破坏，可重复叠加）"));
     connect(ui->actionAdjBrightness, &QAction::triggered, this, &MainWindow::onBrightnessContrast);
+
+    // 滤镜 → 模糊 → 盒模糊（面积算子，非破坏作用于活动像素层）
+    ui->actionBoxBlur->setEnabled(true);
+    ui->actionBoxBlur->setToolTip(tr("盒模糊（非破坏，作用于活动像素层，可调半径）"));
+    connect(ui->actionBoxBlur, &QAction::triggered, this,
+            [this]() { runFilterDialog(Ps::OpName::BoxBlur); });
 
     // —— 图层→新建调整图层→亮度/对比度（PS 式：作用于下方合成）——
     ui->actionNewAdjBrightness->setEnabled(true);
@@ -1551,6 +1559,48 @@ void MainWindow::onBrightnessContrast()
         flashStatusMessage(tr("无法调整：无可见活动层"));
     else
         flashStatusMessage(tr("已添加亮度/对比度滤镜（非破坏）"));
+}
+
+void MainWindow::runFilterDialog(Ps::OpName op)
+{
+    Ps::ImageDocument *doc = m_session ? m_session->document() : nullptr;
+    if (!doc)
+        return;
+
+    const int li = doc->activeLayerIndex();
+    Ps::Layer *layer = doc->layers().layerAt(li);
+    if (!layer || !layer->isVisible() || layer->isAdjustmentLayer()) {
+        flashStatusMessage(tr("请先选中一个像素图层"));
+        return;
+    }
+
+    // 默认参数：盒模糊给个能看见效果的半径
+    Ps::FilterNode node(op);
+    if (op == Ps::OpName::BoxBlur)
+        node.setBlurRadius(5);
+
+    // 先非破坏地加到图层（进入 undo）；对话框改的是这个节点
+    const int fi = doc->addLayerFilter(node);
+    if (fi < 0) {
+        flashStatusMessage(tr("无法添加滤镜"));
+        return;
+    }
+
+    FilterDialog dlg(this);
+    dlg.setNode(node);
+    // 实时预览：slider 变化 → 写回节点并整区重合成（不 push undo）
+    connect(&dlg, &FilterDialog::previewChanged, this,
+            [doc, li, fi](const Ps::FilterNode &n) {
+                doc->setLayerFilterNode(li, fi, n, /*pushUndo=*/false);
+            });
+
+    if (dlg.exec() == QDialog::Accepted) {
+        doc->setLayerFilterNode(li, fi, dlg.node(), /*pushUndo=*/true);
+        flashStatusMessage(tr("已应用滤镜（非破坏）"));
+    } else {
+        // 取消：删掉刚加的节点（undo 栈里是「添加 + 删除」两步，各自可撤销）
+        doc->removeLayerFilter(li, fi);
+    }
 }
 
 void MainWindow::onNewAdjBrightness()

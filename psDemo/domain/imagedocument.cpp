@@ -428,6 +428,19 @@ int ImageDocument::addBrightnessContrastFilter(qreal brightness, qreal contrast)
     return index;
 }
 
+int ImageDocument::addLayerFilter(const FilterNode &node)
+{
+    Layer *layer = activeLayer();
+    if (!layer || !layer->isVisible() || layer->isAdjustmentLayer())
+        return -1;
+
+    pushLayerPropUndo(m_activeLayerIndex, tr("添加滤镜"));
+    const int index = layer->filters().append(node);
+    layer->invalidateCompositeRaster();
+    markDirty(layer->boundsInDocument().intersected(QRect(0, 0, m_width, m_height)));
+    return index;
+}
+
 int ImageDocument::addAdjustmentLayer(OpName op)
 {
     if (m_width <= 0 || m_height <= 0 || !isAdjustmentOp(op))

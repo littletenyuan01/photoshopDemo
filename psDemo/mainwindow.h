@@ -6,6 +6,7 @@
 #ifndef MAINWINDOW_H
 #define MAINWINDOW_H
 
+#include "engine/op/opname.h"
 #include "tools/toolid.h"
 
 #include <QMainWindow>
@@ -112,6 +113,8 @@ private slots:
     void onFreeTransform();
     void onBrightnessContrast();
     void onNewAdjBrightness();
+    /** 打开滤镜对话框，对活动像素层非破坏地追加/编辑指定滤镜。 */
+    void runFilterDialog(Ps::OpName op);
     void onEnsureLayerStyle(int kind);
     void onClearLayerStyles();
     void onCopyLayerStyles();

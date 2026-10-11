@@ -111,6 +111,12 @@ public:
      */
     int addBrightnessContrastFilter(qreal brightness = 0.12, qreal contrast = 0.18);
     /**
+     * 给活动像素层追加一个滤镜节点（非破坏、可开关、可撤销）。
+     * 无可见活动层、或活动层是调整层时失败返回 -1。
+     * @return 新滤镜在层滤镜栈中的下标。
+     */
+    int addLayerFilter(const FilterNode &node);
+    /**
      * 新建调整图层（对照 PS：独立层种 + 默认白色蒙版 + 属性面板调参）。
      * GIMP 原生无此层种，等价物是 drawable filter；本 Demo 按 PS 语义。
      * @return 新层下标；失败 -1。

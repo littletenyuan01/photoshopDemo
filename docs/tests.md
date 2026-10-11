@@ -33,7 +33,7 @@ release\psdemo_tests.exe composite regionraster   :: 只跑指定用例
 | `composite` | 投影分块**并行**合成与单次整体合成逐像素一致（文档含调整层 + 带滤镜层：守住曾导致并行访问冲突崩溃的分支） |
 | `graphcheck` | 图引擎自检（结构 / 缓存复用 / 脏传播 / 与直接合成交叉校验） |
 | `projectio` | `.pslite` 存读往返：层 kind / 属性 / 调整层与滤镜参数逐项一致，且**整幅合成逐像素一致** |
-| `adjustpanel` | 调整层面板：已存参数回填滑动条（含 gamma 量程）；改值只预览、交互结束提交一次且不重复 |
+| `adjustpanel` | 调整层面板：已存参数回填滑动条（含 gamma 量程）；改值只预览、交互结束提交一次且不重复；含**盒模糊半径页**（程序化建页）的回填 |
 | `adjustapply` | 调整层参数落盘后重新打开**仍作用于画面** |
 | `blendparallel` | `blendLayerRangeParallel` 与串行版逐像素一致（移动工具逐帧路径） |
 | `transformlive` | 自由变换 live 投影与提交后合成一致（identity 严格相等 / 缩小 50% 千分之一内） |
