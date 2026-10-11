@@ -113,6 +113,11 @@ void AdjustmentPropsHost::wireSliderSpin(QSlider *slider, QSpinBox *spin,
             [this, slider, applyToNode](int v) {
                 if (m_block)
                     return;
+                // 滑条与数值框始终同步，故 slider->value() 就是「已应用值」。
+                // Qt 的 spinbox 在场编辑收尾（interpret）时会以 always-emit 策略**重发同值**
+                // valueChanged；不挡掉的话，回车一次就会多出一条空操作的预览 + undo 条目。
+                if (slider->value() == v)
+                    return;
                 slider->blockSignals(true);
                 slider->setValue(v);
                 slider->blockSignals(false);
