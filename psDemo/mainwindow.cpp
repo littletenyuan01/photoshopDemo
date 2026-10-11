@@ -376,11 +376,17 @@ void MainWindow::setupMenus()
     connect(ui->actionHighPass, &QAction::triggered, this,
             [this]() { runFilterDialog(Ps::OpName::HighPass); });
 
-    // 滤镜 → 模糊 → 动感模糊（一维盒模糊，0°/45°/90°）
+    // 滤镜 → 模糊 → 动感模糊（一维盒模糊，角度 0..179°）
     ui->actionMotionBlur->setEnabled(true);
-    ui->actionMotionBlur->setToolTip(tr("动感模糊（距离 + 0°/45°/90°；非破坏）"));
+    ui->actionMotionBlur->setToolTip(tr("动感模糊（距离 + 角度 0..179°；非破坏）"));
     connect(ui->actionMotionBlur, &QAction::triggered, this,
             [this]() { runFilterDialog(Ps::OpName::MotionBlur); });
+
+    // 滤镜 → 扭曲 → 波纹（几何重映射代表项）
+    ui->actionRipple->setEnabled(true);
+    ui->actionRipple->setToolTip(tr("波纹（水平正弦位移；非破坏）"));
+    connect(ui->actionRipple, &QAction::triggered, this,
+            [this]() { runFilterDialog(Ps::OpName::Ripple); });
 
     // 滤镜 → 杂色 → 添加杂色（点算子；噪声是 (x,y,seed) 的确定函数，故整层求值）
     ui->actionAddNoise->setEnabled(true);
@@ -1711,8 +1717,15 @@ void MainWindow::runFilterDialog(Ps::OpName op)
     } else if (op == Ps::OpName::ReduceNoise) {
         node.setMedianRadius(2);
         node.setReduceNoiseStrength(50);
-    } else if (op == Ps::OpName::SharpenEdges)
+    }     else if (op == Ps::OpName::SharpenEdges)
         node.setSharpenStrength(1);
+    else if (op == Ps::OpName::Ripple) {
+        node.setRippleAmplitude(8);
+        node.setRippleWavelength(24);
+    } else if (op == Ps::OpName::MotionBlur) {
+        node.setMotionDistance(10);
+        node.setMotionAngle(30);
+    }
 
     // 先把节点**临时**加到图层（pushUndo=false，不进撤销栈），供对话框实时预览；
     // 确定时才「摘掉临时节点 + 正式加入」——这样一次滤镜操作正好是一条撤销

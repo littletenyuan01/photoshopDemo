@@ -1,11 +1,11 @@
 /**
  * motionblurfilterop.cpp — 运动模糊实现（engine/op 层）。
- *
- * 一维盒模糊：每行（水平）或每列（垂直）用滑动窗口求和，O(1)/像素。
- * abyss = 透明（越界样本 0，仍除以完整窗口 2r+1）——与盒模糊同口径，故边缘会自然淡出。
- * 45° = 先水平一趟再垂直一趟（近似对角，口径已在头文件注明）。
  */
 #include "motionblurfilterop.h"
+
+#include <QtMath>
+
+#include <cmath>
 
 namespace Ps {
 
@@ -14,7 +14,7 @@ bool MotionBlurFilterOp::prepare(const FilterContext &ctx)
     if (!ctx.node || ctx.size.isEmpty())
         return false;
     m_distance = qBound(1, ctx.node->motionDistance(), 128);
-    m_angle = ctx.node->motionAngle();
+    m_angle = qBound(0, ctx.node->motionAngle(), 179);
     return true;
 }
 
@@ -33,10 +33,7 @@ void MotionBlurFilterOp::process(QImage &image, const FilterContext &ctx)
     if (w <= 0 || h <= 0 || r <= 0)
         return;
 
-    const bool doH = (m_angle == 0 || m_angle == 45);
-    const bool doV = (m_angle == 90 || m_angle == 45);
-
-    // 预乘 → 直通（与其它模糊算子同口径）
+    // 预乘 → 直通
     for (int y = 0; y < h; ++y) {
         QRgb *row = reinterpret_cast<QRgb *>(image.scanLine(y));
         for (int x = 0; x < w; ++x)
@@ -44,10 +41,13 @@ void MotionBlurFilterOp::process(QImage &image, const FilterContext &ctx)
     }
 
     const int n = 2 * r + 1;
-    // 水平一趟：out(x,y) = Σ_{k=-r..r} in(x+k, y) / n（越界按 0）
+    const int ang = m_angle % 180;
+
     const auto boxH = [&](const QImage &in) -> QImage {
         QImage out(in.size(), QImage::Format_ARGB32);
         for (int y = 0; y < h; ++y) {
+            if ((y & 31) == 0 && aborted(ctx))
+                return out;
             const QRgb *s = reinterpret_cast<const QRgb *>(in.constScanLine(y));
             QRgb *d = reinterpret_cast<QRgb *>(out.scanLine(y));
             int R = 0, G = 0, B = 0, A = 0;
@@ -74,10 +74,11 @@ void MotionBlurFilterOp::process(QImage &image, const FilterContext &ctx)
         return out;
     };
 
-    // 垂直一趟：out(x,y) = Σ_{k=-r..r} in(x, y+k) / n（越界按 0）
     const auto boxV = [&](const QImage &in) -> QImage {
         QImage out(in.size(), QImage::Format_ARGB32);
         for (int x = 0; x < w; ++x) {
+            if ((x & 31) == 0 && aborted(ctx))
+                return out;
             int R = 0, G = 0, B = 0, A = 0;
             for (int k = -r; k <= r; ++k) {
                 if (k < 0 || k >= h)
@@ -102,22 +103,40 @@ void MotionBlurFilterOp::process(QImage &image, const FilterContext &ctx)
         return out;
     };
 
-    QImage work = image; // 已是直通
+    QImage work = image;
     if (aborted(ctx))
         return;
-    if (doH) {
+
+    if (ang == 0) {
         work = boxH(work);
-        if (aborted(ctx))
-            return;
-    }
-    if (doV) {
+    } else if (ang == 90) {
         work = boxV(work);
-        if (aborted(ctx))
-            return;
+    } else {
+        // 任意角：沿方向最近邻取样平均
+        const double rad = double(ang) * M_PI / 180.0;
+        const double c = std::cos(rad);
+        const double s = std::sin(rad);
+        QImage out(w, h, QImage::Format_ARGB32);
+        for (int y = 0; y < h; ++y) {
+            if ((y & 15) == 0 && aborted(ctx))
+                return;
+            QRgb *d = reinterpret_cast<QRgb *>(out.scanLine(y));
+            for (int x = 0; x < w; ++x) {
+                int R = 0, G = 0, B = 0, A = 0;
+                for (int k = -r; k <= r; ++k) {
+                    const int xx = int(std::lround(x + k * c));
+                    const int yy = int(std::lround(y + k * s));
+                    if (xx < 0 || xx >= w || yy < 0 || yy >= h)
+                        continue;
+                    const QRgb p = reinterpret_cast<const QRgb *>(work.constScanLine(yy))[xx];
+                    R += qRed(p); G += qGreen(p); B += qBlue(p); A += qAlpha(p);
+                }
+                d[x] = qRgba(R / n, G / n, B / n, A / n);
+            }
+        }
+        work = out;
     }
 
-    // 直通 → 预乘，并**保持原格式**（中间图是 Format_ARGB32，直接 `image = work`
-    // 会把管线约定的 ARGB32_Premultiplied 改掉 → 下游逐像素比较/合成就对不上）。
     QImage result(image.size(), QImage::Format_ARGB32_Premultiplied);
     for (int y = 0; y < h; ++y) {
         const QRgb *s = reinterpret_cast<const QRgb *>(work.constScanLine(y));

@@ -69,13 +69,15 @@ enum class OpName {
     Minimum,                ///< 最小值（面积算子：排序统计滤波的腐蚀方向）
     CustomFilter,           ///< 自定（3×3 卷积核 + 缩放/位移；一个算子顶多个）
     HighPass,               ///< 高通保留（src - 盒模糊 + 128，保留边缘）
-    MotionBlur,             ///< 运动模糊（一维盒模糊沿 0°/45°/90°）
+    MotionBlur,             ///< 运动模糊（一维盒模糊；角度 0..179°）
     AddNoise,               ///< 添加杂色（点算子；噪声是 (x,y,seed) 的确定函数，须整层求值）
     // —— 批次 A（filter-roadmap.md）：点算子 / 中值组合 / 边缘锐化 ——
     Solarize,               ///< 曝光过度（点算子：v>128 ? 255-v : v）
     DustAndScratches,       ///< 蒙尘与划痕（Demo：中值，|src-med|>阈值才替换）
     ReduceNoise,            ///< 减少杂色（Demo：中值 + 强度混合，非 PS 全功能）
     SharpenEdges,           ///< 锐化边缘（Sobel 幅值作 mask × 锐化）
+    // —— A′ / B 代表项 ——
+    Ripple,                 ///< 波纹（几何重映射：水平正弦位移；位置相关 → 整层求值）
     Count                   ///< 哨兵，勿当作真实算子
 };
 

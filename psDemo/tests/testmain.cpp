@@ -40,6 +40,7 @@ int tMoreFilters();
 int tHighPassMotion();
 int tNoise();
 int tBatchA();
+int tRipple();
 
 namespace {
 
@@ -66,9 +67,10 @@ const Case kCases[] = {
     { "roictx", "ROI 第①步：两条求值路径都按坐标空间填 src/out 几何，且退回本地坐标时结果不变", tRoi },
     { "offset", "位移（几何算子）：wrap/透明语义 oracle、分块投影无块界错位、全幅求值护栏、往返", tOffset },
     { "morefilters", "最大值/最小值/自定滤镜：语义 oracle、分块投影无接缝、参数往返", tMoreFilters },
-    { "hpblur", "高通保留/运动模糊：组合式与一维盒 oracle、分块投影无接缝、往返", tHighPassMotion },
+    { "hpblur", "高通保留/运动模糊：任意角 oracle、分块投影无接缝、往返", tHighPassMotion },
     { "noise", "添加杂色：确定性（同参可复现）、位置稳定（区域==整层裁块）、单色/高斯、往返", tNoise },
     { "batcha", "滤镜批次 A：曝光过度/蒙尘/减少杂色/锐化边缘 oracle + 分块投影 + 往返", tBatchA },
+    { "ripple", "波纹：正弦位移 oracle、位置相关整层路径、分块投影、往返", tRipple },
 };
 
 } // namespace

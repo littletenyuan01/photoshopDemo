@@ -51,6 +51,7 @@ SOURCES += \
     engine/op/motionblurfilterop.cpp \
     engine/op/dustscratchfilterop.cpp \
     engine/op/sharpenedgesfilterop.cpp \
+    engine/op/ripplefilterop.cpp \
     engine/op/sharpenfilterop.cpp \
     engine/op/unsharpmaskfilterop.cpp \
     engine/op/floodfillop.cpp \
@@ -173,6 +174,7 @@ HEADERS += \
     engine/op/motionblurfilterop.h \
     engine/op/dustscratchfilterop.h \
     engine/op/sharpenedgesfilterop.h \
+    engine/op/ripplefilterop.h \
     engine/op/sharpenfilterop.h \
     engine/op/unsharpmaskfilterop.h \
     engine/op/floodfillop.h \

@@ -12,6 +12,8 @@
 #include <QString>
 #include <QtGlobal>
 
+#include <cmath>
+
 namespace Ps {
 
 /**
@@ -211,11 +213,17 @@ public:
     int highPassRadius() const { return m_highPassRadius; }
     void setHighPassRadius(int v) { m_highPassRadius = qBound(1, v, 64); }
 
-    // —— 运动模糊：距离（1..128）+ 角度（0 / 45 / 90，一维盒模糊方向）——
+    // —— 运动模糊：距离（1..128）+ 角度（0..179°，一维盒模糊方向）——
     int motionDistance() const { return m_motionDistance; }
     void setMotionDistance(int v) { m_motionDistance = qBound(1, v, 128); }
     int motionAngle() const { return m_motionAngle; }
-    void setMotionAngle(int v) { m_motionAngle = (v == 45 || v == 90) ? v : 0; }
+    void setMotionAngle(int v) { m_motionAngle = ((v % 180) + 180) % 180; }
+
+    // —— 波纹：振幅（0..64）+ 波长（1..256）；out(x,y)=in(x+A·sin(2πy/λ), y) ——
+    int rippleAmplitude() const { return m_rippleAmplitude; }
+    void setRippleAmplitude(int v) { m_rippleAmplitude = qBound(0, v, 64); }
+    int rippleWavelength() const { return m_rippleWavelength; }
+    void setRippleWavelength(int v) { m_rippleWavelength = qBound(1, v, 256); }
 
     // —— 添加杂色：数量（0..100 %）+ 分布（均匀/高斯）+ 单色 + 种子 ——
     int noiseAmount() const { return m_noiseAmount; }
@@ -253,14 +261,20 @@ public:
     {
         if (op() == OpName::MotionBlur) {
             const int d = m_motionDistance;
-            switch (m_motionAngle) {
-            case 0:
-                return output.adjusted(-d, 0, d, 0); // 水平：只要左右
-            case 90:
-                return output.adjusted(0, -d, 0, d); // 垂直：只要上下
-            default:
-                return output.adjusted(-d, -d, d, d); // 45°：两向都要
-            }
+            const int ang = ((m_motionAngle % 180) + 180) % 180;
+            if (ang == 0)
+                return output.adjusted(-d, 0, d, 0);
+            if (ang == 90)
+                return output.adjusted(0, -d, 0, d);
+            // 任意角：按方向分量外扩（ceil(|d·cos|), ceil(|d·sin|)）
+            const double rad = double(ang) * 3.14159265358979323846 / 180.0;
+            const int padX = int(std::ceil(std::abs(d * std::cos(rad)) - 1e-9));
+            const int padY = int(std::ceil(std::abs(d * std::sin(rad)) - 1e-9));
+            return output.adjusted(-padX, -padY, padX, padY);
+        }
+        if (op() == OpName::Ripple) {
+            const int A = m_rippleAmplitude;
+            return (A > 0) ? output.adjusted(-A, 0, A, 0) : output;
         }
         if (op() == OpName::Offset) {
             // 取图窗口取「输出区 ∪ 平移后的输出区」——**一个矩形**，因此可以逐块求值。
@@ -339,7 +353,9 @@ public:
         case OpName::HighPass:
             return m_highPassRadius;
         case OpName::MotionBlur:
-            return m_motionDistance; // 保守：45° 也按距离外扩（对称外扩是安全上界）
+            return m_motionDistance; // 对称上界（requiredInputs 可更紧）
+        case OpName::Ripple:
+            return m_rippleAmplitude;
         default:
             return 0;
         }
@@ -409,6 +425,8 @@ private:
     bool m_noiseMonochromatic = true;
     quint32 m_noiseSeed = 0x9E3779B9u; ///< 固定默认：同参数 → 同噪声（见 noiseSeed() 注释）
     int m_reduceNoiseStrength = 50; ///< 减少杂色：与中值结果的混合强度 %
+    int m_rippleAmplitude = 5;
+    int m_rippleWavelength = 16;
 };
 
 } // namespace Ps

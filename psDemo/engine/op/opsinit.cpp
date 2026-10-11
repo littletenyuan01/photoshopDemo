@@ -21,6 +21,7 @@
 #include "medianblurfilterop.h"
 #include "motionblurfilterop.h"
 #include "offsetfilterop.h"
+#include "ripplefilterop.h"
 #include "opname.h"
 #include "oppad.h"
 #include "opregistry.h"
@@ -155,6 +156,8 @@ void opsInit()
                      [] { return std::unique_ptr<FilterOp>(new ReduceNoiseFilterOp); });
     registerFilterOp(OpName::SharpenEdges,
                      [] { return std::unique_ptr<FilterOp>(new SharpenEdgesFilterOp); });
+    registerFilterOp(OpName::Ripple,
+                     [] { return std::unique_ptr<FilterOp>(new RippleFilterOp); });
 }
 
 } // namespace Ps

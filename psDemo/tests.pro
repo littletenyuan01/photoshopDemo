@@ -41,7 +41,8 @@ SOURCES += \
     tests/t_morefilters.cpp \
     tests/t_hpblur.cpp \
     tests/t_noise.cpp \
-    tests/t_batcha.cpp
+    tests/t_batcha.cpp \
+    tests/t_ripple.cpp
 
 HEADERS += \
     tests/testutil.h

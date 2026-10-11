@@ -57,10 +57,13 @@ bool FilterStack::containsOffset() const
 
 bool FilterStack::hasPositionalOp() const
 {
-    // 目前唯一的位置相关算子是「添加杂色」：输出依赖像素的**绝对位置**（噪声是位置的函数）。
-    // 与 hasGeometryOp 一样按算子点名（不看 pad —— 它 pad 就是 0），新增时必须加到这里。
+    // 位置相关：输出依赖像素的**绝对位置**（非整块平移不变）。
+    // 添加杂色：噪声是 (x,y,seed) 的函数；波纹：相位用绝对 y（sin(2πy/λ)）。
+    // 按算子点名；新增时必须加到这里。
     for (const FilterNode &n : m_nodes) {
-        if (n.isEnabled() && n.op() == OpName::AddNoise)
+        if (!n.isEnabled())
+            continue;
+        if (n.op() == OpName::AddNoise || n.op() == OpName::Ripple)
             return true;
     }
     return false;

@@ -510,31 +510,30 @@ void AdjustmentPropsHost::ensurePages()
         add(Ps::OpName::HighPass, page);
     }
     {
-        // 运动模糊：距离滑块（1..128）+ 角度下拉（0°/45°/90°）
+        // 运动模糊：距离 1..128 + 角度 0..179°
         auto *page = new QWidget(m_stack);
         auto *col = new QVBoxLayout(page);
         col->setContentsMargins(0, 0, 0, 0);
         const SliderRow dist = makeSliderRow(page, QStringLiteral("距离"), QStringLiteral("motion_distance"), 1, 128);
+        const SliderRow ang = makeSliderRow(page, QStringLiteral("角度 °"), QStringLiteral("motion_angle"), 0, 179);
         col->addWidget(dist.row);
+        col->addWidget(ang.row);
         wireSliderSpin(dist.slider, dist.spin, [this](int v) { m_node.setMotionDistance(v); });
-        auto *row = new QWidget(page);
-        auto *rowLay = new QHBoxLayout(row);
-        rowLay->setContentsMargins(0, 0, 0, 0);
-        rowLay->addWidget(new QLabel(QStringLiteral("角度"), row));
-        auto *combo = new QComboBox(row);
-        combo->setObjectName(QStringLiteral("combo_motion_angle"));
-        combo->addItem(QStringLiteral("水平 0°"), 0);
-        combo->addItem(QStringLiteral("斜向 45°"), 45);
-        combo->addItem(QStringLiteral("垂直 90°"), 90);
-        rowLay->addWidget(combo, 1);
-        col->addWidget(row);
-        connect(combo, qOverload<int>(&QComboBox::currentIndexChanged), this, [this, combo](int) {
-            if (m_block)
-                return;
-            m_node.setMotionAngle(combo->currentData().toInt());
-            emitPreview();
-        });
+        wireSliderSpin(ang.slider, ang.spin, [this](int v) { m_node.setMotionAngle(v); });
         add(Ps::OpName::MotionBlur, page);
+    }
+    {
+        // 波纹：振幅 + 波长
+        auto *page = new QWidget(m_stack);
+        auto *col = new QVBoxLayout(page);
+        col->setContentsMargins(0, 0, 0, 0);
+        const SliderRow amp = makeSliderRow(page, QStringLiteral("振幅"), QStringLiteral("ripple_amplitude"), 0, 64);
+        const SliderRow wl = makeSliderRow(page, QStringLiteral("波长"), QStringLiteral("ripple_wavelength"), 1, 256);
+        col->addWidget(amp.row);
+        col->addWidget(wl.row);
+        wireSliderSpin(amp.slider, amp.spin, [this](int v) { m_node.setRippleAmplitude(v); });
+        wireSliderSpin(wl.slider, wl.spin, [this](int v) { m_node.setRippleWavelength(v); });
+        add(Ps::OpName::Ripple, page);
     }
     {
         // 添加杂色：数量滑块（0..100%）+ 分布下拉 + 单色勾选
@@ -757,10 +756,11 @@ void AdjustmentPropsHost::loadControlsFromNode()
         break;
     case Ps::OpName::MotionBlur:
         setPair("slider_motion_distance", "spin_motion_distance", m_node.motionDistance());
-        if (auto *cb = page->findChild<QComboBox *>(QStringLiteral("combo_motion_angle"))) {
-            const int idx = cb->findData(m_node.motionAngle());
-            cb->setCurrentIndex(idx >= 0 ? idx : 0);
-        }
+        setPair("slider_motion_angle", "spin_motion_angle", m_node.motionAngle());
+        break;
+    case Ps::OpName::Ripple:
+        setPair("slider_ripple_amplitude", "spin_ripple_amplitude", m_node.rippleAmplitude());
+        setPair("slider_ripple_wavelength", "spin_ripple_wavelength", m_node.rippleWavelength());
         break;
     case Ps::OpName::AddNoise:
         setPair("slider_noise_amount", "spin_noise_amount", m_node.noiseAmount());
