@@ -460,6 +460,54 @@ void AdjustmentPropsHost::ensurePages()
         });
         add(Ps::OpName::Offset, page);
     }
+    {
+        // 最大值 / 最小值（排序统计滤波）：与中值同构，一页一个半径滑块（1..8）
+        for (bool isMax : {true, false}) {
+            auto *page = new QWidget(m_stack);
+            auto *col = new QVBoxLayout(page);
+            col->setContentsMargins(0, 0, 0, 0);
+            const QString name = isMax ? QStringLiteral("maximum_radius")
+                                       : QStringLiteral("minimum_radius");
+            const SliderRow radius = makeSliderRow(page, QStringLiteral("半径"), name, 1, 8);
+            col->addWidget(radius.row);
+            wireSliderSpin(radius.slider, radius.spin,
+                           [this](int v) { m_node.setExtremumRadius(v); });
+            add(isMax ? Ps::OpName::Maximum : Ps::OpName::Minimum, page);
+        }
+    }
+    {
+        // 自定滤镜（3×3 卷积核 + 缩放/位移）：无 .ui，程序化建 3×3 权重网格
+        auto *page = new QWidget(m_stack);
+        auto *col = new QVBoxLayout(page);
+        col->setContentsMargins(0, 0, 0, 0);
+        for (int r = 0; r < 3; ++r) {
+            auto *row = new QWidget(page);
+            auto *rowLay = new QHBoxLayout(row);
+            rowLay->setContentsMargins(0, 0, 0, 0);
+            for (int c = 0; c < 3; ++c) {
+                auto *sp = new QSpinBox(row);
+                sp->setRange(-999, 999);
+                sp->setObjectName(QStringLiteral("spin_custom_%1").arg(r * 3 + c));
+                const int idx = r * 3 + c;
+                connect(sp, qOverload<int>(&QSpinBox::valueChanged), this, [this, idx](int v) {
+                    if (m_block)
+                        return;
+                    m_node.setCustomWeight(idx, v);
+                    emitPreview();
+                });
+                connect(sp, &QSpinBox::editingFinished, this, &AdjustmentPropsHost::emitCommit);
+                rowLay->addWidget(sp);
+            }
+            col->addWidget(row);
+        }
+        const SliderRow scale = makeSliderRow(page, QStringLiteral("缩放"), QStringLiteral("custom_scale"), 0, 9999);
+        const SliderRow off = makeSliderRow(page, QStringLiteral("位移"), QStringLiteral("custom_offset"), -255, 255);
+        col->addWidget(scale.row);
+        col->addWidget(off.row);
+        wireSliderSpin(scale.slider, scale.spin, [this](int v) { m_node.setCustomScale(v); });
+        wireSliderSpin(off.slider, off.spin, [this](int v) { m_node.setCustomOffset(v); });
+        add(Ps::OpName::CustomFilter, page);
+    }
 }
 
 void AdjustmentPropsHost::showPageFor(Ps::OpName op)
@@ -591,6 +639,19 @@ void AdjustmentPropsHost::loadControlsFromNode()
         setPair("slider_offset_dy", "spin_offset_dy", m_node.offsetDy());
         if (auto *c = findChild<QCheckBox *>(QStringLiteral("check_offset_wrap")))
             c->setChecked(m_node.offsetWrap());
+        break;
+    case Ps::OpName::Maximum:
+    case Ps::OpName::Minimum:
+        setPair("slider_maximum_radius", "spin_maximum_radius", m_node.extremumRadius());
+        setPair("slider_minimum_radius", "spin_minimum_radius", m_node.extremumRadius());
+        break;
+    case Ps::OpName::CustomFilter:
+        for (int i = 0; i < 9; ++i) {
+            if (auto *sp = page->findChild<QSpinBox *>(QStringLiteral("spin_custom_%1").arg(i)))
+                sp->setValue(m_node.customWeight(i));
+        }
+        setPair("slider_custom_scale", "spin_custom_scale", m_node.customScale());
+        setPair("slider_custom_offset", "spin_custom_offset", m_node.customOffset());
         break;
     default:
         break;

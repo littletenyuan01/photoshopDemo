@@ -6,7 +6,9 @@
 #include "opsinit.h"
 #include "boxblurfilterop.h"
 #include "clonestampdabop.h"
+#include "customfilterop.h"
 #include "embossfilterop.h"
+#include "extremumfilterop.h"
 #include "filterop.h"
 #include "findedgesfilterop.h"
 #include "floodfillop.h"
@@ -126,6 +128,18 @@ void opsInit()
     // 几何算子（非面积算子：inputPad()==0，但只能整幅求值）
     registerFilterOp(OpName::Offset,
                      [] { return std::unique_ptr<FilterOp>(new OffsetFilterOp); });
+    // 排序统计滤波（与中值同族）：最大 = 100% 分位、最小 = 0% 分位
+    registerFilterOp(OpName::Maximum, [] {
+        return std::unique_ptr<FilterOp>(
+            new ExtremumFilterOp(ExtremumFilterOp::Mode::Maximum));
+    });
+    registerFilterOp(OpName::Minimum, [] {
+        return std::unique_ptr<FilterOp>(
+            new ExtremumFilterOp(ExtremumFilterOp::Mode::Minimum));
+    });
+    // 自定滤镜（3×3 卷积核）：验证「算子参数带数组」的路径
+    registerFilterOp(OpName::CustomFilter,
+                     [] { return std::unique_ptr<FilterOp>(new CustomFilterOp); });
 }
 
 } // namespace Ps

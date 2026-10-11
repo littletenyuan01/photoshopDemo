@@ -197,6 +197,18 @@ public:
     bool offsetWrap() const { return m_offsetWrap; }
     void setOffsetWrap(bool on) { m_offsetWrap = on; }
 
+    // —— 最大值 / 最小值（排序统计滤波）：半径（1..8；滑窗直方图，与中值同构）——
+    int extremumRadius() const { return m_extremumRadius; }
+    void setExtremumRadius(int v) { m_extremumRadius = qBound(1, v, 8); }
+
+    // —— 自定滤镜（3×3 卷积核）：9 个权重（-999..999）+ 缩放（0=不除）+ 位移 ——
+    int customWeight(int i) const { return m_customW[qBound(0, i, 8)]; }
+    void setCustomWeight(int i, int v) { m_customW[qBound(0, i, 8)] = qBound(-999, v, 999); }
+    int customScale() const { return m_customScale; }
+    void setCustomScale(int v) { m_customScale = qBound(0, v, 9999); }
+    int customOffset() const { return m_customOffset; }
+    void setCustomOffset(int v) { m_customOffset = qBound(-255, v, 255); }
+
     /**
      * 该算子需要的输入外扩（像素）：点算子 = 0；盒模糊/USM = 半径；查找边缘/锐化/浮雕 = 1（3×3）；
      * 高斯模糊 = 半径 + 2（**安全上界**：三趟盒模糊半径之和 ≈ 0.98×半径，留 2px 余量，
@@ -221,6 +233,11 @@ public:
         case OpName::Sharpen:
         case OpName::Emboss:
             return 1; // 3×3 线性核
+        case OpName::Maximum:
+        case OpName::Minimum:
+            return m_extremumRadius;
+        case OpName::CustomFilter:
+            return 1; // 3×3 卷积核
         default:
             return 0;
         }
@@ -279,6 +296,10 @@ private:
     int m_offsetDx = 0;
     int m_offsetDy = 0;
     bool m_offsetWrap = true;
+    int m_extremumRadius = 1;
+    int m_customW[9] = {0, 0, 0, 0, 1, 0, 0, 0, 0}; ///< 默认恒等（中心 1）
+    int m_customScale = 1;
+    int m_customOffset = 0;
 };
 
 } // namespace Ps

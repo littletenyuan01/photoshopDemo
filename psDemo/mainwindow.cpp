@@ -302,6 +302,22 @@ void MainWindow::setupMenus()
     connect(ui->actionOffset, &QAction::triggered, this,
             [this]() { runFilterDialog(Ps::OpName::Offset); });
 
+    // 滤镜 → 其它 → 最大值 / 最小值（排序统计滤波：膨胀 / 腐蚀方向）
+    ui->actionMaximum->setEnabled(true);
+    ui->actionMaximum->setToolTip(tr("最大值（排序统计滤波，非破坏，作用于活动像素层）"));
+    connect(ui->actionMaximum, &QAction::triggered, this,
+            [this]() { runFilterDialog(Ps::OpName::Maximum); });
+    ui->actionMinimum->setEnabled(true);
+    ui->actionMinimum->setToolTip(tr("最小值（排序统计滤波，非破坏，作用于活动像素层）"));
+    connect(ui->actionMinimum, &QAction::triggered, this,
+            [this]() { runFilterDialog(Ps::OpName::Minimum); });
+
+    // 滤镜 → 其它 → 自定（3×3 卷积核 + 缩放/位移）
+    ui->actionCustomFilter->setEnabled(true);
+    ui->actionCustomFilter->setToolTip(tr("自定（3×3 卷积核，非破坏，作用于活动像素层）"));
+    connect(ui->actionCustomFilter, &QAction::triggered, this,
+            [this]() { runFilterDialog(Ps::OpName::CustomFilter); });
+
     // —— 图层→新建调整图层→亮度/对比度（PS 式：作用于下方合成）——
     ui->actionNewAdjBrightness->setEnabled(true);
     ui->actionNewAdjBrightness->setToolTip(

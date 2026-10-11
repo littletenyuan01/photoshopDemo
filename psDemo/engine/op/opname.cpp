@@ -53,6 +53,9 @@ constexpr OpNameInfo kOpNameTable[] = {
     {OpName::Sharpen,              "ps:sharpen",               "锐化"},
     {OpName::Emboss,               "ps:emboss",                "浮雕效果"},
     {OpName::Offset,               "ps:offset",                "位移"},
+    {OpName::Maximum,              "ps:maximum",               "最大值"},
+    {OpName::Minimum,              "ps:minimum",               "最小值"},
+    {OpName::CustomFilter,         "ps:custom-filter",         "自定"},
 };
 
 const OpNameInfo *infoFor(OpName name)
@@ -94,6 +97,9 @@ bool isAdjustmentOp(OpName name)
     case OpName::Sharpen:
     case OpName::Emboss:
     case OpName::Offset:
+    case OpName::Maximum:
+    case OpName::Minimum:
+    case OpName::CustomFilter:
         return false;
     default:
         break;

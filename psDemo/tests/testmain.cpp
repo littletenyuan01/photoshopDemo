@@ -32,6 +32,7 @@ int tFilterPanel();
 int tFilterAsync();
 int tRoi();
 int tOffset();
+int tMoreFilters();
 
 namespace {
 
@@ -53,6 +54,7 @@ const Case kCases[] = {
     { "filterasync", "滤镜定稿的异步/可取消链路：协作式取消、区域缓存命中且与同步一致、世代号失效", tFilterAsync },
     { "roictx", "ROI 第①步：两条求值路径都按坐标空间填 src/out 几何，且退回本地坐标时结果不变", tRoi },
     { "offset", "位移（几何算子）：wrap/透明语义 oracle、分块投影无块界错位、全幅求值护栏、往返", tOffset },
+    { "morefilters", "最大值/最小值/自定滤镜：语义 oracle、分块投影无接缝、参数往返", tMoreFilters },
 };
 
 } // namespace

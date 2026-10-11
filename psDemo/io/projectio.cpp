@@ -116,6 +116,10 @@ void writeFilterNodeParams(QDataStream &p, const FilterNode &n)
     p << qint32(n.embossStrength());
     // 位移（几何算子）：dx/dy/wrap。**只在尾部追加**，勿动已有顺序（本项目 .pslite 兼容口径）。
     p << qint32(n.offsetDx()) << qint32(n.offsetDy()) << quint8(n.offsetWrap() ? 1 : 0);
+    p << qint32(n.extremumRadius());
+    for (int i = 0; i < 9; ++i)
+        p << qint32(n.customWeight(i));
+    p << qint32(n.customScale()) << qint32(n.customOffset());
     // —— 预留：后续新参数追加在此注释之后、勿改已有顺序 ——
 }
 
@@ -151,6 +155,10 @@ bool readFilterNodeParams(QDataStream &p, FilterNode *n)
     qint32 offsetDx = 0;
     qint32 offsetDy = 0;
     quint8 offsetWrap = 1;
+    qint32 extremumRadius = 1;
+    qint32 customW[9] = {0, 0, 0, 0, 1, 0, 0, 0, 0};
+    qint32 customScale = 1;
+    qint32 customOffset = 0;
     p >> brightness >> contrast;
     p >> hue >> saturation >> lightness >> vibrance;
     p >> exposure >> exposureOffset >> gammaCorrection;
@@ -171,6 +179,10 @@ bool readFilterNodeParams(QDataStream &p, FilterNode *n)
     p >> sharpenStrength;
     p >> embossStrength;
     p >> offsetDx >> offsetDy >> offsetWrap;
+    p >> extremumRadius;
+    for (int i = 0; i < 9; ++i)
+        p >> customW[i];
+    p >> customScale >> customOffset;
     if (p.status() != QDataStream::Ok)
         return false;
     n->setBrightness(brightness);
@@ -233,6 +245,11 @@ bool readFilterNodeParams(QDataStream &p, FilterNode *n)
     n->setOffsetDx(int(offsetDx));
     n->setOffsetDy(int(offsetDy));
     n->setOffsetWrap(offsetWrap != 0);
+    n->setExtremumRadius(int(extremumRadius));
+    for (int i = 0; i < 9; ++i)
+        n->setCustomWeight(i, int(customW[i]));
+    n->setCustomScale(int(customScale));
+    n->setCustomOffset(int(customOffset));
     return true;
 }
 

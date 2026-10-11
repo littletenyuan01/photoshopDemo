@@ -35,7 +35,7 @@
 > 路径 B 之所以这么轻，是因为 `pointop.h` 里的 `PointOp` 是**空壳**（连 `process` 虚函数都没有）。
 > 它借了算子的名字与注册表，但**不是可调度算子**——参见 §10「仍欠」。
 
-**路径 C：滤镜算子（`FilterOp`）** —— 作用在**临时 QImage**（滤镜链 / 调整层的下方合成结果），**绝不写回层瓦片**。有 `prepare/process/finish` 三段式 + **每线程一份**常驻实例，由 `FilterEval::applyNode` 驱动。已落地七个**面积算子**：`BoxBlur`、`GaussianBlur`（三次盒模糊逼近，复用 `BoxBlur`）、`UnsharpMask`（模糊级复用 `BoxBlur`）、`FindEdges`（3×3）、`MedianBlur`（滑窗直方图 + **增量 cum** 定位中值）、`Sharpen` / `Emboss`（3×3 线性/方向性核）；点滤镜无临时资源，**不**注册为 `FilterOp`，仍走 `applyNode` 的直接分发（三段式对它们纯属开销，与 `PointOp` 同一取舍）。
+**路径 C：滤镜算子（`FilterOp`）** —— 作用在**临时 QImage**（滤镜链 / 调整层的下方合成结果），**绝不写回层瓦片**。有 `prepare/process/finish` 三段式 + **每线程一份**常驻实例，由 `FilterEval::applyNode` 驱动。已落地十个**邻域/几何算子**：`BoxBlur`、`GaussianBlur`（三次盒模糊逼近，复用 `BoxBlur`）、`UnsharpMask`（模糊级复用 `BoxBlur`）、`FindEdges`（3×3）、`MedianBlur`（滑窗直方图 + **增量 cum** 定位中值）、`Sharpen` / `Emboss`（3×3 线性/方向性核）、`Maximum` / `Minimum`（排序统计滤波，与中值同族）、`CustomFilter`（3×3 卷积核）、`Offset`（**几何算子**，走整层专用路径）；点滤镜无临时资源，**不**注册为 `FilterOp`，仍走 `applyNode` 的直接分发（三段式对它们纯属开销，与 `PointOp` 同一取舍）。
 
 > 为什么单列一族而非并入 `BufferOp`：`BufferOp` 的 `OpContext` 装的是 `TileBuffer`/`Selection`，而滤镜作用在 `QImage` 上 —— 两种「资源」形态不同，硬塞一族会让 `OpContext` 既装瓦片又装图。
 

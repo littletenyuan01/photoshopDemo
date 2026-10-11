@@ -65,6 +65,9 @@ enum class OpName {
      * 详见 docs/engine/roi.md §5「②③ 为什么后置」。
      */
     Offset,
+    Maximum,                ///< 最大值（面积算子：排序统计滤波的膨胀方向）
+    Minimum,                ///< 最小值（面积算子：排序统计滤波的腐蚀方向）
+    CustomFilter,           ///< 自定（3×3 卷积核 + 缩放/位移；一个算子顶多个）
     Count                   ///< 哨兵，勿当作真实算子
 };
 

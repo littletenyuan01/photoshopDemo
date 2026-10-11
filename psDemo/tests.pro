@@ -37,7 +37,8 @@ SOURCES += \
     tests/t_filterpanel.cpp \
     tests/t_filterasync.cpp \
     tests/t_roi.cpp \
-    tests/t_offset.cpp
+    tests/t_offset.cpp \
+    tests/t_morefilters.cpp
 
 HEADERS += \
     tests/testutil.h
