@@ -158,7 +158,7 @@ bool MoveTool::buildLiveStacks(ImageDocument *doc, int layerIndex,
         // 投影挖洞：一次整图 copy，但不再全幅 blend above/below
         m_below = projectionSnapshot->copy();
         if (!layerBounds.isEmpty())
-            Compositor::blendLayerRange(m_below, *doc, layerBounds, 0, layerIndex, -1);
+            Compositor::blendLayerRangeParallel(m_below, *doc, layerBounds, 0, layerIndex, -1);
         m_belowFromSnapshot = true;
         m_stackRect = full; // 快照路径整幅可用
     } else {
@@ -169,7 +169,7 @@ bool MoveTool::buildLiveStacks(ImageDocument *doc, int layerIndex,
             p.setCompositionMode(QPainter::CompositionMode_Source);
             p.fillRect(work, Qt::transparent);
         }
-        if (!Compositor::blendLayerRange(m_below, *doc, work, 0, layerIndex, -1))
+        if (!Compositor::blendLayerRangeParallel(m_below, *doc, work, 0, layerIndex, -1))
             return false;
         if (snapOk)
             m_live = projectionSnapshot->copy();
@@ -184,8 +184,8 @@ bool MoveTool::buildLiveStacks(ImageDocument *doc, int layerIndex,
             p.setCompositionMode(QPainter::CompositionMode_Source);
             p.fillRect(work, Qt::transparent);
         }
-        if (!Compositor::blendLayerRange(m_above, *doc, work, layerIndex + 1,
-                                         doc->layers().count(), -1))
+        if (!Compositor::blendLayerRangeParallel(m_above, *doc, work, layerIndex + 1,
+                                                 doc->layers().count(), -1))
             return false;
     }
 
@@ -288,12 +288,14 @@ void MoveTool::rebuildLive(ImageDocument *doc, const QRect &patchDoc)
             p.drawImage(stampPos, m_stamp);
             p.setOpacity(1.0);
         } else {
-            Compositor::blendLayerRange(m_live, *doc, area, m_layerIndex,
-                                        m_layerIndex + 1, -1);
+            Compositor::blendLayerRangeParallel(m_live, *doc, area, m_layerIndex,
+                                                m_layerIndex + 1, -1);
         }
         if (m_liveApplyAbove) {
-            Compositor::blendLayerRange(m_live, *doc, area, m_layerIndex + 1,
-                                        layerCount, -1);
+            // 上方有调整层 → 每帧都必须重跑上方全部层（调整层依赖移动后的下方结果）。
+            // 实测 2480x3508 文档上该调用串行需 59~64ms/帧（约 16fps），故走分块并行版。
+            Compositor::blendLayerRangeParallel(m_live, *doc, area, m_layerIndex + 1,
+                                                layerCount, -1);
         } else if (!m_above.isNull()) {
             QPainter p(&m_live);
             p.setCompositionMode(QPainter::CompositionMode_SourceOver);
