@@ -398,6 +398,14 @@ void MainWindow::setupMenus()
     connect(ui->actionFragment, &QAction::triggered, this, [this]() {
         applyFilterNode(Ps::FilterNode(Ps::OpName::Fragment));
     });
+    ui->actionWind->setEnabled(true);
+    ui->actionWind->setToolTip(tr("风（上风向亮度拖尾；非破坏）"));
+    connect(ui->actionWind, &QAction::triggered, this,
+            [this]() { runFilterDialog(Ps::OpName::Wind); });
+    ui->actionTraceContour->setEnabled(true);
+    ui->actionTraceContour->setToolTip(tr("等高线（亮度跨阈值描边；非破坏）"));
+    connect(ui->actionTraceContour, &QAction::triggered, this,
+            [this]() { runFilterDialog(Ps::OpName::TraceContour); });
 
     // 滤镜 → 杂色 → 添加杂色（点算子；噪声是 (x,y,seed) 的确定函数，故整层求值）
     ui->actionAddNoise->setEnabled(true);
@@ -1735,6 +1743,13 @@ void MainWindow::runFilterDialog(Ps::OpName op)
         node.setRippleWavelength(24);
     } else if (op == Ps::OpName::Mosaic) {
         node.setMosaicCell(8);
+    } else if (op == Ps::OpName::Wind) {
+        node.setWindDirection(0);
+        node.setWindMethod(0);
+        node.setWindStrength(5);
+    } else if (op == Ps::OpName::TraceContour) {
+        node.setContourLevel(128);
+        node.setContourEdge(0);
     } else if (op == Ps::OpName::MotionBlur) {
         node.setMotionDistance(10);
         node.setMotionAngle(30);

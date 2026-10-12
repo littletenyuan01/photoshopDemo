@@ -46,7 +46,8 @@ SOURCES += \
     tests/t_rasterbackend.cpp \
     tests/t_gpumedian.cpp \
     tests/t_gpucustom.cpp \
-    tests/t_c1pixelate.cpp
+    tests/t_c1pixelate.cpp \
+    tests/t_c1stylize.cpp
 
 HEADERS += \
     tests/testutil.h

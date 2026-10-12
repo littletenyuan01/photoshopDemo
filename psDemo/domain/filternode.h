@@ -229,6 +229,20 @@ public:
     int mosaicCell() const { return m_mosaicCell; }
     void setMosaicCell(int v) { m_mosaicCell = qBound(2, v, 64); }
 
+    // —— 风：方向（0 左→右 / 1 右→左）+ 方法（0 风 / 1 爆发 / 2 交错）+ 强度（1..20）——
+    int windDirection() const { return m_windDirection; }
+    void setWindDirection(int v) { m_windDirection = qBound(0, v, 1); }
+    int windMethod() const { return m_windMethod; }
+    void setWindMethod(int v) { m_windMethod = qBound(0, v, 2); }
+    int windStrength() const { return m_windStrength; }
+    void setWindStrength(int v) { m_windStrength = qBound(1, v, 20); }
+
+    // —— 等高线：阈值（0..255）+ 边缘（0 较低 / 1 较高）——
+    int contourLevel() const { return m_contourLevel; }
+    void setContourLevel(int v) { m_contourLevel = qBound(0, v, 255); }
+    int contourEdge() const { return m_contourEdge; }
+    void setContourEdge(int v) { m_contourEdge = qBound(0, v, 1); }
+
     // —— 添加杂色：数量（0..100 %）+ 分布（均匀/高斯）+ 单色 + 种子 ——
     int noiseAmount() const { return m_noiseAmount; }
     void setNoiseAmount(int v) { m_noiseAmount = qBound(0, v, 100); }
@@ -280,6 +294,16 @@ public:
             const int A = m_rippleAmplitude;
             return (A > 0) ? output.adjusted(-A, 0, A, 0) : output;
         }
+        if (op() == OpName::Wind) {
+            const int S = (m_windMethod == 1) ? (m_windStrength * 2) : m_windStrength;
+            if (S <= 0)
+                return output;
+            if (m_windMethod == 2) // 交错：奇偶行方向相反，两侧都要
+                return output.adjusted(-S, 0, S, 0);
+            // 0=从左吹：上风在左；1=从右吹：上风在右
+            return (m_windDirection == 0) ? output.adjusted(-S, 0, 0, 0)
+                                         : output.adjusted(0, 0, S, 0);
+        }
         if (op() == OpName::Offset) {
             // 取图窗口取「输出区 ∪ 平移后的输出区」——**一个矩形**，因此可以逐块求值。
             // 算子照旧做 (dx,dy) 平移，调用方再按 `want − srcWant` 裁回，两步合起来正好等于
@@ -322,6 +346,9 @@ public:
         n.m_mosaicCell = shrink(m_mosaicCell);
         if (n.m_mosaicCell < 2)
             n.m_mosaicCell = 2;
+        n.m_windStrength = shrink(m_windStrength);
+        if (n.m_windStrength < 1)
+            n.m_windStrength = 1;
         return n;
     }
 
@@ -367,6 +394,10 @@ public:
             return 4; // 四角偏移 ±4
         case OpName::Mosaic:
             return 0; // 位置相关，走整层（见 FilterStack::hasPositionalOp）
+        case OpName::Wind:
+            return (m_windMethod == 1) ? (m_windStrength * 2) : m_windStrength;
+        case OpName::TraceContour:
+            return 1; // 4-邻接
         default:
             return 0;
         }
@@ -439,6 +470,11 @@ private:
     int m_rippleAmplitude = 5;
     int m_rippleWavelength = 16;
     int m_mosaicCell = 8;
+    int m_windDirection = 0;
+    int m_windMethod = 0;
+    int m_windStrength = 5;
+    int m_contourLevel = 128;
+    int m_contourEdge = 0;
 };
 
 } // namespace Ps

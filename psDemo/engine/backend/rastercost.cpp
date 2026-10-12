@@ -41,6 +41,10 @@ int opCostNsPerPixel(OpName name)
         return 8; // 估值：按块扫一遍均值
     case OpName::Fragment:
         return 6; // 估值：每像素 4 次取样
+    case OpName::Wind:
+        return 10; // 估值：每像素上风向窗口扫
+    case OpName::TraceContour:
+        return 4; // 估值：4-邻接跨阈值
     case OpName::Offset:
         return 2; // 表内 1.5，整型取 2
     case OpName::BrightnessContrast:

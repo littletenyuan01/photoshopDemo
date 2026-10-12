@@ -66,6 +66,8 @@ constexpr OpNameInfo kOpNameTable[] = {
     {OpName::Ripple,               "ps:ripple",                "波纹"},
     {OpName::Mosaic,               "ps:mosaic",                "马赛克"},
     {OpName::Fragment,             "ps:fragment",              "碎片"},
+    {OpName::Wind,                 "ps:wind",                  "风"},
+    {OpName::TraceContour,         "ps:trace-contour",         "等高线"},
 };
 
 const OpNameInfo *infoFor(OpName name)
@@ -119,6 +121,8 @@ bool isAdjustmentOp(OpName name)
     case OpName::Ripple:
     case OpName::Mosaic:
     case OpName::Fragment:
+    case OpName::Wind:
+    case OpName::TraceContour:
         return false;
     default:
         break;

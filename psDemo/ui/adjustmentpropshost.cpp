@@ -547,6 +547,83 @@ void AdjustmentPropsHost::ensurePages()
         add(Ps::OpName::Mosaic, page);
     }
     {
+        // 风：方向 + 方法 + 强度
+        auto *page = new QWidget(m_stack);
+        auto *col = new QVBoxLayout(page);
+        col->setContentsMargins(0, 0, 0, 0);
+        {
+            auto *row = new QWidget(page);
+            auto *rowLay = new QHBoxLayout(row);
+            rowLay->setContentsMargins(0, 0, 0, 0);
+            rowLay->addWidget(new QLabel(QStringLiteral("方向"), row));
+            auto *combo = new QComboBox(row);
+            combo->setObjectName(QStringLiteral("combo_wind_dir"));
+            combo->addItem(QStringLiteral("从左"), 0);
+            combo->addItem(QStringLiteral("从右"), 1);
+            rowLay->addWidget(combo, 1);
+            col->addWidget(row);
+            connect(combo, qOverload<int>(&QComboBox::currentIndexChanged), this, [this, combo](int) {
+                if (m_block)
+                    return;
+                m_node.setWindDirection(combo->currentData().toInt());
+                emitPreview();
+            });
+        }
+        {
+            auto *row = new QWidget(page);
+            auto *rowLay = new QHBoxLayout(row);
+            rowLay->setContentsMargins(0, 0, 0, 0);
+            rowLay->addWidget(new QLabel(QStringLiteral("方法"), row));
+            auto *combo = new QComboBox(row);
+            combo->setObjectName(QStringLiteral("combo_wind_method"));
+            combo->addItem(QStringLiteral("风"), 0);
+            combo->addItem(QStringLiteral("爆发"), 1);
+            combo->addItem(QStringLiteral("交错"), 2);
+            rowLay->addWidget(combo, 1);
+            col->addWidget(row);
+            connect(combo, qOverload<int>(&QComboBox::currentIndexChanged), this, [this, combo](int) {
+                if (m_block)
+                    return;
+                m_node.setWindMethod(combo->currentData().toInt());
+                emitPreview();
+            });
+        }
+        const SliderRow str = makeSliderRow(page, QStringLiteral("强度"), QStringLiteral("wind_strength"),
+                                            1, 20);
+        col->addWidget(str.row);
+        wireSliderSpin(str.slider, str.spin, [this](int v) { m_node.setWindStrength(v); });
+        add(Ps::OpName::Wind, page);
+    }
+    {
+        // 等高线：阈值 + 边缘
+        auto *page = new QWidget(m_stack);
+        auto *col = new QVBoxLayout(page);
+        col->setContentsMargins(0, 0, 0, 0);
+        const SliderRow lvl = makeSliderRow(page, QStringLiteral("色阶"), QStringLiteral("contour_level"),
+                                            0, 255);
+        col->addWidget(lvl.row);
+        wireSliderSpin(lvl.slider, lvl.spin, [this](int v) { m_node.setContourLevel(v); });
+        {
+            auto *row = new QWidget(page);
+            auto *rowLay = new QHBoxLayout(row);
+            rowLay->setContentsMargins(0, 0, 0, 0);
+            rowLay->addWidget(new QLabel(QStringLiteral("边缘"), row));
+            auto *combo = new QComboBox(row);
+            combo->setObjectName(QStringLiteral("combo_contour_edge"));
+            combo->addItem(QStringLiteral("较低"), 0);
+            combo->addItem(QStringLiteral("较高"), 1);
+            rowLay->addWidget(combo, 1);
+            col->addWidget(row);
+            connect(combo, qOverload<int>(&QComboBox::currentIndexChanged), this, [this, combo](int) {
+                if (m_block)
+                    return;
+                m_node.setContourEdge(combo->currentData().toInt());
+                emitPreview();
+            });
+        }
+        add(Ps::OpName::TraceContour, page);
+    }
+    {
         // 添加杂色：数量滑块（0..100%）+ 分布下拉 + 单色勾选
         auto *page = new QWidget(m_stack);
         auto *col = new QVBoxLayout(page);
@@ -775,6 +852,18 @@ void AdjustmentPropsHost::loadControlsFromNode()
         break;
     case Ps::OpName::Mosaic:
         setPair("slider_mosaic_cell", "spin_mosaic_cell", m_node.mosaicCell());
+        break;
+    case Ps::OpName::Wind:
+        if (auto *cb = page->findChild<QComboBox *>(QStringLiteral("combo_wind_dir")))
+            cb->setCurrentIndex(m_node.windDirection());
+        if (auto *cb = page->findChild<QComboBox *>(QStringLiteral("combo_wind_method")))
+            cb->setCurrentIndex(m_node.windMethod());
+        setPair("slider_wind_strength", "spin_wind_strength", m_node.windStrength());
+        break;
+    case Ps::OpName::TraceContour:
+        setPair("slider_contour_level", "spin_contour_level", m_node.contourLevel());
+        if (auto *cb = page->findChild<QComboBox *>(QStringLiteral("combo_contour_edge")))
+            cb->setCurrentIndex(m_node.contourEdge());
         break;
     case Ps::OpName::AddNoise:
         setPair("slider_noise_amount", "spin_noise_amount", m_node.noiseAmount());

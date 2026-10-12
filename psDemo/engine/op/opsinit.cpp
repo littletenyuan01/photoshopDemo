@@ -13,6 +13,8 @@
 #include "filterop.h"
 #include "findedgesfilterop.h"
 #include "fragmentfilterop.h"
+#include "tracecontourfilterop.h"
+#include "windfilterop.h"
 #include "floodfillop.h"
 #include "gaussianblurfilterop.h"
 #include "highpassfilterop.h"
@@ -164,6 +166,10 @@ void opsInit()
                      [] { return std::unique_ptr<FilterOp>(new MosaicFilterOp); });
     registerFilterOp(OpName::Fragment,
                      [] { return std::unique_ptr<FilterOp>(new FragmentFilterOp); });
+    registerFilterOp(OpName::Wind,
+                     [] { return std::unique_ptr<FilterOp>(new WindFilterOp); });
+    registerFilterOp(OpName::TraceContour,
+                     [] { return std::unique_ptr<FilterOp>(new TraceContourFilterOp); });
 }
 
 } // namespace Ps

@@ -128,6 +128,8 @@ void writeFilterNodeParams(QDataStream &p, const FilterNode &n)
     p << qint32(n.reduceNoiseStrength());
     p << qint32(n.rippleAmplitude()) << qint32(n.rippleWavelength());
     p << qint32(n.mosaicCell());
+    p << qint32(n.windDirection()) << qint32(n.windMethod()) << qint32(n.windStrength());
+    p << qint32(n.contourLevel()) << qint32(n.contourEdge());
     // —— 预留：后续新参数追加在此注释之后、勿改已有顺序 ——
 }
 
@@ -178,6 +180,11 @@ bool readFilterNodeParams(QDataStream &p, FilterNode *n)
     qint32 rippleAmplitude = 5;
     qint32 rippleWavelength = 16;
     qint32 mosaicCell = 8;
+    qint32 windDirection = 0;
+    qint32 windMethod = 0;
+    qint32 windStrength = 5;
+    qint32 contourLevel = 128;
+    qint32 contourEdge = 0;
     p >> brightness >> contrast;
     p >> hue >> saturation >> lightness >> vibrance;
     p >> exposure >> exposureOffset >> gammaCorrection;
@@ -208,6 +215,8 @@ bool readFilterNodeParams(QDataStream &p, FilterNode *n)
     p >> reduceNoiseStrength; // 尾部追加；旧 blob 此处为 0（ReduceNoise 新建时由 UI 写默认）
     p >> rippleAmplitude >> rippleWavelength;
     p >> mosaicCell;
+    p >> windDirection >> windMethod >> windStrength;
+    p >> contourLevel >> contourEdge;
     if (p.status() != QDataStream::Ok)
         return false;
     n->setBrightness(brightness);
@@ -285,6 +294,11 @@ bool readFilterNodeParams(QDataStream &p, FilterNode *n)
     n->setRippleAmplitude(int(rippleAmplitude));
     n->setRippleWavelength(int(rippleWavelength));
     n->setMosaicCell(int(mosaicCell));
+    n->setWindDirection(int(windDirection));
+    n->setWindMethod(int(windMethod));
+    n->setWindStrength(int(windStrength));
+    n->setContourLevel(int(contourLevel));
+    n->setContourEdge(int(contourEdge));
     return true;
 }
 

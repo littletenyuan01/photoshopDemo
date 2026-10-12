@@ -45,6 +45,7 @@ int tRasterBackend();
 int tGpuMedian();
 int tGpuCustom();
 int tC1Pixelate();
+int tC1Stylize();
 
 namespace {
 
@@ -79,6 +80,7 @@ const Case kCases[] = {
     { "gpumedian", "有 GPU 才跑：中值 vs CPU（容差≤1）；无 GPU 跳过", tGpuMedian },
     { "gpucustom", "有 GPU 才跑：自定 3×3 vs CPU（容差≤1）；无 GPU 跳过", tGpuCustom },
     { "c1pixelate", "C1 马赛克/碎片：oracle、分块投影、往返", tC1Pixelate },
+    { "c1stylize", "C1 风/等高线：oracle、分块投影、往返", tC1Stylize },
 };
 
 } // namespace

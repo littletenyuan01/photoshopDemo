@@ -58,6 +58,8 @@ SOURCES += \
     engine/op/ripplefilterop.cpp \
     engine/op/mosaicfilterop.cpp \
     engine/op/fragmentfilterop.cpp \
+    engine/op/windfilterop.cpp \
+    engine/op/tracecontourfilterop.cpp \
     engine/op/sharpenfilterop.cpp \
     engine/op/unsharpmaskfilterop.cpp \
     engine/op/floodfillop.cpp \
@@ -188,6 +190,8 @@ HEADERS += \
     engine/op/ripplefilterop.h \
     engine/op/mosaicfilterop.h \
     engine/op/fragmentfilterop.h \
+    engine/op/windfilterop.h \
+    engine/op/tracecontourfilterop.h \
     engine/op/sharpenfilterop.h \
     engine/op/unsharpmaskfilterop.h \
     engine/op/floodfillop.h \
