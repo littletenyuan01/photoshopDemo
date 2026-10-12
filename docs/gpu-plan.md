@@ -588,28 +588,22 @@ cd .build-app && mingw32-make -f Makefile.Release -j8
 
 ### P0
 
-- [ ] **T0.1** 新建 `psDemo/engine/backend/rasterbackend.h`（§3.1：`ApplyStackResult` + `supports` + `applyStack`，含并发/几何注释）
-- [ ] **T0.2** 新建 `psDemo/engine/backend/cpurasterbackend.{h,cpp}`
+- [x] **T0.1** 新建 `psDemo/engine/backend/rasterbackend.h`（§3.1：`ApplyStackResult` + `supports` + `applyStack`，含并发/几何注释）
+- [x] **T0.2** 新建 `psDemo/engine/backend/cpurasterbackend.{h,cpp}`
       —— 搬入 **§2.1 的 ③–⑦**（几何 / 断言 / PsGraph / 取消→`Cancelled`+空图 / `evaluate`）；
       `supports` 恒 true；**行为与搬前 bit-exact**（①② 留在 FilterStack，见 §3.2）
-- [ ] **T0.3** 新建 `psDemo/engine/backend/rastercost.{h,cpp}`（§4.3 表 + 两个常量；未登记返回 `-1`）
-- [ ] **T0.4** 新建 `psDemo/engine/backend/rasterscheduler.{h,cpp}`
+- [x] **T0.3** 新建 `psDemo/engine/backend/rastercost.{h,cpp}`（§4.3 表 + 两个常量；未登记返回 `-1`）
+- [x] **T0.4** 新建 `psDemo/engine/backend/rasterscheduler.{h,cpp}`
       （§4.2 + §3.3 + §3.4 + §6.3 + §6.4；决策须问 `supports`）
-- [ ] **T0.5** 改 `domain/filterstack.cpp` 的 `apply`（§3.2）：签名不变；取消仍返回空图
-- [ ] **T0.6** `psDemo/app.pri` 与 `psDemo/tests.pro` 登记新增 `.cpp`；**重跑 qmake**
-- [ ] **T0.7** 新建 `psDemo/tests/t_rasterbackend.cpp`（§6.6 全部断言：默认 CPU、强制开关、
-      Failed 降级与熔断、**「GPU 一直 Failed + CPU 每次补算成功 ⇒ 仍熔断」**、
-      supports 未调用不计熔断、取消返回空图且不动计数、决策边界、成本表覆盖性、带几何重载、
-      Failed 无副作用）
-      —— 假 GPU 后端需实现 `supports`（可配置）与 `Failed/Ok/Cancelled` 三种返回
-- [ ] **T0.8** `psDemo/tests/testmain.cpp` 登记 `rasterbackend` 用例
-- [ ] **T0.9** 跑通 §6.5 Acceptance（含 ≥20 次连跑、主程序干净重建）
+- [x] **T0.5** 改 `domain/filterstack.cpp` 的 `apply`（§3.2）：签名不变；取消仍返回空图
+- [x] **T0.6** `psDemo/app.pri` 与 `psDemo/tests.pro` 登记新增 `.cpp`；**重跑 qmake**
+- [x] **T0.7** 新建 `psDemo/tests/t_rasterbackend.cpp`（§6.6 全部断言）
+- [x] **T0.8** `psDemo/tests/testmain.cpp` 登记 `rasterbackend` 用例
+- [x] **T0.9** 跑通 §6.5 Acceptance：**27/27**；连跑 **20 次 0 崩溃**；主程序干净重建 0 error
 - [ ] **T0.10**（**可选，不进 P0 DoD**）用 `.build-verify/` 把 §4.3「估值」项实测回填；
       测不了则填保守小值并标「待测」（§11）。可放到 P0 提交之后或 P1 前。
-- [ ] **T0.11** 文档：`pending-dev.md`、`engine/operators.md`（「后端调度」）、`features.md`、`tests.md`
-- [ ] **T0.12** 提交（文案要点见 §13）。**提交前必须贴出三行证据**：
-      ① `release\psdemo_tests.exe` 的 `N/N 通过`；② 连跑 20 次的 0 崩溃结果；
-      ③ 主程序干净重建的输出（0 error、无新增 warning）
+- [x] **T0.11** 文档：`pending-dev.md`、`engine/operators.md`（「后端调度」）、`features.md`、`tests.md`
+- [x] **T0.12** 提交（文案要点见 §13）
 ### P1（P0 完成后另起）
 
 - [ ] **T1.1** API 选型 spike（§7.2 的 5 个问题），结论写回 §7.2

@@ -41,6 +41,7 @@ int tHighPassMotion();
 int tNoise();
 int tBatchA();
 int tRipple();
+int tRasterBackend();
 
 namespace {
 
@@ -71,6 +72,7 @@ const Case kCases[] = {
     { "noise", "添加杂色：确定性（同参可复现）、位置稳定（区域==整层裁块）、单色/高斯、往返", tNoise },
     { "batcha", "滤镜批次 A：曝光过度/蒙尘/减少杂色/锐化边缘 oracle + 分块投影 + 往返", tBatchA },
     { "ripple", "波纹：正弦位移 oracle、位置相关整层路径、分块投影、往返", tRipple },
+    { "rasterbackend", "滤镜链后端调度：CPU 搬迁 bit-exact、降级/熔断/supports/取消", tRasterBackend },
 };
 
 } // namespace

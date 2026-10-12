@@ -1,14 +1,10 @@
 /**
- * filterstack.cpp — FilterStack 节点管理与 FilterEval 串联求值（domain 层）。
+ * filterstack.cpp — FilterStack 节点管理与后端调度求值（domain 层）。
  */
 #include "filterstack.h"
 
-#include "engine/filtereval.h"
-#include "engine/graph/pointfilterop.h"
-#include "engine/graph/psgraph.h"
-#include "engine/graph/sourceop.h"
-
-#include <memory>
+#include "engine/backend/rasterbackend.h"
+#include "engine/backend/rasterscheduler.h"
 
 namespace Ps {
 
@@ -92,7 +88,6 @@ QImage FilterStack::apply(const QImage &source) const
  * 带协作式取消的求值：谓词返回 true 时**尽早停下**，返回的是半成品。
  *
  * 契约与 `FilterEval::applyNode(image, node, shouldAbort)` 一致：调用方必须丢弃结果。
- * 谓词注入图里的每个 `PointFilterOp`（图是本次现建的，故按值写入是安全的）。
  */
 QImage FilterStack::apply(const QImage &source, const std::function<bool()> &shouldAbort) const
 {
@@ -100,12 +95,7 @@ QImage FilterStack::apply(const QImage &source, const std::function<bool()> &sho
 }
 
 /**
- * 带协作式取消 + **几何**的求值（ROI 通用化第 ① 步）。
- *
- * @param srcRect / @p outRect 用**文档坐标**（约定见 docs/engine/roi.md §5 的迁移设计）。
- * 这与 `Layer::compositeRasterRegion` 里 want/srcWant 的坐标空间一致，调用方无需换算；
- * 本函数负责把它们平移到**输入图本地坐标**（`FilterContext` 的几何一律用本地坐标：
- * 输入图左上角 = 原点，外扩那一圈落在正区间）。
+ * 带协作式取消 + **几何**的求值；实际求值走 RasterScheduler（gpu-plan.md §3.2）。
  */
 QImage FilterStack::apply(const QImage &source, const QRect &srcRect, const QRect &outRect,
                           const std::function<bool()> &shouldAbort) const
@@ -117,34 +107,11 @@ QImage FilterStack::apply(const QImage &source, const QRect &srcRect, const QRec
     if (out.format() != QImage::Format_ARGB32_Premultiplied)
         out = out.convertToFormat(QImage::Format_ARGB32_Premultiplied);
 
-    // 几何缺省 = 整张图（本地坐标语义）
-    const QRect srcIn = srcRect.isNull() ? out.rect() : srcRect;
-    const QRect dstIn = outRect.isNull() ? out.rect() : outRect;
-    // 坐标空间说明：`srcRect`/`outRect` 是**文档坐标**（调用方约定），而 `FilterContext`
-    // 的几何一律用「输入图本地坐标」—— 输入图就是 srcRect 抽出来的那块，故本地原点 = srcRect.topLeft()。
-    // 换算由 `PointFilterOp` 在把几何交给 `applyNode` 时完成（它知道手里每张图的外框）。
-    Q_ASSERT_X(out.rect().contains(srcIn.translated(-srcIn.topLeft()))
-                   && out.rect().contains(dstIn.translated(-srcIn.topLeft())),
-               "FilterStack::apply",
-               "srcRect/outRect（文档坐标）的尺寸必须与输入图自洽，且 srcRect 包住 outRect");
-
-    // 建链图：source → f1 → f2 → …（对照 GimpFilterStack 的 GeglNode *graph）
-    // 点滤镜 ROI 恒等，逐像素结果与旧循环一致；图求值在此即「线性链的特例」。
-    PsGraph graph;
-    GraphNode::Id prev = graph.addNode(std::make_shared<ImageSourceOp>(out));
-    for (const FilterNode &node : m_nodes) {
-        if (!node.isEnabled())
-            continue;
-        if (shouldAbort && shouldAbort())
-            return QImage(); // 已取消：交回空图，调用方丢弃
-        auto op = std::make_shared<PointFilterOp>(node);
-        op->setShouldAbort(shouldAbort);
-        op->setGeometry(srcIn, dstIn);
-        const GraphNode::Id cur = graph.addNode(op);
-        graph.connect(prev, cur, 0);
-        prev = cur;
-    }
-    return graph.evaluate(prev, out.rect());
+    ApplyStackResult r = ApplyStackResult::Ok;
+    RasterScheduler::instance().runStack(out, *this, srcRect, outRect, shouldAbort, &r);
+    if (r == ApplyStackResult::Cancelled)
+        return QImage();
+    return out;
 }
 
 } // namespace Ps

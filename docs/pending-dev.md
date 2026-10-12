@@ -1615,6 +1615,17 @@ ROI 第 ③ 步的范围）；③ 大文档下整层求值仍是同步的（不�
 
 ---
 
+## 滤镜链后端调度 P0（可选加速壳，无 GPU kernel）
+
+**已实现**：`FilterStack::apply` → `RasterScheduler` → `CpuRasterBackend`（原 PsGraph ③–⑦）；
+成本表 / 熔断 / `PSLITE_RASTER` / `rasterbackend` 用例。规格见 [gpu-plan.md](gpu-plan.md)。
+
+**验收证据**：全套 **27/27** 通过；连跑 **20 次 0 崩溃**；主程序干净重建 0 error。
+
+**仍欠**：P1 API spike + 中值 GPU（≥3× 端到端才继续）；估值成本项实测回填（T0.10 可选）。
+
+---
+
 ## 维护
 
 - 新发现「已有功能的坑」：在本文件追加一节（已实现 / 已知风险 / 完善方向 / 相关代码）

@@ -37,6 +37,9 @@ SOURCES += \
     engine/filtereval.cpp \
     engine/layerfilterjob.cpp \
     engine/layerstyleeval.cpp \
+    engine/backend/rastercost.cpp \
+    engine/backend/cpurasterbackend.cpp \
+    engine/backend/rasterscheduler.cpp \
     engine/op/layermodeop.cpp \
     engine/op/boxblurfilterop.cpp \
     engine/op/embossfilterop.cpp \
@@ -150,6 +153,10 @@ HEADERS += \
     engine/filtereval.h \
     engine/layerfilterjob.h \
     engine/layerstyleeval.h \
+    engine/backend/rasterbackend.h \
+    engine/backend/rastercost.h \
+    engine/backend/cpurasterbackend.h \
+    engine/backend/rasterscheduler.h \
     engine/paintselectionclip.h \
     engine/painttypes.h \
     engine/premul.h \

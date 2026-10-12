@@ -25,10 +25,10 @@ release\psdemo_tests.exe composite regionraster   :: 只跑指定用例
 
 ## 用例
 
-> 当前 **24 个用例**：`pixelprim / filterchain / regionraster / composite / graphcheck / projectio /
+> 当前 **27 个用例**：`pixelprim / filterchain / regionraster / composite / graphcheck / projectio /
 > adjustpanel / adjustapply / blendparallel / transformlive / dirtybudget / areafilter /
 > filterundo / filterpanel / filterasync / filterpreview / previewdown / posasync / jobteardown /
-> roictx / offset / morefilters / hpblur / noise`。
+> roictx / offset / morefilters / hpblur / noise / batcha / ripple / rasterbackend`。
 
 | 名字 | 守住什么 |
 |---|---|
@@ -58,6 +58,7 @@ release\psdemo_tests.exe composite regionraster   :: 只跑指定用例
 | `hpblur` | 高通 == `clamp(src - 盒模糊 + 128)`；运动模糊 0°/90° 一维盒、30°/45° 方向最近邻取样平均 == 朴素 oracle；各角「分块投影 == 整幅」；`requiredInputs` 按 `|d·cos|/|d·sin|` 外扩；参数往返 |
 | `posasync` | **位置相关算子**（添加杂色）的预览异步化：want 被放大成**整层**、任务把整层写进区域缓存、域层复用该缓存把结果还给请求方（否则等于在 UI 线程上再整层重算一遍） |
 | `jobteardown` | **异步任务的析构安全**：反复「起了重任务立刻析构」，守住 `~LayerFilterJob` 必须等在途 future（曾因注释写了假不变量而偶发堆损坏，见缺陷台账 #21） |
+| `rasterbackend` | 滤镜链**后端调度（P0）**：默认 CPU bit-exact；`PSLITE_RASTER=cpu` 不碰 GPU；Failed 降级正确；Failed×3 熔断；**CPU 补算成功不得清零**；Cancelled / supports=false 不计熔断；决策边界（点算子/像素门槛/位置相关/位移）；成本表覆盖全部 `OpName`；带几何重载；Failed 无副作用 |
 
 ## 约定
 

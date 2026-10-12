@@ -42,7 +42,8 @@ SOURCES += \
     tests/t_hpblur.cpp \
     tests/t_noise.cpp \
     tests/t_batcha.cpp \
-    tests/t_ripple.cpp
+    tests/t_ripple.cpp \
+    tests/t_rasterbackend.cpp
 
 HEADERS += \
     tests/testutil.h
