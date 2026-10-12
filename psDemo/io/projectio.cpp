@@ -130,6 +130,7 @@ void writeFilterNodeParams(QDataStream &p, const FilterNode &n)
     p << qint32(n.mosaicCell());
     p << qint32(n.windDirection()) << qint32(n.windMethod()) << qint32(n.windStrength());
     p << qint32(n.contourLevel()) << qint32(n.contourEdge());
+    p << qint32(n.radialAmount()) << qint32(n.radialMethod());
     // —— 预留：后续新参数追加在此注释之后、勿改已有顺序 ——
 }
 
@@ -185,6 +186,8 @@ bool readFilterNodeParams(QDataStream &p, FilterNode *n)
     qint32 windStrength = 5;
     qint32 contourLevel = 128;
     qint32 contourEdge = 0;
+    qint32 radialAmount = 10;
+    qint32 radialMethod = 0;
     p >> brightness >> contrast;
     p >> hue >> saturation >> lightness >> vibrance;
     p >> exposure >> exposureOffset >> gammaCorrection;
@@ -217,6 +220,7 @@ bool readFilterNodeParams(QDataStream &p, FilterNode *n)
     p >> mosaicCell;
     p >> windDirection >> windMethod >> windStrength;
     p >> contourLevel >> contourEdge;
+    p >> radialAmount >> radialMethod;
     if (p.status() != QDataStream::Ok)
         return false;
     n->setBrightness(brightness);
@@ -299,6 +303,8 @@ bool readFilterNodeParams(QDataStream &p, FilterNode *n)
     n->setWindStrength(int(windStrength));
     n->setContourLevel(int(contourLevel));
     n->setContourEdge(int(contourEdge));
+    n->setRadialAmount(int(radialAmount));
+    n->setRadialMethod(int(radialMethod));
     return true;
 }
 

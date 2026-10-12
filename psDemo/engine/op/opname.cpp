@@ -68,6 +68,7 @@ constexpr OpNameInfo kOpNameTable[] = {
     {OpName::Fragment,             "ps:fragment",              "碎片"},
     {OpName::Wind,                 "ps:wind",                  "风"},
     {OpName::TraceContour,         "ps:trace-contour",         "等高线"},
+    {OpName::RadialBlur,           "ps:radial-blur",           "径向模糊"},
 };
 
 const OpNameInfo *infoFor(OpName name)
@@ -123,6 +124,7 @@ bool isAdjustmentOp(OpName name)
     case OpName::Fragment:
     case OpName::Wind:
     case OpName::TraceContour:
+    case OpName::RadialBlur:
         return false;
     default:
         break;

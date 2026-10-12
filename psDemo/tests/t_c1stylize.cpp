@@ -1,5 +1,5 @@
 /**
- * t_c1stylize.cpp — C1：风 / 等高线 oracle + 分块投影 + 往返。
+ * t_c1stylize.cpp — C1：风 / 等高线 / 径向模糊 oracle + 分块投影 + 往返。
  */
 #include "domain/filternode.h"
 #include "domain/imagedocument.h"
@@ -12,6 +12,7 @@
 #include "testutil.h"
 
 #include <QImage>
+#include <QtMath>
 
 using namespace Ps;
 using PsTests::Reporter;
@@ -109,6 +110,83 @@ QImage naiveContour(const QImage &srcPremul, int level, int edge)
                 }
             }
             dstRow[x] = mark ? qRgba(0, 0, 0, a) : qRgba(255, 255, 255, a);
+        }
+    }
+
+    QImage out(w, h, srcPremul.format());
+    for (int y = 0; y < h; ++y) {
+        const QRgb *s = reinterpret_cast<const QRgb *>(straight.constScanLine(y));
+        QRgb *d = reinterpret_cast<QRgb *>(out.scanLine(y));
+        for (int x = 0; x < w; ++x)
+            d[x] = qPremultiply(s[x]);
+    }
+    return out;
+}
+
+QImage naiveRadial(const QImage &srcPremul, int amount, int method)
+{
+    const int w = srcPremul.width();
+    const int h = srcPremul.height();
+    const double cx = (w - 1) * 0.5;
+    const double cy = (h - 1) * 0.5;
+    const int N = qBound(2, 4 + amount / 2, 24);
+
+    QImage work(w, h, QImage::Format_ARGB32);
+    for (int y = 0; y < h; ++y) {
+        const QRgb *s = reinterpret_cast<const QRgb *>(srcPremul.constScanLine(y));
+        QRgb *d = reinterpret_cast<QRgb *>(work.scanLine(y));
+        for (int x = 0; x < w; ++x)
+            d[x] = qUnpremultiply(s[x]);
+    }
+
+    auto sample = [&](double fx, double fy) -> QRgb {
+        const int ix = qBound(0, int(qRound(fx)), w - 1);
+        const int iy = qBound(0, int(qRound(fy)), h - 1);
+        return reinterpret_cast<const QRgb *>(work.constScanLine(iy))[ix];
+    };
+
+    QImage straight(w, h, QImage::Format_ARGB32);
+    if (method == 0) {
+        const double halfArc = (double(amount) * M_PI / 180.0) * 0.5;
+        for (int y = 0; y < h; ++y) {
+            QRgb *dst = reinterpret_cast<QRgb *>(straight.scanLine(y));
+            for (int x = 0; x < w; ++x) {
+                qint64 R = 0, G = 0, B = 0, A = 0;
+                const double dx = x - cx;
+                const double dy = y - cy;
+                for (int i = 0; i < N; ++i) {
+                    const double t = (N == 1) ? 0.0 : (double(i) / (N - 1) * 2.0 - 1.0);
+                    const double ang = t * halfArc;
+                    const double ca = qCos(ang);
+                    const double sa = qSin(ang);
+                    const QRgb p = sample(cx + dx * ca - dy * sa, cy + dx * sa + dy * ca);
+                    R += qRed(p);
+                    G += qGreen(p);
+                    B += qBlue(p);
+                    A += qAlpha(p);
+                }
+                dst[x] = qRgba(int(R / N), int(G / N), int(B / N), int(A / N));
+            }
+        }
+    } else {
+        const double zoomFrac = double(amount) / 100.0;
+        for (int y = 0; y < h; ++y) {
+            QRgb *dst = reinterpret_cast<QRgb *>(straight.scanLine(y));
+            for (int x = 0; x < w; ++x) {
+                qint64 R = 0, G = 0, B = 0, A = 0;
+                const double dx = x - cx;
+                const double dy = y - cy;
+                for (int i = 0; i < N; ++i) {
+                    const double t = (N == 1) ? 0.0 : double(i) / (N - 1);
+                    const double s = 1.0 - t * zoomFrac;
+                    const QRgb p = sample(cx + dx * s, cy + dy * s);
+                    R += qRed(p);
+                    G += qGreen(p);
+                    B += qBlue(p);
+                    A += qAlpha(p);
+                }
+                dst[x] = qRgba(int(R / N), int(G / N), int(B / N), int(A / N));
+            }
         }
     }
 
@@ -258,6 +336,65 @@ int tC1Stylize()
                     QStringLiteral("等高线：参数往返"));
         } else {
             r.check(false, QStringLiteral("重新打开含等高线的 .pslite"));
+        }
+    }
+
+    {
+        const QImage src = PsTests::makeLayerImage(48, 36, 29, 255);
+        FilterNode n(OpName::RadialBlur);
+        n.setRadialAmount(8);
+        n.setRadialMethod(0);
+        QImage got = src;
+        FilterEval::applyNode(got, n);
+        const long long d = PsTests::diffCount(got, naiveRadial(src, 8, 0));
+        r.check(d == 0, QStringLiteral("径向旋转 == 朴素（diffs=%1）").arg(d));
+        r.check(PsTests::diffCount(src, got) > 0, QStringLiteral("径向模糊确实改变画面"));
+        r.check(n.inputPad() == 0, QStringLiteral("径向模糊 inputPad=0（整层）"));
+    }
+
+    {
+        const QImage src = PsTests::makeLayerImage(40, 40, 17, 255);
+        FilterNode n(OpName::RadialBlur);
+        n.setRadialAmount(12);
+        n.setRadialMethod(1);
+        QImage got = src;
+        FilterEval::applyNode(got, n);
+        const long long d = PsTests::diffCount(got, naiveRadial(src, 12, 1));
+        r.check(d == 0, QStringLiteral("径向缩放 == 朴素（diffs=%1）").arg(d));
+    }
+
+    {
+        auto doc = ImageDocument::createBlank(256, 192, Qt::white);
+        doc->placeImageAsLayer(PsTests::makeLayerImage(200, 160, 41, 255), QStringLiteral("rad"));
+        doc->layers().layerAt(1)->setOffset(20, 10);
+        FilterNode n(OpName::RadialBlur);
+        n.setRadialAmount(6);
+        doc->layers().layerAt(1)->filters().append(n);
+        r.check(doc->layers().layerAt(1)->filters().hasPositionalOp(),
+                QStringLiteral("径向模糊走位置相关（整层）路径"));
+        const long long dc =
+            PsTests::diffCount(Compositor::composite(*doc), chunkedProjection(doc.get()));
+        r.check(dc == 0, QStringLiteral("径向模糊：分块投影 == 整幅（diffs=%1）").arg(dc));
+    }
+
+    {
+        auto doc = ImageDocument::createBlank(64, 48, Qt::white);
+        doc->placeImageAsLayer(PsTests::makeLayerImage(48, 36, 5, 255), QStringLiteral("rad2"));
+        FilterNode n(OpName::RadialBlur);
+        n.setRadialAmount(15);
+        n.setRadialMethod(1);
+        doc->layers().layerAt(1)->filters().append(n);
+        const QString path = PsTests::tempFilePath(QStringLiteral("radial.pslite"));
+        QString err;
+        const bool saved = ProjectIo::save(*doc, path, &err);
+        auto back = saved ? ProjectIo::load(path, &err) : nullptr;
+        if (back && back->layers().count() > 1 && back->layers().layerAt(1)->filters().count() > 0) {
+            const FilterNode &bn = back->layers().layerAt(1)->filters().at(0);
+            r.check(bn.op() == OpName::RadialBlur && bn.radialAmount() == 15
+                        && bn.radialMethod() == 1,
+                    QStringLiteral("径向模糊：参数往返"));
+        } else {
+            r.check(false, QStringLiteral("重新打开含径向模糊的 .pslite"));
         }
     }
 

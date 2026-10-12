@@ -44,7 +44,9 @@ int opCostNsPerPixel(OpName name)
     case OpName::Wind:
         return 10; // 估值：每像素上风向窗口扫
     case OpName::TraceContour:
-        return 4; // 估值：4-邻接跨阈值
+        return 4; // 估值：4-邻接跨电平
+    case OpName::RadialBlur:
+        return 40; // 估值：每像素多点旋转/缩放取样
     case OpName::Offset:
         return 2; // 表内 1.5，整型取 2
     case OpName::BrightnessContrast:

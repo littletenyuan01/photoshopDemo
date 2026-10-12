@@ -403,9 +403,13 @@ void MainWindow::setupMenus()
     connect(ui->actionWind, &QAction::triggered, this,
             [this]() { runFilterDialog(Ps::OpName::Wind); });
     ui->actionTraceContour->setEnabled(true);
-    ui->actionTraceContour->setToolTip(tr("等高线（亮度跨阈值描边；非破坏）"));
+    ui->actionTraceContour->setToolTip(tr("等高线（亮度跨电平描边；非破坏）"));
     connect(ui->actionTraceContour, &QAction::triggered, this,
             [this]() { runFilterDialog(Ps::OpName::TraceContour); });
+    ui->actionRadialBlur->setEnabled(true);
+    ui->actionRadialBlur->setToolTip(tr("径向模糊（旋转/缩放；非破坏）"));
+    connect(ui->actionRadialBlur, &QAction::triggered, this,
+            [this]() { runFilterDialog(Ps::OpName::RadialBlur); });
 
     // 滤镜 → 杂色 → 添加杂色（点算子；噪声是 (x,y,seed) 的确定函数，故整层求值）
     ui->actionAddNoise->setEnabled(true);
@@ -1750,6 +1754,9 @@ void MainWindow::runFilterDialog(Ps::OpName op)
     } else if (op == Ps::OpName::TraceContour) {
         node.setContourLevel(128);
         node.setContourEdge(0);
+    } else if (op == Ps::OpName::RadialBlur) {
+        node.setRadialAmount(10);
+        node.setRadialMethod(0);
     } else if (op == Ps::OpName::MotionBlur) {
         node.setMotionDistance(10);
         node.setMotionAngle(30);

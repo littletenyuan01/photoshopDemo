@@ -60,7 +60,7 @@ bool FilterStack::hasPositionalOp() const
         if (!n.isEnabled())
             continue;
         if (n.op() == OpName::AddNoise || n.op() == OpName::Ripple
-            || n.op() == OpName::Mosaic)
+            || n.op() == OpName::Mosaic || n.op() == OpName::RadialBlur)
             return true;
     }
     return false;

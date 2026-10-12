@@ -237,11 +237,17 @@ public:
     int windStrength() const { return m_windStrength; }
     void setWindStrength(int v) { m_windStrength = qBound(1, v, 20); }
 
-    // —— 等高线：阈值（0..255）+ 边缘（0 较低 / 1 较高）——
+    // —— 等高线：电平（0..255）+ 边缘（0 较低 / 1 较高）——
     int contourLevel() const { return m_contourLevel; }
     void setContourLevel(int v) { m_contourLevel = qBound(0, v, 255); }
     int contourEdge() const { return m_contourEdge; }
     void setContourEdge(int v) { m_contourEdge = qBound(0, v, 1); }
+
+    // —— 径向模糊：数量（1..50）+ 方法（0 旋转 / 1 缩放）；图心 → 整层 ——
+    int radialAmount() const { return m_radialAmount; }
+    void setRadialAmount(int v) { m_radialAmount = qBound(1, v, 50); }
+    int radialMethod() const { return m_radialMethod; }
+    void setRadialMethod(int v) { m_radialMethod = qBound(0, v, 1); }
 
     // —— 添加杂色：数量（0..100 %）+ 分布（均匀/高斯）+ 单色 + 种子 ——
     int noiseAmount() const { return m_noiseAmount; }
@@ -349,6 +355,9 @@ public:
         n.m_windStrength = shrink(m_windStrength);
         if (n.m_windStrength < 1)
             n.m_windStrength = 1;
+        n.m_radialAmount = shrink(m_radialAmount);
+        if (n.m_radialAmount < 1)
+            n.m_radialAmount = 1;
         return n;
     }
 
@@ -398,6 +407,8 @@ public:
             return (m_windMethod == 1) ? (m_windStrength * 2) : m_windStrength;
         case OpName::TraceContour:
             return 1; // 4-邻接
+        case OpName::RadialBlur:
+            return 0; // 位置相关，走整层（见 FilterStack::hasPositionalOp）
         default:
             return 0;
         }
@@ -475,6 +486,8 @@ private:
     int m_windStrength = 5;
     int m_contourLevel = 128;
     int m_contourEdge = 0;
+    int m_radialAmount = 10;
+    int m_radialMethod = 0;
 };
 
 } // namespace Ps

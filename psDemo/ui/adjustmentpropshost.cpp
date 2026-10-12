@@ -624,6 +624,35 @@ void AdjustmentPropsHost::ensurePages()
         add(Ps::OpName::TraceContour, page);
     }
     {
+        // 径向模糊：方法 + 数量
+        auto *page = new QWidget(m_stack);
+        auto *col = new QVBoxLayout(page);
+        col->setContentsMargins(0, 0, 0, 0);
+        {
+            auto *row = new QWidget(page);
+            auto *rowLay = new QHBoxLayout(row);
+            rowLay->setContentsMargins(0, 0, 0, 0);
+            rowLay->addWidget(new QLabel(QStringLiteral("模糊方法"), row));
+            auto *combo = new QComboBox(row);
+            combo->setObjectName(QStringLiteral("combo_radial_method"));
+            combo->addItem(QStringLiteral("旋转"), 0);
+            combo->addItem(QStringLiteral("缩放"), 1);
+            rowLay->addWidget(combo, 1);
+            col->addWidget(row);
+            connect(combo, qOverload<int>(&QComboBox::currentIndexChanged), this, [this, combo](int) {
+                if (m_block)
+                    return;
+                m_node.setRadialMethod(combo->currentData().toInt());
+                emitPreview();
+            });
+        }
+        const SliderRow amt = makeSliderRow(page, QStringLiteral("数量"), QStringLiteral("radial_amount"),
+                                            1, 50);
+        col->addWidget(amt.row);
+        wireSliderSpin(amt.slider, amt.spin, [this](int v) { m_node.setRadialAmount(v); });
+        add(Ps::OpName::RadialBlur, page);
+    }
+    {
         // 添加杂色：数量滑块（0..100%）+ 分布下拉 + 单色勾选
         auto *page = new QWidget(m_stack);
         auto *col = new QVBoxLayout(page);
@@ -864,6 +893,11 @@ void AdjustmentPropsHost::loadControlsFromNode()
         setPair("slider_contour_level", "spin_contour_level", m_node.contourLevel());
         if (auto *cb = page->findChild<QComboBox *>(QStringLiteral("combo_contour_edge")))
             cb->setCurrentIndex(m_node.contourEdge());
+        break;
+    case Ps::OpName::RadialBlur:
+        if (auto *cb = page->findChild<QComboBox *>(QStringLiteral("combo_radial_method")))
+            cb->setCurrentIndex(m_node.radialMethod());
+        setPair("slider_radial_amount", "spin_radial_amount", m_node.radialAmount());
         break;
     case Ps::OpName::AddNoise:
         setPair("slider_noise_amount", "spin_noise_amount", m_node.noiseAmount());
