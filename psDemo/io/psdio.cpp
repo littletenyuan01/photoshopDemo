@@ -1,7 +1,7 @@
 /**
- * psdio.cpp — PsdIo::save 与 PSD 二进制段组装（io 层）。
+ * psdio.cpp — PsdIo::save / load（io 层）。
  *
- * 手写大端写入；图层像素由预乘 ARGB 解预乘为直通 RGBA 平面。
+ * 手写大端读写；导出：预乘 ARGB → 直通 RGBA 平面；导入：直通 → 预乘。
  */
 #include "psdio.h"
 
@@ -12,9 +12,12 @@
 
 #include <QDataStream>
 #include <QDebug>
+#include <QFile>
 #include <QImage>
 #include <QSaveFile>
 #include <QtEndian>
+
+#include <cstring>
 
 namespace Ps {
 namespace {
@@ -30,6 +33,7 @@ enum class PsdColorMode : quint16 {
 
 enum class PsdCompression : quint16 {
     Raw = 0,
+    Rle = 1,
 };
 
 enum class PsdChannelId : qint16 {
@@ -69,6 +73,141 @@ void writeU32(QDataStream &out, quint32 v)
 
 void writeI16(QDataStream &out, qint16 v) { writeU16(out, quint16(v)); }
 void writeI32(QDataStream &out, qint32 v) { writeU32(out, quint32(v)); }
+
+bool readRaw(QDataStream &in, void *data, int len)
+{
+    return in.readRawData(reinterpret_cast<char *>(data), len) == len;
+}
+
+bool readU8(QDataStream &in, quint8 *v)
+{
+    return readRaw(in, v, 1);
+}
+
+bool readU16(QDataStream &in, quint16 *v)
+{
+    quint16 be = 0;
+    if (!readRaw(in, &be, 2))
+        return false;
+    *v = qFromBigEndian(be);
+    return true;
+}
+
+bool readU32(QDataStream &in, quint32 *v)
+{
+    quint32 be = 0;
+    if (!readRaw(in, &be, 4))
+        return false;
+    *v = qFromBigEndian(be);
+    return true;
+}
+
+bool readI16(QDataStream &in, qint16 *v)
+{
+    quint16 u = 0;
+    if (!readU16(in, &u))
+        return false;
+    *v = qint16(u);
+    return true;
+}
+
+bool readI32(QDataStream &in, qint32 *v)
+{
+    quint32 u = 0;
+    if (!readU32(in, &u))
+        return false;
+    *v = qint32(u);
+    return true;
+}
+
+bool skipBytes(QDataStream &in, int n)
+{
+    if (n <= 0)
+        return true;
+    return in.skipRawData(n) == n;
+}
+
+/** PackBits（PSD RLE）解到恰好 dstLen 字节。 */
+bool decodePackBits(const char *src, int srcLen, char *dst, int dstLen)
+{
+    int si = 0;
+    int di = 0;
+    while (di < dstLen) {
+        if (si >= srcLen)
+            return false;
+        const qint8 n = qint8(src[si++]);
+        if (n >= 0) {
+            const int count = int(n) + 1;
+            if (si + count > srcLen || di + count > dstLen)
+                return false;
+            std::memcpy(dst + di, src + si, size_t(count));
+            si += count;
+            di += count;
+        } else if (n != -128) {
+            const int count = 1 - int(n);
+            if (si >= srcLen || di + count > dstLen)
+                return false;
+            const char b = src[si++];
+            std::memset(dst + di, int(uchar(b)), size_t(count));
+            di += count;
+        }
+    }
+    return true;
+}
+
+/**
+ * 读一层某一通道的像素平面（含 2 字节 compression 头）。
+ * @param expectedBytes 未压缩平面字节数（w*h）；0 表示空层，只消耗 compression。
+ */
+bool readChannelPlane(QDataStream &in, int expectedBytes, int height, QByteArray *out)
+{
+    quint16 comp = 0;
+    if (!readU16(in, &comp))
+        return false;
+
+    if (expectedBytes <= 0) {
+        out->clear();
+        return true;
+    }
+
+    out->resize(expectedBytes);
+    if (comp == static_cast<quint16>(PsdCompression::Raw)) {
+        return readRaw(in, out->data(), expectedBytes);
+    }
+    if (comp != static_cast<quint16>(PsdCompression::Rle)) {
+        // Zip 等：本子集不支持
+        return false;
+    }
+    if (height <= 0)
+        return false;
+
+    QVector<quint16> rowLens(height);
+    int compressedTotal = 0;
+    for (int y = 0; y < height; ++y) {
+        if (!readU16(in, &rowLens[y]))
+            return false;
+        compressedTotal += int(rowLens[y]);
+    }
+    QByteArray compressed(compressedTotal, Qt::Uninitialized);
+    if (compressedTotal > 0 && !readRaw(in, compressed.data(), compressedTotal))
+        return false;
+
+    const int width = expectedBytes / height;
+    if (width * height != expectedBytes)
+        return false;
+
+    int off = 0;
+    for (int y = 0; y < height; ++y) {
+        const int len = int(rowLens[y]);
+        if (off + len > compressedTotal)
+            return false;
+        if (!decodePackBits(compressed.constData() + off, len,
+                            out->data() + y * width, width))
+            return false;
+        off += len;
+    }
+    return true;
+}
 
 /** PSD 混合四字符码：PS 的 27 种模式全表（Adobe PSD File Format 的 "Blend mode key"，
  * 对照 GIMP `plug-ins/file-psd/psd-export.c` 的 `blend_modes` 表）。
@@ -114,6 +253,39 @@ const char *psdBlendKey(BlendMode mode)
     return "norm";
 }
 
+BlendMode blendModeFromPsdKey(const char key[4])
+{
+    const QByteArray k = QByteArray(key, 4);
+    if (k == "norm") return BlendMode::Normal;
+    if (k == "diss") return BlendMode::Dissolve;
+    if (k == "dark") return BlendMode::Darken;
+    if (k == "mul ") return BlendMode::Multiply;
+    if (k == "idiv") return BlendMode::ColorBurn;
+    if (k == "lbrn") return BlendMode::LinearBurn;
+    if (k == "dkCl") return BlendMode::DarkerColor;
+    if (k == "lite") return BlendMode::Lighten;
+    if (k == "scrn") return BlendMode::Screen;
+    if (k == "div ") return BlendMode::ColorDodge;
+    if (k == "lddg") return BlendMode::LinearDodge;
+    if (k == "lgCl") return BlendMode::LighterColor;
+    if (k == "over") return BlendMode::Overlay;
+    if (k == "sLit") return BlendMode::SoftLight;
+    if (k == "hLit") return BlendMode::HardLight;
+    if (k == "vLit") return BlendMode::VividLight;
+    if (k == "lLit") return BlendMode::LinearLight;
+    if (k == "pLit") return BlendMode::PinLight;
+    if (k == "hMix") return BlendMode::HardMix;
+    if (k == "diff") return BlendMode::Difference;
+    if (k == "smud") return BlendMode::Exclusion;
+    if (k == "fsub") return BlendMode::Subtract;
+    if (k == "fdiv") return BlendMode::Divide;
+    if (k == "hue ") return BlendMode::Hue;
+    if (k == "sat ") return BlendMode::Saturation;
+    if (k == "colr") return BlendMode::Color;
+    if (k == "lum ") return BlendMode::Luminosity;
+    return BlendMode::Normal;
+}
+
 /** Pascal 字符串，填充到 4 字节对齐（含长度字节）。 */
 void writePascalName(QDataStream &out, const QString &name)
 {
@@ -126,6 +298,28 @@ void writePascalName(QDataStream &out, const QString &name)
     writeRaw(out, utf8.constData(), utf8.size());
     for (int i = total; i < padded; ++i)
         writeU8(out, 0);
+}
+
+/** 读 Pascal 名（含长度字节的 4 对齐）；@p maxRemain 为剩余 extra 字节上限。 */
+bool readPascalName(QDataStream &in, int maxRemain, QString *name, int *consumed)
+{
+    if (maxRemain < 1)
+        return false;
+    quint8 len = 0;
+    if (!readU8(in, &len))
+        return false;
+    const int total = 1 + int(len);
+    const int padded = (total + 3) & ~3;
+    if (padded > maxRemain)
+        return false;
+    QByteArray utf8(int(len), Qt::Uninitialized);
+    if (len > 0 && !readRaw(in, utf8.data(), int(len)))
+        return false;
+    if (!skipBytes(in, padded - total))
+        return false;
+    *name = QString::fromUtf8(utf8);
+    *consumed = padded;
+    return true;
 }
 
 /** 预乘 ARGB → 直通 RGBA 平面（层矩形内）。 */
@@ -368,4 +562,385 @@ bool PsdIo::save(const ImageDocument &doc, const QString &filePath,
     return true;
 }
 
+namespace {
+
+struct PsdChannelDesc {
+    qint16 id = 0;
+    quint32 dataLength = 0; ///< 含 2 字节 compression
+};
+
+struct PsdLayerRecord {
+    qint32 top = 0;
+    qint32 left = 0;
+    qint32 bottom = 0;
+    qint32 right = 0;
+    QVector<PsdChannelDesc> channels;
+    BlendMode blend = BlendMode::Normal;
+    quint8 opacity = 255;
+    quint8 flags = 0;
+    QString name;
+    bool skip = false; ///< 组/空层/无 RGB：不入栈
+    QImage pixels;     ///< 预乘 ARGB；skip 时为空
+};
+
+QImage planesToPremulImage(int w, int h,
+                           const QByteArray &a, const QByteArray &r,
+                           const QByteArray &g, const QByteArray &b)
+{
+    QImage img(w, h, QImage::Format_ARGB32_Premultiplied);
+    const int n = w * h;
+    const bool hasA = a.size() >= n;
+    const bool hasR = r.size() >= n;
+    const bool hasG = g.size() >= n;
+    const bool hasB = b.size() >= n;
+    for (int y = 0; y < h; ++y) {
+        QRgb *line = reinterpret_cast<QRgb *>(img.scanLine(y));
+        for (int x = 0; x < w; ++x) {
+            const int i = y * w + x;
+            const int aa = hasA ? int(uchar(a[i])) : 255;
+            const int rr = hasR ? int(uchar(r[i])) : 0;
+            const int gg = hasG ? int(uchar(g[i])) : 0;
+            const int bb = hasB ? int(uchar(b[i])) : 0;
+            if (aa == 0)
+                line[x] = qRgba(0, 0, 0, 0);
+            else if (aa == 255)
+                line[x] = qRgba(rr, gg, bb, 255);
+            else
+                line[x] = qRgba((rr * aa + 127) / 255,
+                                (gg * aa + 127) / 255,
+                                (bb * aa + 127) / 255,
+                                aa);
+        }
+    }
+    return img;
+}
+
+/** 读合并图像段（无图层时的回退）；失败返回空图。 */
+QImage readMergedRgbFallback(QDataStream &in, int w, int h, int channelCount)
+{
+    if (w <= 0 || h <= 0 || channelCount < 3)
+        return {};
+    quint16 comp = 0;
+    if (!readU16(in, &comp))
+        return {};
+
+    const int planeBytes = w * h;
+    QByteArray r(planeBytes, 0), g(planeBytes, 0), b(planeBytes, 0);
+
+    auto readOnePlane = [&](QByteArray *plane) -> bool {
+        if (comp == static_cast<quint16>(PsdCompression::Raw))
+            return readRaw(in, plane->data(), planeBytes);
+        if (comp != static_cast<quint16>(PsdCompression::Rle))
+            return false;
+        // 合并图 RLE：先全部通道的行长度表，再数据——此处简化只支持 Raw
+        return false;
+    };
+
+    if (comp == static_cast<quint16>(PsdCompression::Raw)) {
+        if (!readOnePlane(&r) || !readOnePlane(&g) || !readOnePlane(&b))
+            return {};
+        // 多余通道（含 alpha）跳过
+        for (int c = 3; c < channelCount; ++c) {
+            if (!skipBytes(in, planeBytes))
+                break;
+        }
+        return planesToPremulImage(w, h, QByteArray(), r, g, b);
+    }
+
+    // RLE 合并图：跳过行长度表 + 压缩数据太易错；无图层时再报错
+    Q_UNUSED(readOnePlane);
+    return {};
+}
+
+} // namespace
+
+std::unique_ptr<ImageDocument> PsdIo::load(const QString &filePath,
+                                           QString *errorMessage)
+{
+    QFile file(filePath);
+    if (!file.open(QIODevice::ReadOnly)) {
+        if (errorMessage)
+            *errorMessage = QObject::tr("无法打开：%1").arg(file.errorString());
+        return nullptr;
+    }
+
+    QDataStream in(&file);
+
+    char sig[4];
+    if (!readRaw(in, sig, 4) || std::memcmp(sig, "8BPS", 4) != 0) {
+        if (errorMessage)
+            *errorMessage = QObject::tr("不是有效的 PSD 文件（缺少 8BPS）");
+        return nullptr;
+    }
+
+    quint16 version = 0;
+    if (!readU16(in, &version) || version != static_cast<quint16>(PsdFileVersion::Photoshop)) {
+        if (errorMessage)
+            *errorMessage = QObject::tr("仅支持 PSD（版本 1），不支持 PSB");
+        return nullptr;
+    }
+
+    if (!skipBytes(in, 6)) {
+        if (errorMessage)
+            *errorMessage = QObject::tr("文件头截断");
+        return nullptr;
+    }
+
+    quint16 channels = 0, depth = 0, colorMode = 0;
+    quint32 height = 0, width = 0;
+    if (!readU16(in, &channels) || !readU32(in, &height) || !readU32(in, &width)
+        || !readU16(in, &depth) || !readU16(in, &colorMode)) {
+        if (errorMessage)
+            *errorMessage = QObject::tr("文件头截断");
+        return nullptr;
+    }
+
+    if (colorMode != static_cast<quint16>(PsdColorMode::Rgb) || depth != kPsdBitDepth) {
+        if (errorMessage)
+            *errorMessage = QObject::tr("仅支持 RGB 8-bit PSD（当前 mode=%1 depth=%2）")
+                                .arg(colorMode)
+                                .arg(depth);
+        return nullptr;
+    }
+    if (width == 0 || height == 0 || width > 30000 || height > 30000) {
+        if (errorMessage)
+            *errorMessage = QObject::tr("画布尺寸无效或过大");
+        return nullptr;
+    }
+
+    quint32 colorModeLen = 0;
+    if (!readU32(in, &colorModeLen) || !skipBytes(in, int(colorModeLen))) {
+        if (errorMessage)
+            *errorMessage = QObject::tr("无法跳过 Color Mode Data");
+        return nullptr;
+    }
+    quint32 resourcesLen = 0;
+    if (!readU32(in, &resourcesLen) || !skipBytes(in, int(resourcesLen))) {
+        if (errorMessage)
+            *errorMessage = QObject::tr("无法跳过 Image Resources");
+        return nullptr;
+    }
+
+    quint32 layerMaskSectionLen = 0;
+    if (!readU32(in, &layerMaskSectionLen)) {
+        if (errorMessage)
+            *errorMessage = QObject::tr("无法读取图层段长度");
+        return nullptr;
+    }
+
+    QVector<PsdLayerRecord> records;
+
+    if (layerMaskSectionLen > 0) {
+        const qint64 sectionEnd = file.pos() + qint64(layerMaskSectionLen);
+
+        quint32 layerInfoLen = 0;
+        if (!readU32(in, &layerInfoLen)) {
+            if (errorMessage)
+                *errorMessage = QObject::tr("无法读取 Layer Info 长度");
+            return nullptr;
+        }
+
+        if (layerInfoLen > 0) {
+            qint16 layerCountSigned = 0;
+            if (!readI16(in, &layerCountSigned)) {
+                if (errorMessage)
+                    *errorMessage = QObject::tr("无法读取图层数");
+                return nullptr;
+            }
+            const int layerCount = qAbs(int(layerCountSigned));
+            if (layerCount > 2048) {
+                if (errorMessage)
+                    *errorMessage = QObject::tr("图层数异常：%1").arg(layerCount);
+                return nullptr;
+            }
+
+            records.resize(layerCount);
+            for (int i = 0; i < layerCount; ++i) {
+                PsdLayerRecord &rec = records[i];
+                if (!readI32(in, &rec.top) || !readI32(in, &rec.left)
+                    || !readI32(in, &rec.bottom) || !readI32(in, &rec.right)) {
+                    if (errorMessage)
+                        *errorMessage = QObject::tr("图层 %1 边界截断").arg(i);
+                    return nullptr;
+                }
+                quint16 chCount = 0;
+                if (!readU16(in, &chCount) || chCount > 64) {
+                    if (errorMessage)
+                        *errorMessage = QObject::tr("图层 %1 通道数无效").arg(i);
+                    return nullptr;
+                }
+                rec.channels.resize(int(chCount));
+                for (int c = 0; c < int(chCount); ++c) {
+                    if (!readI16(in, &rec.channels[c].id)
+                        || !readU32(in, &rec.channels[c].dataLength)) {
+                        if (errorMessage)
+                            *errorMessage = QObject::tr("图层 %1 通道表截断").arg(i);
+                        return nullptr;
+                    }
+                }
+
+                char bim[4], blendKey[4];
+                if (!readRaw(in, bim, 4) || std::memcmp(bim, "8BIM", 4) != 0
+                    || !readRaw(in, blendKey, 4)) {
+                    if (errorMessage)
+                        *errorMessage = QObject::tr("图层 %1 混合签名无效").arg(i);
+                    return nullptr;
+                }
+                if (std::memcmp(blendKey, "pass", 4) == 0)
+                    rec.skip = true;
+                rec.blend = blendModeFromPsdKey(blendKey);
+
+                quint8 clipping = 0, filler = 0;
+                if (!readU8(in, &rec.opacity) || !readU8(in, &clipping)
+                    || !readU8(in, &rec.flags) || !readU8(in, &filler)) {
+                    if (errorMessage)
+                        *errorMessage = QObject::tr("图层 %1 属性截断").arg(i);
+                    return nullptr;
+                }
+                Q_UNUSED(clipping);
+                Q_UNUSED(filler);
+
+                quint32 extraSize = 0;
+                if (!readU32(in, &extraSize)) {
+                    if (errorMessage)
+                        *errorMessage = QObject::tr("图层 %1 extra 长度截断").arg(i);
+                    return nullptr;
+                }
+                const qint64 extraEnd = file.pos() + qint64(extraSize);
+
+                quint32 maskLen = 0;
+                if (!readU32(in, &maskLen) || !skipBytes(in, int(maskLen))) {
+                    if (errorMessage)
+                        *errorMessage = QObject::tr("图层 %1 蒙版段失败").arg(i);
+                    return nullptr;
+                }
+                quint32 blendRangeLen = 0;
+                if (!readU32(in, &blendRangeLen) || !skipBytes(in, int(blendRangeLen))) {
+                    if (errorMessage)
+                        *errorMessage = QObject::tr("图层 %1 混合范围段失败").arg(i);
+                    return nullptr;
+                }
+
+                const int nameRemain = int(extraEnd - file.pos());
+                int nameConsumed = 0;
+                if (nameRemain > 0) {
+                    if (!readPascalName(in, nameRemain, &rec.name, &nameConsumed)) {
+                        if (errorMessage)
+                            *errorMessage = QObject::tr("图层 %1 名称截断").arg(i);
+                        return nullptr;
+                    }
+                }
+                if (rec.name.isEmpty())
+                    rec.name = QObject::tr("图层 %1").arg(i + 1);
+
+                if (!skipBytes(in, int(extraEnd - file.pos()))) {
+                    if (errorMessage)
+                        *errorMessage = QObject::tr("图层 %1 extra 尾部跳过失败").arg(i);
+                    return nullptr;
+                }
+            }
+
+            for (int i = 0; i < records.size(); ++i) {
+                PsdLayerRecord &rec = records[i];
+                const int lw = qMax(0, int(rec.right - rec.left));
+                const int lh = qMax(0, int(rec.bottom - rec.top));
+                const int planeBytes = lw * lh;
+
+                QByteArray a, r, g, b;
+                bool gotR = false, gotG = false, gotB = false;
+
+                for (const PsdChannelDesc &ch : rec.channels) {
+                    QByteArray plane;
+                    const qint64 chStart = file.pos();
+                    const bool okPlane = (!rec.skip && planeBytes > 0)
+                                            ? readChannelPlane(in, planeBytes, lh, &plane)
+                                            : false;
+                    if (!okPlane) {
+                        // 空层 / 跳过层：按声明长度消耗
+                        if (!file.seek(chStart + qint64(ch.dataLength))) {
+                            if (errorMessage)
+                                *errorMessage = QObject::tr("图层 %1 通道跳过失败").arg(i);
+                            return nullptr;
+                        }
+                        continue;
+                    }
+                    const qint64 chEndDeclared = chStart + qint64(ch.dataLength);
+                    if (file.pos() < chEndDeclared)
+                        skipBytes(in, int(chEndDeclared - file.pos()));
+                    else if (file.pos() > chEndDeclared)
+                        file.seek(chEndDeclared);
+
+                    switch (ch.id) {
+                    case static_cast<qint16>(PsdChannelId::Transparency):
+                        a = plane;
+                        break;
+                    case static_cast<qint16>(PsdChannelId::Red):
+                        r = plane;
+                        gotR = true;
+                        break;
+                    case static_cast<qint16>(PsdChannelId::Green):
+                        g = plane;
+                        gotG = true;
+                        break;
+                    case static_cast<qint16>(PsdChannelId::Blue):
+                        b = plane;
+                        gotB = true;
+                        break;
+                    default:
+                        break;
+                    }
+                }
+
+                if (rec.skip || lw <= 0 || lh <= 0 || !(gotR && gotG && gotB)) {
+                    rec.skip = true;
+                    continue;
+                }
+                rec.pixels = planesToPremulImage(lw, lh, a, r, g, b);
+            }
+        }
+
+        if (file.pos() < sectionEnd)
+            skipBytes(in, int(sectionEnd - file.pos()));
+        else if (file.pos() > sectionEnd)
+            file.seek(sectionEnd);
+    }
+
+    auto doc = std::make_unique<ImageDocument>(int(width), int(height));
+    {
+        ImageDocument::HistorySuppress suppress(*doc);
+        int added = 0;
+        for (const PsdLayerRecord &rec : records) {
+            if (rec.skip || rec.pixels.isNull())
+                continue;
+            auto layer = std::make_unique<Layer>(rec.name, rec.pixels);
+            layer->setOffsetSilent(rec.left, rec.top);
+            layer->setOpacity(rec.opacity / 255.0);
+            layer->setBlendMode(rec.blend);
+            layer->setVisible((rec.flags & static_cast<quint8>(PsdLayerFlags::Invisible)) == 0);
+            doc->addLayer(std::move(layer));
+            ++added;
+        }
+
+        if (added == 0) {
+            // 无图层：尝试合并图像作单背景层
+            QImage merged = readMergedRgbFallback(in, int(width), int(height), int(channels));
+            if (merged.isNull()) {
+                if (errorMessage)
+                    *errorMessage = QObject::tr("PSD 中没有可导入的像素图层");
+                return nullptr;
+            }
+            auto layer = std::make_unique<Layer>(QObject::tr("背景"), merged);
+            doc->addLayer(std::move(layer));
+            added = 1;
+        }
+
+        doc->setActiveLayerIndex(added - 1);
+    }
+
+    doc->setFilePath(filePath);
+    doc->clearDirty();
+    return doc;
+}
+
 } // namespace Ps
+

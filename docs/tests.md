@@ -25,10 +25,7 @@ release\psdemo_tests.exe composite regionraster   :: 只跑指定用例
 
 ## 用例
 
-> 当前 **28 个用例**：`pixelprim / filterchain / regionraster / composite / graphcheck / projectio /
-> adjustpanel / adjustapply / blendparallel / transformlive / dirtybudget / areafilter /
-> filterundo / filterpanel / filterasync / filterpreview / previewdown / posasync / jobteardown /
-> roictx / offset / morefilters / hpblur / noise / batcha / ripple / rasterbackend / c1pixelate / c1stylize`。
+> 当前 **29+ 个用例**（含 GPU 条件项）：`… / c1pixelate / c1stylize / webexport` 等；完整列表见下表与 `testmain.cpp`。
 
 | 名字 | 守住什么 |
 |---|---|
@@ -65,6 +62,8 @@ release\psdemo_tests.exe composite regionraster   :: 只跑指定用例
 | `adjarea` | 调整层+面积算子：`isAdjustmentOp` 护栏、子缓冲外扩、分块投影==整幅、往返 |
 | `c1pixelate` | C1 马赛克/碎片：方块均值 / 四角偏移 oracle；马赛克 hasPositionalOp；分块投影==整幅；参数/op 往返 |
 | `c1stylize` | C1 风/等高线/径向/表面/特殊模糊/拼贴：上风向最大亮度 / 跨电平描边 / 旋转·缩放 / 保边均值·边缘模式 / 切块偏移 oracle；分块==整幅；往返 |
+| `webexport` | **存储为 Web**：JPEG 低质量体积更小；PNG 保留/去掉透明；50% 缩放尺寸；`exportWithOptions` / `exportFile` 写盘可回读 |
+| `psdio` | **PSD 子集**：自产文件导出→导入；层数/名/offset/混合/不透明度；合成 diffs=0 或 maxCh≤1 |
 
 ## 约定
 

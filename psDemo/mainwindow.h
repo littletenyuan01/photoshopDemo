@@ -89,6 +89,8 @@ private slots:
     void onSaveDocumentAs();
     void onExportPng();
     void onExportAs();
+    /** 存储为 Web：格式/质量/预览/体积后写出扁平图。 */
+    void onSaveForWeb();
     void onNewLayer();
     void onDuplicateLayer();
     void onDeleteLayer();

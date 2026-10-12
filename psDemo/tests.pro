@@ -49,7 +49,9 @@ SOURCES += \
     tests/t_gput47.cpp \
     tests/t_adjarea.cpp \
     tests/t_c1pixelate.cpp \
-    tests/t_c1stylize.cpp
+    tests/t_c1stylize.cpp \
+    tests/t_webexport.cpp \
+    tests/t_psdio.cpp
 
 HEADERS += \
     tests/testutil.h

@@ -26,6 +26,7 @@
 #include "ui/colorspanel.h"
 #include "ui/homescreen.h"
 #include "ui/imagesizedialog.h"
+#include "ui/saveforwebdialog.h"
 #include "ui/infopanel.h"
 #include "ui/newdocumentdialog.h"
 #include "ui/propertiespanel.h"
@@ -117,8 +118,14 @@ void MainWindow::setupMenus()
     ui->actionExport->setToolTip(tr("把当前合成结果导出为 PNG（不改工程文件）"));
     ui->actionExportAs->setEnabled(true);
     ui->actionExportAs->setToolTip(tr("导出为 PNG 或 JPEG"));
+    ui->actionSaveForWeb->setEnabled(true);
+    ui->actionSaveForWeb->setText(tr("存储为 Web 所用格式..."));
+    ui->actionSaveForWeb->setToolTip(
+        tr("选格式与压缩参数，预览优化结果与体积后导出（不改工程文件）"));
+    ui->actionSaveForWeb->setShortcut(QKeySequence(QStringLiteral("Ctrl+Alt+Shift+S")));
     connect(ui->actionExport, &QAction::triggered, this, &MainWindow::onExportPng);
     connect(ui->actionExportAs, &QAction::triggered, this, &MainWindow::onExportAs);
+    connect(ui->actionSaveForWeb, &QAction::triggered, this, &MainWindow::onSaveForWeb);
     connect(ui->actionExit, &QAction::triggered, this, &QWidget::close);
 
     connect(ui->actionImageSize, &QAction::triggered, this, &MainWindow::onImageSize);
@@ -867,6 +874,7 @@ void MainWindow::onOpenDocument()
         tr("打开"),
         QString(),
         tr("PhotoshopLite 工程 (*.pslite);;"
+           "Photoshop 文件 (*.psd);;"
            "图像文件 (*.png *.jpg *.jpeg *.bmp *.webp);;"
            "所有文件 (*.*)"));
     if (path.isEmpty())
@@ -1099,6 +1107,23 @@ bool MainWindow::openPath(const QString &path)
         return true;
     }
 
+    if (path.endsWith(QStringLiteral(".psd"), Qt::CaseInsensitive)) {
+        QString err;
+        auto doc = Ps::PsdIo::load(path, &err);
+        if (!doc) {
+            QMessageBox::warning(this, tr("打开失败"), err);
+            Ps::RecentDocuments::remove(path);
+            rebuildRecentMenu();
+            ui->homeScreen->refreshRecent();
+            return false;
+        }
+        m_session->setDocument(std::move(doc));
+        rememberRecent(path);
+        onShowWorkspace();
+        flashStatusMessage(tr("已打开 PSD：%1").arg(path), 4000);
+        return true;
+    }
+
     QString err;
     QImage image = Ps::RasterIo::readFile(path, &err);
     if (image.isNull()) {
@@ -1327,6 +1352,27 @@ void MainWindow::onExportAs()
             path += QStringLiteral(".png");
     }
     exportCompositeTo(path);
+}
+
+void MainWindow::onSaveForWeb()
+{
+    Ps::ImageDocument *doc = m_session ? m_session->document() : nullptr;
+    if (!doc) {
+        QMessageBox::information(this, tr("存储为 Web"), tr("当前没有文档。"));
+        return;
+    }
+
+    const QImage premul = Ps::Compositor::composite(*doc);
+    if (premul.isNull()) {
+        QMessageBox::warning(this, tr("存储为 Web"), tr("合成失败，无法导出。"));
+        return;
+    }
+
+    SaveForWebDialog dialog(premul, suggestExportPath(QStringLiteral("jpg")), this);
+    if (dialog.exec() != QDialog::Accepted)
+        return;
+    flashStatusMessage(
+        tr("已导出：%1").arg(QDir::toNativeSeparators(dialog.savePath())), 4000);
 }
 
 void MainWindow::onNewLayer()

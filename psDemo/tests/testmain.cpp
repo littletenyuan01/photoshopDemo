@@ -48,6 +48,8 @@ int tGpuT47();
 int tAdjArea();
 int tC1Pixelate();
 int tC1Stylize();
+int tWebExport();
+int tPsdIo();
 
 namespace {
 
@@ -85,6 +87,8 @@ const Case kCases[] = {
     { "adjarea", "调整层+面积算子：子缓冲外扩、分块投影==整幅、往返", tAdjArea },
     { "c1pixelate", "C1 马赛克/碎片：oracle、分块投影、往返", tC1Pixelate },
     { "c1stylize", "C1 风/等高线/径向/表面/特殊模糊/拼贴：oracle、分块投影、往返", tC1Stylize },
+    { "webexport", "存储为 Web：JPEG 质量体积、PNG alpha、缩放、写出往返", tWebExport },
+    { "psdio", "PSD 子集导出→导入：层属性 + 合成往返", tPsdIo },
 };
 
 } // namespace

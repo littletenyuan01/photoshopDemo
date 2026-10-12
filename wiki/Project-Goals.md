@@ -50,10 +50,10 @@
 
 v1 **不承诺**；链路与简历打磨完成后、代码量仍有余量时可排期。详见 [Roadmap Phase 5](Roadmap.md)。
 
-1. **PSD 导入 / 导出**（简版分层读写）
+1. **PSD 导入 / 导出** ✅ 子集（RGB8 像素层读写；组/蒙版/调整层等不做）
 2. **智能对象**（嵌入位图 + 再栅格化合成）
 3. **插件库**（极简扩展点，非完整宿主）
-4. **存储为 Web / 多格式压缩导出**（PNG/JPEG/WebP 等可选压缩；对照 PS Save for Web 精简版，见 [Roadmap Phase 5](Roadmap.md)）
+4. **存储为 Web / 多格式压缩导出** ✅ MVP（PNG/JPEG/WebP 可选压缩 + 预览体积；见 [Roadmap Phase 5](Roadmap.md)）
 
 ## 成功标准（简历向）
 

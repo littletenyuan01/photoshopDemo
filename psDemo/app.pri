@@ -131,6 +131,7 @@ SOURCES += \
     ui/homescreen.cpp \
     ui/newdocumentdialog.cpp \
     ui/imagesizedialog.cpp \
+    ui/saveforwebdialog.cpp \
     ui/canvassizedialog.cpp \
     ui/layerstyledialog.cpp \
     ui/layerrowwidget.cpp \
@@ -280,6 +281,7 @@ HEADERS += \
     ui/homescreen.h \
     ui/newdocumentdialog.h \
     ui/imagesizedialog.h \
+    ui/saveforwebdialog.h \
     ui/canvassizedialog.h \
     ui/layerstyledialog.h \
     ui/layerrowwidget.h \
@@ -302,6 +304,7 @@ FORMS += \
     ui/homescreen.ui \
     ui/newdocumentdialog.ui \
     ui/imagesizedialog.ui \
+    ui/saveforwebdialog.ui \
     ui/canvassizedialog.ui \
     ui/layerstyledialog.ui \
     ui/layerrowwidget.ui \

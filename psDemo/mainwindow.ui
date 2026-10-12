@@ -1044,13 +1044,13 @@
   </action>
   <action name="actionSaveForWeb">
    <property name="text">
-    <string>存储为 Web 所用格式 (旧版)...</string>
+    <string>存储为 Web 所用格式...</string>
    </property>
    <property name="enabled">
     <bool>false</bool>
    </property>
    <property name="toolTip">
-    <string>UI 占位，功能尚未接入</string>
+    <string>选格式与压缩参数，预览优化结果与体积后导出</string>
    </property>
   </action>
   <action name="actionExport">
