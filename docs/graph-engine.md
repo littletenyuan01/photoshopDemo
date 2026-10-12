@@ -56,7 +56,7 @@ virtual QImage process(const QVector<QImage> &ins, const QRect &out) const = 0; 
 
 - 点算子：`requiredInputs(out) = {out}`（ROI 恒等）。
 - 源算子：`inputCount() = 0`。
-- 面积 / 变换算子可外扩输入区（**预留，暂未实现**，见 §8）。
+- 面积 / 几何算子经 `PointFilterOp::requiredInputs` 按 `inputPad()` **外扩**（已接；见 §8）。
 
 ### 2.3 图源 `GraphSource`
 
@@ -160,17 +160,18 @@ virtual QImage read(const QRect &rect) const = 0;
 
 ## 8. 现状与仍欠（诚实）
 
-**已实现**：DAG + ROI 反向传播 + 节点缓存 + 脏传播 + 滤镜链入图 + 合成入图 + 自检通过。
+**已实现**：DAG + ROI 反向传播 + 节点缓存 + 脏传播 + 滤镜链入图 + 合成入图 + 自检通过；
+面积/几何算子外扩；调整层面积算子；生产侧区域栅格 + `LayerFilterJob` 异步（见 [Roadmap §9](../wiki/Roadmap.md)）。
 
-**仍欠（不得视为已完成）**：
+**仍欠 / 有意边界（不得夸大成「整图 GEGL」）**：
 
-| # | 欠账 | 说明 |
+| # | 项 | 说明 |
 |---|------|------|
-| 1 | **未接 Projection** | 生产合成仍走 `Compositor::compositeRegion`（命令式循环）；`compositeViaGraph` 是校验/演示路径，未被投影调用 |
-| 2 | **图未持久化复用** | `FilterStack::apply` 与 `compositeViaGraph` 每次都 `build` 新图。**已实测**：只建图不求值（4 节点 + 3 连接）为 **0.0017 ms/次**，故持久化无可测收益、未做；跨帧缓存/脏传播仍未接入真实重投影。线性链上已改为**就地求值**（`GraphOp::canProcessInPlace`），省掉逐节点整图拷贝（3 节点省约 18 ms @2000×1500）。 |
-| 3 | **合成源非稀疏** | 生产合成已改为**按区域**取层栅格（`Layer::compositeRasterRegion`：只 `extract` 请求块 → 只滤那块），稀疏优势在合成路径兑现；但**图路径**的 `LayerRasterSource` 仍用整层 `ensureCompositeRaster()`，且区域化目前只覆盖**纯滤镜层**（有启用样式的层退回整层缓存） |
-| 4 | **面积/变换算子** | `requiredInputs` 已真正接上：`PointFilterOp` 按节点 `inputPad()` 外扩 ROI、求值后裁回；首个面积算子 `OpName::BoxBlur` 落地（`FilterEval::applyBoxBlur`，直通 alpha 可分离盒模糊，abyss=透明）。**仍欠**：模糊以外的面积算子（中值/锐化/Sobel/位移…）、**调整层 + 面积算子**（ROI 外扩未接共享缓冲合成路径）、以及变换算子 |
-| 5 | **异步 / 多线程**（原 Stage 4） | **按块并行已做**（在 `Projection::recomposeInvalidChunks`：`QtConcurrent::blockingMap` + 三处线程安全前置，含 `GraphOp::canProcessInPlace` 的独占交接）。注意它是**阻塞式**并行、不是异步；**异步求值 / 可取消求值仍未做**，图内也没有自己的调度器 |
+| 1 | **未接 Projection** | 生产合成仍走 `Compositor::compositeRegion`；`compositeViaGraph` 是校验路径（**有意**） |
+| 2 | **图未持久化复用** | 每次 `build` 新图；建图成本可忽略；跨帧脏传播靠投影/层缓存，不靠长寿命 `PsGraph` |
+| 3 | **有样式层区域化** | 纯滤镜层走 `compositeRasterRegion`；**有启用样式**仍整层缓存（halo） |
+| 4 | **面积算子库** | BoxBlur / 高斯 / 中值 / 锐化族 / 位移 / C1 等已落地；**调整层 + 面积算子已接**；滤镜蒙版未做 |
+| 5 | **异步 / 并行** | 投影块 **blockingMap** 并行；滤镜 **`LayerFilterJob` 异步可取消**。无通用图内 `GraphScheduler`（**明确不做**） |
 
 ---
 

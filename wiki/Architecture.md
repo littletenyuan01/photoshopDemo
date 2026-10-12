@@ -6,4 +6,4 @@
 
 ## 一句话
 
-参考 GIMP：`tools` / `paint(engine)` / `core(domain)` / `display(ui)` 分离；本项目用 Qt 实现瘦身版。v1 不做 PDB/GEGL/完整插件宿主；PSD / 智能对象 / 极简插件库仅作有余力 stretch（见 [Roadmap](Roadmap.md) Phase 5）。
+参考 GIMP：`tools` / `paint(engine)` / `core(domain)` / `display(ui)` 分离；本项目用 Qt 实现瘦身版。v1 不做 PDB/GEGL/完整插件宿主。Phase 9 图引擎主路径见 [Roadmap §9](Roadmap.md)；Phase 5 中 PSD / 存储为 Web 子集已落地，完整 SO / 插件仍为 stretch。

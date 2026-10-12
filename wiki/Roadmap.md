@@ -97,84 +97,91 @@
 
 ## Phase 9 — 迷你图引擎（仿 GEGL 语义）+ 滤镜库
 
-> 【结论】**已有雏形，不另起炉灶**——在现有 `engine/op` + `FilterStack` 上改造成「迷你 GEGL」。  
+> 【结论】**主路径已落地，不另起炉灶**——在 `engine/op` + `FilterStack` + `engine/graph` 上演进成「迷你 GEGL」。  
 > 【目标】能力对齐 GEGL 的 ROI / 异步 / 多线程图求值；**仍不捆绑 GEGL 库**。  
-> 【前置】Phase 7 脏区 + Phase 8 节点栈；`OpRunner` 须先可线程安全（见 `docs/engine/operators.md` §7）。
+> 【前置】Phase 7 脏区 + Phase 8 节点栈。专文：[docs/graph-engine.md](../docs/graph-engine.md)、[docs/engine/operators.md](../docs/engine/operators.md)、[docs/engine/roi.md](../docs/engine/roi.md)、[docs/filter-roadmap.md](../docs/filter-roadmap.md)。
 
-> **进度同步（2026-11）**：9.0 的图引擎骨架（`engine/graph/`）、ROI 反向传播、节点缓存/脏传播、
-> 滤镜链就地求值、层复合栅格区域化、分块并行合成、逐像素快路径**均已落地**（提交 `7ef1cbf`、`36c1ea9`、`ddeb741`、`cbedaa3`、`5737ba0`）。
-> 首个**面积算子 `OpName::BoxBlur` + ROI 外扩**已打通（`de99afe`），并完成 BoxBlur 内环与临时缓冲优化（`75e18fb`/`bf768ac`）。
-> **`FilterEval → OpRunner` 收口已部分落地**：新增 `FilterOp` 族（三段式 + 每线程实例表，`boxblurfilterop` 已迁入）；**仍未做**：其余滤镜逐类迁移、节点缓存参数指纹、异步/可取消、图内调度器、滤镜产品面，以及**调整层 + 面积算子**（其 ROI 外扩尚未接入共享缓冲合成路径，见 `docs/pending-dev.md`）。
+> **进度同步（2026-10）**：下列能力**已在代码与常驻用例中**，本页勾选与之对齐；勾空项 = 真未做或刻意不做。
+>
+> | 能力 | 状态 | 落点 |
+> |------|------|------|
+> | `engine/graph/`（`PsGraph` / ROI 反向 / 节点缓存 / 脏传播） | ✅ | `psgraph.*`、`graphselfcheck`、`t_graphcheck` |
+> | 滤镜链入图 + 就地求值 | ✅ | `FilterStack::apply`、`PointFilterOp` |
+> | 合成入图（校验路径） | ✅ | `CompositeGraph`；**生产合成仍走** `Compositor::compositeRegion` |
+> | 层复合栅格区域化 + pad | ✅ | `Layer::compositeRasterRegion`（有启用样式仍整层） |
+> | 投影分块并行 | ✅ | `Projection` + `QtConcurrent`（阻塞式并行，非图内调度器） |
+> | `FilterOp` 族（三段式 + **每线程实例**） | ✅ | 邻域/几何滤镜已迁入；点滤镜仍直接分发（无资源） |
+> | ROI ①②（`srcRect`/`outRect`、位置相关整层） | ✅ | `FilterContext`、`roictx` / `posasync`；**ROI ③ 不做** |
+> | 调整层 + 面积算子 | ✅ | 子缓冲外扩；`adjarea` |
+> | 异步预览/定稿 + 可取消/接替 | ✅ | `LayerFilterJob`；`filterasync` / `filterpreview` / `jobteardown` |
+> | 区域滤镜缓存（世代号失效） | ✅ | 按层 + 区域；**非**逐节点参数指纹表 |
+> | 滤镜产品面（对话框/面板/撤销） | ✅ MVP | `FilterDialog`、滤镜栈面板、`pushLayerPropUndo` |
+> | 滤镜库扩面 | ✅ 至 C1 | 见 `filter-roadmap.md`；D/F 可选尾巴 |
+> | 通用 `GraphScheduler` / 生产路径改走整图 DAG | ❌ 不做 | 现路径已够演示；图路径作校验 |
+> | 逐节点参数指纹缓存、滤镜蒙版、独立滤镜浏览器 | ❌ 未做 | 后置 |
 
-### 9.0 现有雏形（已实现，改造起点）
+### 9.0 映射表（相对 GEGL）
 
-| GEGL 概念 | 本项目现状 | 缺口 |
+| GEGL 概念 | 本项目现状 | 备注 |
 |-----------|------------|------|
-| Operation | `BufferOp` / `OpName` / `opsInit` | 滤镜求值多走 `FilterEval`，未统一进 `OpRunner` |
-| 注册表 | `OpRegistry` + `PointOpRegistry` | 滤镜目录 UI 尚未消费名字表 |
-| prepare→process | `OpRunner` | 单线程常驻实例，无图调度 |
-| 节点链 | `FilterNode` + `FilterStack::apply` | **线性栈**，非整图；无边/依赖 |
-| 缓冲 | `TileBuffer` 64×64 | 滤镜仍 `materialize` **整层临时图** |
-| 脏区 | `Projection` / `dirtyRect` | 未传到滤镜节点级 ROI |
-| 异步 / 并行 | 无 | Phase 9.2 / 9.3 |
+| Operation | `BufferOp` / `FilterOp` / `GraphOp` + `OpName` | 编辑命令 / 滤镜临时图 / 图求值三条壳，职责分离 |
+| 注册表 | `OpRegistry` + `PointOpRegistry` + `FilterOp` 表 | 菜单已分类接线；无独立「滤镜浏览器」控件 |
+| prepare→process | `OpRunner`（绘制）；`FilterOp` 每线程实例（滤镜） | 绘制仍 UI 线程短路径 |
+| 节点链 / 图 | `FilterStack` + `PsGraph`（链图 / 合成图） | **线性栈为主**；合成图未挂 Projection |
+| 缓冲 | `TileBuffer` 64×64；滤镜区域 `QImage` | 区域化已落地；非全稀疏图调度 |
+| 脏区 → ROI | `Projection` + `requiredInputs` / pad | 面积算子外扩已接 |
+| 异步 / 并行 | `LayerFilterJob`；投影块 `blockingMap` | 无独立图内调度器 |
 
-对照链路（现状）：
+生产链路（现状）：
 
 ```text
 菜单加滤镜 → FilterStack.append(FilterNode)
-合成 → materialize 整层 → FilterStack::apply → FilterEval::applyNode（同步、整图）
-交互绘制 → PaintEngine → OpRunner → BufferOp（另一条路，已算子化）
+合成 → compositeRasterRegion（区域+缓存）→ FilterStack::apply / FilterEval
+重滤镜 → LayerFilterJob（后台条带）→ 写区域缓存 → Projection 命中
+交互绘制 → PaintEngine → OpRunner → BufferOp（UI 线程）
 ```
 
-改造目标链路：
+### 9.0.1 改造步骤（历史顺序；多数已完成）
 
-```text
-FilterStack（或升级为 FilterGraph）
-  → GraphScheduler（ROI + 缓存 + 线程池）
-    → OpRunner / BufferOp（与画笔共用注册表）
-      → 分块写回节点缓存 → Compositor 只取输出
-```
+1. ~~统一求值入口~~ → **已做**：面积/几何走 `FilterOp`；点滤镜薄分发。  
+2. ~~栈 → 图骨架~~ → **已做**：`engine/graph/`；生产合成未切换为整图调度。  
+3. ~~分块 + ROI~~ → **已做**：区域栅格 + pad；缓存按区域/世代，非逐节点指纹。  
+4. ~~异步~~ → **已做**：`LayerFilterJob`（非 `GraphScheduler` 名）。  
+5. ~~并行线程模型~~ → **已做**：`FilterOp` 每线程实例；投影块并行。  
+6. ~~产品面 MVP~~ → **已做**：对话框预览、栈面板、撤销；无滤镜蒙版 / 独立浏览器。
 
-### 9.0.1 改造步骤（顺序固定，避免返工）
-
-1. **统一求值入口**：`FilterEval` 改为薄封装，内部按 `node.op()` 调 `OpRunner`（或专用滤镜 `BufferOp`）；禁止滤镜与绘制两套无关算法壳。  
-2. **栈 → 图**：引入 `engine/graph/`（建议名 `PsGraph`）：`GraphNode` / `GraphEdge` / `GraphScheduler`；初期图可仍是单链，接口按图设计。  
-3. **分块 + ROI**：`FilterStack::apply(QImage)` 改为对 `TileBuffer`/分块 ROI 求值；节点输出缓存带参数指纹。  
-4. **异步**：`GraphScheduler` 投递到线程池；UI 只收完成信号；请求可取消合并。  
-5. **并行**：无依赖分块并行；先改 `OpRunner` 线程模型（加锁 **或** 每线程实例）。  
-6. **产品面**：滤镜浏览器、对话框实时预览、重排/蒙版、undo——挂在图引擎之上。
-
-- [ ] 文档化上述映射（本小节 + `docs/architecture.md` / `docs/engine/operators.md` 互链）
-- [ ] 落地 `engine/graph/` 骨架（可先空转单链，行为与 `FilterStack` 等价）
-- [ ] `FilterEval` → `OpRunner` 收口（BrightnessContrast 作样板）
+- [x] 文档化映射（本页 + [graph-engine.md](../docs/graph-engine.md) / [operators.md](../docs/engine/operators.md) / [roi.md](../docs/engine/roi.md)）
+- [x] 落地 `engine/graph/` 骨架（单链等价 + 合成图校验）
+- [x] `FilterEval` → `FilterOp` 收口（邻域/几何；点算子保持直接分发）
 
 ### 9.1 完整 ROI / 节点缓存
 
-- [ ] 滤镜节点带 **输入/输出 ROI**：参数或上游脏区变化时，只重算相交区域
-- [ ] 节点输出可缓存（按层 + 节点 id + 参数指纹）；未脏节点跳过求值
-- [ ] 合成侧消费「滤镜栈脏区 ∪ 图层脏区」，避免每次 `materialize` 整层重跑全栈
-- [ ] 对照：GIMP `gimptilehandlervalidate` / GEGL 的 ROI 传播语义（自研等价物）
+- [x] 滤镜求值带 **输入/输出 ROI**（`FilterContext` + `inputPad` / `requiredInputs`）
+- [x] 区域输出可缓存（层区域滤镜缓存 + `contentGeneration` 失效）；图节点缓存用于图路径
+- [x] 合成侧按脏块取 `compositeRasterRegion`，避免整层重跑全栈（有样式层除外）
+- [x] 对照语义见 [roi.md](../docs/engine/roi.md)（自研等价物，非 GEGL）
+- [ ] （可选后置）逐节点参数指纹表；有样式层的区域化
 
 ### 9.2 异步求值（不卡 UI）
 
-- [ ] 重滤镜 / 拖动参数时：**后台算预览**，UI 线程只投递请求与贴图
-- [ ] 请求可取消 / 合并（最新参数覆盖未完成任务，防滑条拖影排队）
-- [ ] 完成回调经 Qt 信号回主线程更新 `Projection` / 对话框预览
-- [ ] Phase 7「投影同步不算后台线程」约束**仅限投影 idle**；本阶段允许**滤镜求值线程池**
+- [x] 重滤镜 / 拖参：**后台**预览与定稿（`LayerFilterJob`）
+- [x] 请求可取消 / **接替**（`runId` 世代）
+- [x] 完成回调经 Qt 信号回主线程 → 缓存 / 投影刷新
+- [x] 投影 idle 仍可主线程；滤镜求值允许线程池（与 Phase 7 约束一致）
 
 ### 9.3 多线程算子图
 
-- [ ] 滤镜栈升级为可调度的 **算子图**（节点 = `OpName` + 参数 + 可选蒙版 pad；边 = 数据依赖）
-- [ ] 图内独立子树 / 分块可并行（线程池）；共享 `TileBuffer` 访问有明确读写协议
-- [ ] `OpRunner`：常驻实例加锁，或改为「每线程一份实例 / 无状态算子」——二选一写进实现说明
-- [ ] 画笔类交互算子仍可走 UI 线程短路径；滤镜图与交互路径隔离，避免抢同一实例
+- [x] 滤镜/合成分块可并行（投影 `blockingMap`；滤镜条带并行）
+- [x] `FilterOp`：**每线程一份实例**（写进 [operators.md](../docs/engine/operators.md)）
+- [x] 画笔类仍走 UI 线程短路径，与滤镜后台隔离
+- [ ] （明确不做）通用可调度算子图 + 图内依赖调度器替代现生产路径
 
 ### 9.4 滤镜库产品面（与上三项配套）
 
-- [ ] 滤镜浏览器 / 分类菜单（消费 `opNameId` / `opNameTitle`）
-- [ ] 常用滤镜扩面（模糊、锐化、色阶/曲线对话框等）；参数面板可实时预览
-- [ ] 节点重排、滤镜蒙版（可后置于 9.1–9.3 跑通之后）
-- [ ] 撤销：滤镜参数/栈结构变更走专用 undo（对照 `gimpdrawablefilterundo` 精简）
+- [x] 分类菜单接线（消费 `opNameTitle` 等）；无独立滤镜浏览器窗
+- [x] 常用滤镜扩面至 **C1**（对话框实时预览）；色阶/曲线等调整层对话框已有
+- [x] 节点重排 / 开关 / 删除（滤镜栈面板）+ 参数/栈结构撤销
+- [ ] （后置）滤镜蒙版；批次 D/F（见 [filter-roadmap.md](../docs/filter-roadmap.md)）
 
 ## Phase 5 — 有余力再做（可选 stretch，非 v1）
 

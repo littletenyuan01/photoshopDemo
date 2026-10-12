@@ -407,15 +407,13 @@ psDemo/
 - 调整层对「已合成的下方结果」求值（色阶 / 曲线起步）
 - 【前置依赖】投影管线须支持节点求值 → **依赖主线 ② 的脏区机制已在位**
 
-**滤镜库后续（Phase 9，已记入 Roadmap）**：产品级滤镜库须达成——
+**滤镜库（Phase 9）主路径已落地**（勾选真源见 [wiki/Roadmap.md](../wiki/Roadmap.md) §9；专文 [graph-engine.md](graph-engine.md)）：
 
-1. **完整 ROI / 节点缓存**（脏区传播，跳过未脏节点）  
-2. **异步求值**（重滤镜 / 拖参不卡 UI，可取消合并）  
-3. **多线程算子图**（依赖可并行；`OpRunner` 线程安全改造）
+1. **ROI / 区域缓存** — `FilterContext` + `compositeRasterRegion` + 世代失效（非逐节点指纹）  
+2. **异步求值** — `LayerFilterJob`（预览/定稿可取消接替）  
+3. **并行与线程模型** — 投影块并行；`FilterOp` **每线程实例**（绘制仍 UI 短路径）
 
-**雏形已在**：`BufferOp`+`OpRunner`（算子）与 `FilterStack`+`FilterEval`（线性非破坏链）。Phase 9 是**改造**而非新建：先把 `FilterEval` 收进 `OpRunner`，再引入 `engine/graph/`（`PsGraph`），最后上 ROI/异步/并行。详见 `wiki/Roadmap.md` §9.0。
-
-仍自研演进，**不捆绑 GEGL**。Phase 8 的整层临时图求值是过渡形态。
+**明确不做 / 后置**：通用 `GraphScheduler` 取代生产合成；逐节点参数指纹；滤镜蒙版；批次 D/F。仍自研、**不捆绑 GEGL**。
 
 ### ② 模型与投影分离 + 脏区分块更新
 
@@ -431,7 +429,7 @@ psDemo/
   `sync()` 吸入 `dirtyRect`、视口内块立即合成；挂起块由 `CanvasView` 空闲定时器
   调 `processPendingChunks()`（对照 `chunk_render_*` + `set_priority_rect`）。
   算子侧脏区上报见 [engine/operators.md](engine/operators.md) §3.6
-  尚未做：多线程算子图 / 独立渲染线程（属 Phase 9）。
+  滤镜后台求值见 Phase 9（`LayerFilterJob`）；投影仍主线程 + 块并行，无独立渲染线程。
 
 ### ① 推入式撤销 + 每对象一类
 
@@ -473,7 +471,7 @@ psDemo/
         ↓
 7. ② 投影与脏区分块（Compositor 内部升级，UI 无感）  ✅
 8. ③ 调整层 + 节点化滤镜栈（前置：第 7 步）  
-9. Phase 9 滤镜库：ROI 缓存 / 异步求值 / 多线程算子图（前置：第 8 步）
+9. Phase 9 滤镜库：**主路径已落地**（ROI/异步/`FilterOp`）；可选尾巴见 Roadmap §9.4 / filter-roadmap
 9. Selection + 选区工具 + 绘制约束
 10. LayerMask
 11. ProjectIO + 变换 / 裁剪（完善度 P1）
@@ -509,6 +507,6 @@ psDemo/
 | 轻量算子壳（Phase 6.5） | **已实现**：注册表 + Runner + 混合/洪泛/渐变/填充；无 GEGL |
 | 三、② 脏区分块投影（Phase 7） | **已实现**：`Projection` + `compositeRegion` + 64 块有效位 |
 | 三、③ 节点化非破坏（Phase 8） | **MVP 已实现**：`FilterStack` + BrightnessContrast；**调整层**对下方合成求值；参数对话框后置 |
-| 四、滤镜库（Phase 9） | **计划中**：完整 ROI/节点缓存、异步求值、多线程算子图；仍不引入 GEGL |
+| 四、滤镜库（Phase 9） | **主路径已落地**（ROI/区域缓存、`LayerFilterJob`、`FilterOp` 每线程实例、滤镜库至 C1）；图路径作校验；仍不引入 GEGL。详见 Roadmap §9 |
 | 独立 actions/commands 层 | **不做**（对照 GIMP：无 GoF Command；收口在 domain 语义化 API） |
 | 其余（Selection / IO / Mask） | Selection + RasterIo/ProjectIo/PsdIo + **LayerMask** + **置入为图层** **已实现** |
