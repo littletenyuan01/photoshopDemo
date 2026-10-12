@@ -1,8 +1,8 @@
 #version 440
 
-// 自定滤镜：3×3 卷积（gpu-plan T2.1）。直通 RGBA8；越界=0；alpha 取中心原样。
+// 自定滤镜：3×3 卷积（gpu-plan T2.1）。预乘 ARGB8 入/出（T4.3）；越界=0；alpha 取中心。
 // 口径对齐 CPU CustomFilterOp：out = clamp( (Σ w·c)/scale + offset, 0, 255 )；scale==0 不除。
-// 整数除法向 0 截断（与 C++11 / HLSL 一致）。勿用标识符 half。
+// 解/预乘对齐 Qt qUnpremultiply / qPremultiply。勿用标识符 half。
 layout(local_size_x = 16, local_size_y = 16) in;
 
 layout(std430, binding = 0) readonly buffer Src {
@@ -27,11 +27,40 @@ layout(std140, binding = 2) uniform Params {
     int _p2;
 };
 
-uint getPixel(int x, int y)
+uint qtUnpremultiply(uint p)
+{
+    const uint alpha = (p >> 24) & 255u;
+    if (alpha == 255u)
+        return p;
+    if (alpha == 0u)
+        return 0u;
+    const uint invAlpha = 0x00ff00ffu / alpha;
+    const uint r = ((((p >> 16) & 255u) * invAlpha) + 0x8000u) >> 16;
+    const uint g = ((((p >> 8) & 255u) * invAlpha) + 0x8000u) >> 16;
+    const uint b = (((p & 255u) * invAlpha) + 0x8000u) >> 16;
+    return (alpha << 24) | (r << 16) | (g << 8) | b;
+}
+
+uint qtPremulChan(uint c, uint a)
+{
+    uint x = c * a;
+    return (x + ((x >> 8) & 255u) + 0x80u) >> 8;
+}
+
+uint qtPremultiply(uint x)
+{
+    const uint a = (x >> 24) & 255u;
+    const uint r = qtPremulChan((x >> 16) & 255u, a);
+    const uint g = qtPremulChan((x >> 8) & 255u, a);
+    const uint b = qtPremulChan(x & 255u, a);
+    return (a << 24) | (r << 16) | (g << 8) | b;
+}
+
+uint getPixelStraight(int x, int y)
 {
     if (x < 0 || y < 0 || x >= width || y >= height)
         return 0u;
-    return src[y * width + x];
+    return qtUnpremultiply(src[y * width + x]);
 }
 
 int weightAt(int k)
@@ -56,7 +85,7 @@ void main()
     int k = 0;
     for (int dy = -1; dy <= 1; ++dy) {
         for (int dx = -1; dx <= 1; ++dx) {
-            const uint p = getPixel(x + dx, y + dy);
+            const uint p = getPixelStraight(x + dx, y + dy);
             const int wt = weightAt(k);
             ++k;
             if (wt == 0)
@@ -76,10 +105,10 @@ void main()
     sumG += offset;
     sumB += offset;
 
-    const uint center = getPixel(x, y);
+    const uint center = getPixelStraight(x, y);
     const uint a = (center >> 24) & 255u;
     const uint r = uint(clamp(sumR, 0, 255));
     const uint g = uint(clamp(sumG, 0, 255));
     const uint b = uint(clamp(sumB, 0, 255));
-    dst[y * width + x] = (a << 24) | (r << 16) | (g << 8) | b;
+    dst[y * width + x] = qtPremultiply((a << 24) | (r << 16) | (g << 8) | b);
 }

@@ -1636,27 +1636,14 @@ ROI 第 ③ 步的范围）；③ 大文档下整层求值仍是同步的（不�
 标准测法（seed=7 / warmup=2）：锐化 **2.5～3.4×**；稠密盒 **2.6～2.8×（未跨 3×）**；
 Custom ≈48 ns/px、Gauss ≈19。Q11–Q13 关闭。维持 opt-in。
 
-**仍欠**（**第六轮复审实测后重排**）：
+**已关闭**：T4.1 / T4.2 / **T4.3**（解预乘进 shader；锐化 **4.4～7×**，稠密 **2.8～4.4×**，中值 ~2.1×；门控 bit-exact）。
 
-0. ★★ **提交**：`gpurasterbackend.*` / `shaders/` / `tools/*_e2e/` / 两个 `.pro` / `t_gpu*.cpp`
-   **全部 untracked**，`app.pri`(+`gui-private`) / `resources.qrc` / `tests.pro` / `testmain.cpp`
-   也未提交 ⇒ **别的机器（含独显机）clone 下来没有 GPU 后端**。**这是当前第一障碍**。
-1. ★ **三段计时**（CPU 侧编组 / 传输 / kernel）：GPU 路径在 CPU 侧要遍历全图 **4 趟**
-   （解预乘 → pack memcpy → 回读 memcpy → 预乘），其中 **②③ 是纯 memcpy，可直接消掉**
-   （上传 `QImage::constBits()`、回读缓冲直接当 `QImage`）。T2.8 已证明这类算子的 CPU 成本被
-   **"解预乘/预乘 + 访存"主导**（5→9 权重只从 46→53 ns/px），而 GPU 路径**也在付这份钱** ⇒
-   **优化编组可能比加算子或换卡更值，且惠及所有 GPU 算子**。
-2. ★ **到别的机器验证**：① **独显机器**跑 `median_e2e` / `custom_e2e`（原估 4～6×，**未测**）；
-   ② **完全无 GPU 的机器**跑全套用例（硬约束 2 至今没在真机验证过）。
-3. **核 `187 ns/px` 的口径**：标准测法下实测 512² r=3 的 CPU 是 **207～239 ns/px**（偏高 10～28%），
-   而 `rastercost.cpp` 与多处文档仍写 187。
-4. **明确 GLES2 回退路径**：shader 是 `#version 440` + `std430` SSBO（需 GL 4.3+/GLES 3.1+），
-   而 `initDevice()` 会回退到 OpenGLES2 —— 大概率不可用；要么验证、要么去掉并注明原因，
-   别让读者以为有一条能用的 GL 回退。
-5. ★ **零成本扩算子覆盖 2 → 6**：`Sharpen`/`Emboss`/`FindEdges` **都是 3×3 卷积**
-   ⇒ 直接喂权重给 `custom.comp`；`Maximum`/`Minimum` 复用中值的**计数选择**（只改 `kth`）。
-6. **T3.0 `AddNoise` GPU**（§4.4.1 下一优先；含位置相关 `supports` 放宽 + hash 逐位对齐）。
-7. T3.1 `GaussianBlur` GPU（排在 AddNoise 之后）。**禁止整表铺开。**
+**仍欠**：
+0. T4.4 独显 / 无 GPU 机验证。
+1. T4.5 成本表 `187` vs 实测。
+2. T4.6 GLES2 回退说明或去掉。
+3. ★ **T4.7** 近零成本扩覆盖（Sharpen/Emboss/FindEdges → custom；Max/Min → 计数选择）。
+4. T3.0 `AddNoise` / T3.1 Gauss —— **禁止整表铺开**。
 
 ---
 

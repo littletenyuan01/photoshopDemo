@@ -7,6 +7,7 @@
 #include "domain/filterstack.h"
 #include "engine/op/opname.h"
 
+#include <QElapsedTimer>
 #include <QFile>
 #include <QGuiApplication>
 #include <QMetaObject>
@@ -15,6 +16,7 @@
 #include <rhi/qrhi.h>
 #include <rhi/qshader.h>
 
+#include <cstdio>
 #include <cstring>
 #include <vector>
 
@@ -54,38 +56,54 @@ QShader loadShader(const char *qrcPath)
     return QShader::fromSerialized(f.readAll());
 }
 
-QImage toStraightArgb32(const QImage &premul)
+/** T4.3：shader 内解/预乘；CPU 只做格式对齐（无逐像素解预乘）。 */
+QImage ensurePremulArgb32(const QImage &img)
 {
-    QImage src = premul;
-    if (src.format() != QImage::Format_ARGB32_Premultiplied
-        && src.format() != QImage::Format_ARGB32)
-        src = src.convertToFormat(QImage::Format_ARGB32_Premultiplied);
-    QImage out(src.size(), QImage::Format_ARGB32);
-    for (int y = 0; y < src.height(); ++y) {
-        const QRgb *s = reinterpret_cast<const QRgb *>(src.constScanLine(y));
-        QRgb *d = reinterpret_cast<QRgb *>(out.scanLine(y));
-        for (int x = 0; x < src.width(); ++x)
-            d[x] = (src.format() == QImage::Format_ARGB32) ? s[x] : qUnpremultiply(s[x]);
-    }
-    return out;
-}
-
-QImage toPremul(const QImage &straight, QImage::Format fmt)
-{
-    Q_UNUSED(fmt);
-    QImage out(straight.size(), QImage::Format_ARGB32_Premultiplied);
-    for (int y = 0; y < straight.height(); ++y) {
-        const QRgb *s = reinterpret_cast<const QRgb *>(straight.constScanLine(y));
-        QRgb *d = reinterpret_cast<QRgb *>(out.scanLine(y));
-        for (int x = 0; x < straight.width(); ++x)
-            d[x] = qPremultiply(s[x]);
-    }
-    return out;
+    if (img.format() == QImage::Format_ARGB32_Premultiplied)
+        return img;
+    return img.convertToFormat(QImage::Format_ARGB32_Premultiplied);
 }
 
 bool isGpuOp(OpName op)
 {
     return op == OpName::MedianBlur || op == OpName::CustomFilter;
+}
+
+/** T4.2/T4.3：PSLITE_GPU_STAGE=1。format=格式对齐；device=upload+kernel+readback。 */
+struct StageAccum {
+    bool enabled = false;
+    double format = 0; ///< ensurePremulArgb32
+    double pack = 0;
+    double device = 0; ///< beginOffscreenFrame … finish
+    double unpack = 0;
+    int calls = 0;
+
+    void reset()
+    {
+        format = pack = device = unpack = 0;
+        calls = 0;
+    }
+
+    void print(const char *tag, qint64 px) const
+    {
+        if (!enabled || calls <= 0)
+            return;
+        const double cpu = format + pack + unpack;
+        const double total = cpu + device;
+        const double inv = 1.0 / calls;
+        std::printf("[gpu-stage] %s n=%d px=%lld | "
+                    "format=%.2f pack=%.2f device=%.2f unpack=%.2f | "
+                    "cpu=%.2f (%.0f%%) device=%.2f (%.0f%%) total=%.2f ms/call\n",
+                    tag, calls, static_cast<long long>(px), format * inv, pack * inv,
+                    device * inv, unpack * inv, cpu * inv,
+                    total > 0 ? 100.0 * cpu / total : 0.0, device * inv,
+                    total > 0 ? 100.0 * device / total : 0.0, total * inv);
+    }
+};
+
+bool stageProbeEnabled()
+{
+    return qEnvironmentVariableIsSet("PSLITE_GPU_STAGE");
 }
 
 } // namespace
@@ -97,6 +115,7 @@ struct GpuRasterBackend::Hub : QObject {
     std::unique_ptr<QRhiBuffer> ubuf;
     std::unique_ptr<QRhiShaderResourceBindings> srb;
     std::unique_ptr<QRhiComputePipeline> pipe;
+    StageAccum stage;
     QShader cachedMedianCs;
     QShader cachedCustomCs;
     KernelKind pipeKind = KernelKind::None;
@@ -226,29 +245,44 @@ struct GpuRasterBackend::Hub : QObject {
         return true;
     }
 
-    bool dispatchOnce(const QImage &straightArgb32, KernelKind kind, const void *ubo,
-                      int uboBytes, QImage *outStraight)
+    bool dispatchOnce(const QImage &premulArgb32, KernelKind kind, const void *ubo, int uboBytes,
+                      QImage *outPremul)
     {
-        const int w = straightArgb32.width();
-        const int h = straightArgb32.height();
+        Q_ASSERT(premulArgb32.format() == QImage::Format_ARGB32_Premultiplied);
+        const int w = premulArgb32.width();
+        const int h = premulArgb32.height();
         const int bytes = w * h * int(sizeof(quint32));
         if (!ensureCapacity(bytes))
             return false;
         if (!ensurePipe(kind))
             return false;
 
-        std::vector<quint32> packed(size_t(w * h));
-        for (int y = 0; y < h; ++y) {
-            const auto *row = reinterpret_cast<const quint32 *>(straightArgb32.constScanLine(y));
-            std::memcpy(packed.data() + size_t(y * w), row, size_t(w) * sizeof(quint32));
+        QElapsedTimer t;
+        const void *uploadPtr = nullptr;
+        std::vector<quint32> packed;
+        if (stage.enabled)
+            t.start();
+        if (premulArgb32.bytesPerLine() == w * int(sizeof(quint32))) {
+            uploadPtr = premulArgb32.constBits();
+        } else {
+            packed.resize(size_t(w * h));
+            for (int y = 0; y < h; ++y) {
+                const auto *row = reinterpret_cast<const quint32 *>(premulArgb32.constScanLine(y));
+                std::memcpy(packed.data() + size_t(y * w), row, size_t(w) * sizeof(quint32));
+            }
+            uploadPtr = packed.data();
         }
+        if (stage.enabled)
+            stage.pack += double(t.nsecsElapsed()) / 1e6;
 
         QRhiCommandBuffer *cb = nullptr;
+        if (stage.enabled)
+            t.start();
         if (rhi->beginOffscreenFrame(&cb) != QRhi::FrameOpSuccess)
             return false;
 
         QRhiResourceUpdateBatch *u = rhi->nextResourceUpdateBatch();
-        u->uploadStaticBuffer(srcBuf.get(), 0, bytes, packed.data());
+        u->uploadStaticBuffer(srcBuf.get(), 0, bytes, uploadPtr);
         u->updateDynamicBuffer(ubuf.get(), 0, uboBytes, ubo);
 
         cb->beginComputePass(u);
@@ -264,34 +298,42 @@ struct GpuRasterBackend::Hub : QObject {
         cb->endComputePass(ru);
         rhi->endOffscreenFrame();
         rhi->finish();
+        if (stage.enabled)
+            stage.device += double(t.nsecsElapsed()) / 1e6;
 
         srcNeedsRecreate = (srcBuf->type() == QRhiBuffer::Immutable);
 
         if (!done || rb.data.size() < bytes)
             return false;
 
-        *outStraight = QImage(w, h, QImage::Format_ARGB32);
-        for (int y = 0; y < h; ++y) {
-            std::memcpy(outStraight->scanLine(y),
-                        rb.data.constData() + size_t(y * w) * sizeof(quint32),
-                        size_t(w) * sizeof(quint32));
+        if (stage.enabled)
+            t.start();
+        *outPremul = QImage(w, h, QImage::Format_ARGB32_Premultiplied);
+        if (outPremul->bytesPerLine() == w * int(sizeof(quint32))) {
+            std::memcpy(outPremul->bits(), rb.data.constData(), size_t(bytes));
+        } else {
+            for (int y = 0; y < h; ++y) {
+                std::memcpy(outPremul->scanLine(y),
+                            rb.data.constData() + size_t(y * w) * sizeof(quint32),
+                            size_t(w) * sizeof(quint32));
+            }
         }
+        if (stage.enabled)
+            stage.unpack += double(t.nsecsElapsed()) / 1e6;
         return true;
     }
 
-    bool runMedianOnce(const QImage &straightArgb32, int radius, QImage *outStraight)
+    bool runMedianOnce(const QImage &premulArgb32, int radius, QImage *outPremul)
     {
-        MedianParams params{straightArgb32.width(), straightArgb32.height(),
-                            qBound(1, radius, 8), 0};
-        return dispatchOnce(straightArgb32, KernelKind::Median, &params, sizeof(params),
-                            outStraight);
+        MedianParams params{premulArgb32.width(), premulArgb32.height(), qBound(1, radius, 8), 0};
+        return dispatchOnce(premulArgb32, KernelKind::Median, &params, sizeof(params), outPremul);
     }
 
-    bool runCustomOnce(const QImage &straightArgb32, const FilterNode &node, QImage *outStraight)
+    bool runCustomOnce(const QImage &premulArgb32, const FilterNode &node, QImage *outPremul)
     {
         CustomParams params;
-        params.width = straightArgb32.width();
-        params.height = straightArgb32.height();
+        params.width = premulArgb32.width();
+        params.height = premulArgb32.height();
         params.scale = node.customScale();
         params.offset = node.customOffset();
         for (int i = 0; i < 4; ++i)
@@ -299,8 +341,7 @@ struct GpuRasterBackend::Hub : QObject {
         for (int i = 0; i < 4; ++i)
             params.weights1[i] = node.customWeight(4 + i);
         params.weight8 = node.customWeight(8);
-        return dispatchOnce(straightArgb32, KernelKind::Custom, &params, sizeof(params),
-                            outStraight);
+        return dispatchOnce(premulArgb32, KernelKind::Custom, &params, sizeof(params), outPremul);
     }
 
     ApplyStackResult runStack(QImage &image, const FilterStack &stack,
@@ -313,7 +354,17 @@ struct GpuRasterBackend::Hub : QObject {
         if (image.isNull())
             return ApplyStackResult::Ok;
 
-        QImage work = toStraightArgb32(image);
+        stage.enabled = stageProbeEnabled();
+        if (stage.enabled)
+            stage.reset();
+
+        QElapsedTimer t;
+        if (stage.enabled)
+            t.start();
+        QImage work = ensurePremulArgb32(image);
+        if (stage.enabled)
+            stage.format += double(t.nsecsElapsed()) / 1e6;
+
         for (int i = 0; i < stack.count(); ++i) {
             const FilterNode &n = stack.at(i);
             if (!n.isEnabled())
@@ -332,7 +383,12 @@ struct GpuRasterBackend::Hub : QObject {
                 return ApplyStackResult::Failed;
             work = next;
         }
-        image = toPremul(work, QImage::Format_ARGB32_Premultiplied);
+
+        image = work;
+        if (stage.enabled) {
+            stage.calls = 1;
+            stage.print("applyStack", qint64(image.width()) * image.height());
+        }
         return ApplyStackResult::Ok;
     }
 };
