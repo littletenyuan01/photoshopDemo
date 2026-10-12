@@ -64,6 +64,8 @@ constexpr OpNameInfo kOpNameTable[] = {
     {OpName::ReduceNoise,          "ps:reduce-noise",          "减少杂色"},
     {OpName::SharpenEdges,         "ps:sharpen-edges",         "锐化边缘"},
     {OpName::Ripple,               "ps:ripple",                "波纹"},
+    {OpName::Mosaic,               "ps:mosaic",                "马赛克"},
+    {OpName::Fragment,             "ps:fragment",              "碎片"},
 };
 
 const OpNameInfo *infoFor(OpName name)
@@ -115,6 +117,8 @@ bool isAdjustmentOp(OpName name)
     case OpName::ReduceNoise:
     case OpName::SharpenEdges:
     case OpName::Ripple:
+    case OpName::Mosaic:
+    case OpName::Fragment:
         return false;
     default:
         break;

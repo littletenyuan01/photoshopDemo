@@ -12,6 +12,7 @@
 #include "extremumfilterop.h"
 #include "filterop.h"
 #include "findedgesfilterop.h"
+#include "fragmentfilterop.h"
 #include "floodfillop.h"
 #include "gaussianblurfilterop.h"
 #include "highpassfilterop.h"
@@ -19,6 +20,7 @@
 #include "gradientop.h"
 #include "layermodeop.h"
 #include "medianblurfilterop.h"
+#include "mosaicfilterop.h"
 #include "motionblurfilterop.h"
 #include "offsetfilterop.h"
 #include "ripplefilterop.h"
@@ -158,6 +160,10 @@ void opsInit()
                      [] { return std::unique_ptr<FilterOp>(new SharpenEdgesFilterOp); });
     registerFilterOp(OpName::Ripple,
                      [] { return std::unique_ptr<FilterOp>(new RippleFilterOp); });
+    registerFilterOp(OpName::Mosaic,
+                     [] { return std::unique_ptr<FilterOp>(new MosaicFilterOp); });
+    registerFilterOp(OpName::Fragment,
+                     [] { return std::unique_ptr<FilterOp>(new FragmentFilterOp); });
 }
 
 } // namespace Ps

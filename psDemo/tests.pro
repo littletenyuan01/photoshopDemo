@@ -43,7 +43,8 @@ SOURCES += \
     tests/t_noise.cpp \
     tests/t_batcha.cpp \
     tests/t_ripple.cpp \
-    tests/t_rasterbackend.cpp
+    tests/t_rasterbackend.cpp \
+    tests/t_c1pixelate.cpp
 
 HEADERS += \
     tests/testutil.h

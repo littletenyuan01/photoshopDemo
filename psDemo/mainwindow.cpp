@@ -388,6 +388,17 @@ void MainWindow::setupMenus()
     connect(ui->actionRipple, &QAction::triggered, this,
             [this]() { runFilterDialog(Ps::OpName::Ripple); });
 
+    // 滤镜 → 像素化 → 马赛克 / 碎片（C1）
+    ui->actionMosaic->setEnabled(true);
+    ui->actionMosaic->setToolTip(tr("马赛克（方块均值；非破坏）"));
+    connect(ui->actionMosaic, &QAction::triggered, this,
+            [this]() { runFilterDialog(Ps::OpName::Mosaic); });
+    ui->actionFragment->setEnabled(true);
+    ui->actionFragment->setToolTip(tr("碎片（四角偏移取样平均；非破坏，直接应用）"));
+    connect(ui->actionFragment, &QAction::triggered, this, [this]() {
+        applyFilterNode(Ps::FilterNode(Ps::OpName::Fragment));
+    });
+
     // 滤镜 → 杂色 → 添加杂色（点算子；噪声是 (x,y,seed) 的确定函数，故整层求值）
     ui->actionAddNoise->setEnabled(true);
     ui->actionAddNoise->setToolTip(tr("添加杂色（数量 + 均匀/高斯 + 单色；非破坏，噪声可复现）"));
@@ -1722,6 +1733,8 @@ void MainWindow::runFilterDialog(Ps::OpName op)
     else if (op == Ps::OpName::Ripple) {
         node.setRippleAmplitude(8);
         node.setRippleWavelength(24);
+    } else if (op == Ps::OpName::Mosaic) {
+        node.setMosaicCell(8);
     } else if (op == Ps::OpName::MotionBlur) {
         node.setMotionDistance(10);
         node.setMotionAngle(30);

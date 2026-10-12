@@ -59,7 +59,8 @@ bool FilterStack::hasPositionalOp() const
     for (const FilterNode &n : m_nodes) {
         if (!n.isEnabled())
             continue;
-        if (n.op() == OpName::AddNoise || n.op() == OpName::Ripple)
+        if (n.op() == OpName::AddNoise || n.op() == OpName::Ripple
+            || n.op() == OpName::Mosaic)
             return true;
     }
     return false;

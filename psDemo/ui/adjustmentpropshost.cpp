@@ -536,6 +536,17 @@ void AdjustmentPropsHost::ensurePages()
         add(Ps::OpName::Ripple, page);
     }
     {
+        // 马赛克：方块边长
+        auto *page = new QWidget(m_stack);
+        auto *col = new QVBoxLayout(page);
+        col->setContentsMargins(0, 0, 0, 0);
+        const SliderRow cell = makeSliderRow(page, QStringLiteral("单元格大小"),
+                                             QStringLiteral("mosaic_cell"), 2, 64);
+        col->addWidget(cell.row);
+        wireSliderSpin(cell.slider, cell.spin, [this](int v) { m_node.setMosaicCell(v); });
+        add(Ps::OpName::Mosaic, page);
+    }
+    {
         // 添加杂色：数量滑块（0..100%）+ 分布下拉 + 单色勾选
         auto *page = new QWidget(m_stack);
         auto *col = new QVBoxLayout(page);
@@ -761,6 +772,9 @@ void AdjustmentPropsHost::loadControlsFromNode()
     case Ps::OpName::Ripple:
         setPair("slider_ripple_amplitude", "spin_ripple_amplitude", m_node.rippleAmplitude());
         setPair("slider_ripple_wavelength", "spin_ripple_wavelength", m_node.rippleWavelength());
+        break;
+    case Ps::OpName::Mosaic:
+        setPair("slider_mosaic_cell", "spin_mosaic_cell", m_node.mosaicCell());
         break;
     case Ps::OpName::AddNoise:
         setPair("slider_noise_amount", "spin_noise_amount", m_node.noiseAmount());

@@ -36,6 +36,10 @@ int opCostNsPerPixel(OpName name)
         return 5;
     case OpName::Ripple:
         return 2;
+    case OpName::Mosaic:
+        return 8; // 估值：按块扫一遍均值
+    case OpName::Fragment:
+        return 6; // 估值：每像素 4 次取样
     case OpName::Offset:
         return 2; // 表内 1.5，整型取 2
     case OpName::BrightnessContrast:

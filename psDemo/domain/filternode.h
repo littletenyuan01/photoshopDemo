@@ -225,6 +225,10 @@ public:
     int rippleWavelength() const { return m_rippleWavelength; }
     void setRippleWavelength(int v) { m_rippleWavelength = qBound(1, v, 256); }
 
+    // —— 马赛克：方块边长（2..64）；格子按层内绝对坐标对齐 ——
+    int mosaicCell() const { return m_mosaicCell; }
+    void setMosaicCell(int v) { m_mosaicCell = qBound(2, v, 64); }
+
     // —— 添加杂色：数量（0..100 %）+ 分布（均匀/高斯）+ 单色 + 种子 ——
     int noiseAmount() const { return m_noiseAmount; }
     void setNoiseAmount(int v) { m_noiseAmount = qBound(0, v, 100); }
@@ -315,6 +319,9 @@ public:
         n.m_motionDistance = shrink(m_motionDistance);
         n.m_offsetDx = m_offsetDx / divisor;
         n.m_offsetDy = m_offsetDy / divisor;
+        n.m_mosaicCell = shrink(m_mosaicCell);
+        if (n.m_mosaicCell < 2)
+            n.m_mosaicCell = 2;
         return n;
     }
 
@@ -356,6 +363,10 @@ public:
             return m_motionDistance; // 对称上界（requiredInputs 可更紧）
         case OpName::Ripple:
             return m_rippleAmplitude;
+        case OpName::Fragment:
+            return 4; // 四角偏移 ±4
+        case OpName::Mosaic:
+            return 0; // 位置相关，走整层（见 FilterStack::hasPositionalOp）
         default:
             return 0;
         }
@@ -427,6 +438,7 @@ private:
     int m_reduceNoiseStrength = 50; ///< 减少杂色：与中值结果的混合强度 %
     int m_rippleAmplitude = 5;
     int m_rippleWavelength = 16;
+    int m_mosaicCell = 8;
 };
 
 } // namespace Ps
