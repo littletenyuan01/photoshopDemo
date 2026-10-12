@@ -156,10 +156,10 @@ int tRasterBackend()
     Reporter r;
     auto &sched = RasterScheduler::instance();
 
-    // 1) 默认 auto + 无 GPU
+    // 1) 默认 auto + 无 GPU（显式注入空后端，禁止惰性 QRhi）
     {
         EnvGuard env("PSLITE_RASTER", "auto");
-        sched.resetForTest();
+        sched.setGpuBackendForTest(nullptr);
         const QImage src = PsTests::makeLayerImage(64, 48, 3, 255);
         FilterStack stack = stackOf(OpName::MedianBlur);
         stack.at(0).setMedianRadius(2);
@@ -188,9 +188,24 @@ int tRasterBackend()
         r.check(raw->callCount() == 0, QStringLiteral("PSLITE_RASTER=cpu → GPU 调用 0"));
     }
 
-    // 3) 总是 Failed → 结果仍正确；3 次后不再调用
+    // 2b) Auto opt-in：即使注入假 GPU 也不走（§7.2.2 / T1.9）
     {
         EnvGuard env("PSLITE_RASTER", "auto");
+        auto fake = std::make_unique<FakeGpuBackend>(FakeGpuBackend::Behavior::AlwaysOk);
+        FakeGpuBackend *raw = fake.get();
+        sched.setGpuBackendForTest(std::move(fake));
+        FilterStack med = stackOf(OpName::MedianBlur);
+        r.check(!sched.shouldUseGpu(med, 200000), QStringLiteral("Auto opt-in ⇒ shouldUseGpu false"));
+        const QImage src = PsTests::makeLayerImage(400, 300, 4, 255);
+        QImage got = src.convertToFormat(QImage::Format_ARGB32_Premultiplied);
+        const QString id = sched.runStack(got, med, src.rect(), src.rect(), nullptr, nullptr);
+        r.check(id == QLatin1String("cpu") && raw->callCount() == 0,
+                QStringLiteral("Auto opt-in ⇒ 不上 GPU"));
+    }
+
+    // 3) 总是 Failed → 结果仍正确；3 次后不再调用（需 opt-in gpu）
+    {
+        EnvGuard env("PSLITE_RASTER", "gpu");
         auto fake = std::make_unique<FakeGpuBackend>(FakeGpuBackend::Behavior::AlwaysFail);
         FakeGpuBackend *raw = fake.get();
         sched.setGpuBackendForTest(std::move(fake));
@@ -216,7 +231,7 @@ int tRasterBackend()
 
     // 4) 计数方向
     {
-        EnvGuard env("PSLITE_RASTER", "auto");
+        EnvGuard env("PSLITE_RASTER", "gpu");
         auto fake = std::make_unique<FakeGpuBackend>(FakeGpuBackend::Behavior::FailThenOk);
         fake->setFailThenOkCount(1);
         FakeGpuBackend *raw = fake.get();
@@ -236,7 +251,7 @@ int tRasterBackend()
     }
     {
         // GPU 一直 Failed、CPU 每次补算成功 ⇒ 仍累积到 3 并熔断
-        EnvGuard env("PSLITE_RASTER", "auto");
+        EnvGuard env("PSLITE_RASTER", "gpu");
         auto fake = std::make_unique<FakeGpuBackend>(FakeGpuBackend::Behavior::AlwaysFail);
         sched.setGpuBackendForTest(std::move(fake));
         const QImage src = PsTests::makeLayerImage(400, 300, 11, 255);
@@ -250,7 +265,7 @@ int tRasterBackend()
                 QStringLiteral("CPU 补算成功不得清零 → 仍熔断"));
     }
     {
-        EnvGuard env("PSLITE_RASTER", "auto");
+        EnvGuard env("PSLITE_RASTER", "gpu");
         auto fake = std::make_unique<FakeGpuBackend>(FakeGpuBackend::Behavior::AlwaysCancel);
         sched.setGpuBackendForTest(std::move(fake));
         const QImage src = PsTests::makeLayerImage(400, 300, 13, 255);
@@ -263,14 +278,16 @@ int tRasterBackend()
         r.check(sched.consecutiveFailures() == 0, QStringLiteral("Cancelled 不计熔断"));
     }
 
-    // 5) shouldUseGpu 边界
+    // 5) shouldUseGpu 边界（ForceGpu；真后端 supports 仅中值，假后端可放开）
     {
-        EnvGuard env("PSLITE_RASTER", "auto");
+        EnvGuard env("PSLITE_RASTER", "gpu");
         auto fake = std::make_unique<FakeGpuBackend>(FakeGpuBackend::Behavior::AlwaysOk);
         fake->setSupportsAllCostly(true);
         sched.setGpuBackendForTest(std::move(fake));
 
         FilterStack pts = stackOf(OpName::BrightnessContrast, OpName::Invert);
+        // ForceGpu 跳过成本阈值，但仍问 supports；假后端 supports 高成本链 → 点算子成本低仍 true
+        // 点算子：假后端 supportsAllCostly 看成本，点算子不过线 → false
         r.check(!sched.shouldUseGpu(pts, 200000), QStringLiteral("纯点算子链 ⇒ false"));
 
         FilterStack med = stackOf(OpName::MedianBlur);
@@ -365,7 +382,7 @@ int tRasterBackend()
 
     // 9) Failed 无副作用（最终结果正确已在 3 覆盖；再钉「失败瞬间 image 未改」）
     {
-        EnvGuard env("PSLITE_RASTER", "auto");
+        EnvGuard env("PSLITE_RASTER", "gpu");
         class PeekFail final : public RasterBackend
         {
         public:

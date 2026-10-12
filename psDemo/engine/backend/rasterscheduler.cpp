@@ -5,6 +5,7 @@
 
 #include "cpurasterbackend.h"
 #include "domain/filterstack.h"
+#include "gpurasterbackend.h"
 #include "rastercost.h"
 
 #include <QDebug>
@@ -44,6 +45,18 @@ void RasterScheduler::ensureEnvCached() const
     m_envCached.store(true, std::memory_order_release);
 }
 
+void RasterScheduler::ensureGpu() const
+{
+    if (m_gpuInitAttempted || m_blockGpuAutoCreate)
+        return;
+    QMutexLocker lock(&m_gpuInitMutex);
+    if (m_gpuInitAttempted || m_blockGpuAutoCreate)
+        return;
+    m_gpuInitAttempted = true;
+    if (!m_gpu)
+        m_gpu = GpuRasterBackend::tryCreate();
+}
+
 RasterScheduler::RasterMode RasterScheduler::mode() const
 {
     ensureEnvCached();
@@ -53,8 +66,11 @@ RasterScheduler::RasterMode RasterScheduler::mode() const
 bool RasterScheduler::shouldUseGpu(const FilterStack &stack, int pixelCount) const
 {
     ensureEnvCached();
-    if (m_mode == RasterMode::ForceCpu)
+    // T1.9 / §7.2.2 方案 A：Auto = CPU；GPU 仅 PSLITE_RASTER=gpu（opt-in）
+    // 钉：t_rasterbackend「Auto opt-in ⇒ 不上 GPU」
+    if (m_mode == RasterMode::ForceCpu || m_mode == RasterMode::Auto)
         return false;
+    ensureGpu(); // 仅 ForceGpu 才惰性创建真实后端
     if (!m_gpu || !m_gpu->isAvailable())
         return false;
     if (m_gpuDisabled.load(std::memory_order_relaxed))
@@ -65,12 +81,7 @@ bool RasterScheduler::shouldUseGpu(const FilterStack &stack, int pixelCount) con
         return false;
     if (pixelCount < kMinPixelsForGpu)
         return false;
-    // ForceGpu：仍要 supports / 像素门槛，但跳过成本阈值（优先试 GPU）。
-    if (m_mode != RasterMode::ForceGpu) {
-        const int cost = stackCostNsPerPixel(stack);
-        if (cost < 0 || cost <= kGpuChainCostThresholdNsPerPixel)
-            return false;
-    }
+    // ForceGpu：仍守像素门槛与 supports，但跳过成本阈值（便于门控用例）
     return true;
 }
 
@@ -97,6 +108,8 @@ QString RasterScheduler::runStack(QImage &image, const FilterStack &stack, const
         const ApplyStackResult gr =
             m_gpu->applyStack(image, stack, srcRect, outRect, shouldAbort);
         if (gr == ApplyStackResult::Ok) {
+            // 只有 GPU 自己 Ok 才清零熔断（§3.4 纪律 3）
+            // 钉：t_rasterbackend「随后 GPU Ok → 计数清零」
             m_consecutiveFailures.store(0, std::memory_order_relaxed);
             if (m_log) {
                 qDebug().nospace() << "[raster] ops=" << ops << " cost=" << cost
@@ -107,6 +120,8 @@ QString RasterScheduler::runStack(QImage &image, const FilterStack &stack, const
             return m_gpu->id();
         }
         if (gr == ApplyStackResult::Cancelled) {
+            // Cancelled：不重试、不计熔断（§3.4）
+            // 钉：t_rasterbackend「Cancelled 不计熔断」
             if (resultOut)
                 *resultOut = ApplyStackResult::Cancelled;
             return m_gpu->id();
@@ -114,26 +129,28 @@ QString RasterScheduler::runStack(QImage &image, const FilterStack &stack, const
         if (gr == ApplyStackResult::Unsupported) {
             Q_ASSERT_X(false, "RasterScheduler::runStack",
                        "GPU applyStack returned Unsupported — call supports() first");
-            // Release：不计熔断，落入 CPU
         } else if (gr == ApplyStackResult::Failed) {
+            // Failed：先计数再同图 CPU 重算；连续 3 次熔断（§6.4）
+            // 钉：t_rasterbackend「Failed×3 → 熔断」
             const int n =
                 m_consecutiveFailures.fetch_add(1, std::memory_order_relaxed) + 1;
             if (n >= kCircuitBreakerLimit)
                 m_gpuDisabled.store(true, std::memory_order_relaxed);
-            // image 必须未改；继续 CPU
         }
     }
 
+    // CPU 降级补算成功 → 不清零熔断（纪律 3）
+    // 钉：t_rasterbackend「CPU 补算成功不得清零 → 仍熔断」
     const ApplyStackResult cr =
         m_cpu->applyStack(image, stack, srcRect, outRect, shouldAbort);
     if (cr == ApplyStackResult::Failed) {
+        // CPU 是最后防线：不回退（会死循环），空图 + warning（§3.4 纪律 2）
         qWarning("CpuRasterBackend::applyStack returned Failed — last-resort path");
         image = QImage();
         if (resultOut)
             *resultOut = ApplyStackResult::Failed;
         return backendId;
     }
-    // CPU Ok 不清零熔断（纪律 3）
     if (m_log) {
         qDebug().nospace() << "[raster] ops=" << ops << " cost=" << cost << " ns/px px=" << px
                            << " backend=cpu";
@@ -145,12 +162,18 @@ QString RasterScheduler::runStack(QImage &image, const FilterStack &stack, const
 
 void RasterScheduler::setGpuBackendForTest(std::unique_ptr<RasterBackend> backend)
 {
+    QMutexLocker lock(&m_gpuInitMutex);
     m_gpu = std::move(backend);
+    m_gpuInitAttempted = true;
+    m_blockGpuAutoCreate = !m_gpu; // 注入空 = 禁止再惰性创建
 }
 
 void RasterScheduler::resetForTest()
 {
+    QMutexLocker lock(&m_gpuInitMutex);
     m_gpu.reset();
+    m_gpuInitAttempted = false;
+    m_blockGpuAutoCreate = false;
     m_consecutiveFailures.store(0, std::memory_order_relaxed);
     m_gpuDisabled.store(false, std::memory_order_relaxed);
     m_envCached.store(false, std::memory_order_release);

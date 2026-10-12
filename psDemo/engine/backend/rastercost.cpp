@@ -21,8 +21,9 @@ int opCostNsPerPixel(OpName name)
     case OpName::AddNoise:
         return 22;
     case OpName::GaussianBlur:
+        return 19; // 实测 ~18–21 ns/px @ r=3（§7.4 / T2.0）
     case OpName::CustomFilter:
-        return 20;
+        return 48; // 实测 ~46–53 ns/px（§7.4.1 / T2.7 标准测法）
     case OpName::UnsharpMask:
     case OpName::HighPass:
     case OpName::MotionBlur:

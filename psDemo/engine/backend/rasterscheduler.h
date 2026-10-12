@@ -6,6 +6,7 @@
 
 #include "engine/backend/rasterbackend.h"
 
+#include <QMutex>
 #include <QString>
 
 #include <atomic>
@@ -38,6 +39,7 @@ public:
         return m_consecutiveFailures.load(std::memory_order_relaxed);
     }
 
+    /** 测试注入；传空指针 = 清空并禁止惰性重建（直到 resetForTest）。 */
     void setGpuBackendForTest(std::unique_ptr<RasterBackend> backend);
     void resetForTest();
 
@@ -47,10 +49,14 @@ private:
     enum class RasterMode { Auto, ForceCpu, ForceGpu };
 
     void ensureEnvCached() const;
+    void ensureGpu() const;
     RasterMode mode() const;
 
     std::unique_ptr<RasterBackend> m_cpu;
-    std::unique_ptr<RasterBackend> m_gpu; ///< 可空；测试可注入
+    mutable std::unique_ptr<RasterBackend> m_gpu; ///< 可空；测试可注入 / 惰性 QRhi
+    mutable QMutex m_gpuInitMutex;
+    mutable bool m_gpuInitAttempted = false;
+    mutable bool m_blockGpuAutoCreate = false; ///< 测试注入空后端后为 true
 
     mutable std::atomic<bool> m_envCached{false};
     mutable RasterMode m_mode = RasterMode::Auto;

@@ -1,0 +1,99 @@
+#version 440
+
+// 中值：直通 RGBA8，越界样本 = 0（与 CPU 口径一致）。
+// 选第 k 个：两级计数（粗 16 箱 → 精 16 档），O(n) 非全排序（gpu-plan T1.13）。
+// CPU：kth=(n+1)/2，cum>=kth 的最小 v；与 bitonic 的 a[n/2] 同值（n 奇数）。
+// 勿把大数组经 inout 传函数（HLSL 会算错）。勿用标识符 half（GLSL 保留字）。
+layout(local_size_x = 16, local_size_y = 16) in;
+
+layout(std430, binding = 0) readonly buffer Src {
+    uint src[];
+};
+
+layout(std430, binding = 1) writeonly buffer Dst {
+    uint dst[];
+};
+
+layout(std140, binding = 2) uniform Params {
+    int width;
+    int height;
+    int radius;
+    int _pad;
+};
+
+uint getPixel(int x, int y)
+{
+    if (x < 0 || y < 0 || x >= width || y >= height)
+        return 0u;
+    return src[y * width + x];
+}
+
+// 两级计数选第 KTH 小（从 1 计）。
+#define COUNT_SELECT_KTH(SAMP, N, KTH, OUTV)                          \
+    {                                                                 \
+        uint coarse[16];                                              \
+        for (int _i = 0; _i < 16; ++_i)                               \
+            coarse[_i] = 0u;                                          \
+        for (int _i = 0; _i < (N); ++_i)                              \
+            coarse[(SAMP)[_i] >> 4] += 1u;                            \
+        int _cum = 0;                                                 \
+        int _bin = 0;                                                 \
+        for (; _bin < 16; ++_bin) {                                   \
+            _cum += int(coarse[_bin]);                                \
+            if (_cum >= (KTH))                                        \
+                break;                                                \
+        }                                                             \
+        int _need = (KTH) - (_cum - int(coarse[_bin]));               \
+        uint fine[16];                                                \
+        for (int _i = 0; _i < 16; ++_i)                               \
+            fine[_i] = 0u;                                            \
+        for (int _i = 0; _i < (N); ++_i) {                            \
+            if (int((SAMP)[_i] >> 4) == _bin)                         \
+                fine[(SAMP)[_i] & 15u] += 1u;                         \
+        }                                                             \
+        _cum = 0;                                                     \
+        int _f = 0;                                                   \
+        for (; _f < 16; ++_f) {                                       \
+            _cum += int(fine[_f]);                                    \
+            if (_cum >= _need)                                        \
+                break;                                                \
+        }                                                             \
+        (OUTV) = uint((_bin << 4) | _f);                              \
+    }
+
+void main()
+{
+    const int x = int(gl_GlobalInvocationID.x);
+    const int y = int(gl_GlobalInvocationID.y);
+    if (x >= width || y >= height)
+        return;
+
+    const int r = radius;
+    const int n = (2 * r + 1) * (2 * r + 1); // 9..81
+    const int kth = (n + 1) / 2;             // 与 CPU MedianBlurFilterOp 一致
+
+    uint chR[81];
+    uint chG[81];
+    uint chB[81];
+    uint chA[81];
+
+    int k = 0;
+    for (int dy = -r; dy <= r; ++dy) {
+        for (int dx = -r; dx <= r; ++dx) {
+            const uint p = getPixel(x + dx, y + dy);
+            chR[k] = (p >> 16) & 255u;
+            chG[k] = (p >> 8) & 255u;
+            chB[k] = p & 255u;
+            chA[k] = (p >> 24) & 255u;
+            ++k;
+        }
+    }
+
+    uint outR, outG, outB, outA;
+    COUNT_SELECT_KTH(chR, n, kth, outR)
+    COUNT_SELECT_KTH(chG, n, kth, outG)
+    COUNT_SELECT_KTH(chB, n, kth, outB)
+    COUNT_SELECT_KTH(chA, n, kth, outA)
+
+    dst[y * width + x] = (outA << 24) | (outR << 16) | (outG << 8) | outB;
+}

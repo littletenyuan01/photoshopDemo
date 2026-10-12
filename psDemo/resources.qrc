@@ -98,4 +98,8 @@
   <qresource prefix="/styles">
     <file alias="dark.qss">resources/styles/dark.qss</file>
   </qresource>
+  <qresource prefix="/shaders">
+    <file alias="median.comp.qsb">engine/backend/shaders/median.comp.qsb</file>
+    <file alias="custom.comp.qsb">engine/backend/shaders/custom.comp.qsb</file>
+  </qresource>
 </RCC>

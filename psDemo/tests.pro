@@ -44,6 +44,8 @@ SOURCES += \
     tests/t_batcha.cpp \
     tests/t_ripple.cpp \
     tests/t_rasterbackend.cpp \
+    tests/t_gpumedian.cpp \
+    tests/t_gpucustom.cpp \
     tests/t_c1pixelate.cpp
 
 HEADERS += \

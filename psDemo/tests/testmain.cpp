@@ -42,6 +42,8 @@ int tNoise();
 int tBatchA();
 int tRipple();
 int tRasterBackend();
+int tGpuMedian();
+int tGpuCustom();
 int tC1Pixelate();
 
 namespace {
@@ -74,6 +76,8 @@ const Case kCases[] = {
     { "batcha", "滤镜批次 A：曝光过度/蒙尘/减少杂色/锐化边缘 oracle + 分块投影 + 往返", tBatchA },
     { "ripple", "波纹：正弦位移 oracle、位置相关整层路径、分块投影、往返", tRipple },
     { "rasterbackend", "滤镜链后端调度：CPU 搬迁 bit-exact、降级/熔断/supports/取消", tRasterBackend },
+    { "gpumedian", "有 GPU 才跑：中值 vs CPU（容差≤1）；无 GPU 跳过", tGpuMedian },
+    { "gpucustom", "有 GPU 才跑：自定 3×3 vs CPU（容差≤1）；无 GPU 跳过", tGpuCustom },
     { "c1pixelate", "C1 马赛克/碎片：oracle、分块投影、往返", tC1Pixelate },
 };
 

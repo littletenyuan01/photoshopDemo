@@ -7,7 +7,7 @@
 # 依赖方向强制单向：ui → app → tools/domain；engine 被 tools/domain 调用；
 # domain/engine 禁止依赖 Qt Widgets。
 
-QT += widgets svg concurrent
+QT += widgets svg concurrent gui-private
 CONFIG += c++17
 
 INCLUDEPATH += $$PWD
@@ -39,6 +39,7 @@ SOURCES += \
     engine/layerstyleeval.cpp \
     engine/backend/rastercost.cpp \
     engine/backend/cpurasterbackend.cpp \
+    engine/backend/gpurasterbackend.cpp \
     engine/backend/rasterscheduler.cpp \
     engine/op/layermodeop.cpp \
     engine/op/boxblurfilterop.cpp \
@@ -158,6 +159,7 @@ HEADERS += \
     engine/backend/rasterbackend.h \
     engine/backend/rastercost.h \
     engine/backend/cpurasterbackend.h \
+    engine/backend/gpurasterbackend.h \
     engine/backend/rasterscheduler.h \
     engine/paintselectionclip.h \
     engine/painttypes.h \

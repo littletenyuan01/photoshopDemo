@@ -349,7 +349,7 @@ CanvasView 收到 contentChanged
 > 当前 `ImageDocument::addBrightnessContrastFilter()` / `setLayerFilterEnabled()` /
 > `removeLayerFilter()` **没有任何 UI 调用点**，所以该分支暂时进不去（没有任何入口能加节点）。
 
-### 4.1 滤镜链后端调度（可选加速壳）
+### 4.1 滤镜链后端调度（可选 GPU 中值）
 
 `FilterStack::apply` **不再直接建 `PsGraph`**：早退与预乘格式转换留在栈上，③–⑦（几何 / 建图 /
 `evaluate`）搬进 `CpuRasterBackend`；整链经 `RasterScheduler::runStack` 决策。
@@ -358,11 +358,12 @@ CanvasView 收到 contentChanged
 |---|---|---|
 | `RasterBackend` | `engine/backend/rasterbackend.h` | `supports` + `ApplyStackResult`（Ok/Failed/Cancelled/Unsupported） |
 | `CpuRasterBackend` | `engine/backend/cpurasterbackend.*` | 现有图路径；恒可用；bit-exact 基准 |
+| `GpuRasterBackend` | `engine/backend/gpurasterbackend.*` | QRhi D3D11 中值（独立 RHI 线程）；仅全中值链 |
 | `RasterCost` | `engine/backend/rastercost.*` | 每算子 ns/px；未登记返回 -1 |
 | `RasterScheduler` | `engine/backend/rasterscheduler.*` | 链级决策 / Failed→CPU / 熔断 / `PSLITE_RASTER` |
 
 决策按**整条链**（不是逐算子）：`supports` && 成本严格 `>` 5 ns/px && 像素数 ≥ 100k 等。  
-位置相关（杂色/波纹）与位移一律 CPU。详见 [gpu-plan.md](../gpu-plan.md)。**P0 无 GPU 实现**。
+位置相关（杂色/波纹）与位移一律 CPU。真 GPU 的 `supports` 只收全中值；核显端到端未达 3×，不声称加速。详见 [gpu-plan.md](../gpu-plan.md)。
 
 ---
 

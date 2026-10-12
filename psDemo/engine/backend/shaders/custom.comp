@@ -1,0 +1,85 @@
+#version 440
+
+// 自定滤镜：3×3 卷积（gpu-plan T2.1）。直通 RGBA8；越界=0；alpha 取中心原样。
+// 口径对齐 CPU CustomFilterOp：out = clamp( (Σ w·c)/scale + offset, 0, 255 )；scale==0 不除。
+// 整数除法向 0 截断（与 C++11 / HLSL 一致）。勿用标识符 half。
+layout(local_size_x = 16, local_size_y = 16) in;
+
+layout(std430, binding = 0) readonly buffer Src {
+    uint src[];
+};
+
+layout(std430, binding = 1) writeonly buffer Dst {
+    uint dst[];
+};
+
+// std140：ivec4 各占 16B；总 64B，与 C++ CustomParams 一致
+layout(std140, binding = 2) uniform Params {
+    int width;
+    int height;
+    int scale;
+    int offset;
+    ivec4 weights0; // w[0..3]
+    ivec4 weights1; // w[4..7]
+    int weight8;
+    int _p0;
+    int _p1;
+    int _p2;
+};
+
+uint getPixel(int x, int y)
+{
+    if (x < 0 || y < 0 || x >= width || y >= height)
+        return 0u;
+    return src[y * width + x];
+}
+
+int weightAt(int k)
+{
+    if (k < 4)
+        return weights0[k];
+    if (k < 8)
+        return weights1[k - 4];
+    return weight8;
+}
+
+void main()
+{
+    const int x = int(gl_GlobalInvocationID.x);
+    const int y = int(gl_GlobalInvocationID.y);
+    if (x >= width || y >= height)
+        return;
+
+    int sumR = 0;
+    int sumG = 0;
+    int sumB = 0;
+    int k = 0;
+    for (int dy = -1; dy <= 1; ++dy) {
+        for (int dx = -1; dx <= 1; ++dx) {
+            const uint p = getPixel(x + dx, y + dy);
+            const int wt = weightAt(k);
+            ++k;
+            if (wt == 0)
+                continue;
+            sumR += wt * int((p >> 16) & 255u);
+            sumG += wt * int((p >> 8) & 255u);
+            sumB += wt * int(p & 255u);
+        }
+    }
+
+    if (scale != 0) {
+        sumR /= scale;
+        sumG /= scale;
+        sumB /= scale;
+    }
+    sumR += offset;
+    sumG += offset;
+    sumB += offset;
+
+    const uint center = getPixel(x, y);
+    const uint a = (center >> 24) & 255u;
+    const uint r = uint(clamp(sumR, 0, 255));
+    const uint g = uint(clamp(sumG, 0, 255));
+    const uint b = uint(clamp(sumB, 0, 255));
+    dst[y * width + x] = (a << 24) | (r << 16) | (g << 8) | b;
+}
