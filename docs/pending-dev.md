@@ -1615,16 +1615,39 @@ ROI 第 ③ 步的范围）；③ 大文档下整层求值仍是同步的（不�
 
 ---
 
-## 滤镜链后端调度 P0（可选加速壳，无 GPU kernel）
+## 滤镜链后端调度 + GPU 中值（先接上）
 
-**已实现**：`FilterStack::apply` → `RasterScheduler` → `CpuRasterBackend`（原 PsGraph ③–⑦）；
-成本表 / 熔断 / `PSLITE_RASTER` / `rasterbackend` 用例。规格见 [gpu-plan.md](gpu-plan.md)。
+**已实现**：`FilterStack::apply` → `RasterScheduler` → `CpuRasterBackend` / 可选 `GpuRasterBackend`
+（QRhi D3D11 compute，仅全中值链）；成本表 / 熔断 / `PSLITE_RASTER`；`rasterbackend` + 门控
+`gpumedian`。规格见 [gpu-plan.md](gpu-plan.md)。
 
-**验收证据**：全套 **27/27** 通过；连跑 **20 次 0 崩溃**；主程序干净重建 0 error。
+**产品决策**：spike 端到端约 **0.9～1.1×**（未达 ≥3×），用户要求**仍接上**生产路径；CPU 永为降级；
+不声称加速。详见 `gpu-plan.md` §7.2.1。
 
-**P1 spike（2026-10-12）**：QRhi/D3D11 与 OpenCL（Iris Xe）中值端到端相对生产 CPU（187 ns/px）约 **0.9～1.1×**，**未达 ≥3×** → 按计划停在 P0，不接生产 GPU 后端。详见 `gpu-plan.md` §7.2.1。
+**⚠️ 根因复核（2026-10-12 复审，推翻了原来的归因）**：原结论把慢归到「集成 GPU 上整图上传/回读占比高」，
+**按实测数据反推不成立** —— 1600×1200 上传+回读 ≈ 15.4 MB，即便按 5 GB/s 也只 ≈ 3 ms，
+而端到端 ≈ 400 ms，**传输占比 < 1%**。真因在**实现侧**两条：
 
-**仍欠**：估值成本项实测回填（T0.10 可选）；换独显后可重跑 spike。
+1. **kernel 用了插入排序**（`shaders/median.comp`）：r=3 时 49 个元素 ≈ 49²/4 次**带数据相关分支**的
+   比较+搬移 ×4 通道，是 GPU 最差的形状。而计划 T1.3 明确要求「**排序网络**（小半径）或
+   **并行直方图 + 前缀和**，**不是移植，是重写**」—— 实际既不是前者也不是后者；
+2. **管线/缓冲每次调用都重建**：`gpurasterbackend.cpp` 里 `bufBytes = 0;` 使缓存判断恒不命中，
+   每次重建 srcBuf/dstBuf/ubuf/srb/pipe（原文档「已池化」的描述与代码不符，已改正）。
+
+⇒ 该 spike 测到的是「**未优化实现的下限**」，不足以证明「GPU 达不到 3×」。
+正确的下一步是**先换排序网络 + 真池化再重测**，而不是「换独显再测」。
+详见 `gpu-plan.md` §7.2.1.1。
+
+**⚠️ 默认策略问题（需拍板）**：`PSLITE_RASTER=auto`（默认）下，中值链会命中
+`shouldUseGpu`（成本 187 > 阈值 5、像素数够、`supports` 通过）⇒ **默认走 GPU**，
+而实测 0.9× ⇒ **本机上中值默认比 CPU 慢约 10%**。
+这与「有 GPU 就加速」的原始前提冲突（那句话隐含 GPU 更快）。
+建议 `Auto` = CPU、GPU 走 opt-in（`PSLITE_RASTER=gpu`）。详见 `gpu-plan.md` §7.2.2 与 §12 Q6/Q7。
+
+**仍欠**：① **T1.7 换排序网络重测**（这一步才决定 GPU 究竟值不值得留）；
+② **T1.8 管线/缓冲真池化**；③ **T1.9 默认策略拍板落地**；
+④ T1.10 补回调度器里被删的契约注释（`// CPU Ok 不清零熔断（纪律 3）` 等，指向 `t_rasterbackend` 的断言）；
+⑤ T0.10 估值成本项实测回填（可选）；⑥ P2 其它算子 —— **在 ①②③ 收口前不要开始**。
 
 ---
 
