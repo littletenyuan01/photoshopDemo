@@ -30,7 +30,7 @@
 > ### ★ 当前优先（T4）
 >
 > 1. ✅ T4.1 入库 · ✅ T4.2 分段 · ✅ **T4.3** 解/预乘进 shader（§16.6）。
-> 2. 随后：T4.4 独显 / T4.5 成本表 187 / T4.7 近零扩或 T3.0 AddNoise。
+> 2. 随后：T4.4 独显 / T4.5 成本表 187 / T3.0 AddNoise（T4.7 已落地）。
 >
 > 瓦片 / 投影 / 合成上 GPU = **非目标**（§0）；见 §16。
 
@@ -808,7 +808,7 @@ kernel = 两级计数选择（粗 16 箱 → 精 16 档；`kth=(n+1)/2`）；`ca
 | `GaussianBlur`（三次可分离） | 同上；且它是 **USM / 高通保留的模糊级** ⇒ 一处收益带三处 |
 
 **建议先做 `CustomFilter`**：kernel 最简单（3×3 卷积 + 缩放 + 偏置），
-且它**一个算子覆盖"3×3 卷积族"整类**（`Sharpen` / `Emboss` / `FindEdges` 都是它的特例）。
+且它覆盖**线性** 3×3 卷积族（`Sharpen` / `Emboss` / `CustomFilter`；`FindEdges` 是 Sobel 幅值，另论）。
 
 **第 0 步（必做，约半天）**：先把 §4.3 里 `CustomFilter` / `GaussianBlur` 的
 **「估值」实测出来**。现在那两个数（~20 ns/px）是**猜的**，而整套判据建立在它们上面 ——
@@ -859,7 +859,7 @@ kernel = 两级计数选择（粗 16 箱 → 精 16 档；`kth=(n+1)/2`）；`ca
 
 **判定**：
 - **T4.3 后锐化稳定 ≥4×**（跨 3×）；稠密中大图亦 ≥4×。仍 **opt-in**（产品未改默认）。
-- 编组优化已落地（§16.6）；下一优先 **T4.7 近零扩** 或 **T3.0 AddNoise** / T4.4 独显。
+- 编组优化与 **T4.7** 已落地（§16.6）；下一优先 **T3.0 AddNoise** / T4.4 独显。
 - **P2**：禁止整表铺开。
 
 ---
@@ -997,8 +997,9 @@ cd .build-app && mingw32-make -f Makefile.Release -j8
 - [ ] **T4.6** 明确记一笔 **GLES2 回退路径**的状态（shader 需 GL 4.3+/GLES 3.1+ SSBO，
       回退大概率不可用）：要么验证它、要么在 `initDevice()` 里去掉该回退并注明原因，
       **不要让读者以为有一条能用的 GL 回退**
-- [ ] **T4.7** ★ **零成本扩算子覆盖**（2 → 6）：`Sharpen`/`Emboss`/`FindEdges` 复用 `custom.comp`
-      （只换权重）；`Maximum`/`Minimum` 复用中值的计数选择（只换 `kth`）
+- [x] **T4.7** ★ **近零成本扩算子覆盖**（2 → 5）：`Sharpen`/`Emboss` 复用 `custom.comp`（只换权重）；
+      `Maximum`/`Minimum` 复用中值计数选择（`median.comp` 增 `kth`；0=中值）。
+      **`FindEdges` 未进**：Sobel 幅值是非线性，喂不动 `custom.comp`；另开 kernel 才算，不在近零成本档。
 
 ---
 
@@ -1168,7 +1169,7 @@ feat: GPU 栅格后端（QRhi compute）—— 中值 + 自定 3×3，opt-in
 **P1 开工前必须关闭 Q4**（API spike 结论写回 §7.2）；Q5 随 spike 一并明确。Q1–Q3 不挡工期。
 
 **（2026-10-12）** T2.7–T2.9 / T4.1–T4.3 关闭。Q11–Q15 关闭。维持 opt-in。
-**下一优先：T4.4 独显验证** / T4.7 近零扩或 T3.0 AddNoise。**禁止整表铺开。**
+**下一优先：T4.4 独显验证** / T3.0 AddNoise（T4.7 ✅）。**禁止整表铺开。**
 
 ---
 
@@ -1186,7 +1187,7 @@ feat: GPU 栅格后端（QRhi compute）—— 中值 + 自定 3×3，opt-in
 | 档 | 内容 | 量 |
 |---|---|---|
 | **基础设施** | 调度 / 降级 / 熔断 / opt-in / 门控用例 / e2e 入树 / shader 缓存 / 缓冲池化 | ✅ **基本齐了**（约 90%）；缺 **GPU 侧成本模型**（方案 B，仅在将来想恢复"自动判断"时需要） |
-| **算子覆盖** | 约 **35 个滤镜算子**里只有 **2 个**有 GPU kernel（中值、自定） | ⚠️ 看起来只有 6%，但**扩容成本差异极大**（见下） |
+| **算子覆盖** | 约 **35 个滤镜算子**里 **5 个**走 GPU（中值/最大/最小 + 自定/锐化/浮雕；T4.7） | 扩容仍按四问判据，勿整表铺 |
 | **验证** | 只在**核显（Iris Xe）**上测过 | ❌ 独显 / **完全无 GPU 的机器** / Linux·macOS 都没测；`initDevice()` 的 **GLES2 回退路径未验证**（shader 用 `#version 440` + `std430` SSBO，需 GL 4.3+ / GLES 3.1+，回退大概率不可用 —— 失败会安全降级 CPU，但那条路等于摆设） |
 | **P3（瓦片/合成上 GPU）** | 整块没做 | 明确不在本计划内（§8「不做的事」） |
 
@@ -1194,7 +1195,7 @@ feat: GPU 栅格后端（QRhi compute）—— 中值 + 自定 3×3，opt-in
 
 | 档 | 算子 | 成本 |
 |---|---|---|
-| **近乎零成本**（复用现成 kernel） | `Sharpen` / `Emboss` / `FindEdges` —— **都是 3×3 卷积** ⇒ 直接喂权重给 `custom.comp`；`Maximum` / `Minimum` —— 复用中值的**计数选择**，只改 `kth` | 小（T4.7） |
+| **近乎零成本**（复用现成 kernel） | `Sharpen` / `Emboss` ⇒ `custom.comp`；`Maximum` / `Minimum` ⇒ `median.comp`+`kth`（**T4.7 ✅**）。`FindEdges` 是 Sobel 幅值，**不在此档** | 小（已做） |
 | **值得做**（4 个） | `AddNoise`（**下一优先**）、`GaussianBlur`、`BoxBlur`、`MotionBlur` | 中 |
 | **不值得** | 点算子（传输就吃掉）、`Offset` | — |
 
@@ -1267,4 +1268,4 @@ CPU 只 `ensurePremulArgb32`；连续图直传 `constBits()`，回读整块 `mem
 门控 `gpumedian` / `gpucustom`：**逐通道差 0**（bit-exact）。
 
 **结论**：轻核已跨 3×，仍 **opt-in**（产品未改默认）；重核收益有限（设备侧主导）。  
-下一优先不再是编组，而是 **T4.4 独显** / **T4.7 近零扩覆盖** / **T3.0 AddNoise**。
+下一优先不再是编组，而是 **T4.4 独显** / **T3.0 AddNoise**（T4.7 已完成）。

@@ -47,6 +47,11 @@ int opCostNsPerPixel(OpName name)
         return 4; // 估值：4-邻接跨电平
     case OpName::RadialBlur:
         return 40; // 估值：每像素多点旋转/缩放取样
+    case OpName::SurfaceBlur:
+    case OpName::SmartBlur:
+        return 25; // 估值：保边邻域扫窗
+    case OpName::Tiles:
+        return 8; // 估值：切块拷贝一遍
     case OpName::Offset:
         return 2; // 表内 1.5，整型取 2
     case OpName::BrightnessContrast:

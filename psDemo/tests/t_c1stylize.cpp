@@ -1,5 +1,5 @@
 /**
- * t_c1stylize.cpp — C1：风 / 等高线 / 径向模糊 oracle + 分块投影 + 往返。
+ * t_c1stylize.cpp — C1：风 / 等高线 / 径向 / 表面 / 特殊模糊 / 拼贴 oracle + 分块投影 + 往返。
  */
 #include "domain/filternode.h"
 #include "domain/imagedocument.h"
@@ -200,6 +200,214 @@ QImage naiveRadial(const QImage &srcPremul, int amount, int method)
     return out;
 }
 
+int chanDiff(QRgb a, QRgb b)
+{
+    return qMax(qAbs(qRed(a) - qRed(b)),
+                qMax(qAbs(qGreen(a) - qGreen(b)), qAbs(qBlue(a) - qBlue(b))));
+}
+
+QImage toStraight(const QImage &srcPremul)
+{
+    const int w = srcPremul.width();
+    const int h = srcPremul.height();
+    QImage out(w, h, QImage::Format_ARGB32);
+    for (int y = 0; y < h; ++y) {
+        const QRgb *s = reinterpret_cast<const QRgb *>(srcPremul.constScanLine(y));
+        QRgb *d = reinterpret_cast<QRgb *>(out.scanLine(y));
+        for (int x = 0; x < w; ++x)
+            d[x] = qUnpremultiply(s[x]);
+    }
+    return out;
+}
+
+QImage toPremul(const QImage &straight, QImage::Format fmt)
+{
+    const int w = straight.width();
+    const int h = straight.height();
+    QImage out(w, h, fmt);
+    for (int y = 0; y < h; ++y) {
+        const QRgb *s = reinterpret_cast<const QRgb *>(straight.constScanLine(y));
+        QRgb *d = reinterpret_cast<QRgb *>(out.scanLine(y));
+        for (int x = 0; x < w; ++x)
+            d[x] = qPremultiply(s[x]);
+    }
+    return out;
+}
+
+QImage naiveSurfaceBlur(const QImage &srcPremul, int radius, int threshold)
+{
+    const int w = srcPremul.width();
+    const int h = srcPremul.height();
+    const int r = radius;
+    const int thr = qMax(0, threshold);
+    const QImage src = toStraight(srcPremul);
+    QImage dst = src;
+    for (int y = 0; y < h; ++y) {
+        QRgb *row = reinterpret_cast<QRgb *>(dst.scanLine(y));
+        for (int x = 0; x < w; ++x) {
+            const QRgb center = reinterpret_cast<const QRgb *>(src.constScanLine(y))[x];
+            qint64 R = 0, G = 0, B = 0, A = 0;
+            int n = 0;
+            for (int dy = -r; dy <= r; ++dy) {
+                const int yy = y + dy;
+                if (yy < 0 || yy >= h)
+                    continue;
+                const QRgb *srow = reinterpret_cast<const QRgb *>(src.constScanLine(yy));
+                for (int dx = -r; dx <= r; ++dx) {
+                    const int xx = x + dx;
+                    if (xx < 0 || xx >= w)
+                        continue;
+                    const QRgb p = srow[xx];
+                    if (chanDiff(center, p) > thr)
+                        continue;
+                    R += qRed(p);
+                    G += qGreen(p);
+                    B += qBlue(p);
+                    A += qAlpha(p);
+                    ++n;
+                }
+            }
+            row[x] = (n <= 0) ? center
+                              : qRgba(int(R / n), int(G / n), int(B / n), int(A / n));
+        }
+    }
+    return toPremul(dst, srcPremul.format());
+}
+
+QImage naiveEdges(const QImage &straight, int radius, int threshold)
+{
+    const int w = straight.width();
+    const int h = straight.height();
+    const int r = qMax(1, radius);
+    const int thr = qMax(0, threshold);
+    QImage dst(w, h, QImage::Format_ARGB32);
+    for (int y = 0; y < h; ++y) {
+        QRgb *row = reinterpret_cast<QRgb *>(dst.scanLine(y));
+        for (int x = 0; x < w; ++x) {
+            const QRgb center = reinterpret_cast<const QRgb *>(straight.constScanLine(y))[x];
+            const int a = qAlpha(center);
+            bool edge = false;
+            for (int dy = -r; dy <= r && !edge; ++dy) {
+                const int yy = y + dy;
+                if (yy < 0 || yy >= h)
+                    continue;
+                const QRgb *srow = reinterpret_cast<const QRgb *>(straight.constScanLine(yy));
+                for (int dx = -r; dx <= r; ++dx) {
+                    if (dx == 0 && dy == 0)
+                        continue;
+                    const int xx = x + dx;
+                    if (xx < 0 || xx >= w)
+                        continue;
+                    if (chanDiff(center, srow[xx]) > thr) {
+                        edge = true;
+                        break;
+                    }
+                }
+            }
+            row[x] = edge ? qRgba(255, 255, 255, a) : qRgba(0, 0, 0, a);
+        }
+    }
+    return dst;
+}
+
+QImage naiveSmartBlur(const QImage &srcPremul, int radius, int threshold, int mode)
+{
+    const int w = srcPremul.width();
+    const int h = srcPremul.height();
+    QImage work = toStraight(srcPremul);
+    if (mode == 1) {
+        work = naiveEdges(work, radius, threshold);
+    } else if (mode == 2) {
+        QImage edges = naiveEdges(work, radius, threshold);
+        work = toStraight(naiveSurfaceBlur(srcPremul, radius, threshold));
+        for (int y = 0; y < h; ++y) {
+            QRgb *d = reinterpret_cast<QRgb *>(work.scanLine(y));
+            const QRgb *e = reinterpret_cast<const QRgb *>(edges.constScanLine(y));
+            for (int x = 0; x < w; ++x) {
+                if (qRed(e[x]) > 128)
+                    d[x] = qRgba(0, 0, 0, qAlpha(d[x]));
+            }
+        }
+    } else {
+        return naiveSurfaceBlur(srcPremul, radius, threshold);
+    }
+    return toPremul(work, srcPremul.format());
+}
+
+quint32 tileHash(int tx, int ty, quint32 seed)
+{
+    quint32 h = seed ^ (quint32(tx) * 0x9E3779B9u) ^ (quint32(ty) * 0x85EBCA6Bu);
+    h ^= h >> 16;
+    h *= 0x7FEB352Du;
+    h ^= h >> 15;
+    h *= 0x846CA68Bu;
+    h ^= h >> 16;
+    return h;
+}
+
+int signedOffset(quint32 h, int maxAbs)
+{
+    if (maxAbs <= 0)
+        return 0;
+    const int span = maxAbs * 2 + 1;
+    return int(h % quint32(span)) - maxAbs;
+}
+
+QImage naiveTiles(const QImage &srcPremul, int count, int maxOffset, int fill, quint32 seed)
+{
+    const int w = srcPremul.width();
+    const int h = srcPremul.height();
+    const int n = qBound(2, count, 100);
+    QImage src = toStraight(srcPremul);
+    QImage dst(w, h, QImage::Format_ARGB32);
+    if (fill == 1) {
+        for (int y = 0; y < h; ++y) {
+            const QRgb *s = reinterpret_cast<const QRgb *>(src.constScanLine(y));
+            QRgb *d = reinterpret_cast<QRgb *>(dst.scanLine(y));
+            for (int x = 0; x < w; ++x) {
+                const QRgb p = s[x];
+                d[x] = qRgba(255 - qRed(p), 255 - qGreen(p), 255 - qBlue(p), qAlpha(p));
+            }
+        }
+    } else if (fill == 2) {
+        dst = src.copy();
+    } else {
+        dst.fill(qRgba(0, 0, 0, 0));
+    }
+    for (int ty = 0; ty < n; ++ty) {
+        const int y0 = (ty * h) / n;
+        const int y1 = ((ty + 1) * h) / n;
+        const int th = y1 - y0;
+        if (th <= 0)
+            continue;
+        const int maxOy = (th * maxOffset) / 100;
+        for (int tx = 0; tx < n; ++tx) {
+            const int x0 = (tx * w) / n;
+            const int x1 = ((tx + 1) * w) / n;
+            const int tw = x1 - x0;
+            if (tw <= 0)
+                continue;
+            const int maxOx = (tw * maxOffset) / 100;
+            const int ox = signedOffset(tileHash(tx, ty, seed), maxOx);
+            const int oy = signedOffset(tileHash(tx + 17, ty + 31, seed ^ 0xA5A5A5A5u), maxOy);
+            for (int sy = y0; sy < y1; ++sy) {
+                const int dy = sy + oy;
+                if (dy < 0 || dy >= h)
+                    continue;
+                const QRgb *srow = reinterpret_cast<const QRgb *>(src.constScanLine(sy));
+                QRgb *drow = reinterpret_cast<QRgb *>(dst.scanLine(dy));
+                for (int sx = x0; sx < x1; ++sx) {
+                    const int dx = sx + ox;
+                    if (dx < 0 || dx >= w)
+                        continue;
+                    drow[dx] = srow[sx];
+                }
+            }
+        }
+    }
+    return toPremul(dst, srcPremul.format());
+}
+
 QImage chunkedProjection(ImageDocument *doc)
 {
     Projection p;
@@ -395,6 +603,174 @@ int tC1Stylize()
                     QStringLiteral("径向模糊：参数往返"));
         } else {
             r.check(false, QStringLiteral("重新打开含径向模糊的 .pslite"));
+        }
+    }
+
+    {
+        const QImage src = PsTests::makeLayerImage(32, 24, 61, 255);
+        FilterNode n(OpName::SurfaceBlur);
+        n.setSurfaceRadius(3);
+        n.setSurfaceThreshold(40);
+        QImage got = src;
+        FilterEval::applyNode(got, n);
+        const long long d = PsTests::diffCount(got, naiveSurfaceBlur(src, 3, 40));
+        r.check(d == 0, QStringLiteral("表面模糊 == 朴素（diffs=%1）").arg(d));
+        r.check(PsTests::diffCount(src, got) > 0, QStringLiteral("表面模糊确实改变画面"));
+        r.check(n.inputPad() == 3, QStringLiteral("表面模糊 inputPad=半径"));
+    }
+
+    {
+        auto doc = ImageDocument::createBlank(128, 96, Qt::white);
+        doc->placeImageAsLayer(PsTests::makeLayerImage(100, 80, 73, 255), QStringLiteral("surf"));
+        doc->layers().layerAt(1)->setOffset(10, 8);
+        FilterNode n(OpName::SurfaceBlur);
+        n.setSurfaceRadius(2);
+        n.setSurfaceThreshold(30);
+        doc->layers().layerAt(1)->filters().append(n);
+        const long long dc =
+            PsTests::diffCount(Compositor::composite(*doc), chunkedProjection(doc.get()));
+        r.check(dc == 0, QStringLiteral("表面模糊：分块投影 == 整幅（diffs=%1）").arg(dc));
+    }
+
+    {
+        auto doc = ImageDocument::createBlank(64, 48, Qt::white);
+        doc->placeImageAsLayer(PsTests::makeLayerImage(48, 36, 11, 255), QStringLiteral("surf2"));
+        FilterNode n(OpName::SurfaceBlur);
+        n.setSurfaceRadius(7);
+        n.setSurfaceThreshold(55);
+        doc->layers().layerAt(1)->filters().append(n);
+        const QString path = PsTests::tempFilePath(QStringLiteral("surface.pslite"));
+        QString err;
+        const bool saved = ProjectIo::save(*doc, path, &err);
+        auto back = saved ? ProjectIo::load(path, &err) : nullptr;
+        if (back && back->layers().count() > 1 && back->layers().layerAt(1)->filters().count() > 0) {
+            const FilterNode &bn = back->layers().layerAt(1)->filters().at(0);
+            r.check(bn.op() == OpName::SurfaceBlur && bn.surfaceRadius() == 7
+                        && bn.surfaceThreshold() == 55,
+                    QStringLiteral("表面模糊：参数往返"));
+        } else {
+            r.check(false, QStringLiteral("重新打开含表面模糊的 .pslite"));
+        }
+    }
+
+    {
+        const QImage src = PsTests::makeLayerImage(28, 22, 83, 255);
+        for (int mode = 0; mode <= 2; ++mode) {
+            FilterNode n(OpName::SmartBlur);
+            n.setSmartRadius(2);
+            n.setSmartThreshold(35);
+            n.setSmartMode(mode);
+            QImage got = src;
+            FilterEval::applyNode(got, n);
+            const long long d = PsTests::diffCount(got, naiveSmartBlur(src, 2, 35, mode));
+            r.check(d == 0,
+                    QStringLiteral("特殊模糊 mode=%1 == 朴素（diffs=%2）").arg(mode).arg(d));
+        }
+        r.check(FilterNode(OpName::SmartBlur).inputPad() == 3,
+                QStringLiteral("特殊模糊默认 inputPad=3"));
+    }
+
+    {
+        auto doc = ImageDocument::createBlank(96, 72, Qt::white);
+        doc->placeImageAsLayer(PsTests::makeLayerImage(80, 60, 97, 255), QStringLiteral("smart"));
+        doc->layers().layerAt(1)->setOffset(8, 6);
+        FilterNode n(OpName::SmartBlur);
+        n.setSmartRadius(2);
+        n.setSmartThreshold(28);
+        n.setSmartMode(2);
+        doc->layers().layerAt(1)->filters().append(n);
+        const long long dc =
+            PsTests::diffCount(Compositor::composite(*doc), chunkedProjection(doc.get()));
+        r.check(dc == 0, QStringLiteral("特殊模糊：分块投影 == 整幅（diffs=%1）").arg(dc));
+    }
+
+    {
+        auto doc = ImageDocument::createBlank(64, 48, Qt::white);
+        doc->placeImageAsLayer(PsTests::makeLayerImage(48, 36, 19, 255), QStringLiteral("smart2"));
+        FilterNode n(OpName::SmartBlur);
+        n.setSmartRadius(4);
+        n.setSmartThreshold(42);
+        n.setSmartMode(1);
+        doc->layers().layerAt(1)->filters().append(n);
+        const QString path = PsTests::tempFilePath(QStringLiteral("smart.pslite"));
+        QString err;
+        const bool saved = ProjectIo::save(*doc, path, &err);
+        auto back = saved ? ProjectIo::load(path, &err) : nullptr;
+        if (back && back->layers().count() > 1 && back->layers().layerAt(1)->filters().count() > 0) {
+            const FilterNode &bn = back->layers().layerAt(1)->filters().at(0);
+            r.check(bn.op() == OpName::SmartBlur && bn.smartRadius() == 4
+                        && bn.smartThreshold() == 42 && bn.smartMode() == 1,
+                    QStringLiteral("特殊模糊：参数往返"));
+        } else {
+            r.check(false, QStringLiteral("重新打开含特殊模糊的 .pslite"));
+        }
+    }
+
+    {
+        const QImage src = PsTests::makeLayerImage(48, 36, 103, 255);
+        FilterNode n(OpName::Tiles);
+        n.setTilesCount(4);
+        n.setTilesMaxOffset(40);
+        n.setTilesFill(0);
+        n.setTilesSeed(0xDEADBEEFu);
+        QImage got = src;
+        FilterEval::applyNode(got, n);
+        const long long d =
+            PsTests::diffCount(got, naiveTiles(src, 4, 40, 0, 0xDEADBEEFu));
+        r.check(d == 0, QStringLiteral("拼贴透明填充 == 朴素（diffs=%1）").arg(d));
+        r.check(PsTests::diffCount(src, got) > 0, QStringLiteral("拼贴确实改变画面"));
+        r.check(n.inputPad() == 0, QStringLiteral("拼贴 inputPad=0（整层）"));
+    }
+
+    {
+        const QImage src = PsTests::makeLayerImage(40, 40, 109, 255);
+        FilterNode n(OpName::Tiles);
+        n.setTilesCount(5);
+        n.setTilesMaxOffset(25);
+        n.setTilesFill(1);
+        n.setTilesSeed(42u);
+        QImage got = src;
+        FilterEval::applyNode(got, n);
+        const long long d = PsTests::diffCount(got, naiveTiles(src, 5, 25, 1, 42u));
+        r.check(d == 0, QStringLiteral("拼贴反相填充 == 朴素（diffs=%1）").arg(d));
+    }
+
+    {
+        auto doc = ImageDocument::createBlank(128, 96, Qt::white);
+        doc->placeImageAsLayer(PsTests::makeLayerImage(100, 80, 113, 255), QStringLiteral("tiles"));
+        doc->layers().layerAt(1)->setOffset(12, 8);
+        FilterNode n(OpName::Tiles);
+        n.setTilesCount(6);
+        n.setTilesMaxOffset(30);
+        n.setTilesFill(2);
+        doc->layers().layerAt(1)->filters().append(n);
+        r.check(doc->layers().layerAt(1)->filters().hasPositionalOp(),
+                QStringLiteral("拼贴走位置相关（整层）路径"));
+        const long long dc =
+            PsTests::diffCount(Compositor::composite(*doc), chunkedProjection(doc.get()));
+        r.check(dc == 0, QStringLiteral("拼贴：分块投影 == 整幅（diffs=%1）").arg(dc));
+    }
+
+    {
+        auto doc = ImageDocument::createBlank(64, 48, Qt::white);
+        doc->placeImageAsLayer(PsTests::makeLayerImage(48, 36, 127, 255), QStringLiteral("tiles2"));
+        FilterNode n(OpName::Tiles);
+        n.setTilesCount(8);
+        n.setTilesMaxOffset(15);
+        n.setTilesFill(1);
+        n.setTilesSeed(0xABCDu);
+        doc->layers().layerAt(1)->filters().append(n);
+        const QString path = PsTests::tempFilePath(QStringLiteral("tiles.pslite"));
+        QString err;
+        const bool saved = ProjectIo::save(*doc, path, &err);
+        auto back = saved ? ProjectIo::load(path, &err) : nullptr;
+        if (back && back->layers().count() > 1 && back->layers().layerAt(1)->filters().count() > 0) {
+            const FilterNode &bn = back->layers().layerAt(1)->filters().at(0);
+            r.check(bn.op() == OpName::Tiles && bn.tilesCount() == 8 && bn.tilesMaxOffset() == 15
+                        && bn.tilesFill() == 1 && bn.tilesSeed() == 0xABCDu,
+                    QStringLiteral("拼贴：参数往返"));
+        } else {
+            r.check(false, QStringLiteral("重新打开含拼贴的 .pslite"));
         }
     }
 

@@ -14,6 +14,9 @@
 #include "findedgesfilterop.h"
 #include "fragmentfilterop.h"
 #include "radialblurfilterop.h"
+#include "smartblurfilterop.h"
+#include "surfaceblurfilterop.h"
+#include "tilesfilterop.h"
 #include "tracecontourfilterop.h"
 #include "windfilterop.h"
 #include "floodfillop.h"
@@ -173,6 +176,12 @@ void opsInit()
                      [] { return std::unique_ptr<FilterOp>(new TraceContourFilterOp); });
     registerFilterOp(OpName::RadialBlur,
                      [] { return std::unique_ptr<FilterOp>(new RadialBlurFilterOp); });
+    registerFilterOp(OpName::SurfaceBlur,
+                     [] { return std::unique_ptr<FilterOp>(new SurfaceBlurFilterOp); });
+    registerFilterOp(OpName::SmartBlur,
+                     [] { return std::unique_ptr<FilterOp>(new SmartBlurFilterOp); });
+    registerFilterOp(OpName::Tiles,
+                     [] { return std::unique_ptr<FilterOp>(new TilesFilterOp); });
 }
 
 } // namespace Ps

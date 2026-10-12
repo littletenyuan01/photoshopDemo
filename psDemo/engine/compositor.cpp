@@ -42,22 +42,29 @@ namespace {
  * @param mode 混合模式（**按值**传入）。不再依赖常驻 `LayerModeOp` 实例：
  *        那是共享可变状态，按 chunk 并行合成会竞态；颜色算法本就在 `Blend::pixel`。
  */
+/**
+ * 把源瓦片混到 @p dst。
+ * @p dstOrigin 为 dst(0,0) 对应的**文档坐标**；整幅投影时为 (0,0)，
+ * 调整层面积算子的子缓冲则为 srcWant.topLeft()（只分配外扩矩形，不建整幅临时图）。
+ */
 void blendTileOnto(QImage &dst,
                    const QImage &src,
                    int ox,
                    int oy,
                    qreal opacity,
                    BlendMode mode,
-                   const QRect &dirty,
+                   const QRect &dirtyDoc,
                    const LayerMask *mask,
                    int layerOx,
-                   int layerOy)
+                   int layerOy,
+                   QPoint dstOrigin = QPoint(0, 0))
 {
     if (opacity <= 0.0 || src.isNull())
         return;
 
+    const QRect dstDocRect(dstOrigin.x(), dstOrigin.y(), dst.width(), dst.height());
     const QRect tileRect(ox, oy, src.width(), src.height());
-    const QRect area = dirty.intersected(dst.rect()).intersected(tileRect);
+    const QRect area = dirtyDoc.intersected(dstDocRect).intersected(tileRect);
     if (area.isEmpty())
         return;
 
@@ -65,7 +72,8 @@ void blendTileOnto(QImage &dst,
     const bool useMask = mask && mask->isEnabled() && !mask->isNull();
 
     for (int y = area.top(); y <= area.bottom(); ++y) {
-        QRgb *dline = reinterpret_cast<QRgb *>(dst.scanLine(y)) + area.left();
+        QRgb *dline = reinterpret_cast<QRgb *>(dst.scanLine(y - dstOrigin.y()))
+                      + (area.left() - dstOrigin.x());
         const QRgb *sline = reinterpret_cast<const QRgb *>(src.constScanLine(y - oy))
                             + (area.left() - ox);
 
@@ -76,6 +84,189 @@ void blendTileOnto(QImage &dst,
                                           dissolving, docX, y, maskV);
         }
     }
+}
+
+/**
+ * 叠层实现：@p dst 可以是整幅投影，也可以是「文档矩形 @p rect」对应的子图
+ * （此时 @p dstOrigin 必须等于 rect.topLeft()，且 dst.size()==rect.size()）。
+ */
+bool blendLayerRangeImpl(QImage &dst,
+                         const ImageDocument &doc,
+                         const QRect &rect,
+                         int layerBegin,
+                         int layerEnd,
+                         int skipLayer,
+                         QPoint dstOrigin)
+{
+    const QRect dstDocRect(dstOrigin.x(), dstOrigin.y(), dst.width(), dst.height());
+    const QRect area = rect.intersected(dstDocRect)
+                           .intersected(QRect(0, 0, doc.width(), doc.height()));
+    if (area.isEmpty())
+        return true;
+
+    const LayerStack &stack = doc.layers();
+    const int lo = qMax(0, layerBegin);
+    const int hi = qMin(stack.count(), layerEnd);
+    for (int i = lo; i < hi; ++i) {
+        if (i == skipLayer)
+            continue;
+        const Layer *layer = stack.layerAt(i);
+        if (!layer || !layer->isVisible() || layer->opacity() <= 0.0)
+            continue;
+
+        // 调整层：滤镜作用在下方阶段性合成上，再按不透明度/蒙版写回
+        if (layer->isAdjustmentLayer()) {
+            if (!layer->filters().hasEnabled())
+                continue;
+
+            const QRect docBounds(0, 0, doc.width(), doc.height());
+            // 文档坐标：面积算子要外扩邻居；不能从共享投影读 pad（邻块可能未合成/并行冲突）
+            const QRect srcWant =
+                layer->filters().requiredInputRect(area).intersected(docBounds);
+
+            QImage filtered;
+            if (srcWant == area && dstOrigin == QPoint(0, 0)
+                && dst.width() == doc.width() && dst.height() == doc.height()) {
+                // 点算子快路径：下方结果已在投影 dst 的 area 里
+                filtered = layer->filters().apply(dst.copy(area));
+            } else {
+                QImage below(srcWant.size(), QImage::Format_ARGB32_Premultiplied);
+                below.fill(Qt::transparent);
+                if (!blendLayerRangeImpl(below, doc, srcWant, lo, i, skipLayer,
+                                         srcWant.topLeft()))
+                    return false;
+                QImage work = layer->filters().apply(below, srcWant, area, nullptr);
+                if (work.isNull())
+                    continue;
+                const int dx = area.left() - srcWant.left();
+                const int dy = area.top() - srcWant.top();
+                if (work.width() == area.width() && work.height() == area.height()
+                    && dx == 0 && dy == 0) {
+                    filtered = work;
+                } else {
+                    filtered = work.copy(dx, dy, area.width(), area.height());
+                }
+            }
+            if (filtered.isNull())
+                continue;
+
+            const LayerMask *rawMask = (layer->hasMask() && layer->mask()
+                                        && layer->mask()->isEnabled())
+                                           ? layer->mask()
+                                           : nullptr;
+            const LayerMask *mask =
+                (rawMask && !rawMask->isFullyOpaque()) ? rawMask : nullptr;
+            const qreal opacity = layer->opacity();
+            const int layerOx = layer->offsetX();
+            const int layerOy = layer->offsetY();
+
+            if (opacity >= 0.999 && !mask) {
+                const int copyW = qMin(area.width(), filtered.width());
+                const int copyH = qMin(area.height(), filtered.height());
+                for (int y = 0; y < copyH; ++y) {
+                    QRgb *dline =
+                        reinterpret_cast<QRgb *>(dst.scanLine(area.top() + y - dstOrigin.y()))
+                        + (area.left() - dstOrigin.x());
+                    const QRgb *fline =
+                        reinterpret_cast<const QRgb *>(filtered.constScanLine(y));
+                    std::memcpy(dline, fline, size_t(copyW) * sizeof(QRgb));
+                }
+            } else {
+                for (int y = area.top(); y <= area.bottom(); ++y) {
+                    QRgb *dline = reinterpret_cast<QRgb *>(dst.scanLine(y - dstOrigin.y()))
+                                  + (area.left() - dstOrigin.x());
+                    const QRgb *fline =
+                        reinterpret_cast<const QRgb *>(filtered.constScanLine(y - area.top()));
+                    for (int x = 0; x < area.width(); ++x) {
+                        qreal t = opacity;
+                        if (mask) {
+                            const int lx = (area.left() + x) - layerOx;
+                            const int ly = y - layerOy;
+                            t *= mask->valueAt(lx, ly) / 255.0;
+                        }
+                        if (t <= 0.0)
+                            continue;
+                        if (t >= 0.999) {
+                            dline[x] = fline[x];
+                            continue;
+                        }
+                        const QRgb d = dline[x];
+                        const QRgb f = fline[x];
+                        const int or_ = qBound(0, int(qRed(d) + (qRed(f) - qRed(d)) * t + 0.5), 255);
+                        const int og = qBound(0, int(qGreen(d) + (qGreen(f) - qGreen(d)) * t + 0.5), 255);
+                        const int ob = qBound(0, int(qBlue(d) + (qBlue(f) - qBlue(d)) * t + 0.5), 255);
+                        const int oa = qBound(0, int(qAlpha(d) + (qAlpha(f) - qAlpha(d)) * t + 0.5), 255);
+                        dline[x] = qRgba(or_, og, ob, oa);
+                    }
+                }
+            }
+            continue;
+        }
+
+        const bool hasPreview = layer->hasCompositePreview();
+        if (!layer->hasPixelData() && !hasPreview)
+            continue;
+
+        const BlendMode mode = layer->blendMode();
+        if (!PointOpRegistry::find(layerModeOperation(mode)))
+            continue;
+
+        const int layerOx = layer->offsetX();
+        const int layerOy = layer->offsetY();
+        const qreal opacity = layer->opacity();
+        const LayerMask *rawMask = (layer->hasMask() && layer->mask()
+                                    && layer->mask()->isEnabled())
+                                       ? layer->mask()
+                                       : nullptr;
+        const LayerMask *mask =
+            (rawMask && !rawMask->isFullyOpaque()) ? rawMask : nullptr;
+
+        const QRect localArea = area.translated(-layerOx, -layerOy);
+
+        if (hasPreview) {
+            if (layer->hasPixelData()) {
+                layer->tiles().forEachTileInRect(
+                    localArea,
+                    [&](int, int, const QImage &tile, const QRect &bounds) {
+                        blendTileOnto(dst, tile,
+                                      bounds.x() + layerOx,
+                                      bounds.y() + layerOy,
+                                      opacity, mode, area,
+                                      mask, layerOx, layerOy, dstOrigin);
+                    });
+            }
+            blendTileOnto(dst, layer->compositePreview(),
+                          layer->compositePreviewDocX(),
+                          layer->compositePreviewDocY(),
+                          opacity, mode, area,
+                          mask, layerOx, layerOy, dstOrigin);
+            continue;
+        }
+
+        const bool needMaterialize = layer->filters().hasEnabled()
+                                     || layer->styles().hasEnabled();
+        if (needMaterialize) {
+            const Layer::CompositeRegion r = layer->compositeRasterRegion(area);
+            if (!r.image.isNull()) {
+                blendTileOnto(dst, r.image, r.docX, r.docY,
+                              opacity, mode, area,
+                              mask, layerOx, layerOy, dstOrigin);
+            }
+            continue;
+        }
+
+        layer->tiles().forEachTileInRect(
+            localArea,
+            [&](int, int, const QImage &tile, const QRect &bounds) {
+                blendTileOnto(dst, tile,
+                              bounds.x() + layerOx,
+                              bounds.y() + layerOy,
+                              opacity, mode, area,
+                              mask, layerOx, layerOy, dstOrigin);
+            });
+    }
+
+    return true;
 }
 
 } // namespace
@@ -131,170 +322,8 @@ bool Compositor::blendLayerRange(QImage &dst,
         return false;
     }
 
-    const QRect area = rect.intersected(dst.rect());
-    if (area.isEmpty())
-        return true;
-
-    const LayerStack &stack = doc.layers();
-    const int lo = qMax(0, layerBegin);
-    const int hi = qMin(stack.count(), layerEnd);
-    for (int i = lo; i < hi; ++i) {
-        if (i == skipLayer)
-            continue;
-        const Layer *layer = stack.layerAt(i);
-        if (!layer || !layer->isVisible() || layer->opacity() <= 0.0)
-            continue;
-
-        // 调整层：滤镜作用在下方阶段性合成（dst）上，再按不透明度/蒙版写回
-        // 对照 PS 调整图层；GIMP 原生无此层种（drawable filter 只改本层像素）
-        if (layer->isAdjustmentLayer()) {
-            if (!layer->filters().hasEnabled())
-                continue;
-
-            QImage filtered = layer->filters().apply(dst.copy(area));
-            if (filtered.isNull())
-                continue;
-
-            const LayerMask *rawMask = (layer->hasMask() && layer->mask()
-                                        && layer->mask()->isEnabled())
-                                           ? layer->mask()
-                                           : nullptr;
-            // 默认白蒙版（全 255）等价于无蒙版，走 QPainter 整区替换
-            const LayerMask *mask =
-                (rawMask && !rawMask->isFullyOpaque()) ? rawMask : nullptr;
-            const qreal opacity = layer->opacity();
-            const int layerOx = layer->offsetX();
-            const int layerOy = layer->offsetY();
-
-            // opacity≈1 且无有效蒙版：整区替换。
-            // 直接逐行拷贝，不用 QPainter：同一 paint device 不能被多个 QPainter 同时绘制
-            // （按 chunk 并行时会崩），而这里本就是 Source 模式的整幅贴图。
-            if (opacity >= 0.999 && !mask) {
-                const int copyW = qMin(area.width(), filtered.width());
-                const int copyH = qMin(area.height(), filtered.height());
-                for (int y = 0; y < copyH; ++y) {
-                    QRgb *dline = reinterpret_cast<QRgb *>(dst.scanLine(area.top() + y))
-                                  + area.left();
-                    const QRgb *fline =
-                        reinterpret_cast<const QRgb *>(filtered.constScanLine(y));
-                    std::memcpy(dline, fline, size_t(copyW) * sizeof(QRgb));
-                }
-            } else {
-                for (int y = area.top(); y <= area.bottom(); ++y) {
-                    QRgb *dline = reinterpret_cast<QRgb *>(dst.scanLine(y))
-                                  + area.left();
-                    const QRgb *fline =
-                        reinterpret_cast<const QRgb *>(filtered.constScanLine(y - area.top()))
-                        + 0;
-                    for (int x = 0; x < area.width(); ++x) {
-                        qreal t = opacity;
-                        if (mask) {
-                            const int lx = (area.left() + x) - layerOx;
-                            const int ly = y - layerOy;
-                            t *= mask->valueAt(lx, ly) / 255.0;
-                        }
-                        if (t <= 0.0)
-                            continue;
-                        if (t >= 0.999) {
-                            dline[x] = fline[x];
-                            continue;
-                        }
-                        const QRgb d = dline[x];
-                        const QRgb f = fline[x];
-                        const int dr = qRed(d);
-                        const int dg = qGreen(d);
-                        const int db = qBlue(d);
-                        const int da = qAlpha(d);
-                        const int fr = qRed(f);
-                        const int fg = qGreen(f);
-                        const int fb = qBlue(f);
-                        const int fa = qAlpha(f);
-                        const int or_ = qBound(0, int(dr + (fr - dr) * t + 0.5), 255);
-                        const int og = qBound(0, int(dg + (fg - dg) * t + 0.5), 255);
-                        const int ob = qBound(0, int(db + (fb - db) * t + 0.5), 255);
-                        const int oa = qBound(0, int(da + (fa - da) * t + 0.5), 255);
-                        dline[x] = qRgba(or_, og, ob, oa);
-                    }
-                }
-            }
-            continue;
-        }
-
-        const bool hasPreview = layer->hasCompositePreview();
-        if (!layer->hasPixelData() && !hasPreview)
-            continue;
-
-        // 只做注册表「是否已初始化」的**只读**校验；不再取常驻 LayerModeOp 实例：
-        // 那是共享可变状态（setMode 写 m_mode），并行合成必然竞态。颜色算法本就在
-        // Blend::pixel，此处把 mode 作为值往下传（compositePixelOnto 同样按值收 mode）。
-        const BlendMode mode = layer->blendMode();
-        if (!PointOpRegistry::find(layerModeOperation(mode)))
-            continue;
-
-        const int layerOx = layer->offsetX();
-        const int layerOy = layer->offsetY();
-        const qreal opacity = layer->opacity();
-        // 有蒙版且启用时乘到层 alpha（对照 GIMP Applicator aux / layer mask）
-        // 全白蒙版跳过，避免无谓的 valueAt 乘算
-        const LayerMask *rawMask = (layer->hasMask() && layer->mask()
-                                    && layer->mask()->isEnabled())
-                                       ? layer->mask()
-                                       : nullptr;
-        const LayerMask *mask =
-            (rawMask && !rawMask->isFullyOpaque()) ? rawMask : nullptr;
-
-        // 只遍历与本矩形相交的瓦片格（旧写法遍历该层**全部**瓦片再逐个判交，
-        // 分块重算时是 O(块数 × 层数 × 总瓦片数)）
-        const QRect localArea = area.translated(-layerOx, -layerOy);
-
-        // 会话预览覆盖：瓦片（含挖空）+ 预览图叠在同一层位置，z 序不变
-        if (hasPreview) {
-            if (layer->hasPixelData()) {
-                layer->tiles().forEachTileInRect(
-                    localArea,
-                    [&](int, int, const QImage &tile, const QRect &bounds) {
-                        blendTileOnto(dst, tile,
-                                      bounds.x() + layerOx,
-                                      bounds.y() + layerOy,
-                                      opacity, mode, area,
-                                      mask, layerOx, layerOy);
-                    });
-            }
-            blendTileOnto(dst, layer->compositePreview(),
-                          layer->compositePreviewDocX(),
-                          layer->compositePreviewDocY(),
-                          opacity, mode, area,
-                          mask, layerOx, layerOy);
-            continue;
-        }
-
-        const bool needMaterialize = layer->filters().hasEnabled()
-                                     || layer->styles().hasEnabled();
-        if (needMaterialize) {
-            // **按 area 区域**求值，而不是整层：整层粒度会让「画一笔」也重建全幅
-            // 滤镜链（实测 447ms @2000x1500 + 3 点滤镜）。点滤镜逐像素，按区域与
-            // 「整层后裁剪」逐像素等价；有样式时该函数内部退回整层缓存。
-            const Layer::CompositeRegion r = layer->compositeRasterRegion(area);
-            if (!r.image.isNull()) {
-                blendTileOnto(dst, r.image, r.docX, r.docY,
-                              opacity, mode, area,
-                              mask, layerOx, layerOy);
-            }
-            continue;
-        }
-
-        layer->tiles().forEachTileInRect(
-            localArea,
-            [&](int, int, const QImage &tile, const QRect &bounds) {
-                blendTileOnto(dst, tile,
-                              bounds.x() + layerOx,
-                              bounds.y() + layerOy,
-                              opacity, mode, area,
-                              mask, layerOx, layerOy);
-            });
-    }
-
-    return true;
+    return blendLayerRangeImpl(dst, doc, rect, layerBegin, layerEnd, skipLayer,
+                               QPoint(0, 0));
 }
 
 void Compositor::warmLayerCaches(const ImageDocument &doc)

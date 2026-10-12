@@ -44,6 +44,8 @@ int tRipple();
 int tRasterBackend();
 int tGpuMedian();
 int tGpuCustom();
+int tGpuT47();
+int tAdjArea();
 int tC1Pixelate();
 int tC1Stylize();
 
@@ -79,8 +81,10 @@ const Case kCases[] = {
     { "rasterbackend", "滤镜链后端调度：CPU 搬迁 bit-exact、降级/熔断/supports/取消", tRasterBackend },
     { "gpumedian", "有 GPU 才跑：中值 vs CPU（容差≤1）；无 GPU 跳过", tGpuMedian },
     { "gpucustom", "有 GPU 才跑：自定 3×3 vs CPU（容差≤1）；无 GPU 跳过", tGpuCustom },
+    { "gput47", "有 GPU 才跑：T4.7 锐化/浮雕/最大/最小 vs CPU（容差≤1）；无 GPU 跳过", tGpuT47 },
+    { "adjarea", "调整层+面积算子：子缓冲外扩、分块投影==整幅、往返", tAdjArea },
     { "c1pixelate", "C1 马赛克/碎片：oracle、分块投影、往返", tC1Pixelate },
-    { "c1stylize", "C1 风/等高线/径向模糊：oracle、分块投影、往返", tC1Stylize },
+    { "c1stylize", "C1 风/等高线/径向/表面/特殊模糊/拼贴：oracle、分块投影、往返", tC1Stylize },
 };
 
 } // namespace

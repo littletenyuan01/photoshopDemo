@@ -249,6 +249,31 @@ public:
     int radialMethod() const { return m_radialMethod; }
     void setRadialMethod(int v) { m_radialMethod = qBound(0, v, 1); }
 
+    // —— 表面模糊：半径（1..20）+ 阈值（0..255）——
+    int surfaceRadius() const { return m_surfaceRadius; }
+    void setSurfaceRadius(int v) { m_surfaceRadius = qBound(1, v, 20); }
+    int surfaceThreshold() const { return m_surfaceThreshold; }
+    void setSurfaceThreshold(int v) { m_surfaceThreshold = qBound(0, v, 255); }
+
+    // —— 特殊模糊：半径 + 阈值 + 模式（0 正常 / 1 仅边缘 / 2 叠加边缘）——
+    int smartRadius() const { return m_smartRadius; }
+    void setSmartRadius(int v) { m_smartRadius = qBound(1, v, 20); }
+    int smartThreshold() const { return m_smartThreshold; }
+    void setSmartThreshold(int v) { m_smartThreshold = qBound(0, v, 255); }
+    int smartMode() const { return m_smartMode; }
+    void setSmartMode(int v) { m_smartMode = qBound(0, v, 2); }
+
+    // —— 拼贴：每边块数 + 最大偏移% + 空隙填充 + 种子（确定性）——
+    int tilesCount() const { return m_tilesCount; }
+    void setTilesCount(int v) { m_tilesCount = qBound(2, v, 100); }
+    int tilesMaxOffset() const { return m_tilesMaxOffset; }
+    void setTilesMaxOffset(int v) { m_tilesMaxOffset = qBound(0, v, 100); }
+    /** 0 透明（背景）/ 1 反相 / 2 原图未改。 */
+    int tilesFill() const { return m_tilesFill; }
+    void setTilesFill(int v) { m_tilesFill = qBound(0, v, 2); }
+    quint32 tilesSeed() const { return m_tilesSeed; }
+    void setTilesSeed(quint32 v) { m_tilesSeed = v; }
+
     // —— 添加杂色：数量（0..100 %）+ 分布（均匀/高斯）+ 单色 + 种子 ——
     int noiseAmount() const { return m_noiseAmount; }
     void setNoiseAmount(int v) { m_noiseAmount = qBound(0, v, 100); }
@@ -358,6 +383,12 @@ public:
         n.m_radialAmount = shrink(m_radialAmount);
         if (n.m_radialAmount < 1)
             n.m_radialAmount = 1;
+        n.m_surfaceRadius = shrink(m_surfaceRadius);
+        if (n.m_surfaceRadius < 1)
+            n.m_surfaceRadius = 1;
+        n.m_smartRadius = shrink(m_smartRadius);
+        if (n.m_smartRadius < 1)
+            n.m_smartRadius = 1;
         return n;
     }
 
@@ -408,6 +439,12 @@ public:
         case OpName::TraceContour:
             return 1; // 4-邻接
         case OpName::RadialBlur:
+            return 0; // 位置相关，走整层（见 FilterStack::hasPositionalOp）
+        case OpName::SurfaceBlur:
+            return m_surfaceRadius;
+        case OpName::SmartBlur:
+            return m_smartRadius;
+        case OpName::Tiles:
             return 0; // 位置相关，走整层（见 FilterStack::hasPositionalOp）
         default:
             return 0;
@@ -488,6 +525,15 @@ private:
     int m_contourEdge = 0;
     int m_radialAmount = 10;
     int m_radialMethod = 0;
+    int m_surfaceRadius = 5;
+    int m_surfaceThreshold = 15;
+    int m_smartRadius = 3;
+    int m_smartThreshold = 25;
+    int m_smartMode = 0;
+    int m_tilesCount = 10;
+    int m_tilesMaxOffset = 10;
+    int m_tilesFill = 0;
+    quint32 m_tilesSeed = 0xC0FFEE01u;
 };
 
 } // namespace Ps

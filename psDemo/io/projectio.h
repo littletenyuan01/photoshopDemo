@@ -21,7 +21,7 @@ class ImageDocument;
  * 仅 Current；不兼容变更时改此值。滤镜参数块大小见 projectio.cpp `kFilterNodeParamBytes`。
  */
 enum class ProjectFormat : quint32 {
-    Current = 2, ///< 滤镜节点：op+enabled+固定 512B 参数块（含预留）
+    Current = 3, ///< 滤镜节点：op+enabled+固定 1024B 参数块（含预留；v2 为 512B）
 };
 
 /**

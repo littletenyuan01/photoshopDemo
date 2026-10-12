@@ -373,8 +373,10 @@ int tAreaFilter()
 
     // —— ④ 护栏 + 往返 ——
     {
-        r.check(!isAdjustmentOp(OpName::BoxBlur),
-                QStringLiteral("BoxBlur 不是调整层算子（护栏）"));
+        r.check(isAdjustmentOp(OpName::BoxBlur),
+                QStringLiteral("BoxBlur 是调整层算子（子缓冲外扩已接）"));
+        r.check(!isAdjustmentOp(OpName::Offset),
+                QStringLiteral("Offset 仍不是调整层算子"));
 
         auto doc = ImageDocument::createBlank(64, 64, Qt::white);
         doc->placeImageAsLayer(PsTests::makeLayerImage(64, 64, 9, 255), QStringLiteral("blurL"));
@@ -459,7 +461,7 @@ int tAreaFilter()
         const long long d0 = PsTests::diffCount(plain, noOp);
         r.check(d0 == 0, QStringLiteral("USM 强度 0 == 未加滤镜（diffs=%1）").arg(d0));
 
-        // 往返：USM 三个新字段都要能存回来（projectio 在固定 512B 块尾部追加）
+        // 往返：USM 三个新字段都要能存回来（projectio 在固定参数块尾部追加）
         layer->filters().at(0).setUsmRadius(3);
         layer->filters().at(0).setUsmAmount(2.0);
         layer->filters().at(0).setUsmThreshold(7);

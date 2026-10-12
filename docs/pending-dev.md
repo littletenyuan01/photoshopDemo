@@ -654,7 +654,9 @@ sliderReleased → setLayerFilterNode(..., pushUndo=true)
 
 **仍欠（下一轮）**：
 
-- **调整层 + 面积算子**：调整层滤镜的是「下方合成结果」= 共享投影缓冲，其 ROI 外扩要解决「外扩区可能落在未合成的块上」→ 需要合成器支持**子缓冲/偏移**（在临时区算、只拷回请求区），或按层反向扫描每层 `need_i`。本轮用 `isAdjustmentOp(BoxBlur)==false` 作护栏，避免静默错像素。
+- ~~**调整层 + 面积算子**~~ ✅：合成器 `blendLayerRangeImpl` 对 `requiredInputRect` 外扩走**私有子缓冲**
+  （下方层叠到 srcWant、滤镜后只写回请求区）；点算子仍读投影本块。护栏改为只挡 Offset / 位置相关。
+  用例 `adjarea`。
 - 更多面积算子：中值、锐化（USM）、Sobel、位移（参考 GIMP `gimpoperationoffset.c`）。
 - abyss 策略固定为「透明」；GEGL 有 CLIP / LOOP / BLACK / WHITE / TRANSPARENT，后续可参数化。
 
@@ -684,7 +686,7 @@ sliderReleased → setLayerFilterNode(..., pushUndo=true)
 语义 oracle 仍 diffs=0（算法搬移行为等价）。全套 12/12，主程序干净重建 0/0。
 
 **仍欠（下一轮）**：其余**有资源**的滤镜（中值、锐化 USM 等）新增时逐个迁入 `FilterOp`，不要再写自由函数；
-「调整层 + 面积算子」的 ROI 外扩仍未接共享缓冲合成路径（仍由 `isAdjustmentOp(BoxBlur)==false` 护栏）。
+~~「调整层 + 面积算子」的 ROI 外扩~~ ✅ 已接子缓冲路径（见上节与 `adjarea`）。
 
 ---
 
@@ -1642,7 +1644,7 @@ Custom ≈48 ns/px、Gauss ≈19。Q11–Q13 关闭。维持 opt-in。
 0. T4.4 独显 / 无 GPU 机验证。
 1. T4.5 成本表 `187` vs 实测。
 2. T4.6 GLES2 回退说明或去掉。
-3. ★ **T4.7** 近零成本扩覆盖（Sharpen/Emboss/FindEdges → custom；Max/Min → 计数选择）。
+3. ~~★ **T4.7** 近零成本扩覆盖~~ ✅（Sharpen/Emboss → custom；Max/Min → median+kth；FindEdges 非线性未进）。
 4. T3.0 `AddNoise` / T3.1 Gauss —— **禁止整表铺开**。
 
 ---

@@ -410,6 +410,18 @@ void MainWindow::setupMenus()
     ui->actionRadialBlur->setToolTip(tr("径向模糊（旋转/缩放；非破坏）"));
     connect(ui->actionRadialBlur, &QAction::triggered, this,
             [this]() { runFilterDialog(Ps::OpName::RadialBlur); });
+    ui->actionSurfaceBlur->setEnabled(true);
+    ui->actionSurfaceBlur->setToolTip(tr("表面模糊（保边；非破坏）"));
+    connect(ui->actionSurfaceBlur, &QAction::triggered, this,
+            [this]() { runFilterDialog(Ps::OpName::SurfaceBlur); });
+    ui->actionSmartBlur->setEnabled(true);
+    ui->actionSmartBlur->setToolTip(tr("特殊模糊（保边/边缘模式；非破坏）"));
+    connect(ui->actionSmartBlur, &QAction::triggered, this,
+            [this]() { runFilterDialog(Ps::OpName::SmartBlur); });
+    ui->actionTiles->setEnabled(true);
+    ui->actionTiles->setToolTip(tr("拼贴（网格切块偏移；非破坏，偏移可复现）"));
+    connect(ui->actionTiles, &QAction::triggered, this,
+            [this]() { runFilterDialog(Ps::OpName::Tiles); });
 
     // 滤镜 → 杂色 → 添加杂色（点算子；噪声是 (x,y,seed) 的确定函数，故整层求值）
     ui->actionAddNoise->setEnabled(true);
@@ -1757,6 +1769,17 @@ void MainWindow::runFilterDialog(Ps::OpName op)
     } else if (op == Ps::OpName::RadialBlur) {
         node.setRadialAmount(10);
         node.setRadialMethod(0);
+    } else if (op == Ps::OpName::SurfaceBlur) {
+        node.setSurfaceRadius(5);
+        node.setSurfaceThreshold(15);
+    } else if (op == Ps::OpName::SmartBlur) {
+        node.setSmartRadius(3);
+        node.setSmartThreshold(25);
+        node.setSmartMode(0);
+    } else if (op == Ps::OpName::Tiles) {
+        node.setTilesCount(10);
+        node.setTilesMaxOffset(10);
+        node.setTilesFill(0);
     } else if (op == Ps::OpName::MotionBlur) {
         node.setMotionDistance(10);
         node.setMotionAngle(30);

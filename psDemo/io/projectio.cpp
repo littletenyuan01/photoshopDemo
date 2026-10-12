@@ -80,7 +80,7 @@ bool readLayerStyles(QDataStream &in, LayerStyleStack *styles)
 }
 
 /** 每个滤镜节点参数块固定长度；已用字段从前写，尾部预留填 0。用尽前勿改此常量。 */
-constexpr int kFilterNodeParamBytes = 512;
+constexpr int kFilterNodeParamBytes = 1024; // v3：原 512 已用尽（~520B）；加大并升 ProjectFormat
 
 void writeFilterNodeParams(QDataStream &p, const FilterNode &n)
 {
@@ -131,6 +131,10 @@ void writeFilterNodeParams(QDataStream &p, const FilterNode &n)
     p << qint32(n.windDirection()) << qint32(n.windMethod()) << qint32(n.windStrength());
     p << qint32(n.contourLevel()) << qint32(n.contourEdge());
     p << qint32(n.radialAmount()) << qint32(n.radialMethod());
+    p << qint32(n.surfaceRadius()) << qint32(n.surfaceThreshold());
+    p << qint32(n.smartRadius()) << qint32(n.smartThreshold()) << qint32(n.smartMode());
+    p << qint32(n.tilesCount()) << qint32(n.tilesMaxOffset()) << qint32(n.tilesFill())
+      << quint32(n.tilesSeed());
     // —— 预留：后续新参数追加在此注释之后、勿改已有顺序 ——
 }
 
@@ -188,6 +192,15 @@ bool readFilterNodeParams(QDataStream &p, FilterNode *n)
     qint32 contourEdge = 0;
     qint32 radialAmount = 10;
     qint32 radialMethod = 0;
+    qint32 surfaceRadius = 5;
+    qint32 surfaceThreshold = 15;
+    qint32 smartRadius = 3;
+    qint32 smartThreshold = 25;
+    qint32 smartMode = 0;
+    qint32 tilesCount = 10;
+    qint32 tilesMaxOffset = 10;
+    qint32 tilesFill = 0;
+    quint32 tilesSeed = 0xC0FFEE01u;
     p >> brightness >> contrast;
     p >> hue >> saturation >> lightness >> vibrance;
     p >> exposure >> exposureOffset >> gammaCorrection;
@@ -221,6 +234,9 @@ bool readFilterNodeParams(QDataStream &p, FilterNode *n)
     p >> windDirection >> windMethod >> windStrength;
     p >> contourLevel >> contourEdge;
     p >> radialAmount >> radialMethod;
+    p >> surfaceRadius >> surfaceThreshold;
+    p >> smartRadius >> smartThreshold >> smartMode;
+    p >> tilesCount >> tilesMaxOffset >> tilesFill >> tilesSeed;
     if (p.status() != QDataStream::Ok)
         return false;
     n->setBrightness(brightness);
@@ -305,6 +321,15 @@ bool readFilterNodeParams(QDataStream &p, FilterNode *n)
     n->setContourEdge(int(contourEdge));
     n->setRadialAmount(int(radialAmount));
     n->setRadialMethod(int(radialMethod));
+    n->setSurfaceRadius(int(surfaceRadius));
+    n->setSurfaceThreshold(int(surfaceThreshold));
+    n->setSmartRadius(int(smartRadius));
+    n->setSmartThreshold(int(smartThreshold));
+    n->setSmartMode(int(smartMode));
+    n->setTilesCount(int(tilesCount));
+    n->setTilesMaxOffset(int(tilesMaxOffset));
+    n->setTilesFill(int(tilesFill));
+    n->setTilesSeed(tilesSeed);
     return true;
 }
 

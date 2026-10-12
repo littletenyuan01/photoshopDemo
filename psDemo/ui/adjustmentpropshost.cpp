@@ -653,6 +653,89 @@ void AdjustmentPropsHost::ensurePages()
         add(Ps::OpName::RadialBlur, page);
     }
     {
+        // 表面模糊：半径 + 阈值
+        auto *page = new QWidget(m_stack);
+        auto *col = new QVBoxLayout(page);
+        col->setContentsMargins(0, 0, 0, 0);
+        const SliderRow radius = makeSliderRow(page, QStringLiteral("半径"), QStringLiteral("surface_radius"),
+                                               1, 20);
+        const SliderRow thr = makeSliderRow(page, QStringLiteral("阈值"), QStringLiteral("surface_threshold"),
+                                            0, 255);
+        col->addWidget(radius.row);
+        col->addWidget(thr.row);
+        wireSliderSpin(radius.slider, radius.spin, [this](int v) { m_node.setSurfaceRadius(v); });
+        wireSliderSpin(thr.slider, thr.spin, [this](int v) { m_node.setSurfaceThreshold(v); });
+        add(Ps::OpName::SurfaceBlur, page);
+    }
+    {
+        // 特殊模糊：半径 + 阈值 + 模式
+        auto *page = new QWidget(m_stack);
+        auto *col = new QVBoxLayout(page);
+        col->setContentsMargins(0, 0, 0, 0);
+        const SliderRow radius = makeSliderRow(page, QStringLiteral("半径"), QStringLiteral("smart_radius"),
+                                               1, 20);
+        const SliderRow thr = makeSliderRow(page, QStringLiteral("阈值"), QStringLiteral("smart_threshold"),
+                                            0, 255);
+        col->addWidget(radius.row);
+        col->addWidget(thr.row);
+        wireSliderSpin(radius.slider, radius.spin, [this](int v) { m_node.setSmartRadius(v); });
+        wireSliderSpin(thr.slider, thr.spin, [this](int v) { m_node.setSmartThreshold(v); });
+        {
+            auto *row = new QWidget(page);
+            auto *rowLay = new QHBoxLayout(row);
+            rowLay->setContentsMargins(0, 0, 0, 0);
+            rowLay->addWidget(new QLabel(QStringLiteral("模式"), row));
+            auto *combo = new QComboBox(row);
+            combo->setObjectName(QStringLiteral("combo_smart_mode"));
+            combo->addItem(QStringLiteral("正常"), 0);
+            combo->addItem(QStringLiteral("仅边缘"), 1);
+            combo->addItem(QStringLiteral("叠加边缘"), 2);
+            rowLay->addWidget(combo, 1);
+            col->addWidget(row);
+            connect(combo, qOverload<int>(&QComboBox::currentIndexChanged), this, [this, combo](int) {
+                if (m_block)
+                    return;
+                m_node.setSmartMode(combo->currentData().toInt());
+                emitPreview();
+            });
+        }
+        add(Ps::OpName::SmartBlur, page);
+    }
+    {
+        // 拼贴：块数 + 最大偏移% + 空隙填充
+        auto *page = new QWidget(m_stack);
+        auto *col = new QVBoxLayout(page);
+        col->setContentsMargins(0, 0, 0, 0);
+        const SliderRow cnt = makeSliderRow(page, QStringLiteral("拼贴数"), QStringLiteral("tiles_count"),
+                                            2, 100);
+        const SliderRow off = makeSliderRow(page, QStringLiteral("最大偏移 %"),
+                                            QStringLiteral("tiles_offset"), 0, 100);
+        col->addWidget(cnt.row);
+        col->addWidget(off.row);
+        wireSliderSpin(cnt.slider, cnt.spin, [this](int v) { m_node.setTilesCount(v); });
+        wireSliderSpin(off.slider, off.spin, [this](int v) { m_node.setTilesMaxOffset(v); });
+        {
+            auto *row = new QWidget(page);
+            auto *rowLay = new QHBoxLayout(row);
+            rowLay->setContentsMargins(0, 0, 0, 0);
+            rowLay->addWidget(new QLabel(QStringLiteral("空隙填充"), row));
+            auto *combo = new QComboBox(row);
+            combo->setObjectName(QStringLiteral("combo_tiles_fill"));
+            combo->addItem(QStringLiteral("透明"), 0);
+            combo->addItem(QStringLiteral("反相"), 1);
+            combo->addItem(QStringLiteral("原图"), 2);
+            rowLay->addWidget(combo, 1);
+            col->addWidget(row);
+            connect(combo, qOverload<int>(&QComboBox::currentIndexChanged), this, [this, combo](int) {
+                if (m_block)
+                    return;
+                m_node.setTilesFill(combo->currentData().toInt());
+                emitPreview();
+            });
+        }
+        add(Ps::OpName::Tiles, page);
+    }
+    {
         // 添加杂色：数量滑块（0..100%）+ 分布下拉 + 单色勾选
         auto *page = new QWidget(m_stack);
         auto *col = new QVBoxLayout(page);
@@ -898,6 +981,22 @@ void AdjustmentPropsHost::loadControlsFromNode()
         if (auto *cb = page->findChild<QComboBox *>(QStringLiteral("combo_radial_method")))
             cb->setCurrentIndex(m_node.radialMethod());
         setPair("slider_radial_amount", "spin_radial_amount", m_node.radialAmount());
+        break;
+    case Ps::OpName::SurfaceBlur:
+        setPair("slider_surface_radius", "spin_surface_radius", m_node.surfaceRadius());
+        setPair("slider_surface_threshold", "spin_surface_threshold", m_node.surfaceThreshold());
+        break;
+    case Ps::OpName::SmartBlur:
+        setPair("slider_smart_radius", "spin_smart_radius", m_node.smartRadius());
+        setPair("slider_smart_threshold", "spin_smart_threshold", m_node.smartThreshold());
+        if (auto *cb = page->findChild<QComboBox *>(QStringLiteral("combo_smart_mode")))
+            cb->setCurrentIndex(m_node.smartMode());
+        break;
+    case Ps::OpName::Tiles:
+        setPair("slider_tiles_count", "spin_tiles_count", m_node.tilesCount());
+        setPair("slider_tiles_offset", "spin_tiles_offset", m_node.tilesMaxOffset());
+        if (auto *cb = page->findChild<QComboBox *>(QStringLiteral("combo_tiles_fill")))
+            cb->setCurrentIndex(m_node.tilesFill());
         break;
     case Ps::OpName::AddNoise:
         setPair("slider_noise_amount", "spin_noise_amount", m_node.noiseAmount());

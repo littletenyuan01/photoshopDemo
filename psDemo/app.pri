@@ -61,6 +61,10 @@ SOURCES += \
     engine/op/windfilterop.cpp \
     engine/op/tracecontourfilterop.cpp \
     engine/op/radialblurfilterop.cpp \
+    engine/op/edgepreserve.cpp \
+    engine/op/surfaceblurfilterop.cpp \
+    engine/op/smartblurfilterop.cpp \
+    engine/op/tilesfilterop.cpp \
     engine/op/sharpenfilterop.cpp \
     engine/op/unsharpmaskfilterop.cpp \
     engine/op/floodfillop.cpp \
@@ -194,6 +198,10 @@ HEADERS += \
     engine/op/windfilterop.h \
     engine/op/tracecontourfilterop.h \
     engine/op/radialblurfilterop.h \
+    engine/op/edgepreserve.h \
+    engine/op/surfaceblurfilterop.h \
+    engine/op/smartblurfilterop.h \
+    engine/op/tilesfilterop.h \
     engine/op/sharpenfilterop.h \
     engine/op/unsharpmaskfilterop.h \
     engine/op/floodfillop.h \

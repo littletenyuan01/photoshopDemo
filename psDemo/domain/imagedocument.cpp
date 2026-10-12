@@ -451,10 +451,27 @@ int ImageDocument::addAdjustmentLayer(OpName op)
     auto layer = std::make_unique<Layer>(opNameTitle(op), m_width, m_height);
     layer->setKindSilent(LayerKind::Adjustment);
     FilterNode node(op);
-    // 亮度/对比度默认略抬一点，便于立刻看见效果；其余保持中性默认
+    // 亮度/对比度默认略抬一点，便于立刻看见效果；面积算子给可见默认半径
     if (op == OpName::BrightnessContrast) {
         node.setBrightness(0.12);
         node.setContrast(0.18);
+    } else if (op == OpName::BoxBlur) {
+        node.setBlurRadius(4);
+    } else if (op == OpName::GaussianBlur) {
+        node.setGaussRadius(5);
+    } else if (op == OpName::MedianBlur) {
+        node.setMedianRadius(2);
+    } else if (op == OpName::UnsharpMask) {
+        node.setUsmRadius(2);
+        node.setUsmAmount(1.0);
+    } else if (op == OpName::HighPass) {
+        node.setHighPassRadius(5);
+    } else if (op == OpName::MotionBlur) {
+        node.setMotionDistance(10);
+        node.setMotionAngle(0);
+    } else if (op == OpName::SurfaceBlur) {
+        node.setSurfaceRadius(5);
+        node.setSurfaceThreshold(15);
     }
     layer->filters().append(node);
     // 对齐 PS：新建调整层自动挂白色蒙版（显示全部）；随层结构进同一 undo

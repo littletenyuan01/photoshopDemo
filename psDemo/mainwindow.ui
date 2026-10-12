@@ -4349,7 +4349,7 @@
   </action>
   <action name="actionSmartBlur">
    <property name="text">
-    <string>智能模糊...</string>
+    <string>特殊模糊...</string>
    </property>
    <property name="enabled">
     <bool>false</bool>

@@ -1203,21 +1203,27 @@ void CanvasView::flushAdjustmentPreview()
     auto future = QtConcurrent::run([this, gen, patch, belowRef, aboveRef, stackRect, stack,
                                      opacity, maskMatters, maskRef, maskOx, maskOy, haveStacks,
                                      layerIndex, docW, docH, layerCount, docPtr]() {
-        QImage belowCrop;
-        QImage aboveCrop;
+        QImage belowPad;   ///< 可能比视口大一圈（面积算子）
+        QImage aboveCrop;  ///< 与视口同尺寸
         QImage belowFull;
         QImage aboveFull;
-        QRect usePatch = patch;
+        const QRect docBounds(0, 0, docW, docH);
+        QRect viewPatch = patch; ///< 写回视口的矩形
 
         if (haveStacks && !belowRef.isNull()) {
-            // 缓存为「整图 + stackRect」或「仅 ROI」两种：统一裁到 usePatch
-            usePatch = stackRect;
-            if (belowRef.size() == usePatch.size()) {
-                belowCrop = belowRef;
+            viewPatch = stackRect;
+            const QRect belowNeed = stack.requiredInputRect(viewPatch).intersected(docBounds);
+            if (belowRef.size() == belowNeed.size()) {
+                belowPad = belowRef;
+                aboveCrop = aboveRef;
+            } else if (belowRef.size() == viewPatch.size()) {
+                // 旧缓存无外扩：退化为点路径
+                belowPad = belowRef;
                 aboveCrop = aboveRef;
             } else {
-                belowCrop = belowRef.copy(usePatch);
-                aboveCrop = aboveRef.copy(usePatch);
+                belowPad = belowRef.copy(belowNeed);
+                aboveCrop = aboveRef.size() == viewPatch.size() ? aboveRef
+                                                               : aboveRef.copy(viewPatch);
             }
         } else {
             Ps::ImageDocument *doc = docPtr.data();
@@ -1229,12 +1235,13 @@ void CanvasView::flushAdjustmentPreview()
                 }, Qt::QueuedConnection);
                 return;
             }
+            const QRect belowNeed = stack.requiredInputRect(viewPatch).intersected(docBounds);
             belowFull = QImage(docW, docH, QImage::Format_ARGB32_Premultiplied);
             belowFull.fill(Qt::transparent);
             aboveFull = QImage(docW, docH, QImage::Format_ARGB32_Premultiplied);
             aboveFull.fill(Qt::transparent);
-            if (!Ps::Compositor::blendLayerRange(belowFull, *doc, usePatch, 0, layerIndex, -1)
-                || !Ps::Compositor::blendLayerRange(aboveFull, *doc, usePatch, layerIndex + 1,
+            if (!Ps::Compositor::blendLayerRange(belowFull, *doc, belowNeed, 0, layerIndex, -1)
+                || !Ps::Compositor::blendLayerRange(aboveFull, *doc, viewPatch, layerIndex + 1,
                                                    layerCount, -1)) {
                 QMetaObject::invokeMethod(this, [this, gen]() {
                     if (gen != m_adjPreviewGen)
@@ -1247,23 +1254,25 @@ void CanvasView::flushAdjustmentPreview()
                 }, Qt::QueuedConnection);
                 return;
             }
-            belowCrop = belowFull.copy(usePatch);
-            aboveCrop = aboveFull.copy(usePatch);
+            belowPad = belowFull.copy(belowNeed);
+            aboveCrop = aboveFull.copy(viewPatch);
         }
 
-        // 视口可能很大：滤镜在缩小图上算，再放大回视口尺寸（覆盖整屏，不裁中心）
+        const QRect belowNeed = stack.requiredInputRect(viewPatch).intersected(docBounds);
+
+        // 视口可能很大：滤镜在缩小图上算，再放大（外扩图同步缩放）
         constexpr int kMaxFilterEdge = 512;
         qreal scale = 1.0;
-        if (belowCrop.width() > kMaxFilterEdge || belowCrop.height() > kMaxFilterEdge) {
-            scale = qMin(kMaxFilterEdge / qreal(belowCrop.width()),
-                         kMaxFilterEdge / qreal(belowCrop.height()));
+        if (belowPad.width() > kMaxFilterEdge || belowPad.height() > kMaxFilterEdge) {
+            scale = qMin(kMaxFilterEdge / qreal(belowPad.width()),
+                         kMaxFilterEdge / qreal(belowPad.height()));
         }
-        const QSize smallSize(qMax(1, int(belowCrop.width() * scale + 0.5)),
-                              qMax(1, int(belowCrop.height() * scale + 0.5)));
+        const QSize smallSize(qMax(1, int(belowPad.width() * scale + 0.5)),
+                              qMax(1, int(belowPad.height() * scale + 0.5)));
         QImage belowWork = (scale < 0.999)
-                               ? belowCrop.scaled(smallSize, Qt::IgnoreAspectRatio,
-                                                  Qt::FastTransformation)
-                               : belowCrop;
+                               ? belowPad.scaled(smallSize, Qt::IgnoreAspectRatio,
+                                                 Qt::FastTransformation)
+                               : belowPad;
         QImage filtered = stack.apply(belowWork);
         if (filtered.isNull()) {
             QMetaObject::invokeMethod(this, [this, gen]() {
@@ -1278,28 +1287,38 @@ void CanvasView::flushAdjustmentPreview()
             return;
         }
         if (scale < 0.999) {
-            filtered = filtered.scaled(belowCrop.size(), Qt::IgnoreAspectRatio,
+            filtered = filtered.scaled(belowPad.size(), Qt::IgnoreAspectRatio,
                                        Qt::FastTransformation);
+        }
+
+        // 外扩滤镜结果裁回视口
+        QImage filteredView = filtered;
+        QImage belowView = belowPad;
+        if (belowPad.size() != viewPatch.size() && belowNeed.contains(viewPatch)) {
+            const int dx = viewPatch.left() - belowNeed.left();
+            const int dy = viewPatch.top() - belowNeed.top();
+            filteredView = filtered.copy(dx, dy, viewPatch.width(), viewPatch.height());
+            belowView = belowPad.copy(dx, dy, viewPatch.width(), viewPatch.height());
         }
 
         QImage patchImg;
         if (!maskMatters && opacity >= 0.999) {
-            patchImg = std::move(filtered);
+            patchImg = std::move(filteredView);
         } else {
-            patchImg = belowCrop;
+            patchImg = belowView;
             QImage maskCrop;
             if (maskMatters && !maskRef.isNull()) {
-                maskCrop = maskRef.copy(QRect(usePatch.x() - maskOx, usePatch.y() - maskOy,
-                                              usePatch.width(), usePatch.height()));
+                maskCrop = maskRef.copy(QRect(viewPatch.x() - maskOx, viewPatch.y() - maskOy,
+                                              viewPatch.width(), viewPatch.height()));
             }
-            for (int y = 0; y < usePatch.height(); ++y) {
+            for (int y = 0; y < viewPatch.height(); ++y) {
                 QRgb *dline = reinterpret_cast<QRgb *>(patchImg.scanLine(y));
                 const QRgb *fline =
-                    reinterpret_cast<const QRgb *>(filtered.constScanLine(y));
+                    reinterpret_cast<const QRgb *>(filteredView.constScanLine(y));
                 const uchar *mline = (!maskCrop.isNull() && y < maskCrop.height())
                                         ? maskCrop.constScanLine(y)
                                         : nullptr;
-                for (int x = 0; x < usePatch.width(); ++x) {
+                for (int x = 0; x < viewPatch.width(); ++x) {
                     qreal t = opacity;
                     if (mline && x < maskCrop.width())
                         t *= mline[x] / 255.0;
@@ -1326,23 +1345,23 @@ void CanvasView::flushAdjustmentPreview()
             p.drawImage(0, 0, aboveCrop);
         }
 
-        // 首次建栈：把 ROI 缓存回主线程（非整图，后续帧只滤镜）
+        // 首次建栈：缓存外扩下方图 + 视口上方图；stackRect 仍是视口
         const bool storeStacks = !haveStacks;
-        QMetaObject::invokeMethod(this, [this, gen, usePatch, patchImg, storeStacks, layerIndex,
-                                         belowCrop, aboveCrop]() {
+        QMetaObject::invokeMethod(this, [this, gen, viewPatch, patchImg, storeStacks, layerIndex,
+                                         belowPad, aboveCrop]() {
             m_adjPreviewBusy = false;
             if (gen != m_adjPreviewGen || !m_document)
                 return;
             if (storeStacks) {
-                m_adjBelow = belowCrop;
+                m_adjBelow = belowPad;
                 m_adjAbove = aboveCrop;
-                m_adjStackRect = usePatch;
+                m_adjStackRect = viewPatch;
                 m_adjLiveLayer = layerIndex;
             }
             if (!m_adjLive.isNull()) {
                 QPainter p(&m_adjLive);
                 p.setCompositionMode(QPainter::CompositionMode_Source);
-                p.drawImage(usePatch.topLeft(), patchImg);
+                p.drawImage(viewPatch.topLeft(), patchImg);
                 update();
             }
             if (m_adjPreviewDirty) {

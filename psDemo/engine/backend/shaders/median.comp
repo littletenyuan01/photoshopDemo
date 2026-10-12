@@ -17,7 +17,7 @@ layout(std140, binding = 2) uniform Params {
     int width;
     int height;
     int radius;
-    int _pad;
+    int kth; // 选第 k 小（从 1 计）；中值=(n+1)/2，最小=1，最大=n；0=按中值公式
 };
 
 // 对齐 Qt qUnpremultiply（qt_inv_premul_factor[a] == 0x00ff00ff/a）。
@@ -100,7 +100,8 @@ void main()
 
     const int r = radius;
     const int n = (2 * r + 1) * (2 * r + 1); // 9..81
-    const int kth = (n + 1) / 2;             // 与 CPU MedianBlurFilterOp 一致
+    // kth==0 → 中值；(n+1)/2。否则钳到 [1,n]（最大/最小复用本 kernel，T4.7）
+    const int sel = (kth <= 0) ? ((n + 1) / 2) : clamp(kth, 1, n);
 
     uint chR[81];
     uint chG[81];
@@ -120,10 +121,10 @@ void main()
     }
 
     uint outR, outG, outB, outA;
-    COUNT_SELECT_KTH(chR, n, kth, outR)
-    COUNT_SELECT_KTH(chG, n, kth, outG)
-    COUNT_SELECT_KTH(chB, n, kth, outB)
-    COUNT_SELECT_KTH(chA, n, kth, outA)
+    COUNT_SELECT_KTH(chR, n, sel, outR)
+    COUNT_SELECT_KTH(chG, n, sel, outG)
+    COUNT_SELECT_KTH(chB, n, sel, outB)
+    COUNT_SELECT_KTH(chA, n, sel, outA)
 
     dst[y * width + x] =
         qtPremultiply((outA << 24) | (outR << 16) | (outG << 8) | outB);

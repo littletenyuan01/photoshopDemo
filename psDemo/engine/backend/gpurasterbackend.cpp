@@ -1,5 +1,8 @@
 /**
- * gpurasterbackend.cpp — QRhi D3D11 compute（中值 + 自定卷积；独立 RHI 线程；池化）。
+ * gpurasterbackend.cpp — QRhi D3D11 compute（中值族 + 自定卷积族；独立 RHI 线程；池化）。
+ *
+ * T4.7：Sharpen/Emboss 喂权重给 custom.comp；Maximum/Minimum 改 median.comp 的 kth。
+ * FindEdges 是 Sobel 幅值（非线性），不能复用 custom —— 仍走 CPU。
  */
 #include "gpurasterbackend.h"
 
@@ -30,7 +33,7 @@ struct MedianParams {
     qint32 width = 0;
     qint32 height = 0;
     qint32 radius = 0;
-    qint32 pad = 0;
+    qint32 kth = 0; ///< 0=中值公式；(n+1)/2；最大=n；最小=1
 };
 
 /** 与 custom.comp std140 Params 一致（64B）。 */
@@ -66,7 +69,17 @@ QImage ensurePremulArgb32(const QImage &img)
 
 bool isGpuOp(OpName op)
 {
-    return op == OpName::MedianBlur || op == OpName::CustomFilter;
+    switch (op) {
+    case OpName::MedianBlur:
+    case OpName::Maximum:
+    case OpName::Minimum:
+    case OpName::CustomFilter:
+    case OpName::Sharpen:
+    case OpName::Emboss:
+        return true;
+    default:
+        return false;
+    }
 }
 
 /** T4.2/T4.3：PSLITE_GPU_STAGE=1。format=格式对齐；device=upload+kernel+readback。 */
@@ -323,25 +336,51 @@ struct GpuRasterBackend::Hub : QObject {
         return true;
     }
 
-    bool runMedianOnce(const QImage &premulArgb32, int radius, QImage *outPremul)
+    bool runMedianOnce(const QImage &premulArgb32, int radius, int kth, QImage *outPremul)
     {
-        MedianParams params{premulArgb32.width(), premulArgb32.height(), qBound(1, radius, 8), 0};
+        MedianParams params{premulArgb32.width(), premulArgb32.height(), qBound(1, radius, 8), kth};
         return dispatchOnce(premulArgb32, KernelKind::Median, &params, sizeof(params), outPremul);
     }
 
-    bool runCustomOnce(const QImage &premulArgb32, const FilterNode &node, QImage *outPremul)
+    bool runCustomWeightsOnce(const QImage &premulArgb32, const int w[9], int scale, int offset,
+                              QImage *outPremul)
     {
         CustomParams params;
         params.width = premulArgb32.width();
         params.height = premulArgb32.height();
-        params.scale = node.customScale();
-        params.offset = node.customOffset();
+        params.scale = scale;
+        params.offset = offset;
         for (int i = 0; i < 4; ++i)
-            params.weights0[i] = node.customWeight(i);
+            params.weights0[i] = w[i];
         for (int i = 0; i < 4; ++i)
-            params.weights1[i] = node.customWeight(4 + i);
-        params.weight8 = node.customWeight(8);
+            params.weights1[i] = w[4 + i];
+        params.weight8 = w[8];
         return dispatchOnce(premulArgb32, KernelKind::Custom, &params, sizeof(params), outPremul);
+    }
+
+    bool runCustomOnce(const QImage &premulArgb32, const FilterNode &node, QImage *outPremul)
+    {
+        int w[9];
+        for (int i = 0; i < 9; ++i)
+            w[i] = node.customWeight(i);
+        return runCustomWeightsOnce(premulArgb32, w, node.customScale(), node.customOffset(),
+                                    outPremul);
+    }
+
+    /** 锐化核：中心 1+4s，四邻 -s（与 SharpenFilterOp 一致；不透明图 alpha 卷积仍为 255）。 */
+    bool runSharpenOnce(const QImage &premulArgb32, int strength, QImage *outPremul)
+    {
+        const int s = qBound(1, strength, 4);
+        const int w[9] = {0, -s, 0, -s, 1 + 4 * s, -s, 0, -s, 0};
+        return runCustomWeightsOnce(premulArgb32, w, 1, 0, outPremul);
+    }
+
+    /** 浮雕核：-s -s 0 / -s 0 s / 0 s s + 偏置 128（与 EmbossFilterOp 一致）。 */
+    bool runEmbossOnce(const QImage &premulArgb32, int strength, QImage *outPremul)
+    {
+        const int s = qBound(1, strength, 4);
+        const int w[9] = {-s, -s, 0, -s, 0, s, 0, s, s};
+        return runCustomWeightsOnce(premulArgb32, w, 1, 128, outPremul);
     }
 
     ApplyStackResult runStack(QImage &image, const FilterStack &stack,
@@ -375,10 +414,20 @@ struct GpuRasterBackend::Hub : QObject {
             }
             QImage next;
             bool ok = false;
-            if (n.op() == OpName::MedianBlur)
-                ok = runMedianOnce(work, n.medianRadius(), &next);
-            else if (n.op() == OpName::CustomFilter)
+            if (n.op() == OpName::MedianBlur) {
+                ok = runMedianOnce(work, n.medianRadius(), /*kth=*/0, &next);
+            } else if (n.op() == OpName::Maximum || n.op() == OpName::Minimum) {
+                const int r = qBound(1, n.extremumRadius(), 8);
+                const int win = (2 * r + 1) * (2 * r + 1);
+                const int kth = (n.op() == OpName::Maximum) ? win : 1;
+                ok = runMedianOnce(work, r, kth, &next);
+            } else if (n.op() == OpName::CustomFilter) {
                 ok = runCustomOnce(work, n, &next);
+            } else if (n.op() == OpName::Sharpen) {
+                ok = runSharpenOnce(work, n.sharpenStrength(), &next);
+            } else if (n.op() == OpName::Emboss) {
+                ok = runEmbossOnce(work, n.embossStrength(), &next);
+            }
             if (!ok)
                 return ApplyStackResult::Failed;
             work = next;

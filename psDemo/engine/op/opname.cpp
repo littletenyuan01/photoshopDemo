@@ -69,6 +69,9 @@ constexpr OpNameInfo kOpNameTable[] = {
     {OpName::Wind,                 "ps:wind",                  "风"},
     {OpName::TraceContour,         "ps:trace-contour",         "等高线"},
     {OpName::RadialBlur,           "ps:radial-blur",           "径向模糊"},
+    {OpName::SurfaceBlur,          "ps:surface-blur",          "表面模糊"},
+    {OpName::SmartBlur,            "ps:smart-blur",            "特殊模糊"},
+    {OpName::Tiles,                "ps:tiles",                 "拼贴"},
 };
 
 const OpNameInfo *infoFor(OpName name)
@@ -98,33 +101,17 @@ QString opNameTitle(OpName name)
 
 bool isAdjustmentOp(OpName name)
 {
-    // 面积算子暂不作为调整图层（其 ROI 外扩尚未接入共享缓冲合成路径，见 docs/pending-dev）。
-    // 新增面积算子时**必须**加到这里，否则会被当成调整层算子（菜单/新建调整层都会出错）。
-    // 几何算子（Offset）同理：它滤的是层自己的像素，不是下方合成结果。
+    // 面积算子已可作调整层：合成器对 pad>0 走「下方合成 → 子缓冲外扩 → 只写回请求区」
+    // （见 compositor.cpp blendLayerRangeImpl）。
+    // 仍排除：① 几何 Offset（滤的是层自身像素语义，不是下方合成）；
+    // ② 位置相关（噪声/马赛克/径向/拼贴/波纹）—— 依赖绝对坐标，分块下方合成会对不齐。
     switch (name) {
-    case OpName::BoxBlur:
-    case OpName::UnsharpMask:
-    case OpName::FindEdges:
-    case OpName::GaussianBlur:
-    case OpName::MedianBlur:
-    case OpName::Sharpen:
-    case OpName::Emboss:
     case OpName::Offset:
-    case OpName::Maximum:
-    case OpName::Minimum:
-    case OpName::CustomFilter:
-    case OpName::HighPass:
-    case OpName::MotionBlur:
     case OpName::AddNoise:
-    case OpName::DustAndScratches:
-    case OpName::ReduceNoise:
-    case OpName::SharpenEdges:
     case OpName::Ripple:
     case OpName::Mosaic:
-    case OpName::Fragment:
-    case OpName::Wind:
-    case OpName::TraceContour:
     case OpName::RadialBlur:
+    case OpName::Tiles:
         return false;
     default:
         break;
