@@ -81,7 +81,7 @@ const Case kCases[] = {
     { "batcha", "滤镜批次 A：曝光过度/蒙尘/减少杂色/锐化边缘 oracle + 分块投影 + 往返", tBatchA },
     { "ripple", "波纹：正弦位移 oracle、位置相关整层路径、分块投影、往返", tRipple },
     { "rasterbackend", "滤镜链后端调度：CPU 搬迁 bit-exact、降级/熔断/supports/取消", tRasterBackend },
-    { "gpumedian", "有 GPU 才跑：中值 vs CPU（容差≤1）；无 GPU 跳过", tGpuMedian },
+    { "gpumedian", "中值 GPU 门控 + T5.1：r=5..8 必须走 CPU 且 bit-exact", tGpuMedian },
     { "gpucustom", "有 GPU 才跑：自定 3×3 vs CPU（容差≤1）；无 GPU 跳过", tGpuCustom },
     { "gput47", "有 GPU 才跑：T4.7 锐化/浮雕/最大/最小 vs CPU（容差≤1）；无 GPU 跳过", tGpuT47 },
     { "adjarea", "调整层+面积算子：子缓冲外扩、分块投影==整幅、往返", tAdjArea },

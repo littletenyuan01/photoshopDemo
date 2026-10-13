@@ -56,7 +56,7 @@ release\psdemo_tests.exe composite regionraster   :: 只跑指定用例
 | `posasync` | **位置相关算子**（添加杂色）的预览异步化：want 被放大成**整层**、任务把整层写进区域缓存、域层复用该缓存把结果还给请求方（否则等于在 UI 线程上再整层重算一遍） |
 | `jobteardown` | **异步任务的析构安全**：反复「起了重任务立刻析构」，守住 `~LayerFilterJob` 必须等在途 future（曾因注释写了假不变量而偶发堆损坏，见缺陷台账 #21） |
 | `rasterbackend` | 滤镜链**后端调度（P0）**：默认 CPU bit-exact；`PSLITE_RASTER=cpu` 不碰 GPU；Failed 降级正确；Failed×3 熔断；**CPU 补算成功不得清零**；Cancelled / supports=false 不计熔断；决策边界（点算子/像素门槛/位置相关/位移）；成本表覆盖全部 `OpName`；带几何重载；Failed 无副作用 |
-| `gpumedian` | **有 GPU 才跑**：`PSLITE_RASTER=gpu` 且后端非 `cpu` 时比对中值 vs CPU（容差逐通道 ≤1）；否则跳过不算失败 |
+| `gpumedian` | 有 GPU：r=2 比对中值 vs CPU（≤1）；**始终**：T5.1 钉住 r=5..8 `supports==false`、调度走 CPU 且 bit-exact |
 | `gpucustom` | **有 GPU 才跑**：自定 3×3 vs CPU（容差 ≤1）；否则跳过 |
 | `gput47` | **有 GPU 才跑**：T4.7 锐化/浮雕/最大/最小 vs CPU（容差 ≤1）；否则跳过 |
 | `adjarea` | 调整层+面积算子：`isAdjustmentOp` 护栏、子缓冲外扩、分块投影==整幅、往返 |

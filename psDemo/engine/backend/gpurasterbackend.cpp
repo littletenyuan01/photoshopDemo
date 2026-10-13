@@ -82,6 +82,30 @@ bool isGpuOp(OpName op)
     }
 }
 
+/**
+ * median.comp 的 `uint chR[81]`（注释 // 9..81）⇒ n=(2r+1)² ≤ 81 ⇒ **r ≤ 4**。
+ * 节点/UI 允许 1..8；超出时 supports() 必须 false，否则静默错像素（台账 #22 / T5.1）。
+ */
+constexpr int kGpuMedianMaxRadius = 4;
+
+/** op 名在白名单之外，或参数超出对应 kernel 真实能力 ⇒ 不支持。 */
+bool gpuParamsSupported(const FilterNode &n)
+{
+    switch (n.op()) {
+    case OpName::MedianBlur:
+        return n.medianRadius() >= 1 && n.medianRadius() <= kGpuMedianMaxRadius;
+    case OpName::Maximum:
+    case OpName::Minimum:
+        return n.extremumRadius() >= 1 && n.extremumRadius() <= kGpuMedianMaxRadius;
+    case OpName::CustomFilter:
+    case OpName::Sharpen:
+    case OpName::Emboss:
+        return true;
+    default:
+        return false;
+    }
+}
+
 /** T4.2/T4.3：PSLITE_GPU_STAGE=1。format=格式对齐；device=upload+kernel+readback。 */
 struct StageAccum {
     bool enabled = false;
@@ -338,7 +362,10 @@ struct GpuRasterBackend::Hub : QObject {
 
     bool runMedianOnce(const QImage &premulArgb32, int radius, int kth, QImage *outPremul)
     {
-        MedianParams params{premulArgb32.width(), premulArgb32.height(), qBound(1, radius, 8), kth};
+        // 双保险：supports() 已拒 r>4；此处再拒，避免将来绕过 supports 时越界写 chR[81]
+        if (radius < 1 || radius > kGpuMedianMaxRadius)
+            return false;
+        MedianParams params{premulArgb32.width(), premulArgb32.height(), radius, kth};
         return dispatchOnce(premulArgb32, KernelKind::Median, &params, sizeof(params), outPremul);
     }
 
@@ -417,7 +444,7 @@ struct GpuRasterBackend::Hub : QObject {
             if (n.op() == OpName::MedianBlur) {
                 ok = runMedianOnce(work, n.medianRadius(), /*kth=*/0, &next);
             } else if (n.op() == OpName::Maximum || n.op() == OpName::Minimum) {
-                const int r = qBound(1, n.extremumRadius(), 8);
+                const int r = n.extremumRadius();
                 const int win = (2 * r + 1) * (2 * r + 1);
                 const int kth = (n.op() == OpName::Maximum) ? win : 1;
                 ok = runMedianOnce(work, r, kth, &next);
@@ -488,7 +515,8 @@ bool GpuRasterBackend::supports(const FilterStack &stack) const
         const FilterNode &n = stack.at(i);
         if (!n.isEnabled())
             continue;
-        if (!isGpuOp(n.op()))
+        // 能力声明 = op 名 + 参数范围（与 median.comp 真实上限对齐，T5.1）
+        if (!isGpuOp(n.op()) || !gpuParamsSupported(n))
             return false;
         any = true;
     }
