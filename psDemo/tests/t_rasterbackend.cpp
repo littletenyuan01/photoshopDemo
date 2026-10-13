@@ -38,6 +38,11 @@ public:
 
     bool supports(const FilterStack &stack) const override
     {
+        // 【为什么要数它】判定顺序是本项目的性能前提之一：投影合成按 64×64 块反复问
+        // （1600×1200 ≈ 1900 次，每块约 4.6k px）。若把像素门槛放到 supports() 之后，
+        // 每个小块都要白问后端一次；设备未建时更会被一个小块触发建整个设备（约 300 ms）。
+        // 只数 applyStack 是看不出这个问题的 —— 那时根本还没提交。
+        ++m_probes;
         if (!m_supportsAllCostly) {
             // 仅「纯中值」—— 贴近 P1，便于测 supports==false 的高成本链
             for (int i = 0; i < stack.count(); ++i) {
@@ -92,6 +97,8 @@ public:
     }
 
     int callCount() const { return m_calls.load(); }
+    /** supports() 被问了几次（**不含** applyStack）。用于钉「小块必须短路、不许问后端」。 */
+    int probeCount() const { return m_probes.load(); }
     void setFailThenOkCount(int n) { m_failRemaining = n; }
 
 private:
@@ -100,6 +107,7 @@ private:
     bool m_supportsAllCostly = true;
     int m_failRemaining = 1;
     std::atomic<int> m_calls{0};
+    mutable std::atomic<int> m_probes{0};
 };
 
 FilterStack stackOf(OpName a, OpName b = OpName::Count)
@@ -156,7 +164,7 @@ int tRasterBackend()
     Reporter r;
     auto &sched = RasterScheduler::instance();
 
-    // 1) 默认 auto + 无 GPU（显式注入空后端，禁止惰性 QRhi）
+    // 1) 默认 auto + **无可用 GPU**（显式注入空后端，禁止惰性 QRhi）⇒ 静默走 CPU
     {
         EnvGuard env("PSLITE_RASTER", "auto");
         sched.setGpuBackendForTest(nullptr);
@@ -170,11 +178,11 @@ int tRasterBackend()
             sched.runStack(got, stack, src.rect(), src.rect(), nullptr, &outR);
         const QImage ref = cpuApply(src, stack);
         r.check(id == QLatin1String("cpu") && outR == ApplyStackResult::Ok,
-                QStringLiteral("默认无 GPU → backend=cpu"));
+                QStringLiteral("默认 Auto 但无可用 GPU → backend=cpu"));
         r.check(PsTests::diffCount(got, ref) == 0, QStringLiteral("默认路径 == 直接 CPU"));
     }
 
-    // 2) PSLITE_RASTER=cpu ⇒ GPU 调用次数 0
+    // 2) PSLITE_RASTER=cpu ⇒ GPU 调用次数 0（连设备都不该建）
     {
         EnvGuard env("PSLITE_RASTER", "cpu");
         auto fake = std::make_unique<FakeGpuBackend>(FakeGpuBackend::Behavior::AlwaysOk);
@@ -188,19 +196,27 @@ int tRasterBackend()
         r.check(raw->callCount() == 0, QStringLiteral("PSLITE_RASTER=cpu → GPU 调用 0"));
     }
 
-    // 2b) Auto opt-in：即使注入假 GPU 也不走（§7.2.2 / T1.9）
+    // 2b) ★ Auto = **自动用 GPU**（默认行为）：注入可用假 GPU + 足够像素 + 成本过线 ⇒ 上卡。
+    // 这条钉的是产品语义的反转：旧行为是"Auto 永不调用 GPU"（opt-in），
+    // 现在默认就该用上独显（gpu-plan §0.2 实测重核 12～36×）。
     {
         EnvGuard env("PSLITE_RASTER", "auto");
         auto fake = std::make_unique<FakeGpuBackend>(FakeGpuBackend::Behavior::AlwaysOk);
         FakeGpuBackend *raw = fake.get();
         sched.setGpuBackendForTest(std::move(fake));
-        FilterStack med = stackOf(OpName::MedianBlur);
-        r.check(!sched.shouldUseGpu(med, 200000), QStringLiteral("Auto opt-in ⇒ shouldUseGpu false"));
+        FilterStack med = stackOf(OpName::MedianBlur); // 187 ns/px > 阈值 5
+        r.check(sched.shouldUseGpu(med, 200000), QStringLiteral("Auto + 有 GPU + 成本过线 ⇒ true"));
         const QImage src = PsTests::makeLayerImage(400, 300, 4, 255);
         QImage got = src.convertToFormat(QImage::Format_ARGB32_Premultiplied);
         const QString id = sched.runStack(got, med, src.rect(), src.rect(), nullptr, nullptr);
-        r.check(id == QLatin1String("cpu") && raw->callCount() == 0,
-                QStringLiteral("Auto opt-in ⇒ 不上 GPU"));
+        r.check(id.startsWith(QLatin1String("gpu")) && raw->callCount() == 1,
+                QStringLiteral("Auto ⇒ 自动上 GPU（backend=%1）").arg(id));
+
+        // 但 Auto **仍守** 成本阈值与像素门槛（ForceGpu 才跳过）
+        FilterStack pts = stackOf(OpName::BrightnessContrast, OpName::Invert);
+        r.check(!sched.shouldUseGpu(pts, 200000),
+                QStringLiteral("Auto：纯点算子链（成本 0）⇒ false"));
+        r.check(!sched.shouldUseGpu(med, 1000), QStringLiteral("Auto：像素过少 ⇒ false"));
     }
 
     // 3) 总是 Failed → 结果仍正确；3 次后不再调用（需 opt-in gpu）
@@ -227,6 +243,110 @@ int tRasterBackend()
         sched.runStack(got, stack, src.rect(), src.rect(), nullptr, nullptr);
         r.check(raw->callCount() == 3, QStringLiteral("熔断后不再调用 GPU"));
         r.check(PsTests::diffCount(got, ref) == 0, QStringLiteral("熔断后仍走 CPU 正确"));
+    }
+
+    // 3c) ★ 启动探测：`warmUp()` 必须按模式返回真实生效的后端
+    // 钉的是「软件起来自己检测」这条产品行为：
+    //   · Auto 且探测到可用后端 ⇒ 报 GPU（并把设备建好，别等首次绘制才建）
+    //   · `cpu` ⇒ 报 CPU，且**不碰**注入的 GPU（连探测都不做）
+    {
+        EnvGuard env("PSLITE_RASTER", "auto");
+        auto fake = std::make_unique<FakeGpuBackend>(FakeGpuBackend::Behavior::AlwaysOk);
+        FakeGpuBackend *raw = fake.get();
+        sched.setGpuBackendForTest(std::move(fake));
+        const QString id = sched.warmUp();
+        r.check(id == QLatin1String("gpu:fake"),
+                QStringLiteral("warmUp（Auto + 有后端）⇒ 报 GPU（实际 %1）").arg(id));
+        r.check(sched.activeBackendName() == QLatin1String("gpu:fake"),
+                QStringLiteral("activeBackendName 与 warmUp 一致"));
+        r.check(raw->callCount() == 0, QStringLiteral("warmUp 只探测建后端，不跑任何链"));
+    }
+    {
+        EnvGuard env("PSLITE_RASTER", "cpu");
+        auto fake = std::make_unique<FakeGpuBackend>(FakeGpuBackend::Behavior::AlwaysOk);
+        FakeGpuBackend *raw = fake.get();
+        sched.setGpuBackendForTest(std::move(fake));
+        const QString id = sched.warmUp();
+        r.check(id == QLatin1String("cpu"),
+                QStringLiteral("warmUp（PSLITE_RASTER=cpu）⇒ 报 CPU（实际 %1）").arg(id));
+        r.check(raw->callCount() == 0, QStringLiteral("cpu 模式不调用 GPU"));
+    }
+
+    // 3d) ★ 小图/低收益链必须**短路**，连 supports() 都不该问
+    // 钉的是合成路径的性能前提：投影按 64×64 块反复问（1600×1200 ≈ 1900 次，每块约 4.6k px），
+    // 这些块永远低于像素门槛。若判定顺序把它放到 ensureGpu()/supports() 之后，
+    // 每个小块都要付一次后端查询；设备未建时更会**被一个小块触发建整个设备**（约 300 ms）。
+    {
+        EnvGuard env("PSLITE_RASTER", "auto");
+        auto fake = std::make_unique<FakeGpuBackend>(FakeGpuBackend::Behavior::AlwaysOk);
+        FakeGpuBackend *raw = fake.get();
+        sched.setGpuBackendForTest(std::move(fake));
+
+        FilterStack med = stackOf(OpName::MedianBlur); // 成本 187 > 5，仅像素不够
+        r.check(!sched.shouldUseGpu(med, 4624),
+                QStringLiteral("小块（4.6k px，合成块的量级）⇒ false"));
+        r.check(raw->probeCount() == 0,
+                QStringLiteral("小块判定**没有触碰后端**（supports 调用 0 次，实际 %1）")
+                    .arg(raw->probeCount()));
+
+        // 对照：同样这条链、像素够了 ⇒ 必须真的去问后端并上卡
+        r.check(sched.shouldUseGpu(med, 200000), QStringLiteral("同链 + 足够像素 ⇒ true"));
+        r.check(raw->probeCount() >= 1, QStringLiteral("够像素时才去问后端（supports 被调用）"));
+    }
+
+    // 3e) ★ 首选项（QSettings）持久化 + 优先级：环境变量 > 用户选择 > 默认 Auto
+    // 这是「首选项 → 性能」的落点。必须能往返、且**不能污染开发者机器上的真实设置**，
+    // 所以这里先存旧值、结束时恢复。
+    {
+        const RasterScheduler::Accel savedPref = RasterScheduler::accelPreference();
+        // 先探一次写入能力：受限/沙箱环境里 QSettings 写注册表会静默失败，
+        // 那时**跳过**往返断言并如实说明，而不是报一条环境导致的假失败。
+        const bool writable = RasterScheduler::setAccelPreference(RasterScheduler::Accel::CpuOnly);
+        if (!writable) {
+            r.info(QStringLiteral("本机 QSettings 不可写 ⇒ 跳过首选项往返断言"
+                                  "（不报假失败；写失败已由 setAccelPreference 返回 false 暴露）"));
+        } else {
+            r.check(RasterScheduler::accelPreference() == RasterScheduler::Accel::CpuOnly,
+                    QStringLiteral("首选项往返：写入「仅 CPU」后读回一致"));
+            RasterScheduler::setAccelPreference(RasterScheduler::Accel::GpuOnly);
+            r.check(RasterScheduler::accelPreference() == RasterScheduler::Accel::GpuOnly,
+                    QStringLiteral("首选项往返：写入「强制 GPU」后读回一致"));
+        }
+
+        // 优先级（不依赖写盘能力：直接改内存里的偏好不可行，故仅在可写时验）
+        if (writable) {
+            // 环境变量未设 ⇒ 用首选项（此处首选项 = 强制 GPU）
+            {
+                EnvGuard env("PSLITE_RASTER", nullptr);
+                sched.resetForTest(); // 清环境缓存，让 ensureEnvCached 重新按新规则解析
+                auto fake = std::make_unique<FakeGpuBackend>(FakeGpuBackend::Behavior::AlwaysOk);
+                sched.setGpuBackendForTest(std::move(fake));
+                FilterStack med = stackOf(OpName::MedianBlur);
+                r.check(sched.shouldUseGpu(med, 200000),
+                        QStringLiteral("无环境变量 ⇒ 按首选项「强制 GPU」上卡"));
+                r.check(!RasterScheduler::envOverrideActive(),
+                        QStringLiteral("无环境变量 ⇒ envOverrideActive() == false"));
+            }
+
+            // 环境变量 = cpu ⇒ **压过**首选项的「强制 GPU」
+            {
+                EnvGuard env("PSLITE_RASTER", "cpu");
+                sched.resetForTest();
+                auto fake = std::make_unique<FakeGpuBackend>(FakeGpuBackend::Behavior::AlwaysOk);
+                FakeGpuBackend *raw = fake.get();
+                sched.setGpuBackendForTest(std::move(fake));
+                FilterStack med = stackOf(OpName::MedianBlur);
+                r.check(!sched.shouldUseGpu(med, 200000),
+                        QStringLiteral("环境变量 cpu **压过**首选项的强制 GPU"));
+                r.check(raw->callCount() == 0,
+                        QStringLiteral("被环境变量压过时 GPU 一次都没被调用"));
+                r.check(RasterScheduler::envOverrideActive(),
+                        QStringLiteral("有环境变量 ⇒ envOverrideActive() == true（界面据此置灰）"));
+            }
+        }
+
+        // 恢复现场：别把开发者的真实首选项改掉
+        RasterScheduler::setAccelPreference(savedPref);
     }
 
     // 4) 计数方向
@@ -289,6 +409,24 @@ int tRasterBackend()
         // ForceGpu 跳过成本阈值，但仍问 supports；假后端 supports 高成本链 → 点算子成本低仍 true
         // 点算子：假后端 supportsAllCostly 看成本，点算子不过线 → false
         r.check(!sched.shouldUseGpu(pts, 200000), QStringLiteral("纯点算子链 ⇒ false"));
+
+        // 点算子**不计入链成本**：这张表的语义是"GPU 能省下多少 CPU 工作量"，
+        // 而点算子在两条路径上都是 CPU 就地求值（T5.2），省不掉 ⇒ 不该被累加。
+        // 只钉 `stackCostNsPerPixel` 本身：在 ForceGpu 下 `shouldUseGpu` **按设计跳过**
+        // 成本阈值（见 rasterscheduler.cpp 末尾），拿它来验成本是测不到东西的。
+        {
+            FilterStack manyPts;
+            for (int i = 0; i < 6; ++i)
+                manyPts.append(FilterNode(i % 2 ? OpName::Invert : OpName::BrightnessContrast));
+            r.check(stackCostNsPerPixel(manyPts) == 0,
+                    QStringLiteral("一串点算子的链成本 == 0（不计入，实际 %1）")
+                        .arg(stackCostNsPerPixel(manyPts)));
+            // 点算子 + 中值：成本应等于**中值自己的** 187，点算子一分不加
+            FilterStack mixed = stackOf(OpName::BrightnessContrast, OpName::MedianBlur);
+            r.check(stackCostNsPerPixel(mixed) == stackCostNsPerPixel(stackOf(OpName::MedianBlur)),
+                    QStringLiteral("点算子+中值的链成本 == 仅中值（实际 %1）")
+                        .arg(stackCostNsPerPixel(mixed)));
+        }
 
         FilterStack med = stackOf(OpName::MedianBlur);
         r.check(sched.shouldUseGpu(med, 200000), QStringLiteral("仅中值 + 足够像素 ⇒ true"));

@@ -47,6 +47,7 @@ SOURCES += \
     tests/t_gpumedian.cpp \
     tests/t_gpucustom.cpp \
     tests/t_gput47.cpp \
+    tests/t_gpukernels.cpp \
     tests/t_adjarea.cpp \
     tests/t_c1pixelate.cpp \
     tests/t_c1stylize.cpp \

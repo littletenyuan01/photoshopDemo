@@ -26,6 +26,7 @@
 #include "ui/colorspanel.h"
 #include "ui/homescreen.h"
 #include "ui/imagesizedialog.h"
+#include "ui/performancedialog.h"
 #include "ui/saveforwebdialog.h"
 #include "ui/infopanel.h"
 #include "ui/newdocumentdialog.h"
@@ -487,8 +488,47 @@ void MainWindow::setupMenus()
     connect(ui->actionWindowProperties, &QAction::toggled, ui->propertiesPanel, &QWidget::setVisible);
     connect(ui->actionWindowInfo, &QAction::toggled, ui->infoPanel, &QWidget::setVisible);
 
+    // —— 首选项：目前只接了"性能"（滤镜加速后端），其余仍为占位 ——
+    // 只启用真正有实现的那一项：菜单里留着一堆点了没反应的项比不显示更误导。
+    ui->actionPrefsPerformance->setEnabled(true);
+    connect(ui->actionPrefsPerformance, &QAction::triggered, this,
+            &MainWindow::onPreferencesPerformance);
+
     // —— 帮助 ——
     connect(ui->actionHelpAbout, &QAction::triggered, this, &MainWindow::onAbout);
+}
+
+/**
+ * 首选项 → 性能：滤镜加速后端（自动 / 仅 CPU / 强制 GPU）。
+ *
+ * 只做两件事：把选择写进 `QSettings`（`RasterScheduler::setAccelPreference` 会立即生效），
+ * 并把"现在实际跑在哪、是否被环境变量覆盖"回读给用户 —— 不骗人比什么都重要。
+ */
+void MainWindow::onPreferencesPerformance()
+{
+    PerformanceDialog dlg(this);
+    if (dlg.exec() != QDialog::Accepted)
+        return;
+    const Ps::RasterScheduler::Accel chosen = dlg.selectedAccel();
+    if (!Ps::RasterScheduler::setAccelPreference(chosen)) {
+        // 写盘失败必须让用户知道：否则他以为改好了，下次启动却变回去
+        QMessageBox::warning(this, tr("首选项"),
+                             tr("加速设置**未能保存到本机**（可能是注册表/配置目录不可写）。\n"
+                                "本次会话内仍会按你的选择运行，但下次启动可能恢复原值。"));
+    }
+    refreshAccelStatus(); // 立即刷新状态栏，让用户看到"现在跑在哪"
+}
+
+/**
+ * 把「当前实际后端」显示到状态栏 —— 用户改完首选项必须能立刻看到生效结果，
+ * 而不是只能靠猜或看日志。
+ */
+void MainWindow::refreshAccelStatus()
+{
+    const QString id = Ps::RasterScheduler::instance().activeBackendName();
+    const bool gpu = id.startsWith(QLatin1String("gpu"));
+    statusBar()->showMessage(gpu ? tr("滤镜加速：GPU（%1）").arg(id)
+                                 : tr("滤镜加速：CPU"), 4000);
 }
 
 void MainWindow::setupSession()

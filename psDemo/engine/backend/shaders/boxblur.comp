@@ -1,0 +1,98 @@
+#version 440
+
+// BoxBlur：预乘 ARGB8 入/出（T4.3）；采样时 qUnpremultiply、写出时 qPremultiply（对齐 Qt）。
+// 单趟**二维**盒模糊（半径 r，盒宽 n=2r+1，窗口面积 n²），越界采样 = 0（对齐 CPU boxblurfilterop）。
+//
+// 【归一化必须除 n²，不是 n】CPU 是**两次一维**（水平一趟除 n、垂直一趟再除 n）⇒ 总面积 n²；
+// 本 kernel 一次算完整窗口，所以除数必须是窗口面积。曾写成 `(sum + n/2) / n`（只除盒宽）：
+// 结果整整放大 n 倍（r=1 时 3×、r=3 时 7×），且**没有任何测试会失败** —— 直到 T3.2 门控补上。
+// 用 `(sum + n²/2) / n²` 做四舍五入，与 CPU 的两趟「除 n + 就近舍入」在 n² 为奇数时口径一致。
+// 定位 = P2 浮点/模糊类（gpu-plan §8）：中间舍入位置不同，护栏 ≤1。
+// 供 BoxBlur（单次）与 GaussianBlur（三次盒，由后端循环调用）复用。
+layout(local_size_x = 16, local_size_y = 16) in;
+
+layout(std430, binding = 0) readonly buffer Src {
+    uint src[];
+};
+
+layout(std430, binding = 1) writeonly buffer Dst {
+    uint dst[];
+};
+
+layout(std140, binding = 2) uniform Params {
+    int width;
+    int height;
+    int radius;
+    int pad;
+};
+
+// 对齐 Qt qUnpremultiply（qt_inv_premul_factor[a] == 0x00ff00ff/a）。
+uint qtUnpremultiply(uint p)
+{
+    const uint alpha = (p >> 24) & 255u;
+    if (alpha == 255u)
+        return p;
+    if (alpha == 0u)
+        return 0u;
+    const uint invAlpha = 0x00ff00ffu / alpha;
+    const uint r = ((((p >> 16) & 255u) * invAlpha) + 0x8000u) >> 16;
+    const uint g = ((((p >> 8) & 255u) * invAlpha) + 0x8000u) >> 16;
+    const uint b = (((p & 255u) * invAlpha) + 0x8000u) >> 16;
+    return (alpha << 24) | (r << 16) | (g << 8) | b;
+}
+
+// 对齐 Qt qPremultiply 单通道舍入。
+uint qtPremulChan(uint c, uint a)
+{
+    uint x = c * a;
+    return (x + ((x >> 8) & 255u) + 0x80u) >> 8;
+}
+
+uint qtPremultiply(uint x)
+{
+    const uint a = (x >> 24) & 255u;
+    const uint r = qtPremulChan((x >> 16) & 255u, a);
+    const uint g = qtPremulChan((x >> 8) & 255u, a);
+    const uint b = qtPremulChan(x & 255u, a);
+    return (a << 24) | (r << 16) | (g << 8) | b;
+}
+
+// 直通采样；越界 = 0（对齐 CPU：running sum 跳过越界项）。
+uint getPixelStraight(int x, int y)
+{
+    if (x < 0 || y < 0 || x >= width || y >= height)
+        return 0u;
+    return qtUnpremultiply(src[y * width + x]);
+}
+
+void main()
+{
+    int x = int(gl_GlobalInvocationID.x);
+    int y = int(gl_GlobalInvocationID.y);
+    if (x >= width || y >= height)
+        return;
+
+    const int r = radius;
+    const int n = r * 2 + 1;
+    const uint area = uint(n) * uint(n); // 窗口面积（= CPU 两趟各除 n 的合成）
+    const uint halfArea = area / 2u; // 勿用标识符 half（GLSL 保留字）
+
+    uint sr = 0u, sg = 0u, sb = 0u, sa = 0u;
+    for (int dy = -r; dy <= r; ++dy) {
+        for (int dx = -r; dx <= r; ++dx) {
+            const uint p = getPixelStraight(x + dx, y + dy);
+            sr += (p >> 16) & 255u;
+            sg += (p >> 8) & 255u;
+            sb += p & 255u;
+            sa += (p >> 24) & 255u;
+        }
+    }
+
+    const uint nr = (sr + halfArea) / area;
+    const uint ng = (sg + halfArea) / area;
+    const uint nb = (sb + halfArea) / area;
+    const uint na = (sa + halfArea) / area;
+
+    const uint o = (na << 24) | (nr << 16) | (ng << 8) | nb;
+    dst[y * width + x] = qtPremultiply(o);
+}

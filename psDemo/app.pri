@@ -128,6 +128,7 @@ SOURCES += \
     ui/toolbox.cpp \
     ui/tooloptionsbar.cpp \
     ui/colorpickerdialog.cpp \
+    ui/performancedialog.cpp \
     ui/homescreen.cpp \
     ui/newdocumentdialog.cpp \
     ui/imagesizedialog.cpp \
@@ -278,6 +279,7 @@ HEADERS += \
     ui/toolbox.h \
     ui/tooloptionsbar.h \
     ui/colorpickerdialog.h \
+    ui/performancedialog.h \
     ui/homescreen.h \
     ui/newdocumentdialog.h \
     ui/imagesizedialog.h \
@@ -301,6 +303,7 @@ FORMS += \
     ui/toolbox.ui \
     ui/tooloptionsbar.ui \
     ui/colorpickerdialog.ui \
+    ui/performancedialog.ui \
     ui/homescreen.ui \
     ui/newdocumentdialog.ui \
     ui/imagesizedialog.ui \

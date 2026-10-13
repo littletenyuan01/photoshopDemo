@@ -61,6 +61,19 @@ constexpr int kMinPixelsForGpu = int(GpuDecisionThreshold::MIN_PIXELS);
 OpCostNsPx opCostNsPerPixel(OpName name);
 
 /**
+ * 是否为「点算子」（逐像素、无邻域、无临时资源）。
+ *
+ * **唯一白名单，两个用途共用**（口径只有一处，避免两处各写一份而漂）：
+ *  1. `stackCostNsPerPixel` **跳过**它们 —— 点算子在 CPU/GPU 两条路径上都是 CPU 就地求值
+ *     （GPU 侧见 `runStack` 调 `FilterEval::applyNode`），算进链成本只会白抬高、
+ *     把不该上卡的链推过阈值；
+ *  2. `GpuRasterBackend` 用它判断「该算子能不能走 CPU inline 穿透」。
+ *
+ * 加新的调整类算子时**只改这一处**。
+ */
+bool isPointOp(OpName name);
+
+/**
  * 栈内启用节点的成本之和（ns/px）。
  * 遇未登记项返回 `int(OpCostNsPx::UNREGISTERED)`（= -1）。
  */

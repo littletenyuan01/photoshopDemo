@@ -101,5 +101,7 @@
   <qresource prefix="/shaders">
     <file alias="median.comp.qsb">engine/backend/shaders/median.comp.qsb</file>
     <file alias="custom.comp.qsb">engine/backend/shaders/custom.comp.qsb</file>
+    <file alias="noise.comp.qsb">engine/backend/shaders/noise.comp.qsb</file>
+    <file alias="boxblur.comp.qsb">engine/backend/shaders/boxblur.comp.qsb</file>
   </qresource>
 </RCC>

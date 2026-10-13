@@ -103,6 +103,9 @@ private slots:
     void onZoomIn();
     void onZoomOut();
     void onToggleDockPanel(bool visible);
+    void onPreferencesPerformance();
+    /** 把当前实际加速后端显示到状态栏（改完首选项立刻可见）。 */
+    void refreshAccelStatus();
     void onAbout();
     void onToolChanged(Ps::ToolId id);
     void onBrushDiameterChanged(int diameter);

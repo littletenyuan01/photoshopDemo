@@ -1,0 +1,148 @@
+#version 440
+
+layout(local_size_x = 16, local_size_y = 16) in;
+
+layout(std430, binding = 0) readonly buffer Src {
+    uint src[];
+};
+
+layout(std430, binding = 1) writeonly buffer Dst {
+    uint dst[];
+};
+
+layout(std140, binding = 2) uniform Params {
+    int width;
+    int height;
+    int offsetX;
+    int offsetY;
+    uint seed;
+    int amount;
+    int gaussian;
+    int mono;
+};
+
+uint noiseHash(uint x, uint y, uint s, uint channel)
+{
+    uint h = s ^ (x * 0x9E3779B9u) ^ (y * 0x85EBCA6Bu) ^ (channel * 0xC2B2AE35u);
+    h ^= h >> 16;
+    h *= 0x7FEB352Du;
+    h ^= h >> 15;
+    h *= 0x846CA68Bu;
+    h ^= h >> 16;
+    return h;
+}
+
+float noiseUnit(uint h)
+{
+    return float(h >> 8) * (1.0 / 16777216.0);
+}
+
+float noiseGauss(uint h1, uint h2, uint h3)
+{
+    return 2.0 * (noiseUnit(h1) + noiseUnit(h2) + noiseUnit(h3)) - 3.0;
+}
+
+uint qtUnpremultiply(uint p)
+{
+    uint alpha = (p >> 24) & 255u;
+    if (alpha == 255u)
+        return p;
+    if (alpha == 0u)
+        return 0u;
+    uint invAlpha = 0x00ff00ffu / alpha;
+    uint r = ((((p >> 16) & 255u) * invAlpha) + 0x8000u) >> 16;
+    uint g = ((((p >> 8) & 255u) * invAlpha) + 0x8000u) >> 16;
+    uint b = (((p & 255u) * invAlpha) + 0x8000u) >> 16;
+    return (alpha << 24) | (r << 16) | (g << 8) | b;
+}
+
+uint qtPremulChan(uint c, uint a)
+{
+    uint x = c * a;
+    return (x + ((x >> 8) & 255u) + 0x80u) >> 8;
+}
+
+uint qtPremultiply(uint x)
+{
+    uint a = (x >> 24) & 255u;
+    uint r = qtPremulChan((x >> 16) & 255u, a);
+    uint g = qtPremulChan((x >> 8) & 255u, a);
+    uint b = qtPremulChan(x & 255u, a);
+    return (a << 24) | (r << 16) | (g << 8) | b;
+}
+
+int qRound(float v)
+{
+    return int(v + (v >= 0.0 ? 0.5 : -0.5));
+}
+
+void main()
+{
+    int x = int(gl_GlobalInvocationID.x);
+    int y = int(gl_GlobalInvocationID.y);
+    if (x >= width || y >= height)
+        return;
+
+    uint idx = uint(y * width + x);
+    uint p = qtUnpremultiply(src[idx]);
+    int a = int((p >> 24) & 255u);
+    if (a == 0) {
+        dst[idx] = p;
+        return;
+    }
+
+    uint gx = uint(x + offsetX);
+    uint gy = uint(y + offsetY);
+    // 【幅度必须整数算】CPU 侧是 `amp = amount * 2.55`（double）。
+    // 这里若直接写 `float(amount) * 2.55`，SPIR-V 翻译会把它**改写**成 `amount / 256.0`
+    // （代数等价、数值不等价：相对误差 9.4e-7 → 幅度绝对误差 ≤2.4e-4），
+    // 结果是 qRound 边界上的像素与 CPU 差 1。改成整数四舍五入：
+    //     amp = round(amount * 2.55) = (2*amount*255 + 100) / 200
+    // 分子 ≤ 51100（int 安全）。与 `double(amount)*2.55` 的精确四舍五入逐值一致；
+    // 仅 amount∈{20,50} 处 CPU 的 double 表示略低于 .5（理想值分别为 51 / 127.5），
+    // 本式取理想值 ⇒ 与 CPU 相差 1 —— 属 P2 允许的 ±1（见 gpu-plan §8）。
+    float amp = float((2 * amount * 255 + 100) / 200);
+
+    float dr, dg, db;
+    if (mono != 0) {
+        uint h1 = noiseHash(gx, gy, seed, 0u);
+        if (gaussian == 0) {
+            float v = (noiseUnit(h1) * 2.0 - 1.0) * amp;
+            dr = dg = db = v;
+        } else {
+            uint h2 = noiseHash(gx, gy, seed, 101u);
+            uint h3 = noiseHash(gx, gy, seed, 202u);
+            float v = noiseGauss(h1, h2, h3) * (amp / 3.0);
+            dr = dg = db = v;
+        }
+    } else {
+        uint h1r = noiseHash(gx, gy, seed, 1u);
+        uint h1g = noiseHash(gx, gy, seed, 2u);
+        uint h1b = noiseHash(gx, gy, seed, 3u);
+        if (gaussian == 0) {
+            dr = (noiseUnit(h1r) * 2.0 - 1.0) * amp;
+            dg = (noiseUnit(h1g) * 2.0 - 1.0) * amp;
+            db = (noiseUnit(h1b) * 2.0 - 1.0) * amp;
+        } else {
+            uint h2r = noiseHash(gx, gy, seed, 101u + 1u);
+            uint h3r = noiseHash(gx, gy, seed, 202u + 1u);
+            uint h2g = noiseHash(gx, gy, seed, 101u + 2u);
+            uint h3g = noiseHash(gx, gy, seed, 202u + 2u);
+            uint h2b = noiseHash(gx, gy, seed, 101u + 3u);
+            uint h3b = noiseHash(gx, gy, seed, 202u + 3u);
+            dr = noiseGauss(h1r, h2r, h3r) * (amp / 3.0);
+            dg = noiseGauss(h1g, h2g, h3g) * (amp / 3.0);
+            db = noiseGauss(h1b, h2b, h3b) * (amp / 3.0);
+        }
+    }
+
+    int r = int((p >> 16) & 255u) + qRound(dr);
+    int g = int((p >> 8) & 255u) + qRound(dg);
+    int b_ = int(p & 255u) + qRound(db);
+    r = clamp(r, 0, 255);
+    g = clamp(g, 0, 255);
+    b_ = clamp(b_, 0, 255);
+
+    uint result = (uint(a) << 24) | (uint(r) << 16) | (uint(g) << 8) | uint(b_);
+    dst[idx] = qtPremultiply(result);
+}

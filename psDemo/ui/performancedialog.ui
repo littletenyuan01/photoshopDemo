@@ -1,0 +1,157 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>PerformanceDialog</class>
+ <widget class="QDialog" name="PerformanceDialog">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>520</width>
+    <height>330</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>首选项 — 性能</string>
+  </property>
+  <property name="modal">
+   <bool>true</bool>
+  </property>
+  <property name="styleSheet">
+   <string notr="true">QDialog#PerformanceDialog {
+  background-color: #4a4a4a;
+  color: #e8e8e8;
+}
+QLabel { color: #e8e8e8; background: transparent; }
+QLabel#hintLabel { color: #b0b0b0; }
+QLabel#statusLabel { color: #d8d8d8; }
+QGroupBox {
+  border: 1px solid #353535;
+  border-radius: 4px;
+  margin-top: 10px;
+  padding: 10px 8px 8px 8px;
+  color: #cfcfcf;
+}
+QGroupBox::title { subcontrol-origin: margin; left: 10px; padding: 0 4px; }
+QRadioButton { color: #e8e8e8; background: transparent; padding: 3px 0; }
+QPushButton {
+  background-color: #3c3c3c;
+  border: 1px solid #222;
+  border-radius: 3px;
+  padding: 4px 16px;
+  color: #eee;
+  min-height: 22px;
+}
+QPushButton:hover { background-color: #4a4a4a; }
+QPushButton#okButton {
+  background-color: #0d66d0;
+  color: #fff;
+  border: 1px solid #0a4f9e;
+}
+QPushButton#okButton:hover { background-color: #1a75dd; }</string>
+  </property>
+  <layout class="QVBoxLayout" name="rootLayout">
+   <item>
+    <widget class="QGroupBox" name="accelGroup">
+     <property name="title">
+      <string>滤镜加速后端</string>
+     </property>
+     <layout class="QVBoxLayout" name="accelLayout">
+      <item>
+       <widget class="QRadioButton" name="autoRadio">
+        <property name="text">
+         <string>自动（推荐）：检测到独立显卡就用 GPU，检测不到就用 CPU</string>
+        </property>
+        <property name="checked">
+         <bool>true</bool>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QRadioButton" name="cpuRadio">
+        <property name="text">
+         <string>仅使用 CPU：不创建 GPU 设备（排查问题 / 省电时用）</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QRadioButton" name="gpuRadio">
+        <property name="text">
+         <string>强制使用 GPU：忽略收益门槛，能上卡就上卡（调试 / 实测用）</string>
+        </property>
+       </widget>
+      </item>
+     </layout>
+    </widget>
+   </item>
+   <item>
+    <widget class="QLabel" name="statusLabel">
+     <property name="text">
+      <string>状态</string>
+     </property>
+     <property name="wordWrap">
+      <bool>true</bool>
+     </property>
+    </widget>
+   </item>
+   <item>
+    <widget class="QLabel" name="hintLabel">
+     <property name="text">
+      <string>提示</string>
+     </property>
+     <property name="wordWrap">
+      <bool>true</bool>
+     </property>
+    </widget>
+   </item>
+   <item>
+    <spacer name="verticalSpacer">
+     <property name="orientation">
+      <enum>Qt::Vertical</enum>
+     </property>
+     <property name="sizeHint" stdset="0">
+      <size>
+       <width>20</width>
+       <height>10</height>
+      </size>
+     </property>
+    </spacer>
+   </item>
+   <item>
+    <layout class="QHBoxLayout" name="buttonLayout">
+     <item>
+      <spacer name="buttonSpacer">
+       <property name="orientation">
+        <enum>Qt::Horizontal</enum>
+       </property>
+       <property name="sizeHint" stdset="0">
+        <size>
+         <width>40</width>
+         <height>20</height>
+        </size>
+       </property>
+      </spacer>
+     </item>
+     <item>
+      <widget class="QPushButton" name="cancelButton">
+       <property name="text">
+        <string>取消</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QPushButton" name="okButton">
+       <property name="text">
+        <string>确定</string>
+       </property>
+       <property name="default">
+        <bool>true</bool>
+       </property>
+      </widget>
+     </item>
+    </layout>
+   </item>
+  </layout>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>

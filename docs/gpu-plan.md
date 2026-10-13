@@ -18,29 +18,163 @@
 
 ### 0.1 ⚠️ 当前状态（先读这一行）
 
-> **P1（中值）+ P1′（自定 3×3）已入库**（`1fe8dc3`）。**默认策略仍是 opt-in**：`Auto` = CPU。
+> **P1（中值）+ P1′（自定 3×3）已入库**（`1fe8dc3`）。**默认策略已改为自动**：
+> `Auto`（默认）= **检测到可用 GPU 就用它**，检测不到就静默走 CPU —— 与 §0.2 的实测相符
+>（独显上重核 12～36×，没有理由不用）。`PSLITE_RASTER=cpu` 可一键回到纯 CPU（排查用）。
 >
 > | 样本（标准测法，T4.3 后） | 端到端 | 一致性 |
 > |---|---|---|
-> | 中值 r=3 | **≈2.1～2.3×** | bit-exact |
+> | 中值 r=3 | **≈2.1～2.3×** ← 旧记录（核显/弱卡机型） | bit-exact |
 > | 自定锐化 / 稠密盒 | **≈4.4～7.0×** / **≈2.8～4.4×** | bit-exact |
 >
-> **判定**：轻核已跨 3×；重核仍 1–3×。维持 **opt-in**（默认 Auto=CPU）；不整开 P2。Q8/Q10–Q15 已关。
+> ### 0.2 ★ 第八轮实机复测（RTX 3060 Laptop，1600×1200，2026-10-13）
+>
+> 上面那行"中值 2.1～2.3×"是**弱卡机型的旧记录**，与独显差距极大，别再拿它做判断。
+> 本轮用 `psDemo/tools/gpu_bench`（**走真实调度路径**、端到端含上传/回读）实测：
+>
+> | 链 | CPU | GPU（含传输） | 加速比 | 一致性 |
+> |---|---|---|---|---|
+> | **中值 r=3** | 1107 ms | **31 ms** | **≈36×** | bit-exact |
+> | 最大值 r=3 | 513 ms | 30 ms | ≈17× | bit-exact |
+> | 自定卷积（锐化核） | 140 ms | 11 ms | ≈12× | bit-exact |
+> | 锐化 s=2 | 77 ms | 11 ms | ≈7.0× | bit-exact |
+> | 添加杂色 12% 高斯彩 | 73 ms | 10 ms | ≈7.3× | 差 1（P2 护栏） |
+> | 高斯模糊 r=5 | 199 ms | 33 ms | ≈6.0× | 差 1（P2 护栏） |
+> | 盒模糊 r=4 | 69 ms | 12 ms | ≈5.6× | 差 1（P2 护栏） |
+> | 亮度→中值→反相（混合链） | 1164 ms | 99 ms | ≈11.8× | bit-exact |
+> | 亮度→反相（纯点算子，2 ns/px） | 5 ms | —（不走 GPU） | 1.00× | — |
+>
+> **判定（更新）**：在独显上**几乎每个已上卡算子都 ≥5×**，重核（中值/极值/卷积）**12～36×**；
+> 端到端传输占比已经很小（中值 31 ms 里 kernel 只是一小部分）。
+> 「轻核跨不过 3×」的旧结论**在独显上不成立** —— 它是弱卡机型的结论。
+>
+> **但默认仍然是 `Auto`=CPU**，所以真实用户**感受不到**这些收益（§0.3）。
+> ⚠️ **附带发现**：`gpu_bench` 里"纯点算子链"看似上了卡（60 ms，比 CPU 慢 12 倍），
+> 其实是 `PSLITE_RASTER=gpu` ⇒ `ForceGpu` **按设计跳过成本阈值**的强制行为，不是成本判据的结果。
+> 详见 §0.3 的更正说明。
+>
+> **判定（策略层，已改）**：**默认从 opt-in 改为自动**（`Auto` = 有 GPU 就用）。理由就是上表：
+> 独占 GPU 能把重核做到 12～36×，让用户手动设环境变量才吃得到，产品上说不通。
+> 仍**不整开 P2**（未上卡的算子照旧走 CPU，整链支持才上卡）。Q8/Q10–Q15 已关。
+>
+> **实测（默认，`PSLITE_RASTER` 未设置）**：上表各行从"1.00×（cpu）"变为
+> 中值 37.0×、最大值 16.7×、卷积 13.9×、杂色 7.6×、高斯 6.5×、混合链 11.9×；
+> 而**锐化 s=2 与盒模糊 r=4 仍正确地留在 CPU**（成本 5 ns/px 未过阈值）、
+> 纯点算子链也在 CPU（成本 0）—— 成本门槛与像素门槛在 Auto 下**照常生效**。
+>
+> ### 0.3 成本阈值：Auto 下生效，ForceGpu 下按设计跳过（一处容易误读的地方）
+>
+> `RasterScheduler::shouldUseGpu` 的两条分支语义不同：
+> * `Auto`（**默认**）—— 探测到 GPU 就用，**但仍守** `supports()`（整链支持）、像素门槛
+>   与**成本阈值**（小图/低收益链为几毫秒上一次卡不划算）；
+> * `ForceGpu`（`PSLITE_RASTER=gpu`）—— 守 `supports()` 与像素门槛，但**按设计跳过成本阈值**
+>   （注释写明"便于门控用例与实测对照"）；
+> * `ForceCpu`（`PSLITE_RASTER=cpu`）—— 永不碰 GPU，连设备都不建。
+>
+> ⚠️ **实测时务必分清**：`PSLITE_RASTER=gpu` 下"上了卡"**不代表**"成本判据认为该上卡"。
+> 本轮就踩过这个坑：一度把 ForceGpu 的强制行为当成成本判据的结果，误判出一个不存在的性能 bug。
+> 想验证成本判据本身，**必须不设 `PSLITE_RASTER`（走 Auto）**——见 §0.2 末尾那段实测。
+>
+> `stackCostNsPerPixel` / `CHAIN_COST_NS_PER_PIXEL` 现在是**真正生效的判据**（Auto 分支用它），
+> 不再是"为将来准备的数据"。⚠️ 但注意它的**表值仍严重失真**（见 T4.5：中值标 187、本机实测 636），
+> 所以它现在主要起"挡住小图/纯点算子链"的作用，绝对阈值不可当真。
+>
+> 相关小节：`stackCostNsPerPixel` **不把点算子计入**链成本（点算子在两条路径上都是 CPU 就地求值，
+> 累加它等于把"省不掉的量"当成"上卡的理由"）—— 见 `rastercost.cpp` 的注释与 `rasterbackend` 用例。
+>
+> ### 0.4 启动成本与合成路径（改默认后新测的两件事）
+>
+> **① 启动探测是异步的，不拖慢启动**
+>
+> 建 QRhi/D3D11 设备 + 加载编译 shader 实测约 **214 ms**。这笔钱**不能让用户白等**，
+> 所以 `main.cpp` 只**发起**后台探测（`RasterScheduler::warmUp()` 交给一个单线程
+> `QThreadPool`），窗口立刻出来。实测：
+>
+> | 量 | 值 |
+> |---|---|
+> | `warmUp()` 返回耗时 | **0 ms**（探测前它报 `cpu`） |
+> | 探测落地耗时 | **214 ms**（后台线程） |
+> | 最终后端 | `gpu:qrhi`（检测成功） |
+>
+> 代价：探测完成前的那几百毫秒里，滤镜判定先走 CPU，之后自动切到 GPU —— 判定结果始终正确，
+> 只是头几次慢一点。启动日志分两行（"探测已发起" → "后端 = …"），用 50 ms 轮询等结论落地，
+> **绝不在主线程 sleep**。若嫌日志啰嗦，把 `PSLITE_RASTER_LOG=1` 关掉即可（qInfo 仍会打那两行）。
+>
+> **② 合成路径（投影小块）在 Auto 下与纯 CPU 等价 —— 千万不要被均值骗了**：
+>
+> | 模式 | 逐次耗时（ms） | 稳态中位数 |
+> |---|---|---|
+> | Auto（GPU 已就绪） | **322**, 99, 100 | **100 ms** |
+> | `PSLITE_RASTER=cpu` | 97, 98, 99 | **98 ms** |
+>
+> 两个要点：
+> * 合成的小块（64×64 输出 + pad ⇒ ≈4.6k px）**永远低于 100k 像素门槛**，所以合成**一次都没
+>   调用 GPU**（实测 1901 次调用全部 `backend=cpu`，GPU 行 0 条）。GPU 在合成里帮不上忙，
+>   但也**不拖慢** —— 稳态与纯 CPU 持平。
+> * 为这条路径做了**判定短路**：`shouldUseGpu` 把「像素门槛 / 位移 / 成本」这几条**只依赖参数**的
+>   判据提到 `ensureGpu()` 与 `supports()` **之前**。否则每个小块都要白问一次后端；
+>   更糟的是——设备若还没建，**一个小块就会触发建整个 D3D11 设备**（214 ms）。
+>   用例 `rasterbackend` 用 `probeCount()` 钉住"小块判定一次都不许碰后端"。
+> * ⚠️ **只预热 1 次会得出"Auto 比 CPU 慢 1.7×"的假结论**（本轮真的先得到了这个错结论）：
+>   初始化开销漏进第一次计时，而均值把 322 平摊成 168。**测稳态必须多预热几次并看中位数**，
+>   否则会把"一次性启动成本"误报成"每次合成变慢"。
+
 >
 > ### ★ 当前优先（T4 收尾 → T5 通用性）
 >
 > 1. ✅ T4.1 入库 · ✅ T4.2 分段 · ✅ **T4.3** 解/预乘进 shader（§16.6）· ✅ T4.7 复用扩到 5 算子。
-> 2. 随后：T4.4 独显 / T4.5 成本表 187 / T3.0 AddNoise。
+> 2. ✅ **T5.2** 点算子 CPU inline 穿透（**2026-10-13**）· ✅ **T5.4** ROI（srcRect/outRect）支持（**2026-10-13**）。
+> 3. ✅ **T3.0** `AddNoise` GPU（**2026-10-13**，§10/§3.3）· ✅ **T3.1** `GaussianBlur` GPU（**2026-10-13**，§3.3）。
+> 随后：T4.4 独显 / T4.5 成本表 187。
 >
 > ### ⚠️⚠️ 但**先停下来修两件事**（第七轮架构评审，§17）
 >
 > | 顺序 | 事项 | 为什么插队 |
 > |---|---|---|
 > | **T5.1** | ✅ **r=5..8 静默错像素已修**（台账 **#22**） | `supports()` + `gpuParamsSupported` 校验 **r ≤ 4**（对齐 `chR[81]`）；越界走 CPU。`gpumedian` 钉住 r=5..8 bit-exact |
-> | **T5.2** | ★★ **点算子（调整类）上 GPU** | `isGpuOp()` 不含任何 adjustment ⇒ **`亮度+中值` 整条退回 CPU**，§4.1 的招牌收益「点算子顺带免费」**完全落空**；真实编辑里调整层极常见 |
-> | **T5.3** | ★ **kernel 描述符注册表** | 现在加一个算子要改 **6~7 处**后端核心 —— 正是"为某项滤镜专门设计"。通用后 = **加 1 行** |
+> | **T5.2** | ✅ **点算子（调整类）上 GPU**（**2026-10-13**） | `isPointOp()` + `isGpuPathOp()` → `supports()` 放行；`runStack` 内 `FilterEval::applyNode` 就地处理点算子；**`亮度+中值` 不再整条退回 CPU**。实现策略：点算子走 CPU inline（无 GPU kernel），避免因调整层丢掉邻域算子的 GPU 加速 |
+> | **T5.3** | ✅ **kernel 描述符注册表**（**2026-10-13**） | `OpKernelBinding` + `KernelDesc`；加新 GPU 算子 = 绑定表 1 行（旧需 6~7 处）；`runNodeOnce` 统一派发 |
 >
-> ⚠️ **T5.1–T5.3 未完成前，不要再按 §4.4.1 铺新算子**（每加一个都在加深"专用化"）。
+> ### 本轮改进（2026-10-13）
+>
+> | 编号 | 改进 | 位置 |
+> |---|---|---|
+> | **T5.2** | 点算子 CPU inline 穿透 | `isPointOp()` / `isGpuPathOp()` / `gpuParamsSupported()` / `runStack`（gpurasterbackend.cpp） |
+> | **T5.3** | kernel 描述符注册表 | `KernelDesc` / `OpKernelBinding` / `bindingForOp()` 表 / `runNodeOnce()` 统一派发 / `KernelKind::RankSelect/Conv3x3` / `QHash` 缓存 shader（gpurasterbackend.cpp） |
+> | **T5.4** | ROI（srcRect/outRect）支持 | `runStack` 裁剪上传 + QPainter 回贴（gpurasterbackend.cpp） |
+> | **T3.0** | `AddNoise` GPU（noise.comp） | `KernelKind::NoiseHash` + 绑定表；放宽位置相关 supports（gpurasterbackend.cpp / rasterscheduler.cpp / noise.comp） |
+> | **T3.1** | `GaussianBlur` GPU（boxblur.comp） | `KernelKind::BoxBlur` + 绑定表；`GaussianBlur` = 三次盒复用 `boxblur.comp`（`runGaussianOnce` 逐趟换 UBO）；顺带 `BoxBlur` 单算子单趟直达（gpurasterbackend.cpp / boxblur.comp） |
+> | — | `srcBuf` Dynamic 缓冲复用 | `recreateSrcBinding`（gpurasterbackend.cpp） |
+> | — | `tryCreate` 死锁防护 | `tryCreate` 目标线程直调路径（gpurasterbackend.cpp） |
+>
+> ### 🔴 第八轮实机复核（2026-10-13 —— 上面那批改动**当时一条都没被验证过**）
+>
+> 本轮把 `PSLITE_RASTER=gpu` 真正跑起来（D3D11），发现**整个 GPU 后端其实一次都没生效过**，
+> 且新加的 BoxBlur 路径算错。四处都已修 + 全部补上门控（`gpukernels`）：
+>
+> | # | 缺陷 | 症状 | 性质 |
+> |---|---|---|---|
+> | **#23** | `srcBuf` 用了 `QRhiBuffer::Dynamic` + `StorageBuffer` | **QRhi 直接拒绝**（`StorageBuffer cannot be combined with Dynamic`）⇒ `tryCreate()` 失败 ⇒ 大半径以外**全部静默走 CPU**。所有 GPU 门控用例只 SKIP、不算失败，`supports()` 直测却照过 ⇒ 从外部完全看不出 | 致命且**完全静默** |
+> | **#24** | `boxblur.comp` 归一化除 `n` 而非 **`n²`** | 一趟二维盒模糊的窗口面积没除掉 ⇒ 结果放大 `n` 倍（r=1 → 3×，r=3 → 7×）。**T3.1 的 BoxBlur/GaussianBlur 从一开始就是错的** | 静默错像素 |
+> | **#25** | `srcBuf` 每次上传都必须换一块（Immutable 不能二次 `uploadStaticBuffer`） | 链里第二个算子读到的是**第一个算子的输出** ⇒ 多算子链静默算错（单算子用例照不出来） | 静默错像素 |
+> | **#26** | `noise.comp` 的幅度 `amount * 2.55` 被 SPIR-V 翻译**改写**成 `amount / 256` | 代数等价、数值不等价（相对误差 9.4e-7）；加上 `noise.comp.qsb` 比源码旧（改过没重烘焙）⇒ GPU 噪声与 CPU 差 1 且用的是旧逻辑 | 精度漂移 |
+> | **#27** | `custom.comp.qsb` 里只有 `DXBC 50`，缺 `HLSL 50` | D3D11 运行时期望 HLSL ⇒ 自定卷积族在这个包下起不来 | 资产漂移 |
+> | **#28** | T5.4 的回贴位曾算成 `outRect - srcRect.topLeft()` | `image` 原点与 `srcRect` 不重合时**少贴一圈**（实测 160×120 的 ROI 被贴到偏 (-60,-50) 处，越权改 11573 像素） | 静默贴错位置 |
+>
+> **结论（比缺陷本身更重要）**：这批改动**全部**落在「不报错、不崩溃、只静默变慢或算错」这一类，
+> 而当时的验收手段（`supports()` 直测 + 「无 GPU 则 SKIP」的门控）**一条都拦不住**。
+> 唯一有效的办法是**把 GPU 真跑起来对账**，并**要求门控必须报告真实后端名**
+> （`GpuRasterBackend::backendName()`，见 §9）。SKIP 不能当成通过。
+>
+> ### 资产纪律（本轮新增）
+>
+> `.qsb` 是**入库二进制**，此前仓库里没有任何地方记录它的生成命令，实测已经漂了三处。
+> 现在：**`psDemo/tools/build-shaders.bat`** 是唯一生成入口（四个包同一组 target），
+> 用例 **`gpukernels`** 守住「四个包都能解析 + 带齐 HLSL/GLSL 目标」，改了 `.comp` 忘了烘焙会直接红。
+
+> T5.1-T5.4 + T3.0/T3.1 在**实机 D3D11 上跑通**（`gpukernels` / `gpumedian` / `gpucustom` / `gput47` 全绿）。
+> 下个优先：**T4.5 成本表标定**（§0.2 实测显示表值偏差已达 3.4×；开 Auto 自动决策前必须先解决）
+> —— 铺新算子只需绑定表加 1 行（+ 如需新 kernel 才写 `.comp` 并跑一次烘焙脚本）。
 >
 > 瓦片 / 投影 / 合成上 GPU = **非目标**（§0）；剩余量见 §16，通用性评审见 **§17**。
 
@@ -324,13 +458,18 @@ QImage FilterStack::apply(const QImage &source, const QRect &srcRect, const QRec
 几何**照传**（接口带 `srcRect/outRect`）。`shouldUseGpu` / `GpuRasterBackend::supports` 还要求：
 
 ```
-链里**不含**位置相关算子（`hasPositionalOp()`：AddNoise / Ripple）与位移（`containsOffset()`：Offset）
+链里**不含**几何位移（`containsOffset()`：Offset）
 ```
 
-原因：这两类依赖**输入图的绝对原点**（噪声按 `(x,y,seed)` 取、位移读「别处」），
-P1 GPU 只处理位置无关链。不满足 ⇒ `supports==false` ⇒ 走 CPU（**不计熔断**）。
+**位置相关算子（`AddNoise`/`Ripple`/…）自 T3.0 起不再整体拒绝**：改由绑定表**逐算子**裁决。
+`AddNoise` 已进 GPU 绑定表——它是**位置锚定的逐像素散列**（噪声按 `(x,y,seed)` 取），等价点算子，
+GPU 上用 `gx=x+offsetX, gy=y+offsetY`（offset=0）。坐标语义与 CPU 一致：CPU `PointFilterOp` 与
+GPU `runStack` 均先把子图复制为以左上角为原点的局部图再逐像素应用（整层时局部坐标即绝对坐标）；
+`Ripple` 等无绑定项 ⇒ `isGpuOp()==false` ⇒ `supports==false` ⇒ 走 CPU。**不满足 ⇒ CPU，不计熔断**。
 
-> 分块路径（`srcRect != outRect`）**不必**排除：几何透传、中值位置无关；
+> `containsOffset()` 兜底位移：其需求是**平移型**（读「别处」），超出当前各 kernel 的邻域能力。
+> 分块路径（`srcRect != outRect`）**不必**排除：几何透传、中值位置无关；且含位置相关算子的链
+> 整层求值（`FilterStack` 保证传给后端的 `srcRect/outRect` 为整张图），`gx=x+offsetX(0)` 即绝对坐标。
 > 像素数门槛（§4.3）通常已把过小的分块请求筛掉。
 
 **GPU 后端不使用 `PsGraph`。** 这是有意的：图引擎（`engine/graph`）是 CPU 侧的调度与缓存设施
@@ -380,34 +519,35 @@ P1 GPU 只处理位置无关链。不满足 ⇒ `supports==false` ⇒ 走 CPU（
 
 既然要传，就把整条链都放上去（点算子在 GPU 上本就近乎免费）。
 
-### 4.2 判据 —— **⚠️ 已随 T1.9（opt-in）简化：成本阈值不再参与决策**
+### 4.2 判据 —— **默认 Auto 用成本阈值；`PSLITE_RASTER=gpu` 强制模式按设计跳过**
 
 **当前实现（`rasterscheduler.cpp`，T1.9 之后）**：
 
 ```
-shouldUseGpu =  开关 == "gpu"            // Auto/ForceCpu 一律 false（§7.2.2 方案 A）
-             && gpuBackend 存在 && isAvailable()
+shouldUseGpu =  开关 != "cpu"            // cpu = 永不碰 GPU（连设备都不建）
+             && gpuBackend 存在 && isAvailable()   // Auto 下探测失败 ⇒ false ⇒ 静默 CPU
              && !熔断中
              && gpuBackend->supports(stack)     // §3.3 / §7.1；不支持≠失败
              && pixelCount >= kMinPixelsForGpu  // = image 像素数（含 pad）
+             && (开关 == "gpu"                  // ForceGpu：按设计跳过成本阈值
+                 || stackCostNsPerPixel(stack) > kGpuChainCostThresholdNsPerPixel)
 ```
 
-**为什么去掉成本阈值**：改成 opt-in 之后，是否用 GPU 已经是**用户的显式选择**，
-再加一层"成本不够就别用"只会让 `PSLITE_RASTER=gpu` 时行为不可预期
-（例如门控用例会时灵时不灵）。所以简化成"你说了算 + supports/像素/熔断三道硬门槛"。
+**默认（`Auto`）用成本阈值，`gpu` 强制模式不用**：`Auto` 是"自动决定"，所以要挡住
+"为几毫秒上一次卡"的小图/低收益链；而 `PSLITE_RASTER=gpu` 是**用户的显式选择**，
+再加一层"成本不够就别用"只会让行为不可预期（门控用例会时灵时不灵）。
 
-> **`kGpuChainCostThresholdNsPerPixel` 与 `stackCostNsPerPixel` 现在只用于日志**
-> （`[raster] ops=… cost=… backend=…`）与**成本表覆盖性用例**（§6.6 第 7 条）。
-> **它们不再影响任何决策** —— 别再照下面那段旧公式实现。
-> 保留它们是给**方案 B**（GPU 成本模型）留的地基。
+> **`kGpuChainCostThresholdNsPerPixel` 与 `stackCostNsPerPixel` 在 `Auto` 下是生效判据**，
+> 同时继续用于日志（`[raster] ops=… cost=… backend=…`）与成本表覆盖性用例（§6.6 第 7 条）。
+> ⚠️ 表值本身已失真（T4.5），所以它现在主要起"挡住小图/纯点算子链"的作用，**绝对阈值不可当真**。
 
 **（历史公式，仅存档）** 早先版本按"链的每像素总成本 vs 一次往返"决策，推导如下：
 一次往返（8.7 Mpx ≈ 35 MB，PCIe ~10 GB/s）≈ 7 ms ≈ **0.8 ns/px**；像素数两边成比例会约掉，
 于是判据化简为链的静态属性 —— `Σ(ns/px) > 阈值`。
-**这个思路本身没错**，但在"opt-in"策略下没有意义；而且**它隐含假设"GPU 一定更快"**，
-与 bitonic 时代实测（§7.2.1.2：r=3 只有 0.53×）冲突；计数选择后约 2×（§7.2.1.4）
-仍未达 3× ⇒ 若将来要恢复"自动判断"，**必须先有 GPU 侧的成本模型**，
-而不是拿 CPU 的 ns/px 去比一个固定阈值。
+**这个思路本身没错**，只是当年在"opt-in"策略下没有被用到；而**它隐含假设"GPU 一定更快"**，
+这在 bitonic 时代（§7.2.1.2：r=3 只有 0.53×）确实是错的，所以一度被撤掉。
+计数选择 + D3D11 落地后实测重核 12～36×（§0.2），这个假设**在独显上成立了**，
+于是成本阈值随"默认自动"一起恢复生效。
 ### 4.3 成本表（`rastercost.cpp`）
 
 **取值纪律**：标「实测」的是本项目真实量到的；标「估值」的必须在 P0 用一次性程序
@@ -517,7 +657,7 @@ shouldUseGpu =  开关 == "gpu"            // Auto/ForceCpu 一律 false（§7.2
 | **P0** | 壳与调度（**不写任何 GPU 代码**） | 无 | 做完即有价值 | ✅ **已提交** `0db3a5d` |
 | **P1** | 证伪样本 #1：**中值**（排序统计） | P0 + API spike | 原为「端到端 ≥3× 才继续」；被产品决策覆盖 | ✅ 标准测法 r=3 ≈**2.4～2.9×**；opt-in |
 | **P1′** | 证伪样本 #2：**卷积族**（`CustomFilter`） | P0 | ≥3× / 1–3× / <1× 三档 | ✅ **T4.3 后锐化 4.4～7×**；稠密 2.8～4.4×；仍 opt-in |
-| **P2** | 按 **§4.4.1** 逐算子扩（**先 `AddNoise`**） | T2.7–T2.9 | 每算子单独验收；仍 opt-in | ⏸ **下一优先 T3.0** |
+| **P2** | 按 **§4.4.1** 逐算子扩（`AddNoise`、`GaussianBlur` 已落地） | T2.7–T2.9 | 每算子单独验收；默认自动（`Auto`） | ✅ **T3.0/T3.1/T3.2 完成**；未上卡的算子整链回 CPU |
 | **P3** | 绘制算子特例（另一量级） | 另行评估 | 只有"拖动/绘制也要快"成为真实需求才启动 | ⏸ 未开始 |
 
 **顺序提醒**：P1 的"先接上"是产品决策，**不等于 P1 达标**；而 P1 未达标**也不能推出**
@@ -543,7 +683,7 @@ shouldUseGpu =  开关 == "gpu"            // Auto/ForceCpu 一律 false（§7.2
 
 | 变量 | 取值 | 语义 |
 |---|---|---|
-| `PSLITE_RASTER` | `auto`（默认）/ `cpu` / `gpu` | `cpu` = 永不使用 GPU；`gpu` = 优先 GPU 但失败仍降级（**不报错**，硬约束 2） |
+| `PSLITE_RASTER` | `auto`（**默认**）/ `cpu` / `gpu` | **`auto` = 探测到可用 GPU 就用它，探测不到静默走 CPU**（第八轮起为默认）；`cpu` = 永不使用 GPU（连设备都不建）；`gpu` = 强制优先 GPU（**跳过成本阈值**，供门控/实测），失败仍降级（**不报错**，硬约束 2） |
 | `PSLITE_RASTER_LOG` | `1` | 每次决策打一行 `qDebug`，格式固定：`[raster] ops=3 cost=210 ns/px px=2073600 backend=cpu` |
 
 首次读取后缓存到 `static`（§1.5）。
@@ -591,7 +731,8 @@ shouldUseGpu =  开关 == "gpu"            // Auto/ForceCpu 一律 false（§7.2
    - **仅中值**且像素数足够 ⇒ `true`
    - 中值 + 亮度（成本过线、假后端 supports 为 true）⇒ `true`（P0）；**P1 真后端 supports 收紧后此项应变 false**——P1 验收再钉（§7.1）
    - 像素数 < `kMinPixelsForGpu` ⇒ `false`
-   - 含 `AddNoise` / `Ripple` / `Offset` ⇒ `false`（§3.3）
+   - 含 `Offset` ⇒ `false`；含 `AddNoise`/`Ripple`：真后端逐绑定表（AddNoise 放行 / Ripple 拒），
+     假后端仍按「非位置/位移」拒（§3.3）
    - 假后端 `supports==false` 的高成本链（如仅蒙尘）⇒ `false`，且 **applyStack 调用次数不增加、熔断计数不变**
    - 熔断后 ⇒ `false`
 6. **取消**：`shouldAbort` 一开始就 true ⇒ `FilterStack::apply` 返回空图，熔断计数不变，不把半成品当结果；
@@ -780,15 +921,21 @@ kernel = 两级计数选择（粗 16 箱 → 精 16 档；`kth=(n+1)/2`）；`ca
 
 **判定**：r=3 稳定 ≥1× 且 <3× ⇒ 保留路径、**维持 opt-in**；中值线收口。
 
-#### 7.2.2 默认策略（已落地 opt-in）
+#### 7.2.2 默认策略（**第八轮已改为自动**）
 
 | 方案 | 做法 | 状态 |
 |---|---|---|
-| **A** | `Auto` = CPU；GPU 仅 `PSLITE_RASTER=gpu` | **已落地（T1.9）**；重测仍支持此选择 |
-| B | GPU 成本模型，`Auto` 估算更快才开 | 可后续；r=3 模型会倾向 CPU |
+| **A** | `Auto` = CPU；GPU 仅 `PSLITE_RASTER=gpu` | **曾落地（T1.9）**，但**已废弃** —— §0.2 实测独显上重核 12～36×，让用户手动设环境变量才吃得到，产品上说不通 |
+| **A′** | **`Auto`（默认）= 探测到可用 GPU 就用**；仍守 `supports()`/像素门槛/成本阈值；`cpu` 一键回纯 CPU | ✅ **现行（第八轮）** |
+| B | GPU 成本模型，`Auto` 估算更快才开 | 未做；**成本表失真（T4.5）是它的前置**，现阶段用固定阈值即可 |
 | C | 把成本阈值抬到中值之上 | 不采用（名不副实） |
 
-`PSLITE_RASTER_LOG=1` 打出实际 `backend=`；`features.md` 已写明。
+> ⚠️ **本文档里大量"维持 opt-in / `Auto` = CPU"的表述记录的是各轮当时的状态与决策**，
+> 读到时请以本节与 §0.1／§0.2 为准 —— 默认已在第八轮反转为自动。
+
+`PSLITE_RASTER_LOG=1` 打出实际 `backend=`；启动时 `main.cpp` 会打一行
+`[raster] 栅格后端 = gpu:qrhi（GPU 加速已启用）` / `... = cpu（未检测到可用 GPU 或已强制 CPU）`；
+`features.md` 已同步。
 
 ### 7.3 P1 的 Acceptance（**证伪样本 #1：中值**）
 
@@ -882,8 +1029,10 @@ kernel = 两级计数选择（粗 16 箱 → 精 16 档；`kth=(n+1)/2`）；`ca
 |---|---|
 | **CPU 回归** | 全套用例**默认跑 CPU**；无 GPU 机器/CI 必须全绿 |
 | **不放宽 CPU oracle** | 现有 bit-exact 断言（`diffs==0`）**一个都不改** |
-| **GPU 一致性** | **新增**一个「有 GPU 才跑」的门控用例：`PSLITE_RASTER` 为 `gpu` **且**后端自报非 `cpu` 时才执行；门控不满足时**跳过并打印跳过原因**，不算失败 |
-| **容差** | **P1（中值）目标 bit-exact**（中值取自输入已有像素，理论上可完全一致）。**允许逐通道 ≤1** 作为护栏；**不允许 >1 或结构性差异**。P2 浮点模糊类再单独评估，勿在 P1 预留「必须吃满容差」 |
+| **GPU 一致性** | **新增**一个「有 GPU 才跑」的门控用例：`PSLITE_RASTER` 为 `gpu` **且**后端自报非 `cpu` 时才执行；门控不满足时**跳过并打印跳过原因**，不算失败。⚠️ **第八轮教训**：SKIP 只能用于「这台机器确实没 GPU」；探测失败与「不支持这条链」必须能分开，否则整个后端起不来也只会安静 SKIP —— 所以门控要打印 `GpuRasterBackend::backendName()` |
+| **收益（性能）** | 用 `psDemo/tools/gpu_bench`（**走真实调度路径**、端到端含上传/回读，与 §0.2 同源）。⚠️ **别用 `median_e2e`/`custom_e2e` 的数字回答"生产里快多少"**：它们**直接调 `GpuRasterBackend`**、绕过调度器，量的是 kernel 上限，不是"生产会不会走 GPU、走了值不值"。两者结论可以完全不同（中值 37× vs 36× 接近，但决策层完全不同） |
+| **容差** | **P1（中值/卷积/秩选择）目标 bit-exact**（取自输入已有像素，理论上可完全一致）。**允许逐通道 ≤1** 作为护栏；**不允许 >1 或结构性差异**。<br>**P2 浮点/模糊类**单独定：`AddNoise` ≤1（见下）；`BoxBlur`/`GaussianBlur` **≤2** —— CPU 是两趟一维、每趟各舍入一次，GPU 是一趟二维、只舍入一次，r=64 实测差 2，属分离性的固有差异而非错误 |
+| **为什么 AddNoise 只到 ≤1** | CPU 是 `amp = amount * 2.55`（double）。shader 里**不能**直接写这个常量：SPIR-V 翻译会把它改写成 `amount / 256`（代数等价、数值不等价），于是 qRound 边界上的像素会与 CPU 差 1。现改为整数式 `(2*amount*255 + 100) / 200`（= 精确四舍五入），与 `double(amount)*2.55` 逐值一致；仅 `amount ∈ {20, 50}` 处 CPU 的 double 表示略低于 .5（理想值 51 / 127.5），本式取理想值 ⇒ 差 1，正好落在护栏内 |
 | **降级 / 熔断** | 见 §3.4、§6.4、§6.6 |
 | **压力** | 并发改动必须**全量连跑 ≥20 次** |
 | **性能** | 一次性程序放 `.build-verify/`（不参与编译），**必须报端到端含传输** |
@@ -901,6 +1050,11 @@ kernel = 两级计数选择（粗 16 箱 → 精 16 档；`kth=(n+1)/2`）；`ca
 ::   make   D:\QtSoftWare\QT6.9\Tools\mingw1120_64\bin\mingw32-make.exe
 :: 仓库根（本机）D:\CVlearningProject\gimp ；下面用 <repo> 占位
 
+:: 【0】改了任何 engine/backend/shaders/*.comp 之后，**必须重新烘焙 .qsb**：
+::     psDemo\tools\build-shaders.bat            （找不到 qsb 时 set QSB=<路径>\qsb.exe）
+::     .qsb 是入库二进制，跑 qmake/make 都**不会**自动重烘焙它。
+::     `gpukernels` 用例会守住「包能解析 + 目标齐」，但守不住「与 .comp 同步」——靠这条纪律。
+
 :: 测试（Release；构建目录已在 .gitignore）
 cd <repo>\photoshopDemo
 qmake psDemo\tests.pro -o .build-clean\Makefile -spec win32-g++
@@ -914,6 +1068,13 @@ release\psdemo_tests.exe rasterbackend      :: 只跑新用例
 :: 主程序（干净重建 = 先删 .build-app 再 qmake）
 qmake psDemo\psDemo.pro -o .build-app\Makefile -spec win32-g++
 cd .build-app && mingw32-make -f Makefile.Release -j8
+
+:: GPU 收益实测（端到端，走真实调度路径；见 §0.2 的表就是它跑出来的）
+mkdir .build-verify\gpu_bench\build && cd .build-verify\gpu_bench\build
+qmake <repo>\psDemo\gpu_bench.pro && mingw32-make -f Makefile.Release -j8
+set PSLITE_RASTER=gpu && set QT_QPA_PLATFORM=offscreen && release\gpu_bench.exe
+::   可带尺寸：release\gpu_bench.exe 512 512
+::   默认（不设 PSLITE_RASTER）就会自动用 GPU；设 =cpu 可对照纯 CPU 基线
 ```
 
 **本项目踩过的坑（务必遵守）**
@@ -921,7 +1082,12 @@ cd .build-app && mingw32-make -f Makefile.Release -j8
 2. `.pri` 里的相对路径按**包含它的 `.pro` 所在目录**解析（见 tests.md）；
 3. 源码目录若有陈旧 `psDemo/ui_*.h` 会**遮蔽**新生成的（`-I../psDemo` 先于 `-I.`）；
 4. **不要**用 PowerShell 来回读写含中文的文件（`Get-Content|Set-Content` 会毁编码）；
-5. 新增 `OpName` 必须加在 **`Count` 之前**（`.pslite` 存的是枚举整数值）。
+5. 新增 `OpName` 必须加在 **`Count` 之前**（`.pslite` 存的是枚举整数值）；
+6. **改了 `.comp` 必须跑 `psDemo\tools\build-shaders.bat`**（见上面第【0】条与「资产纪律」）；
+7. **GPU 门控用例里 `SKIP` 不等于通过**。无 GPU 的机器上必须 SKIP（硬约束 2），
+   但有 GPU 的机器上要能分清「探测失败」与「不支持」——`GpuRasterBackend::backendName()`
+   会把真实后端名报出来（`gpukernels` 会打印）。第八轮就是靠这一点才发现
+   「整个后端一次都没起来」（见上面 #23），此前所有门控都只是安静地 SKIP。
 
 ---
 
@@ -995,18 +1161,34 @@ cd .build-app && mingw32-make -f Makefile.Release -j8
 
 #### P2 待办（opt-in 下按 §4.4.1 **逐个**扩）
 
-- [ ] **T3.0** ★ **`AddNoise` GPU**：`noiseHash`→GLSL（uint32 / 舍入对齐）；放宽位置相关 `supports`；
-      ⚠️ 工程成本含调度契约，不只是 kernel
-- [ ] **T3.1** `GaussianBlur` GPU（可分离 / 三次盒模糊）—— **排在 AddNoise 之后**
-- [ ] **T3.2** 每个新增算子：门控用例 + e2e；bit-exact 或护栏 ≤1
+- [x] **T3.0** ★ **`AddNoise` GPU**（**2026-10-13**）：`noiseHash`→GLSL（`noise.comp`，uint32 与 filtereval 对齐）；
+      `KernelKind::NoiseHash` + 绑定表一行；**放宽位置相关 `supports`**：`hasPositionalOp()` 不再整体拒绝，
+      改由绑定表逐算子裁决（AddNoise 是位置锚定的逐像素散列，等价点算子 → 放行；Ripple/Offset 无绑定项仍拒），
+      `containsOffset()` 仍兜底位移。**精度定位**：创造性算子，浮点链在 qRound 边界可 ±1（合法容差）
+- [x] **T3.1** ★ **`GaussianBlur` GPU**（**2026-10-13**）：新增 `boxblur.comp`（单趟二维盒模糊，预乘↔直通在 shader 内）；
+      `KernelKind::BoxBlur` + 绑定表一行；`BoxBlur` 单算子单趟直达；
+      `GaussianBlur` 复用 `boxblur.comp` 三次盒（`runGaussianOnce` 用 `boxRadiiFor` 逐趟换 UBO，对齐 CPU 口径）。
+      **归一化除窗口面积 `n²`**（一趟二维 = CPU 两趟各除 `n` 的合成；除 `n` 会放大 `n` 倍 —— 见 #24）。
+      **精度定位**：P2 浮点模糊类，护栏 ≤2（CPU 两趟一维各舍入一次、GPU 只舍入一次；r=64 实测差 2）
+- [x] **T3.2** 每个新增算子：门控用例 + e2e —— **`gpukernels`**（`psDemo/tests/t_gpukernels.cpp`）：
+      shader 资产一致性（4 个 `.qsb` 可解析 + 带 HLSL/GLSL 目标，**不依赖 GPU**）、
+      AddNoise 8 组参数（容差 ≤1）、BoxBlur r=1/3/64 与 GaussianBlur r=1/5/30（容差 ≤2）、
+      ROI 语义（裁剪等价、越权写、非法几何拒收）。全部断言「真走了 GPU」并打印后端名。
+      **`SKIP` 不算通过**（无 GPU 机器上才允许 SKIP）
 
 #### ★ T4 收尾与验证
 
 - [x] **T4.1** ★★ **提交 GPU 实现** —— **`1fe8dc3`**
 - [x] **T4.2** ★ **三段计时探针** —— `PSLITE_GPU_STAGE=1` + `tools/stage_e2e/`；结果见 **§16.5**
 - [x] **T4.3** ★ **①④ 进 shader** + 直传 `constBits()` —— 结果见 **§16.6**；门控 bit-exact
-- [ ] **T4.4** **到别的机器上验证**（§16.3）：① 独显跑 e2e；② 无 GPU 机跑全套用例
-- [ ] **T4.5** 核实 **`187 ns/px` vs 实测 207～239 ns/px** 的口径差（Q16）
+- [x] **T4.4** **到别的机器上验证**（§16.3）：① ✅ **独显已实测**（RTX 3060 Laptop，见 **§0.2**：
+      中值 36×／卷积 12×／各轻核 5～7×，全部走真实调度路径 + 端到端含传输）；
+      ② ⏳ 无 GPU 机跑全套用例（本机有独显，`Auto` 下等价于"不走 GPU"，但真无卡机器仍待验）
+- [ ] **T4.5** ★ **成本表已明显失真 —— 优先级上调**：`MEDIAN_MEASURED = 187 ns/px` 是**旧机实测**，
+      本机（同代码）实测 **628～636 ns/px**（≈3.4× 差），`GAUSSIAN` 标 19 实测 ~35、
+      `CUSTOM` 标 48 实测 ~63、`ADD_NOISE` 标 22 实测 ~38。这是**单一"代表机"口径的固有弱点** ——
+      阈值判据只有在 `Auto` 下才生效（§0.3），所以现在不致命，但若要开自动决策，必须先定
+      「相对化」策略（例如按本机实测标定一次，或改成"单算子相对排名"而不是绝对 ns/px）
 - [ ] **T4.6** 明确记一笔 **GLES2 回退路径**的状态（shader 需 GL 4.3+/GLES 3.1+ SSBO，
       回退大概率不可用）：要么验证它、要么在 `initDevice()` 里去掉该回退并注明原因，
       **不要让读者以为有一条能用的 GL 回退**
@@ -1017,23 +1199,29 @@ cd .build-app && mingw32-make -f Makefile.Release -j8
 #### ★ T5 通用性架构收口（第七轮复审新增 —— **T5.1 是正确性缺陷，最先修**）
 
 > 依据 **§17**。判据：**加一个算子应从"改 6~7 处后端核心"变成"只加 1 行描述符"**。
-> ⚠️ **T5.1–T5.2 未完成前，不要再按 §4.4.1 铺新算子** —— 每加一个都在加深 §17.3 第 3 条。
+> T5.1–T5.5 已落定（**2026-10-13**）。下个优先：**T4.4 独显**（T3.0/T3.1 已完成）。
 
 - [x] **T5.1** ✅ ★★ **修 r=5..8 静默错像素**（台账 #22 / §17.1 方案 A）：
       `gpuParamsSupported` + `supports()` 校验 **r ≤ 4**；`runMedianOnce` 拒收越界；
       `gpumedian`：`supports(r=5)==false` / `supports(r=4)==true`；r=5..8 调度 `backend=cpu` 且 bit-exact。
       T1.16 已同步勾选关闭
-- [ ] **T5.2** ★★ **点算子 kernel**（§17.3 第 2 条 / Q18）—— 兑现 §4.1「点算子顺带免费」：
-      最简一类 kernel（无邻域/无状态）；**进一步做"点算子链融合成 1 趟"**
-      （`亮度→反相→对比度` = 1 上传 + 1 pass + 1 回读）。修掉"`亮度+中值` 整条退回 CPU"
-- [ ] **T5.3** ★ **kernel 描述符注册表**（§17.4）：`KernelDesc{matches, qsb, uboBytes, wg, maxParam, fill}`；
-      `supports()` = `∀节点: kernelFor && 参数在范围 && fill 成功`；`runStack` 去掉 if-else 链。
+- [x] **T5.2** ★★ **点算子 CPU inline 穿透**（§17.3 第 2 条 / Q18，**2026-10-13**）：
+      `isPointOp()` 白名单 18 个调整算子；`runStack` 遇点算子调 `FilterEval::applyNode` 就地处理。
+      **「亮度+中值」等混合链不再整条退回 CPU**。点算子本身走 CPU（无 GPU kernel），作为穿透手段。
+- [x] **T5.3** ★ **kernel 描述符注册表**（§17.4，**2026-10-13**）：`KernelDesc` + `OpKernelBinding` 双表；`RankSelect`/`Conv3x3` 数学命名；`QHash` 缓存 shader；`runNodeOnce` 查表派发
+      `supports()` = `∀节点: bindingForOp && paramsOk`；`runStack` 去掉 if-else 链。
       **验收**：加 `BoxBlur` 只需 `boxblur.comp` + 描述符一行
-- [ ] **T5.4** kernel **改数学名**：`KernelKind::Median` → `RankSelect`、`Custom` → `Conv3x3`
-- [ ] **T5.5** shader/pipe 缓存改 `QHash<QByteArray, …>` 按 qsb 路径；删掉三元 `shaderFor()`
+- [x] **T5.4** kernel **改数学名**：`KernelKind::Median` → `RankSelect`、`Custom` → `Conv3x3`（**2026-10-13**，合入 T5.3）
+- [x] **T5.5** shader/pipe 缓存改 `QHash<QByteArray, …>` 按 qsb 路径；删掉三元 `shaderFor()`（**2026-10-13**，合入 T5.3）
+- [x] **T5.7** `applyStack` 的 `srcRect`/`outRect`：ROI 裁剪上传 + QPainter 回贴（**2026-10-13**，见 T5.4）
+      —— **契约**：`image` 就是 `srcRect` 那一块（同坐标系、同尺寸），结果写在 `outRect` 处；
+      裁剪 = `srcRect ∩ image.rect()`（整幅时恒等、不搬像素），回贴 = `drawImage(outRect.topLeft(), …)`。
+      `outRect ⊄ srcRect` ⇒ 返回 `Failed` 走 CPU 补算（不猜）。第八轮修掉 #28（回贴位曾算成相对 `srcRect`）。
 - [ ] **T5.6** 三份 e2e（`median_e2e`/`custom_e2e`/`stage_e2e`）合成**一个参数化 bench**
-- [ ] **T5.7** `applyStack` 的 `srcRect`/`outRect`：**要么真支持 ROI，要么在 `supports()` 里显式拒绝**分块请求
 - [ ] **T5.8** 参数越界补用例（`r=9`、`strength=5`…），把钳制规则与 CPU 实现对齐到一处
+- [ ] **T5.9**（第八轮新增）**把「GPU 真的跑了」变成可观测的事实**：
+      `backendName()` 已加、`gpukernels` 已打印；待办＝让 `RasterScheduler` 的 `PSLITE_RASTER_LOG=1`
+      也把后端名/失败原因一起打出来，避免下一次又是「安静地 SKIP 了一个月」
 
 ---
 
@@ -1124,8 +1312,8 @@ feat: GPU 栅格后端（QRhi compute）—— 中值 + 自定 3×3，opt-in
   单飞互斥；失败静默且无副作用（image 与调用前逐字节相同）；不移植 PsGraph
 - kernel：median.comp（两级计数选择 16 箱 → 16 档）、custom.comp（3×3 卷积；
   scale==0 不除、offset 在除法后、clamp、alpha 取中心；口径与 CpuRasterBackend 对齐）
-- supports：启用节点全为 {MedianBlur, CustomFilter} 才放行（整链，不半链混跑）；
-  位置相关（AddNoise/Ripple）与 Offset 一律 CPU
+- supports：启用节点经绑定表逐算子校验（T3.0 起含 AddNoise：位置锚定的逐像素散列）；
+  Ripple / Offset（几何位移）一律 CPU
 - 默认策略 opt-in：PSLITE_RASTER=auto(默认)=CPU，=gpu 才启用；=cpu 永不调用
   （Auto 下连设备都不创建）
 - 熔断：连续 3 次真 Failed 禁用；只有 GPU 自己 Ok 才清零（CPU 降级补算不清零）
@@ -1362,14 +1550,14 @@ CPU 只 `ensurePremulArgb32`；连续图直传 `constBits()`，回读整块 `mem
 | # | 问题 | 位置（证据） | 为什么不好 | 通用做法 |
 |---|---|---|---|---|
 | **1** | ⚠️ **能力声明与 kernel 真实能力分离**（**已是真 bug，见 §17.1 / 台账 #22**） | `isGpuOp()` 只看 op 名；真实上限在 shader 的 `chR[81]` | 静默错像素；且**下一次仍会漂**（加算子/调上限时） | 描述符里带参数范围；`supports()` 校验 op 名**与**参数 |
-| **2** | ★★ **点算子（调整类）一个都没上 GPU** | `isGpuOp()` 只含 6 个**邻域**算子，**不含任何 adjustment** | 计划 §4.1 的招牌收益是「上传 → 亮度 → 中值 → 反相 → 回读，**一次往返，点算子顺带免费**」；但 `亮度 + 中值` 这条链 `supports()==false` ⇒ **整条退回 CPU**。实际编辑里调整层极常见 ⇒ **GPU 在多数真实链上一次都用不上**。§16.2 还把点算子列为"不值得" —— 那个判断**只对"单独用点算子"成立**；**一旦与邻域算子同链，它就该顺带免费**，这是 §4.1 的核心 | 点算子是**最简单的一类 kernel**（无邻域、无状态）；更进一步：**点算子链可融合成 1 趟**（`亮度→反相→对比度` = 上传 1、1 pass、回读 1） |
-| **3** | ★ **`KernelKind` 是算子枚举；加一个算子要改 6~7 处** | `enum class KernelKind{None,Median,Custom}`、`isGpuOp()` switch、`ensureShader()` if-chain、`shaderFor()`、具名成员 `cachedMedianCs/cachedCustomCs`、`runStack()` 的 if-else 链、各自的 `runXxxOnce()` | 后端核心为"某个具体算子"反复开洞 —— 正是"为某项滤镜专门设计"的定义；**每处都可能漏改**（§17.1 就是漏了参数维度） | **kernel 描述符注册表**：`{matches(op,n)、qsb 路径、UBO 大小、派发几何、fill(n,w,h,ubo)}`；**加算子 = 加一行** |
-| **4** | **kernel 按算子命名，不按数学命名** | `KernelKind::Median` 实际是"**按 kth 选秩**"（已被 Max/Min 复用）；`Custom` 实际是"**3×3 卷积**"（已被 Sharpen/Emboss 复用） | 复用**已经发生**，但名字在**劝退复用** —— 下一个人会加 `KernelKind::Maximum` 而不是复用 | 改成数学名：`RankSelect` / `Conv3x3` |
-| **5** | **`shaderFor()` 用三元表达式** | `return kind == Custom ? cachedCustomCs : cachedMedianCs;` | 只有两种 kind 时才成立；`None` 已返回 median；**加第三种会静默拿错 shader** | `QHash<QByteArray, QShader>` 按 qsb 路径缓存；**查不到就失败**，不猜 |
+| **2** | ✅ **点算子（调整类）一个都没上 GPU**（**T5.2，2026-10-13**） | `isPointOp()` 含 18 个调整算子白名单（BrightnessContrast / Levels / Curves / Exposure / Vibrance / HueSaturation / ColorBalance / BlackAndWhite / PhotoFilter / ChannelMixer / ColorLookup / Invert / Posterize / Threshold / GradientMap / SelectiveColor / Solarize / LayerMode）；方案选 **CPU inline**：`runStack` 遇点算子调 `FilterEval::applyNode` 就地处理。优点：① 不改 shader、② 天然 bit-exact、③ **「亮度+中值」等常见混合链不再整条退回 CPU**。缺点：点算子本身未加速（无 GPU kernel），只作为穿透手段 | `isPointOp()` + `isGpuPathOp()` 合并点算子与 GPU 内核白名单；`gpuParamsSupported()` 对点算子直接放行；`supports()` 使用 `isGpuPathOp` 作为能力判断；满足 §17.4 的「加一个点算子 = 白名单加一行」 |
+| **3** | ✅ **`KernelKind` 是算子枚举；加一个算子要改 6~7 处**（**T5.3，2026-10-13**） | 现已改为描述符注册表：`OpKernelBinding` 表（op→kind+paramsOk+fillUbo）是唯一注册点；`KernelDesc` 表（kind→qsbPath+uboBytes+wgSize）是 kernel 级描述；`runNodeOnce` 查表统一派发，无 if-else 分支；`ensureShader` 按 qsb 路径 hash 查找，不依赖枚举 | 加新 GPU 算子 = `bindingForOp` 表加 1 行 |
+| **4** | ✅ **kernel 按算子命名，不按数学命名**（**T5.3，2026-10-13**） | `KernelKind::RankSelect`（秩选择，覆盖中值/最大/最小）、`KernelKind::Conv3x3`（3×3 卷积，覆盖自定/锐化/浮雕） | 名字描述**做什么**而非**谁用**，鼓励复用 |
+| **5** | ✅ **`shaderFor()` 用三元表达式**（**T5.3，2026-10-13**） | 已替换为 `QHash<QByteArray, QShader> cachedShaders`，`ensureShader(qsbPath)` 按路径缓存/查找；查不到就失败不猜 | 加第三种 kernel 不再静默拿错 shader |
 | **6** | **每算子手写 UBO 布局 + 手写 std140 对齐** | `MedianParams`（4×int）、`CustomParams`（`2×ivec4 + int + int pad[3]`，`static_assert(sizeof==64)`）；shader 侧同样手写 | `static_assert` 是好习惯，但两侧仍靠**人手对齐**；且已有「勿把大数组经 `inout` 传函数，HLSL 翻译会错」这类踩坑 ⇒ 易错难审 | 统一定长 `int/float` 槽位 + 具名 setter（`setI(0,w)`…），或由描述符**生成两侧** |
 | **7** | **每算子一份 e2e 计时程序** | `tools/median_e2e`（131 行）、`tools/custom_e2e`（187 行）、`tools/stage_e2e` **三份同构** | 加算子要复制第四份；"标准测法"（seed=7/warmup=2/同图）要在多处同步 ⇒ **迟早漂**（第五轮就因两表不同源出过 38% 的差） | **一个参数化 bench**：算子与参数集从命令行给 |
 | **8** | **参数越界静默钳制** | `qBound(1,radius,8)`、`qBound(1,strength,4)` | 与 CPU 的钳制规则**不在同一处**，容易分叉；越界路径**没有测试**（**正是 §17.1 的温床**） | 参数适配器与算子 CPU 实现**放一起**；越界要么 `supports==false`，要么用例钉住 |
-| **9** | **`applyStack` 忽略 `srcRect`/`outRect`** | `Q_UNUSED(srcRect); Q_UNUSED(outRect);` | 接口**承诺**支持 ROI（§3.1），实现只按整图语义；`srcRect != outRect` 时语义可能不对 —— 现在靠"反正传整图"绕开 | 要么真支持 ROI，要么在 `supports()` 里**明确拒绝**分块请求（显式 > 隐式） |
+| **9** | ✅ **`applyStack` 忽略 `srcRect`/`outRect`**（**T5.4，2026-10-13**） | 原先 `Q_UNUSED(srcRect); Q_UNUSED(outRect);`，整图处理 | 现支持 ROI：裁剪 `srcRect ∩ image.rect()` 上传 → 处理 → `QPainter` 回贴到 `outRect`。**契约见 T5.7**：`image` 就是 `srcRect` 那一块。⚠️ 第八轮发现初版把回贴位算成相对 `srcRect`（#28，静默贴错位置），已修 + `gpukernels` 钉住 |
 
 ### 17.4 目标形态（"通用"到底长什么样）
 
@@ -1405,7 +1593,7 @@ const KernelDesc *kernelFor(OpName);                    // 唯一注册点
 | 顺序 | 做什么 | 理由 |
 |---|---|---|
 | **1** | ✅ **修 §17.1（T5.1 已落地）** | `supports()` 校验 r≤4；台账 #22 / T1.16 / Q17 已关 |
-| **2** | ★★ **做点算子（§17.3 第 2 条）** | 这是把"通用加速"**真正兑现**的一步：真实链几乎都含调整层；且点算子最简单、还能**融合成 1 趟** ⇒ 投入产出比最高。§16.2 把它列为"不值得"是**误判**（只对"单独用"成立） |
-| **3** | **描述符注册表 + 数学命名 + hash 缓存（第 3/4/5 条）** | 这是"以后加算子不再改后端"的**地基**；越晚做返工越多 |
-| **4** | 第 6/7/8/9 条随上面重构一并解决 | 不必单独排期 |
-| — | **不建议**现在按 §4.4.1 铺更多邻域算子 | 先把机制做通用，否则每加一个都在加深第 3 条 |
+| **2** | ✅ **做点算子（§17.3 第 2 条，T5.2 已落地，2026-10-13）** | `isPointOp()` 白名单 18 个调整算子；`runStack` 内 `FilterEval::applyNode` CPU inline 穿透 |
+| **3** | ✅ **ROI 支持（§17.3 第 9 条，T5.4 已落地，2026-10-13）** | `runStack` 裁剪上传 + QPainter 回贴 |
+| **4** | ✅ **描述符注册表 + 数学命名 + hash 缓存（§17.3 第 3/4/5 条，T5.3 已落地，2026-10-13）** | `OpKernelBinding` + `KernelDesc` 双表；`KernelKind::RankSelect/Conv3x3`；`QHash<QByteArray,QShader>` |
+| **5** | **第 6/7/8 条随上面重构一并解决** | 不必单独排期；下个优先：**T4.4 独显 / T3.0 AddNoise** |

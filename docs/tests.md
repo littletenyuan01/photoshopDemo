@@ -59,6 +59,8 @@ release\psdemo_tests.exe composite regionraster   :: 只跑指定用例
 | `gpumedian` | 有 GPU：r=2 比对中值 vs CPU（≤1）；**始终**：T5.1 钉住 r=5..8 `supports==false`、调度走 CPU 且 bit-exact |
 | `gpucustom` | **有 GPU 才跑**：自定 3×3 vs CPU（容差 ≤1）；否则跳过 |
 | `gput47` | **有 GPU 才跑**：T4.7 锐化/浮雕/最大/最小 vs CPU（容差 ≤1）；否则跳过 |
+| `gpukernels` | **T3.0/T3.1/T5.4 门控**：① shader 资产一致（四个 `.qsb` 可解析 + 带 HLSL/GLSL 目标，**不依赖 GPU**，改了 `.comp` 忘了跑 `tools\build-shaders.bat` 就红）；② `AddNoise` 8 组参数 vs CPU（≤1）；③ `BoxBlur r=1/3/64`、`GaussianBlur r=1/5/30` vs CPU（≤2，CPU 两趟各舍入一次）；④ ROI：裁剪后求值 == 单独求值、`outRect` 外逐字节不变、请求区内确实求过、非法几何拒收。全部断言「真走了 GPU」并打印后端名（本机 D3D11）—— **SKIP 不算通过** |
+| `gpu_bench`（一次性程序，不是常驻用例） | **GPU 收益实测**：走**真实调度路径**（supports / 像素门槛 / 熔断）+ 端到端含上传回读，覆盖中值 / 极值 / 卷积 / 锐化 / 杂色 / 高斯 / 盒模糊 / 混合链，打印调度器实际选的后端与逐像素差。用法见 `docs/gpu-plan.md` §9，结果见 §0.2。⚠️ 别用 `median_e2e`/`custom_e2e`（直调后端、绕过调度器）的数字回答「生产里快多少」 |
 | `adjarea` | 调整层+面积算子：`isAdjustmentOp` 护栏、子缓冲外扩、分块投影==整幅、往返 |
 | `c1pixelate` | C1 马赛克/碎片：方块均值 / 四角偏移 oracle；马赛克 hasPositionalOp；分块投影==整幅；参数/op 往返 |
 | `c1stylize` | C1 风/等高线/径向/表面/特殊模糊/拼贴：上风向最大亮度 / 跨电平描边 / 旋转·缩放 / 保边均值·边缘模式 / 切块偏移 oracle；分块==整幅；往返 |
