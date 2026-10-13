@@ -269,11 +269,13 @@ public:
 ```cpp
 // psDemo/engine/backend/rastercost.h
 namespace Ps {
-/** 每算子的「每像素成本」（纳秒）。**-1 = 未登记**（用例会红，强制补表）。 */
-int opCostNsPerPixel(OpName name);
-
-constexpr int kGpuChainCostThresholdNsPerPixel = 5; ///< 见 §4.2（严格大于）
-constexpr int kMinPixelsForGpu = 100 * 1000;        ///< 见 §4.3
+enum class OpCostNsPx : int { UNREGISTERED = -1, MEDIAN_MEASURED = 187, /* … §4.3 */ };
+enum class GpuDecisionThreshold : int {
+    CHAIN_COST_NS_PER_PIXEL = int(OpCostNsPx::LIGHT_3X3), // =5，单独 BoxBlur 不上
+    MIN_PIXELS = 100 * 1000,
+};
+OpCostNsPx opCostNsPerPixel(OpName name); // 未登记 → UNREGISTERED（用例会红）
+int stackCostNsPerPixel(const FilterStack &); // Σ ns/px；遇未登记 → -1
 }
 ```
 

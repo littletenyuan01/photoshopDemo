@@ -348,7 +348,7 @@ int tRasterBackend()
     {
         bool all = true;
         for (int i = 0; i < int(OpName::Count); ++i) {
-            if (opCostNsPerPixel(static_cast<OpName>(i)) < 0) {
+            if (opCostNsPerPixel(static_cast<OpName>(i)) == OpCostNsPx::UNREGISTERED) {
                 all = false;
                 r.check(false, QStringLiteral("成本表缺 OpName=%1").arg(i));
             }

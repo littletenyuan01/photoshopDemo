@@ -1,5 +1,5 @@
 /**
- * rastercost.cpp — OpName → ns/px 表（gpu-plan.md §4.3）。
+ * rastercost.cpp — OpName → OpCostNsPx（gpu-plan.md §4.3）。
  */
 #include "rastercost.h"
 
@@ -7,53 +7,51 @@
 
 namespace Ps {
 
-int opCostNsPerPixel(OpName name)
+OpCostNsPx opCostNsPerPixel(OpName name)
 {
     switch (name) {
     case OpName::MedianBlur:
-        return 187;
+        return OpCostNsPx::MEDIAN_MEASURED;
     case OpName::Maximum:
     case OpName::Minimum:
     case OpName::DustAndScratches:
-        return 100;
+        return OpCostNsPx::EXTREMUM_FAMILY_EST;
     case OpName::ReduceNoise:
-        return 50;
+        return OpCostNsPx::REDUCE_NOISE_EST;
     case OpName::AddNoise:
-        return 22;
+        return OpCostNsPx::ADD_NOISE_MEASURED;
     case OpName::GaussianBlur:
-        return 19; // 实测 ~18–21 ns/px @ r=3（§7.4 / T2.0）
+        return OpCostNsPx::GAUSSIAN_MEASURED;
     case OpName::CustomFilter:
-        return 48; // 实测 ~46–53 ns/px（§7.4.1 / T2.7 标准测法）
+        return OpCostNsPx::CUSTOM_MEASURED;
     case OpName::UnsharpMask:
     case OpName::HighPass:
     case OpName::MotionBlur:
-        return 15;
+        return OpCostNsPx::BLUR_PLUS_MERGE_EST;
     case OpName::SharpenEdges:
-        return 10;
+        return OpCostNsPx::SHARPEN_EDGES_EST;
     case OpName::BoxBlur:
     case OpName::FindEdges:
     case OpName::Sharpen:
     case OpName::Emboss:
-        return 5;
+        return OpCostNsPx::LIGHT_3X3;
     case OpName::Ripple:
-        return 2;
+    case OpName::Offset:
+        return OpCostNsPx::LIGHT_REMAP;
     case OpName::Mosaic:
-        return 8; // 估值：按块扫一遍均值
+    case OpName::Tiles:
+        return OpCostNsPx::BLOCK_SCAN_EST;
     case OpName::Fragment:
-        return 6; // 估值：每像素 4 次取样
+        return OpCostNsPx::FRAGMENT_EST;
     case OpName::Wind:
-        return 10; // 估值：每像素上风向窗口扫
+        return OpCostNsPx::WIND_EST;
     case OpName::TraceContour:
-        return 4; // 估值：4-邻接跨电平
+        return OpCostNsPx::TRACE_CONTOUR_EST;
     case OpName::RadialBlur:
-        return 40; // 估值：每像素多点旋转/缩放取样
+        return OpCostNsPx::RADIAL_BLUR_EST;
     case OpName::SurfaceBlur:
     case OpName::SmartBlur:
-        return 25; // 估值：保边邻域扫窗
-    case OpName::Tiles:
-        return 8; // 估值：切块拷贝一遍
-    case OpName::Offset:
-        return 2; // 表内 1.5，整型取 2
+        return OpCostNsPx::EDGE_PRESERVING_EST;
     case OpName::BrightnessContrast:
     case OpName::Levels:
     case OpName::Curves:
@@ -70,9 +68,9 @@ int opCostNsPerPixel(OpName name)
     case OpName::Threshold:
     case OpName::GradientMap:
     case OpName::SelectiveColor:
-        return 1;
+        return OpCostNsPx::POINT_ADJUST;
     case OpName::Solarize:
-        return 0; // 表内 0.5，整型取 0（点算子，偏向不上 GPU）
+        return OpCostNsPx::NEGLIGIBLE; // 表内 0.5 → 整型 0；偏向不上 GPU
     case OpName::StampDab:
     case OpName::FloodFill:
     case OpName::Gradient:
@@ -85,11 +83,11 @@ int opCostNsPerPixel(OpName name)
     case OpName::ShapeFill:
     case OpName::FreeTransform:
     case OpName::LayerMode:
-        return 0;
+        return OpCostNsPx::NEGLIGIBLE;
     case OpName::Count:
         break;
     }
-    return -1;
+    return OpCostNsPx::UNREGISTERED;
 }
 
 int stackCostNsPerPixel(const FilterStack &stack)
@@ -99,10 +97,10 @@ int stackCostNsPerPixel(const FilterStack &stack)
         const FilterNode &n = stack.at(i);
         if (!n.isEnabled())
             continue;
-        const int c = opCostNsPerPixel(n.op());
-        if (c < 0)
-            return -1;
-        sum += c;
+        const OpCostNsPx c = opCostNsPerPixel(n.op());
+        if (c == OpCostNsPx::UNREGISTERED)
+            return int(OpCostNsPx::UNREGISTERED);
+        sum += int(c);
     }
     return sum;
 }

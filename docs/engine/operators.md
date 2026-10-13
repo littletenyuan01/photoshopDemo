@@ -359,7 +359,7 @@ CanvasView 收到 contentChanged
 | `RasterBackend` | `engine/backend/rasterbackend.h` | `supports` + `ApplyStackResult`（Ok/Failed/Cancelled/Unsupported） |
 | `CpuRasterBackend` | `engine/backend/cpurasterbackend.*` | 现有图路径；恒可用；bit-exact 基准 |
 | `GpuRasterBackend` | `engine/backend/gpurasterbackend.*` | QRhi D3D11 中值（独立 RHI 线程）；仅全中值链 |
-| `RasterCost` | `engine/backend/rastercost.*` | 每算子 ns/px；未登记返回 -1 |
+| `RasterCost` | `engine/backend/rastercost.*` | `OpCostNsPx`（ns/px 具名档）；未登记 → `UNREGISTERED` |
 | `RasterScheduler` | `engine/backend/rasterscheduler.*` | 链级决策 / Failed→CPU / 熔断 / `PSLITE_RASTER` |
 
 决策按**整条链**（不是逐算子）：`supports` && 成本严格 `>` 5 ns/px && 像素数 ≥ 100k 等。  
