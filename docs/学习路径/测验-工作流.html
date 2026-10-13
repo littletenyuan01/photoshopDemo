@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>PhotoshopLite 工作流测验</title>
+<style>
+  :root { --bg:#1a1d23; --card:#242830; --fg:#e8eaed; --muted:#9aa0a6; --ok:#3dd68c; --bad:#f07178; --accent:#7aa2f7; }
+  body { margin:0; font-family:"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif; background:var(--bg); color:var(--fg); line-height:1.55; }
+  main { max-width:720px; margin:0 auto; padding:2rem 1.25rem 4rem; }
+  h1 { font-size:1.4rem; margin:0 0 .4rem; }
+  .sub { color:var(--muted); font-size:.95rem; margin-bottom:1.4rem; }
+  .q { background:var(--card); border-radius:10px; padding:1rem 1.1rem; margin:0 0 .85rem; }
+  .q h2 { font-size:.98rem; margin:0 0 .55rem; font-weight:600; }
+  .tag { font-size:.68rem; color:var(--accent); border:1px solid var(--accent); border-radius:4px; padding:0 5px; margin-right:5px; }
+  label { display:block; padding:.32rem 0; cursor:pointer; }
+  button#grade { background:var(--accent); color:#0d1117; border:0; border-radius:8px; padding:.65rem 1.2rem; font-weight:700; cursor:pointer; }
+  #result { margin-top:1.2rem; padding:1rem; border-radius:10px; background:var(--card); display:none; }
+  #result.show { display:block; }
+  .ok { color:var(--ok); } .bad { color:var(--bad); }
+  a { color:var(--accent); }
+</style>
+</head>
+<body>
+<main>
+  <h1>工作流测验（新建 → 导出）</h1>
+  <p class="sub">按用户流程出题。建议 ≥10/12 再写简历口述。L11 GPU 仅 1 题。</p>
+  <form id="quiz">
+    <div class="q" data-ans="b"><h2><span class="tag">L0</span>学习路径主顺序应是？</h2>
+      <label><input type="radio" name="q0" value="a" /> 先 GPU，再 UI，再文档</label>
+      <label><input type="radio" name="q0" value="b" /> 启动→新建/打开→看见→编辑→保存/导出</label>
+      <label><input type="radio" name="q0" value="c" /> 先通读全部 engine/op</label></div>
+    <div class="q" data-ans="a"><h2><span class="tag">L1</span>新建文档后，文档所有权在？</h2>
+      <label><input type="radio" name="q1" value="a" /> AppSession（unique_ptr）</label>
+      <label><input type="radio" name="q1" value="b" /> CanvasView</label>
+      <label><input type="radio" name="q1" value="c" /> Compositor</label></div>
+    <div class="q" data-ans="c"><h2><span class="tag">L2</span>用户正在编辑的像素主要在？</h2>
+      <label><input type="radio" name="q2" value="a" /> 工程文件头</label>
+      <label><input type="radio" name="q2" value="b" /> HistoryStack 里</label>
+      <label><input type="radio" name="q2" value="c" /> Layer 的 TileBuffer</label></div>
+    <div class="q" data-ans="b"><h2><span class="tag">L3</span>画了之后屏幕更新的核心链？</h2>
+      <label><input type="radio" name="q3" value="a" /> 直接写窗口 DC 绕过文档</label>
+      <label><input type="radio" name="q3" value="b" /> markDirty → Projection → compositeRegion → update</label>
+      <label><input type="radio" name="q3" value="c" /> 每次导出 PNG 再加载</label></div>
+    <div class="q" data-ans="a"><h2><span class="tag">L4</span>画笔一笔的合理顺序？</h2>
+      <label><input type="radio" name="q4" value="a" /> pushUndo → 写 tiles → markDirty</label>
+      <label><input type="radio" name="q4" value="b" /> 写 tiles → markDirty → pushUndo</label>
+      <label><input type="radio" name="q4" value="c" /> 只 markDirty 不改文档</label></div>
+    <div class="q" data-ans="c"><h2><span class="tag">L5</span>撤销栈跟谁走？</h2>
+      <label><input type="radio" name="q5" value="a" /> 全局单例，换文档共用</label>
+      <label><input type="radio" name="q5" value="b" /> 只跟 MainWindow</label>
+      <label><input type="radio" name="q5" value="c" /> 跟当前 ImageDocument</label></div>
+    <div class="q" data-ans="b"><h2><span class="tag">L6</span>选区本质是？</h2>
+      <label><input type="radio" name="q6" value="a" /> 路径的别名</label>
+      <label><input type="radio" name="q6" value="b" /> 文档级灰度 mask</label>
+      <label><input type="radio" name="q6" value="c" /> GPU 纹理句柄</label></div>
+    <div class="q" data-ans="a"><h2><span class="tag">L7</span>改不透明度应？</h2>
+      <label><input type="radio" name="q7" value="a" /> 走 ImageDocument 语义化 setter</label>
+      <label><input type="radio" name="q7" value="b" /> 只改面板文字</label>
+      <label><input type="radio" name="q7" value="c" /> 改 Compositor 静态变量</label></div>
+    <div class="q" data-ans="c"><h2><span class="tag">L8</span>默认加滤镜会？</h2>
+      <label><input type="radio" name="q8" value="a" /> 立刻永久覆盖 tiles</label>
+      <label><input type="radio" name="q8" value="b" /> 必须有 GPU</label>
+      <label><input type="radio" name="q8" value="c" /> 非破坏挂在 FilterStack，求值时出效果</label></div>
+    <div class="q" data-ans="b"><h2><span class="tag">L9</span>钢笔路径是？</h2>
+      <label><input type="radio" name="q9" value="a" /> 与选区同一块内存</label>
+      <label><input type="radio" name="q9" value="b" /> 矢量真相，可与选区互转</label>
+      <label><input type="radio" name="q9" value="c" /> 仅存在于撤销栈</label></div>
+    <div class="q" data-ans="a"><h2><span class="tag">L10</span>保存 .pslite 时 Format≠Current？</h2>
+      <label><input type="radio" name="q10" value="a" /> 加载失败（不兼容）</label>
+      <label><input type="radio" name="q10" value="b" /> 自动迁移</label>
+      <label><input type="radio" name="q10" value="c" /> 改用 GPU 解码</label></div>
+    <div class="q" data-ans="c"><h2><span class="tag">L11</span>GPU 在工作流中的位置？</h2>
+      <label><input type="radio" name="q11" value="a" /> 必须在「保存」之前完成的一步</label>
+      <label><input type="radio" name="q11" value="b" /> 替代文档模型</label>
+      <label><input type="radio" name="q11" value="c" /> 滤镜等算子的可选加速，失败则 CPU</label></div>
+    <button type="button" id="grade">交卷</button>
+  </form>
+  <div id="result"></div>
+  <p class="sub" style="margin-top:1.5rem"><a href="./README.md">学习路径 README</a></p>
+</main>
+<script>
+(function(){
+  const back=["L0 工作流","L1 AppSession","L2 TileBuffer","L3 Projection","L4 PaintTool","L5 History","L6 Selection","L7 图层 API","L8 FilterStack","L9 Path","L10 ProjectFormat","L11 GPU 定位"];
+  document.getElementById("grade").onclick=function(){
+    const cards=document.querySelectorAll(".q"); let score=0; const weak=[];
+    cards.forEach(function(card,i){
+      const ok=card.getAttribute("data-ans");
+      const p=card.querySelector("input:checked");
+      if(p&&p.value===ok) score++; else weak.push(back[i]);
+    });
+    const box=document.getElementById("result"); box.classList.add("show");
+    let h="<p>得分：<strong>"+score+" / "+cards.length+"</strong></p>";
+    if(!weak.length) h+="<p class='ok'>通过。可以整理简历口述了。</p>";
+    else { h+="<p class='bad'>弱项回溯：</p><ul>"; weak.forEach(function(w){h+="<li>"+w+"</li>";}); h+="</ul>"; }
+    box.innerHTML=h;
+  };
+})();
+</script>
+</body>
+</html>
