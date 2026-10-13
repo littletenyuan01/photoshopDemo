@@ -138,6 +138,111 @@ void ImageDocument::pushSelectionUndo(const QString &label)
     m_history->push(std::make_unique<SelectionUndo>(m_selection.mask().copy(), label));
 }
 
+void ImageDocument::pushPathUndo(const QString &label)
+{
+    if (!shouldRecordHistory())
+        return;
+    m_history->push(std::make_unique<PathUndo>(snapshotPaths(), m_activePathIndex, label));
+}
+
+QVector<Path> ImageDocument::snapshotPaths() const
+{
+    QVector<Path> out;
+    out.reserve(m_paths.count());
+    for (int i = 0; i < m_paths.count(); ++i) {
+        const Path *p = m_paths.pathAt(i);
+        if (p)
+            out.append(*p);
+    }
+    return out;
+}
+
+void ImageDocument::replacePathsFromUndo(const QVector<Path> &paths, int activeIndex)
+{
+    while (m_paths.count() > 0)
+        m_paths.takePath(0);
+    for (const Path &p : paths)
+        m_paths.addPath(std::make_unique<Path>(p));
+    m_activePathIndex = (activeIndex >= 0 && activeIndex < m_paths.count()) ? activeIndex : -1;
+    if (m_activePathIndex < 0 && m_paths.count() > 0)
+        m_activePathIndex = m_paths.count() - 1;
+    emit pathsChanged();
+}
+
+void ImageDocument::setActivePathIndex(int index)
+{
+    if (index < -1 || index >= m_paths.count())
+        return;
+    if (m_activePathIndex == index)
+        return;
+    m_activePathIndex = index;
+    emit pathsChanged();
+}
+
+Path *ImageDocument::activePath()
+{
+    return m_paths.pathAt(m_activePathIndex);
+}
+
+const Path *ImageDocument::activePath() const
+{
+    return m_paths.pathAt(m_activePathIndex);
+}
+
+int ImageDocument::addPath(Path path)
+{
+    if (path.name.isEmpty())
+        path.name = tr("路径 %1").arg(m_paths.count() + 1);
+    const int idx = m_paths.addPath(std::make_unique<Path>(std::move(path)));
+    m_activePathIndex = idx;
+    emit pathsChanged();
+    return idx;
+}
+
+bool ImageDocument::setPathAt(int index, Path path)
+{
+    if (!m_paths.replacePath(index, std::move(path)))
+        return false;
+    emit pathsChanged();
+    return true;
+}
+
+bool ImageDocument::removePath(int index)
+{
+    if (!m_paths.takePath(index))
+        return false;
+    if (m_activePathIndex == index)
+        m_activePathIndex = m_paths.count() > 0 ? qMin(index, m_paths.count() - 1) : -1;
+    else if (m_activePathIndex > index)
+        --m_activePathIndex;
+    emit pathsChanged();
+    return true;
+}
+
+bool ImageDocument::setPathName(int index, const QString &name)
+{
+    Path *p = m_paths.pathAt(index);
+    if (!p)
+        return false;
+    if (p->name == name)
+        return true;
+    p->name = name;
+    emit pathsChanged();
+    return true;
+}
+
+bool ImageDocument::setPathVisible(int index, bool visible)
+{
+    Path *p = m_paths.pathAt(index);
+    if (!p)
+        return false;
+    if (p->visible == visible)
+        return true;
+    p->visible = visible;
+    emit pathsChanged();
+    return true;
+}
+
 void ImageDocument::pushLayerPropUndo(int index, const QString &label)
 {
     if (!shouldRecordHistory())

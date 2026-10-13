@@ -270,6 +270,30 @@ void SelectionUndo::pop(ImageDocument &doc)
     emit doc.selectionChanged();
 }
 
+PathUndo::PathUndo(QVector<Path> paths, int activeIndex, const QString &label)
+    : m_paths(std::move(paths))
+    , m_activeIndex(activeIndex)
+    , m_label(label)
+{
+}
+
+quint64 PathUndo::byteSize() const
+{
+    quint64 n = 64;
+    for (const Path &p : m_paths)
+        n += quint64(p.totalAnchors()) * 64ull + 128ull;
+    return n;
+}
+
+void PathUndo::pop(ImageDocument &doc)
+{
+    QVector<Path> live = doc.snapshotPaths();
+    const int liveActive = doc.activePathIndex();
+    doc.replacePathsFromUndo(m_paths, m_activeIndex);
+    m_paths = std::move(live);
+    m_activeIndex = liveActive;
+}
+
 DocumentGeomUndo::DocumentGeomUndo(int width, int height, QImage selectionMask,
                                    std::vector<LayerState> layers, int activeIndex,
                                    const QString &label)

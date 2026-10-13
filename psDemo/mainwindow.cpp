@@ -733,6 +733,12 @@ void MainWindow::setupToolbox()
             ui->toolOptionsBar->shapeCornerRadius(),
             ui->toolOptionsBar->shapeAntialias());
     });
+    connect(ui->toolOptionsBar, &ToolOptionsBar::pathOptionsChanged, this, [this]() {
+        ui->canvasWorkspace->canvasView()->setPathOptions(
+            ui->toolOptionsBar->pathPolygonal(),
+            ui->toolOptionsBar->pathAutoAdd(),
+            ui->toolOptionsBar->pathRubberBand());
+    });
 
     // 自由变换：选项栏 ↔ TransformTool；右键菜单
     if (Ps::ToolManager *tm = canvas->toolManager()) {
@@ -832,6 +838,9 @@ void MainWindow::setupToolbox()
                             ui->toolOptionsBar->shapeStrokeWidth(),
                             ui->toolOptionsBar->shapeCornerRadius(),
                             ui->toolOptionsBar->shapeAntialias());
+    canvas->setPathOptions(ui->toolOptionsBar->pathPolygonal(),
+                           ui->toolOptionsBar->pathAutoAdd(),
+                           ui->toolOptionsBar->pathRubberBand());
     ui->infoPanel->setToolHint(ui->toolOptionsBar->currentHint());
 }
 

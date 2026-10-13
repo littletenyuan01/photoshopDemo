@@ -76,6 +76,11 @@ struct ToolContext
     qreal shapeCornerRadius = 0.0;     ///< 矩形圆角
     bool shapeAntialias = true;        ///< 消除锯齿
 
+    // —— 路径（对照选项栏 pagePath；P2 不做形状层）——
+    bool pathPolygonal = false;        ///< 多边形（直线段）
+    bool pathAutoAdd = true;           ///< 自动添加/删除锚点
+    bool pathRubberBand = true;        ///< 橡皮带预览
+
     // —— 视图变换（供工具浮层把文档坐标画到控件上；由 CanvasView 填）——
     qreal viewZoom = 1.0;              ///< 当前缩放
     QPointF viewOffset;                ///< 文档原点在控件中的位置

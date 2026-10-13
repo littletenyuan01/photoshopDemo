@@ -11,6 +11,7 @@
 #include "domain/filternode.h"
 #include "domain/layer.h"
 #include "domain/layerstyle.h"
+#include "domain/path.h"
 
 #include <QImage>
 #include <QString>
@@ -175,6 +176,26 @@ public:
 
 private:
     QImage m_mask;
+    QString m_label;
+};
+
+/**
+ * 路径撤销（整栈快照）。
+ *
+ * 【为什么不增量】GIMP gimppathundo.c 也是粗粒度快照；一条路径几百锚点 ≈ 几 KB，
+ * byteSize 扛得住。增量会引入「撤销后索引失效」类 bug，不值得。
+ */
+class PathUndo final : public UndoItem
+{
+public:
+    PathUndo(QVector<Path> paths, int activeIndex, const QString &label);
+    QString name() const override { return m_label; }
+    quint64 byteSize() const override;
+    void pop(ImageDocument &doc) override;
+
+private:
+    QVector<Path> m_paths;
+    int m_activeIndex = -1;
     QString m_label;
 };
 

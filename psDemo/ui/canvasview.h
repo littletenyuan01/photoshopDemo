@@ -117,6 +117,8 @@ public:
     /** 同步形状选项（填充/描边/粗细/圆角/抗锯齿）。 */
     void setShapeOptions(bool fill, bool stroke, qreal strokeWidth,
                          qreal cornerRadius, bool antialias);
+    /** 同步路径选项（多边形/自动添加/橡皮带）。 */
+    void setPathOptions(bool polygonal, bool autoAdd, bool rubberBand);
 
     /**
      * 从当前投影缓存读取文档坐标像素（解预乘后的 RGB）。
@@ -277,6 +279,10 @@ private:
     qreal m_shapeStrokeWidth = 2.0;
     qreal m_shapeCornerRadius = 0.0;
     bool m_shapeAntialias = true;
+
+    bool m_pathPolygonal = false;
+    bool m_pathAutoAdd = true;
+    bool m_pathRubberBand = true;
 
     QTimer *m_antsTimer = nullptr; ///< 蚂蚁线虚线相位动画
     QTimer *m_projIdleTimer = nullptr; ///< 投影空闲分块（对照 GIMP projection idle）

@@ -53,6 +53,7 @@ int tWebExport();
 int tPsdIo();
 int tPathGeom();
 int tPathRaster();
+int tPenTool();
 
 namespace {
 
@@ -95,6 +96,7 @@ const Case kCases[] = {
     { "psdio", "PSD 子集导出→导入：层属性 + 合成往返", tPsdIo },
     { "pathgeom", "路径几何：贝塞尔分裂/扁平化/命中/自动曲线控制柄", tPathGeom },
     { "pathraster", "路径栅格化：WindingFill/选区合并/描边 dab", tPathRaster },
+    { "pentool", "钢笔工具：落点/控制柄/修饰键/弯度/撤销", tPenTool },
 };
 
 } // namespace

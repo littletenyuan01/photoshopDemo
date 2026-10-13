@@ -28,6 +28,7 @@ SOURCES += \
     domain/layerstylestack.cpp \
     domain/imagedocument.cpp \
     domain/path.cpp \
+    domain/pathstack.cpp \
     io/projectio.cpp \
     io/psdio.cpp \
     io/rasterio.cpp \
@@ -97,6 +98,7 @@ SOURCES += \
     tools/handtool.cpp \
     tools/zoomtool.cpp \
     tools/painttool.cpp \
+    tools/pentool.cpp \
     tools/paintbuckettool.cpp \
     tools/gradienttool.cpp \
     tools/marqueeselecttool.cpp \
@@ -160,6 +162,7 @@ HEADERS += \
     domain/layerstylestack.h \
     domain/imagedocument.h \
     domain/path.h \
+    domain/pathstack.h \
     io/projectio.h \
     io/psdio.h \
     io/rasterio.h \
@@ -251,6 +254,7 @@ HEADERS += \
     tools/handtool.h \
     tools/zoomtool.h \
     tools/painttool.h \
+    tools/pentool.h \
     tools/paintbuckettool.h \
     tools/gradienttool.h \
     tools/marqueeselecttool.h \

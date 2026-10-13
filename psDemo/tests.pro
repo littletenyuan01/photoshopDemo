@@ -54,7 +54,8 @@ SOURCES += \
     tests/t_webexport.cpp \
     tests/t_psdio.cpp \
     tests/t_pathgeom.cpp \
-    tests/t_pathraster.cpp
+    tests/t_pathraster.cpp \
+    tests/t_pentool.cpp
 
 HEADERS += \
     tests/testutil.h

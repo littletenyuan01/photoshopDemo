@@ -10,6 +10,8 @@
 #include "filternode.h"
 #include "layerstack.h"
 #include "layerstyle.h"
+#include "path.h"
+#include "pathstack.h"
 #include "selection.h"
 #include "engine/op/opname.h"
 
@@ -31,6 +33,7 @@ class LayerPropUndo;
 class LayerStructureUndo;
 class LayerMoveUndo;
 class DocumentGeomUndo;
+class PathUndo;
 
 /**
  * 图像文档：一张「可编辑图」的根对象（domain）。
@@ -66,6 +69,30 @@ public:
 
     Selection &selection() { return m_selection; }
     const Selection &selection() const { return m_selection; }
+
+    PathStack &paths() { return m_paths; }
+    const PathStack &paths() const { return m_paths; }
+
+    int activePathIndex() const { return m_activePathIndex; }
+    void setActivePathIndex(int index);
+    Path *activePath();
+    const Path *activePath() const;
+
+    /** 追加路径；返回下标。发 pathsChanged。 */
+    int addPath(Path path);
+    /** 替换指定路径内容；越界返回 false。 */
+    bool setPathAt(int index, Path path);
+    /** 删除路径；越界返回 false。 */
+    bool removePath(int index);
+    /** 改路径名。 */
+    bool setPathName(int index, const QString &name);
+    /** 改路径可见性。 */
+    bool setPathVisible(int index, bool visible);
+
+    /** 路径变更前：整栈快照（钢笔提交 / 路径树用）。 */
+    void pushPathUndo(const QString &label);
+    /** 只读快照（Undo / 测试）；不持有文档内指针。 */
+    QVector<Path> snapshotPaths() const;
 
     /** 清空选区并发 selectionChanged。 */
     void clearSelection();
@@ -404,6 +431,7 @@ signals:
     void structureChanged();                     ///< 层数/顺序/文档尺寸变更
     void activeLayerChanged(int index);          ///< 活动层切换
     void selectionChanged();                     ///< 选区 mask 变更
+    void pathsChanged();                         ///< 路径栈结构或内容变更（勿每帧发）
     void editingTargetChanged();                 ///< 像素 ↔ 蒙版编辑目标切换
     void contentChanged();                       ///< 汇总：任意需整 UI 刷新时
     /**
@@ -432,6 +460,10 @@ private:
     friend class LayerMoveUndo;
     friend class DocumentGeomUndo;
     friend class SelectionUndo;
+    friend class PathUndo;
+
+    /** PathUndo::pop 专用：整栈替换并发 pathsChanged。 */
+    void replacePathsFromUndo(const QVector<Path> &paths, int activeIndex);
 
     /** 是否应 push 撤销（未抑制且非 redo/undo 回放中）。 */
     bool shouldRecordHistory() const;
@@ -449,7 +481,9 @@ private:
     int m_height = 0;                            ///< 文档高度（像素）
     LayerStack m_layers;                         ///< 自底向顶图层栈
     Selection m_selection;                       ///< 文档级选区 mask
+    PathStack m_paths;                           ///< 命名路径栈
     int m_activeLayerIndex = -1;                 ///< 活动层下标；-1 无
+    int m_activePathIndex = -1;                  ///< 活动路径下标；-1 无
     bool m_dirty = false;                        ///< 未保存变更标志
     QString m_filePath;                          ///< 关联磁盘路径（可为空）
     QRect m_dirtyRect;                           ///< 累计脏区（文档坐标）

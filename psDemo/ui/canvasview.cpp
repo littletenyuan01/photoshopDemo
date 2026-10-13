@@ -415,6 +415,9 @@ void CanvasView::refreshToolContext()
     m_toolContext.shapeStrokeWidth = m_shapeStrokeWidth;
     m_toolContext.shapeCornerRadius = m_shapeCornerRadius;
     m_toolContext.shapeAntialias = m_shapeAntialias;
+    m_toolContext.pathPolygonal = m_pathPolygonal;
+    m_toolContext.pathAutoAdd = m_pathAutoAdd;
+    m_toolContext.pathRubberBand = m_pathRubberBand;
     m_toolContext.viewZoom = m_zoom;
     m_toolContext.viewOffset = m_offset;
     updateProjectionPriorityRect();
@@ -528,6 +531,14 @@ void CanvasView::setShapeOptions(bool fill, bool stroke, qreal strokeWidth,
     m_shapeStrokeWidth = qMax(1.0, strokeWidth);
     m_shapeCornerRadius = qMax(0.0, cornerRadius);
     m_shapeAntialias = antialias;
+    refreshToolContext();
+}
+
+void CanvasView::setPathOptions(bool polygonal, bool autoAdd, bool rubberBand)
+{
+    m_pathPolygonal = polygonal;
+    m_pathAutoAdd = autoAdd;
+    m_pathRubberBand = rubberBand;
     refreshToolContext();
 }
 

@@ -34,6 +34,8 @@ public:
 
     bool canUndo() const { return !m_undo.empty(); }
     bool canRedo() const { return !m_redo.empty(); }
+    /** undo 栈深度（测例 / 调试用）。 */
+    int undoDepth() const { return int(m_undo.size()); }
     /** 正在 pop 条目时为 true；此时禁止再 push（递归守卫）。 */
     bool isApplying() const { return m_applying; }
 

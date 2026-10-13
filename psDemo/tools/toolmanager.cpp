@@ -18,6 +18,7 @@
 #include "movetool.h"
 #include "paintbuckettool.h"
 #include "painttool.h"
+#include "pentool.h"
 #include "polygonallassotool.h"
 #include "quickselecttool.h"
 #include "shapetool.h"
@@ -63,6 +64,10 @@ ToolManager::ToolManager(QObject *parent)
     registerTool(std::make_unique<ShapeTool>(Ps::ToolId::ShapeEllipse, ShapeKind::Ellipse));
     registerTool(std::make_unique<ShapeTool>(Ps::ToolId::ShapeTriangle, ShapeKind::Triangle));
     registerTool(std::make_unique<ShapeTool>(Ps::ToolId::ShapeLine, ShapeKind::Line));
+    // P2：三支钢笔共用 PenTool；Add/Delete/ConvertAnchor 留 P4
+    registerTool(std::make_unique<PenTool>(Ps::ToolId::Pen));
+    registerTool(std::make_unique<PenTool>(Ps::ToolId::FreeformPen));
+    registerTool(std::make_unique<PenTool>(Ps::ToolId::CurvaturePen));
     registerTool(std::make_unique<HandTool>());
     registerTool(std::make_unique<ZoomTool>());
 

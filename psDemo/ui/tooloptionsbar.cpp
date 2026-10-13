@@ -99,7 +99,14 @@ ToolOptionsBar::ToolOptionsBar(QWidget *parent)
     wireIntEdit(ui->cropWidthEdit, 0, 99999, 800, []() {});
     wireIntEdit(ui->cropHeightEdit, 0, 99999, 600, []() {});
 
-    // 路径 / 文字占位
+    // 路径：P2 固定「路径」模式，整控件灰显「形状」（矢量形状层另列任务）
+    ui->pathModeCombo->setCurrentIndex(0);
+    ui->pathModeCombo->setEnabled(false);
+    ui->pathModeCombo->setToolTip(tr("形状模式尚未实现；当前仅支持路径"));
+    const auto emitPath = [this]() { emit pathOptionsChanged(); };
+    connect(ui->pathPolygonalCheck, &QCheckBox::toggled, this, emitPath);
+    connect(ui->pathAutoAddCheck, &QCheckBox::toggled, this, emitPath);
+    connect(ui->pathRubberBandCheck, &QCheckBox::toggled, this, emitPath);
     wireIntEdit(ui->pathStrokeWidthEdit, 1, 100, 2, []() {});
     wireIntEdit(ui->textSizeEdit, 1, 999, 24, []() {});
     wireIntEdit(ui->textLineSpacingEdit, -200, 500, 0, []() {});
@@ -293,6 +300,21 @@ int ToolOptionsBar::shapeCornerRadius() const
 bool ToolOptionsBar::shapeAntialias() const
 {
     return ui->shapeSmoothCheck->isChecked();
+}
+
+bool ToolOptionsBar::pathPolygonal() const
+{
+    return ui->pathPolygonalCheck->isChecked();
+}
+
+bool ToolOptionsBar::pathAutoAdd() const
+{
+    return ui->pathAutoAddCheck->isChecked();
+}
+
+bool ToolOptionsBar::pathRubberBand() const
+{
+    return ui->pathRubberBandCheck->isChecked();
 }
 
 void ToolOptionsBar::setCurrentTool(Ps::ToolId id)

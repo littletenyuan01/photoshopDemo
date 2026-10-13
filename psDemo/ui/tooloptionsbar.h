@@ -84,6 +84,11 @@ public:
     int shapeCornerRadius() const;
     bool shapeAntialias() const;
 
+    // —— 路径（pagePath）——
+    bool pathPolygonal() const;
+    bool pathAutoAdd() const;
+    bool pathRubberBand() const;
+
     /**
      * 用变换工具当前参数刷新自由变换选项页（拖拽中由 MainWindow 调用）。
      * 写入时短暂阻断信号，避免回写工具造成抖动。
@@ -118,6 +123,8 @@ signals:
     void cloneStampOptionsChanged();
     /** 形状参数变化（填充/描边/粗细/圆角/抗锯齿）。 */
     void shapeOptionsChanged();
+    /** 路径参数变化（多边形/自动添加/橡皮带）。 */
+    void pathOptionsChanged();
     /** 自由变换：选项栏数值提交（失焦/回车）。 */
     void freeTransformParamsEdited(qreal x, qreal y, qreal wPercent, qreal hPercent,
                                    qreal angleDeg, qreal skewHDeg, qreal skewVDeg);
