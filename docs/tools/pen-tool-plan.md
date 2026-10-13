@@ -405,11 +405,16 @@ public:
 → 调 `PaintEngine`（与 `tools/painttool.cpp` 同一条 dab 路径）。
 **不要**用 `QPainter::strokePath`：那会得到一条纯色描边，与画笔 dab 观感不一致。
 
-### 4.3 新增 `engine/op/opname.*` 条目
+### 4.3 ⚠️ **不要**为路径栅格化新增 `OpName`
 
-- `OpName` 枚举加 `PathFill`、`PathStroke`（**加在 `Count` 之前**）
-- `opname.cpp` 名字表加对应 id/title
-- `rastercost.cpp` 登记成本档（两条都归 `LIGHT_REMAP` 档即可，或新增 `PATH_RASTER_EST`）
+`PathFillOp` / `PathStrokeOp` 是**静态工具类**（由钢笔 / 路径树直接调用），**不进** `FilterStack`、**不进**调整层。
+
+| 若错误地加在 `BrightnessContrast..Count` 段 | 后果 |
+|---|---|
+| `isAdjustmentOp` 默认 true | 可被 `addAdjustmentLayer` 接受；属性页无对应页 |
+| 成本表要登记但从不出现在滤镜链 | 语义噪音 |
+
+**若将来必须进枚举**：只能放在 **`ShapeFill` 旁的绘制段**，并**显式排除**出 `isAdjustmentOp`；本计划 **P0–P4 不做**。
 
 ### 4.4 接入选区
 
@@ -561,7 +566,7 @@ Esc（任意状态）→ 丢弃 m_edit，不留任何痕迹（**不压撤销**�
 **命中与绘制必须用同一套尺寸常量**（定义成文件内 `constexpr`），
 否则会出现"看得见却点不中"。
 
-### 5.7 注册（`tools/toolmanager.cpp`）
+### 5.7 注册（`tools/toolmanager.cpp`）与选项栏
 
 在 `registerTool(...)` 列表里加：
 
@@ -572,6 +577,10 @@ registerTool(std::make_unique<PenTool>(Ps::ToolId::CurvaturePen));
 ```
 
 > `AddAnchorPoint` / `DeleteAnchorPoint` / `ConvertPoint` 留到 P4（共用实现）。
+
+**`pathModeCombo`（路径 / 形状）**：本计划**不做形状层 / 矢量蒙版**。
+P2 起将该 combo **固定为「路径」并禁用「形状」项**（或整控件灰显），避免点了悬空。
+形状模式单列后续任务，**不要**在 P2–P4「顺手做」。
 
 ### 5.8 新增常驻用例 `psDemo/tests/t_pentool.cpp`
 
@@ -655,12 +664,15 @@ class PathUndo final : public UndoItem { /* before / after 两份 Path + 索引 
 
 ### 6.5 `.pslite` 持久化（`io/projectio.cpp`）
 
-- **版本号 +1**（`ProjectFormat::Current`）
+> ⚠️ **与现行 IO 政策对齐**：`ProjectIo` 只认 `ProjectFormat::Current`，**不做跨版本兼容**
+> （见 `projectio.h`）。路径入库 = **升版本**，不是「旧档静默无路径」。
+
+- **`ProjectFormat::Current` +1**（例如 3 → 4）
 - 路径段写在图层段之后：`路径数 → 每条 {name, visible, 子路径数 → {closed, 锚点数 → 每个锚点 6 个 double + 3 个 bool}}`
-- **向后兼容**：旧版本文件没有路径段 ⇒ 读到路径段前先判断版本，旧文件路径列表为空
+- **旧版文件**：`format != Current` ⇒ **明确报错**（与现有「工程格式不匹配」一致）；**不**假装打开空路径
 - **新增用例断言**（扩展 `t_projectio`）：
   1. 存 3 条路径（含闭合/多子路径/显式控制柄/尖角）→ 读回 → **每锚点浮点逐位相等**
-  2. **旧版本文件仍能打开**（用 git 里既有的旧格式样本，或构造一个"截断在图层段末"的流）
+  2. 构造/保留一份 **v3（无路径段）样本** ⇒ `load` 失败且错误信息含格式不匹配（政策护栏）
 
 ### 6.6 新用例 `t_pathtree`（面板接线）
 
@@ -739,7 +751,7 @@ namespace Ps::PathEditOps {
 | **2** | P1 栅格化 + 选区接线 | `pathfillop`、`pathstrokeop`、`t_pathraster` | 8 条全绿；含**第 3/4/5 条 non-zero 护栏** |
 | **3** | P2 钢笔基础交互 | `tools/pentool.*`、注册 3 个 ID、`t_pentool` 1–10 条 | 全绿 |
 | **4** | P2 收尾：修饰键 + 弯度/自由钢笔 | 同上扩展、`t_pentool` 11–13 条 | 弯度共线 + 不被覆盖两条必过 |
-| **5** | P3 路径树 + 撤销 + 持久化 | `imagedocument` 路径 API、`PathUndo`、`projectio`、`t_pathtree` | 旧格式仍可打开 |
+| **5** | P3 路径树 + 撤销 + 持久化 | `imagedocument` 路径 API、`PathUndo`、`projectio`、`t_pathtree` | Current 升版；旧版明确拒读 |
 | **6** | P4 三个锚点工具 | `patheditops.*` + 3 个工具类 | 无重复几何逻辑 |
 
 **建议每次只做一步并提交**，便于回滚。

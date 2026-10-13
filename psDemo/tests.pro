@@ -52,7 +52,9 @@ SOURCES += \
     tests/t_c1pixelate.cpp \
     tests/t_c1stylize.cpp \
     tests/t_webexport.cpp \
-    tests/t_psdio.cpp
+    tests/t_psdio.cpp \
+    tests/t_pathgeom.cpp \
+    tests/t_pathraster.cpp
 
 HEADERS += \
     tests/testutil.h

@@ -27,9 +27,11 @@ SOURCES += \
     domain/layerstyle.cpp \
     domain/layerstylestack.cpp \
     domain/imagedocument.cpp \
+    domain/path.cpp \
     io/projectio.cpp \
     io/psdio.cpp \
     io/rasterio.cpp \
+    engine/bezier.cpp \
     engine/blend.cpp \
     engine/compositor.cpp \
     engine/projection.cpp \
@@ -74,6 +76,8 @@ SOURCES += \
     engine/op/focusdabop.cpp \
     engine/op/tonedabop.cpp \
     engine/op/shapefillop.cpp \
+    engine/op/pathfillop.cpp \
+    engine/op/pathstrokeop.cpp \
     engine/op/freetransformop.cpp \
     engine/op/solidfillop.cpp \
     engine/op/selectpolygonop.cpp \
@@ -155,9 +159,11 @@ HEADERS += \
     domain/layerstyle.h \
     domain/layerstylestack.h \
     domain/imagedocument.h \
+    domain/path.h \
     io/projectio.h \
     io/psdio.h \
     io/rasterio.h \
+    engine/bezier.h \
     engine/blend.h \
     engine/compositor.h \
     engine/projection.h \
@@ -213,6 +219,8 @@ HEADERS += \
     engine/op/focusdabop.h \
     engine/op/tonedabop.h \
     engine/op/shapefillop.h \
+    engine/op/pathfillop.h \
+    engine/op/pathstrokeop.h \
     engine/op/freetransformop.h \
     engine/op/solidfillop.h \
     engine/op/selectpolygonop.h \

@@ -51,6 +51,8 @@ int tC1Pixelate();
 int tC1Stylize();
 int tWebExport();
 int tPsdIo();
+int tPathGeom();
+int tPathRaster();
 
 namespace {
 
@@ -91,6 +93,8 @@ const Case kCases[] = {
     { "c1stylize", "C1 风/等高线/径向/表面/特殊模糊/拼贴：oracle、分块投影、往返", tC1Stylize },
     { "webexport", "存储为 Web：JPEG 质量体积、PNG alpha、缩放、写出往返", tWebExport },
     { "psdio", "PSD 子集导出→导入：层属性 + 合成往返", tPsdIo },
+    { "pathgeom", "路径几何：贝塞尔分裂/扁平化/命中/自动曲线控制柄", tPathGeom },
+    { "pathraster", "路径栅格化：WindingFill/选区合并/描边 dab", tPathRaster },
 };
 
 } // namespace
