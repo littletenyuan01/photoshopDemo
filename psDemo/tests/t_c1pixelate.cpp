@@ -164,7 +164,8 @@ int tC1Pixelate()
         FilterEval::applyNode(got, n);
         const long long d = PsTests::diffCount(got, naiveFragment(src, 4));
         r.check(d == 0, QStringLiteral("碎片 == 朴素四角平均（diffs=%1）").arg(d));
-        r.check(n.inputPad() == 4, QStringLiteral("碎片 inputPad=4"));
+        r.check(n.fragmentOffset() == 4 && n.inputPad() == 4,
+                QStringLiteral("碎片默认偏移=4 / inputPad=4"));
         r.check(PsTests::diffCount(src, got) > 0, QStringLiteral("碎片确实改变画面"));
     }
 

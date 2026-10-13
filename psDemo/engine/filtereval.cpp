@@ -324,14 +324,18 @@ void buildLookupLut(int preset, int *lutR, int *lutG, int *lutB)
     }
 }
 
-void applyColorLookup(QImage &image, int preset)
+void applyColorLookup(QImage &image, const FilterNode &node)
 {
+    const qreal tMix = node.gradientMapStrength() / 100.0;
+    if (tMix <= 0.0)
+        return;
     int lutR[256], lutG[256], lutB[256];
-    buildLookupLut(preset, lutR, lutG, lutB);
+    buildLookupLut(node.colorLookupPreset(), lutR, lutG, lutB);
     forEachPixel(image, [&](int *r, int *g, int *b, int) {
-        *r = lutR[*r];
-        *g = lutG[*g];
-        *b = lutB[*b];
+        const int mr = lutR[*r], mg = lutG[*g], mb = lutB[*b];
+        *r = qBound(0, int(*r * (1.0 - tMix) + mr * tMix + 0.5), 255);
+        *g = qBound(0, int(*g * (1.0 - tMix) + mg * tMix + 0.5), 255);
+        *b = qBound(0, int(*b * (1.0 - tMix) + mb * tMix + 0.5), 255);
     });
 }
 
@@ -492,16 +496,17 @@ void applyAddNoise(QImage &image, const FilterNode &node)
     }
 }
 
-/** 曝光过度（对照 PS「滤镜→风格化→曝光过度」）：v>128 ? 255-v : v。 */
-void applySolarize(QImage &image)
+/** 曝光过度（对照 PS「滤镜→风格化→曝光过度」）：v>pivot ? 255-v : v；pivot 默认 128。 */
+void applySolarize(QImage &image, int pivot)
 {
+    const int thr = qBound(0, pivot, 255);
     const int w = image.width();
     const int h = image.height();
     for (int y = 0; y < h; ++y) {
         QRgb *row = reinterpret_cast<QRgb *>(image.scanLine(y));
         for (int x = 0; x < w; ++x) {
             const QRgb p = qUnpremultiply(row[x]);
-            const auto sol = [](int v) { return v > 128 ? 255 - v : v; };
+            const auto sol = [thr](int v) { return v > thr ? 255 - v : v; };
             row[x] = qPremultiply(
                 qRgba(sol(qRed(p)), sol(qGreen(p)), sol(qBlue(p)), qAlpha(p)));
         }
@@ -519,7 +524,7 @@ void applyPointNode(QImage &image, const FilterNode &node)
         applyInvert(image);
         break;
     case OpName::Solarize:
-        applySolarize(image);
+        applySolarize(image, node.threshold());
         break;
     case OpName::HueSaturation:
         applyHueSaturation(image, node.hue(), node.saturation(), node.lightness());
@@ -557,7 +562,7 @@ void applyPointNode(QImage &image, const FilterNode &node)
         applyChannelMixer(image, node);
         break;
     case OpName::ColorLookup:
-        applyColorLookup(image, node.colorLookupPreset());
+        applyColorLookup(image, node);
         break;
     case OpName::GradientMap:
         applyGradientMap(image, node);

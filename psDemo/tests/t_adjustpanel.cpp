@@ -124,5 +124,39 @@ int tAdjustPanel()
     r.check(sliderValue(blPage, "slider_radius") == 7
                 && spinValue(blPage, "spin_radius") == 7,
             QStringLiteral("盒模糊半径 7 → 回填 7"));
+
+    // —— 查找边缘 / 曝光过度 / 碎片（原先无页或无滑条）——
+    FilterNode fe(OpName::FindEdges);
+    fe.setUsmAmount(1.5);
+    host.setNode(fe);
+    QWidget *fePage = currentPage(host);
+    r.check(sliderValue(fePage, "slider_findedges_amount") == 150
+                && spinValue(fePage, "spin_findedges_amount") == 150,
+            QStringLiteral("查找边缘强度 150% → 回填"));
+
+    FilterNode sol(OpName::Solarize);
+    sol.setThreshold(96);
+    host.setNode(sol);
+    QWidget *solPage = currentPage(host);
+    r.check(sliderValue(solPage, "slider_solarize_threshold") == 96
+                && spinValue(solPage, "spin_solarize_threshold") == 96,
+            QStringLiteral("曝光过度阈值 96 → 回填"));
+
+    FilterNode frag(OpName::Fragment);
+    frag.setFragmentOffset(7);
+    host.setNode(frag);
+    QWidget *fragPage = currentPage(host);
+    r.check(sliderValue(fragPage, "slider_fragment_offset") == 7
+                && spinValue(fragPage, "spin_fragment_offset") == 7,
+            QStringLiteral("碎片偏移 7 → 回填"));
+
+    FilterNode lut(OpName::ColorLookup);
+    lut.setColorLookupPreset(2);
+    lut.setGradientMapStrength(40);
+    host.setNode(lut);
+    QWidget *lutPage = currentPage(host);
+    r.check(sliderValue(lutPage, "slider_strength") == 40
+                && spinValue(lutPage, "spin_strength") == 40,
+            QStringLiteral("颜色查找强度 40 → 回填"));
     return r.fails;
 }

@@ -42,6 +42,13 @@ void FindEdgesFilterOp::process(QImage &image, const FilterContext &ctx)
         return row[x];
     };
 
+    // 强度复用 usmAmount（1.0 = 100%；默认与旧无参行为一致）
+    const double amount = ctx.node ? ctx.node->usmAmount() : 1.0;
+    const auto mag = [amount](int gx, int gy) -> int {
+        const double m = std::sqrt(double(gx) * gx + double(gy) * gy) * amount;
+        return qBound(0, int(m + 0.5), 255);
+    };
+
     for (int y = 0; y < h; ++y) {
         if ((y & 31) == 0 && aborted(ctx))
             return; // 协作式取消（见 filterop.h 的 FilterContext::shouldAbort）
@@ -67,10 +74,6 @@ void FindEdgesFilterOp::process(QImage &image, const FilterContext &ctx)
                     gyR += ky * r; gyG += ky * g; gyB += ky * b;
                 }
             }
-            const auto mag = [](int gx, int gy) -> int {
-                const double m = std::sqrt(double(gx) * gx + double(gy) * gy);
-                return qBound(0, int(m + 0.5), 255);
-            };
             // alpha 取当前像素原始 alpha（cur[x] 就是原始值）
             d[x] = qRgba(mag(gxR, gyR), mag(gxG, gyG), mag(gxB, gyB), qAlpha(cur[x]));
         }

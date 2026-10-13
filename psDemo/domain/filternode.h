@@ -293,6 +293,10 @@ public:
     int reduceNoiseStrength() const { return m_reduceNoiseStrength; }
     void setReduceNoiseStrength(int v) { m_reduceNoiseStrength = qBound(0, v, 100); }
 
+    // —— 碎片：四角取样偏移（1..16；默认 4，与旧 kOffset 一致）——
+    int fragmentOffset() const { return m_fragmentOffset; }
+    void setFragmentOffset(int v) { m_fragmentOffset = qBound(1, v, 16); }
+
     /**
      * 「想算出 `output` 这块像素，输入至少要有哪一块」—— **层内坐标**（与 output 同一空间）。
      *
@@ -389,6 +393,9 @@ public:
         n.m_smartRadius = shrink(m_smartRadius);
         if (n.m_smartRadius < 1)
             n.m_smartRadius = 1;
+        n.m_fragmentOffset = shrink(m_fragmentOffset);
+        if (n.m_fragmentOffset < 1)
+            n.m_fragmentOffset = 1;
         return n;
     }
 
@@ -431,7 +438,7 @@ public:
         case OpName::Ripple:
             return m_rippleAmplitude;
         case OpName::Fragment:
-            return 4; // 四角偏移 ±4
+            return m_fragmentOffset; // 四角偏移 ±o
         case OpName::Mosaic:
             return 0; // 位置相关，走整层（见 FilterStack::hasPositionalOp）
         case OpName::Wind:
@@ -534,6 +541,7 @@ private:
     int m_tilesMaxOffset = 10;
     int m_tilesFill = 0;
     quint32 m_tilesSeed = 0xC0FFEE01u;
+    int m_fragmentOffset = 4;
 };
 
 } // namespace Ps

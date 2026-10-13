@@ -17,11 +17,11 @@ void FragmentFilterOp::finish(const FilterContext &ctx)
 
 void FragmentFilterOp::process(QImage &image, const FilterContext &ctx)
 {
-    if (image.isNull())
+    if (image.isNull() || !ctx.node)
         return;
     const int w = image.width();
     const int h = image.height();
-    const int o = kOffset;
+    const int o = ctx.node->fragmentOffset();
     const QImage src = image.copy();
 
     for (int y = 0; y < h; ++y) {

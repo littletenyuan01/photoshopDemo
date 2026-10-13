@@ -322,6 +322,9 @@ void AdjustmentPropsHost::ensurePages()
                     emitPreview();
                     emitCommit();
                 });
+        wireSliderSpin(ui->slider_strength, ui->spin_strength, [this](int v) {
+            m_node.setGradientMapStrength(v);
+        });
         add(Ps::OpName::ColorLookup, page);
     }
     {
@@ -434,8 +437,44 @@ void AdjustmentPropsHost::ensurePages()
         const SliderRow strength = makeSliderRow(page, QStringLiteral("强度"), QStringLiteral("emboss_strength"), 1, 4);
         col->addWidget(strength.row);
         wireSliderSpin(strength.slider, strength.spin, [this](int v) { m_node.setEmbossStrength(v); });
-        col->addWidget(strength.row);
         add(Ps::OpName::Emboss, page);
+    }
+    {
+        // 查找边缘：强度（复用 usmAmount，100% = 旧无参行为）
+        auto *page = new QWidget(m_stack);
+        auto *col = new QVBoxLayout(page);
+        col->setContentsMargins(0, 0, 0, 0);
+        const SliderRow amount = makeSliderRow(page, QStringLiteral("强度 %"),
+                                               QStringLiteral("findedges_amount"), 0, 500);
+        col->addWidget(amount.row);
+        wireSliderSpin(amount.slider, amount.spin,
+                       [this](int v) { m_node.setUsmAmount(v / 100.0); });
+        col->addStretch(1);
+        add(Ps::OpName::FindEdges, page);
+    }
+    {
+        // 曝光过度：反相枢轴（复用 threshold，默认 128）
+        auto *page = new QWidget(m_stack);
+        auto *col = new QVBoxLayout(page);
+        col->setContentsMargins(0, 0, 0, 0);
+        const SliderRow pivot = makeSliderRow(page, QStringLiteral("阈值"),
+                                              QStringLiteral("solarize_threshold"), 0, 255);
+        col->addWidget(pivot.row);
+        wireSliderSpin(pivot.slider, pivot.spin, [this](int v) { m_node.setThreshold(v); });
+        col->addStretch(1);
+        add(Ps::OpName::Solarize, page);
+    }
+    {
+        // 碎片：四角取样偏移
+        auto *page = new QWidget(m_stack);
+        auto *col = new QVBoxLayout(page);
+        col->setContentsMargins(0, 0, 0, 0);
+        const SliderRow off = makeSliderRow(page, QStringLiteral("偏移"),
+                                            QStringLiteral("fragment_offset"), 1, 16);
+        col->addWidget(off.row);
+        wireSliderSpin(off.slider, off.spin, [this](int v) { m_node.setFragmentOffset(v); });
+        col->addStretch(1);
+        add(Ps::OpName::Fragment, page);
     }
     {
         // 位移：无 .ui，一页两个偏移滑块（移出即丢、空出透明）。
@@ -902,6 +941,17 @@ void AdjustmentPropsHost::loadControlsFromNode()
     case Ps::OpName::ColorLookup:
         if (auto *cb = page->findChild<QComboBox *>(QStringLiteral("comboPreset")))
             cb->setCurrentIndex(m_node.colorLookupPreset());
+        setPair("slider_strength", "spin_strength", int(m_node.gradientMapStrength()));
+        break;
+    case Ps::OpName::FindEdges:
+        setPair("slider_findedges_amount", "spin_findedges_amount",
+                int(m_node.usmAmount() * 100.0 + 0.5));
+        break;
+    case Ps::OpName::Solarize:
+        setPair("slider_solarize_threshold", "spin_solarize_threshold", m_node.threshold());
+        break;
+    case Ps::OpName::Fragment:
+        setPair("slider_fragment_offset", "spin_fragment_offset", m_node.fragmentOffset());
         break;
     case Ps::OpName::GradientMap:
         setPair("slider_strength", "spin_strength", int(m_node.gradientMapStrength()));

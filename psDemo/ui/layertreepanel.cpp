@@ -89,6 +89,7 @@ LayerTreePanel::LayerTreePanel(QWidget *parent)
         addAdj(Ps::OpName::Threshold);
         addAdj(Ps::OpName::GradientMap);
         addAdj(Ps::OpName::SelectiveColor);
+        addAdj(Ps::OpName::Solarize);
         menu->addSeparator();
         // 面积算子调整层（合成器子缓冲外扩；见 compositor blendLayerRangeImpl）
         addAdj(Ps::OpName::BoxBlur);
@@ -96,11 +97,21 @@ LayerTreePanel::LayerTreePanel(QWidget *parent)
         addAdj(Ps::OpName::MedianBlur);
         addAdj(Ps::OpName::UnsharpMask);
         addAdj(Ps::OpName::Sharpen);
+        addAdj(Ps::OpName::SharpenEdges);
         addAdj(Ps::OpName::FindEdges);
         addAdj(Ps::OpName::Emboss);
         addAdj(Ps::OpName::HighPass);
         addAdj(Ps::OpName::MotionBlur);
         addAdj(Ps::OpName::SurfaceBlur);
+        addAdj(Ps::OpName::SmartBlur);
+        addAdj(Ps::OpName::Maximum);
+        addAdj(Ps::OpName::Minimum);
+        addAdj(Ps::OpName::DustAndScratches);
+        addAdj(Ps::OpName::ReduceNoise);
+        addAdj(Ps::OpName::Fragment);
+        addAdj(Ps::OpName::Wind);
+        addAdj(Ps::OpName::TraceContour);
+        addAdj(Ps::OpName::CustomFilter);
         ui->btnAdjustment->setMenu(menu);
         ui->btnAdjustment->setPopupMode(QToolButton::InstantPopup);
     }

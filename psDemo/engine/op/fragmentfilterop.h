@@ -15,8 +15,6 @@ public:
     bool prepare(const FilterContext &ctx) override;
     void process(QImage &image, const FilterContext &ctx) override;
     void finish(const FilterContext &ctx) override;
-
-    static constexpr int kOffset = 4;
 };
 
 } // namespace Ps

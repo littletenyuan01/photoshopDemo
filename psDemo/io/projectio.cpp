@@ -135,6 +135,7 @@ void writeFilterNodeParams(QDataStream &p, const FilterNode &n)
     p << qint32(n.smartRadius()) << qint32(n.smartThreshold()) << qint32(n.smartMode());
     p << qint32(n.tilesCount()) << qint32(n.tilesMaxOffset()) << qint32(n.tilesFill())
       << quint32(n.tilesSeed());
+    p << qint32(n.fragmentOffset());
     // —— 预留：后续新参数追加在此注释之后、勿改已有顺序 ——
 }
 
@@ -201,6 +202,7 @@ bool readFilterNodeParams(QDataStream &p, FilterNode *n)
     qint32 tilesMaxOffset = 10;
     qint32 tilesFill = 0;
     quint32 tilesSeed = 0xC0FFEE01u;
+    qint32 fragmentOffset = 4;
     p >> brightness >> contrast;
     p >> hue >> saturation >> lightness >> vibrance;
     p >> exposure >> exposureOffset >> gammaCorrection;
@@ -237,6 +239,7 @@ bool readFilterNodeParams(QDataStream &p, FilterNode *n)
     p >> surfaceRadius >> surfaceThreshold;
     p >> smartRadius >> smartThreshold >> smartMode;
     p >> tilesCount >> tilesMaxOffset >> tilesFill >> tilesSeed;
+    p >> fragmentOffset; // 尾部追加；旧 blob 此处为 0 → 回落默认 4
     if (p.status() != QDataStream::Ok)
         return false;
     n->setBrightness(brightness);
@@ -330,6 +333,7 @@ bool readFilterNodeParams(QDataStream &p, FilterNode *n)
     n->setTilesMaxOffset(int(tilesMaxOffset));
     n->setTilesFill(int(tilesFill));
     n->setTilesSeed(tilesSeed);
+    n->setFragmentOffset(fragmentOffset > 0 ? int(fragmentOffset) : 4);
     return true;
 }
 
