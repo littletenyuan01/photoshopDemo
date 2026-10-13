@@ -94,6 +94,27 @@ public:
     /** 只读快照（Undo / 测试）；不持有文档内指针。 */
     QVector<Path> snapshotPaths() const;
 
+    /**
+     * 活动路径 → 选区（PathFillOp + combineShapeMask）。
+     * @return false 若无活动路径。
+     */
+    bool pathToSelection(ChannelOp op = ChannelOp::Replace);
+    /**
+     * 选区 → 新路径（Moore 轮廓 + 简化）；空选区返回 -1。
+     * @return 新路径下标。
+     */
+    int selectionToPath();
+    /**
+     * 用前景色填充活动路径到活动层（灰 mask 作剪贴）。
+     * @return false 若无路径/层不可编辑。
+     */
+    bool fillActivePath(const QColor &color);
+    /**
+     * 沿活动路径用 dab 描边到活动层。
+     * @param halfWidth dab 半径（像素）。
+     */
+    bool strokeActivePath(const QColor &color, qreal halfWidth);
+
     /** 清空选区并发 selectionChanged。 */
     void clearSelection();
     /** 全选并发 selectionChanged。 */

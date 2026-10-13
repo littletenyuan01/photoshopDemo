@@ -7,6 +7,7 @@
 
 #include "domain/imagedocument.h"
 #include "engine/bezier.h"
+#include "patheditops.h"
 
 #include <QLineF>
 #include <QPainter>
@@ -234,12 +235,12 @@ bool PenTool::mousePress(const ToolEvent &e, const ToolContext &ctx, ViewPort &v
 
     const Target t = classify(e, ctx);
 
-    // Ctrl+点锚点/线段 → 删除（pathAutoAdd 开时）
+    // Ctrl+点锚点/线段 → 删除（pathAutoAdd 开时）；几何走 PathEditOps
     if (ctrl && ctx.pathAutoAdd && m_hasEdit) {
         if (t == Target::Anchor) {
             const Path::Hit ah = m_edit.hitTestAnchor(e.imagePos, tolDoc(ctx));
             if (ah.sub >= 0) {
-                m_edit.deleteAnchor(ah.sub, ah.index);
+                PathEditOps::deleteAnchorAt(m_edit, ah.sub, ah.index);
                 m_dirtySinceCommit = true;
                 if (m_docIndex >= 0)
                     commitEditToDocument(ctx, QObject::tr("删除锚点"));
@@ -250,13 +251,11 @@ bool PenTool::mousePress(const ToolEvent &e, const ToolContext &ctx, ViewPort &v
         if (t == Target::Segment) {
             const Path::SegHit sh = m_edit.nearestOnPath(e.imagePos, tolDoc(ctx));
             if (sh.sub >= 0) {
-                // 删段近端锚点
-                int i0 = 0, i1 = 0;
                 const SubPath &sp = m_edit.subPaths[sh.sub];
-                i0 = sh.seg;
-                i1 = (sh.seg + 1 < sp.anchors.size()) ? (sh.seg + 1) : 0;
+                const int i0 = sh.seg;
+                const int i1 = (sh.seg + 1 < sp.anchors.size()) ? (sh.seg + 1) : 0;
                 const int del = (sh.t < 0.5) ? i0 : i1;
-                m_edit.deleteAnchor(sh.sub, del);
+                PathEditOps::deleteAnchorAt(m_edit, sh.sub, del);
                 m_dirtySinceCommit = true;
                 if (m_docIndex >= 0)
                     commitEditToDocument(ctx, QObject::tr("删除锚点"));
@@ -266,16 +265,11 @@ bool PenTool::mousePress(const ToolEvent &e, const ToolContext &ctx, ViewPort &v
         }
     }
 
-    // Alt+点锚点 → 尖角↔平滑
+    // Alt+点锚点 → 尖角↔平滑（PathEditOps::toggleCorner）
     if (alt && t == Target::Anchor && m_hasEdit) {
         const Path::Hit ah = m_edit.hitTestAnchor(e.imagePos, tolDoc(ctx));
         if (ah.sub >= 0) {
-            PathAnchor &a = m_edit.subPaths[ah.sub].anchors[ah.index];
-            m_edit.setCorner(ah.sub, ah.index, !a.corner);
-            if (!a.corner) {
-                // 平滑：镜像 out ← in
-                a.outHandle = a.point - (a.inHandle - a.point);
-            }
+            PathEditOps::toggleCorner(m_edit, ah.sub, ah.index);
             m_dirtySinceCommit = true;
             if (m_docIndex >= 0)
                 commitEditToDocument(ctx, QObject::tr("转换锚点"));
@@ -304,8 +298,7 @@ bool PenTool::mousePress(const ToolEvent &e, const ToolContext &ctx, ViewPort &v
 
     if (t == Target::Segment && ctx.pathAutoAdd) {
         const Path::SegHit sh = m_edit.nearestOnPath(e.imagePos, tolDoc(ctx));
-        if (sh.sub >= 0 && m_edit.insertAnchor(sh.sub, sh.seg, sh.t)) {
-            // 新锚点插在 seg+1
+        if (sh.sub >= 0 && PathEditOps::addAnchorAt(m_edit, sh.sub, sh.seg, sh.t)) {
             const int newIdx = sh.seg + 1;
             selectAnchor(sh.sub, newIdx);
             m_state = State::DraggingAnchor;

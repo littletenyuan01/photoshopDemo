@@ -14,6 +14,7 @@
 #include "domain/layer.h"
 #include "domain/layermask.h"
 #include "domain/layerstyle.h"
+#include "domain/path.h"
 #include "domain/selection.h"
 #include "engine/op/opname.h"
 #include "io/rasterio.h"
@@ -597,6 +598,24 @@ std::unique_ptr<ImageDocument> loadDocumentBody(QDataStream &in,
             doc->replaceSelectionMask(mask);
     }
 
+    // v4：路径栈（在选区之后）
+    qint32 pathCount = 0;
+    in >> pathCount;
+    if (in.status() != QDataStream::Ok || pathCount < 0 || pathCount > 4096) {
+        if (errorMessage)
+            *errorMessage = QObject::tr("读取路径数量失败");
+        return nullptr;
+    }
+    for (qint32 i = 0; i < pathCount; ++i) {
+        Path path = Path::read(in);
+        if (in.status() != QDataStream::Ok) {
+            if (errorMessage)
+                *errorMessage = QObject::tr("读取路径 %1 失败").arg(i);
+            return nullptr;
+        }
+        doc->addPath(std::move(path));
+    }
+
     if (activeIndex < 0 || activeIndex >= doc->layers().count())
         activeIndex = doc->layers().count() - 1;
     doc->setActiveLayerIndex(activeIndex);
@@ -687,6 +706,17 @@ bool ProjectIo::save(const ImageDocument &doc, const QString &filePath,
         if (errorMessage)
             *errorMessage = QObject::tr("写入选区失败");
         return false;
+    }
+
+    out << qint32(doc.paths().count());
+    for (int i = 0; i < doc.paths().count(); ++i) {
+        const Path *p = doc.paths().pathAt(i);
+        if (!p) {
+            if (errorMessage)
+                *errorMessage = QObject::tr("路径 %1 无效").arg(i);
+            return false;
+        }
+        p->write(out);
     }
 
     if (out.status() != QDataStream::Ok) {

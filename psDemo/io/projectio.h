@@ -21,7 +21,7 @@ class ImageDocument;
  * 仅 Current；不兼容变更时改此值。滤镜参数块大小见 projectio.cpp `kFilterNodeParamBytes`。
  */
 enum class ProjectFormat : quint32 {
-    Current = 3, ///< 滤镜节点：op+enabled+固定 1024B 参数块（含预留；v2 为 512B）
+    Current = 4, ///< v4：图层段后追加路径栈；v3 = 滤镜 1024B 参数块、无路径段
 };
 
 /**
@@ -35,6 +35,7 @@ enum class ProjectFormat : quint32 {
  *   + 样式栈 + 可选蒙版 + 链接路径 + kind + 滤镜栈
  *   （滤镜：count × {op, enabled, 固定长度参数 blob，尾部预留填 0}）
  * - 选区：灰度 PNG（空选区则长度 0）
+ * - 路径：数量 → 每条 Path::write（name/visible/子路径/锚点）
  */
 class ProjectIo
 {

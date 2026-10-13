@@ -34,6 +34,7 @@ SOURCES += \
     io/rasterio.cpp \
     engine/bezier.cpp \
     engine/blend.cpp \
+    engine/selectiontopath.cpp \
     engine/compositor.cpp \
     engine/projection.cpp \
     engine/paintengine.cpp \
@@ -98,6 +99,8 @@ SOURCES += \
     tools/handtool.cpp \
     tools/zoomtool.cpp \
     tools/painttool.cpp \
+    tools/patheditops.cpp \
+    tools/pathanchortool.cpp \
     tools/pentool.cpp \
     tools/paintbuckettool.cpp \
     tools/gradienttool.cpp \
@@ -168,6 +171,7 @@ HEADERS += \
     io/rasterio.h \
     engine/bezier.h \
     engine/blend.h \
+    engine/selectiontopath.h \
     engine/compositor.h \
     engine/projection.h \
     engine/paintengine.h \
@@ -254,6 +258,8 @@ HEADERS += \
     tools/handtool.h \
     tools/zoomtool.h \
     tools/painttool.h \
+    tools/patheditops.h \
+    tools/pathanchortool.h \
     tools/pentool.h \
     tools/paintbuckettool.h \
     tools/gradienttool.h \

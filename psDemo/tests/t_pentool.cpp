@@ -387,18 +387,54 @@ int tPenTool()
         }
     }
 
-    // 13) Add/Delete/Convert 未注册 ⇒ 回退中性工具不崩
+    // 13) Add/Delete/Convert 已注册：选中后点击真的改路径
     {
-        auto doc = ImageDocument::createBlank(200, 200, Qt::white);
+        auto doc = ImageDocument::createBlank(400, 300, Qt::white);
+        // 先用钢笔建一条 3 点路径并入库
         ToolManager tm;
+        tm.setActiveTool(ToolId::Pen, vp);
         ToolContext ctx = makeCtx(doc.get());
-        r.check(tm.tool(ToolId::AddAnchorPoint) == nullptr, QStringLiteral("AddAnchor 未注册"));
-        r.check(tm.tool(ToolId::DeleteAnchorPoint) == nullptr, QStringLiteral("DeleteAnchor 未注册"));
-        r.check(tm.tool(ToolId::ConvertPoint) == nullptr, QStringLiteral("ConvertPoint 未注册"));
-        tm.setActiveTool(ToolId::AddAnchorPoint, vp); // 未注册 → 兜底 Move（可能已是 Move，返回 false）
-        r.check(tm.activeToolId() == ToolId::Move, QStringLiteral("回退到 Move"));
-        tm.dispatchPress(makePress({10, 10}), ctx, vp);
-        r.check(true, QStringLiteral("中性工具消费事件不崩"));
+        for (const QPointF &p : {QPointF(40, 100), QPointF(120, 40), QPointF(200, 100)}) {
+            tm.dispatchPress(makePress(p), ctx, vp);
+            tm.dispatchMove(makeMove(p + QPointF(20, 0)), ctx, vp);
+            tm.dispatchRelease(makeRelease(p + QPointF(20, 0)), ctx, vp);
+        }
+        tm.dispatchKeyPress(Qt::Key_Return, Qt::NoModifier, ctx, vp);
+        r.check(doc->paths().count() == 1
+                    && doc->paths().pathAt(0)->subPaths[0].anchors.size() == 3,
+                QStringLiteral("预备路径 3 锚点"));
+
+        // AddAnchor：点线段中部
+        tm.setActiveTool(ToolId::AddAnchorPoint, vp);
+        r.check(tm.activeToolId() == ToolId::AddAnchorPoint, QStringLiteral("选中 AddAnchor"));
+        {
+            const auto &a0 = doc->paths().pathAt(0)->subPaths[0].anchors[0];
+            const auto &a1 = doc->paths().pathAt(0)->subPaths[0].anchors[1];
+            const Bezier::Seg s = Bezier::fromAnchors(a0, a1);
+            const QPointF mid = Bezier::pointAt(s, 0.5);
+            tm.dispatchPress(makePress(mid), ctx, vp);
+        }
+        r.check(doc->paths().pathAt(0)->subPaths[0].anchors.size() == 4,
+                QStringLiteral("AddAnchor 后锚点数 +1"));
+
+        // DeleteAnchor：点一个锚点
+        tm.setActiveTool(ToolId::DeleteAnchorPoint, vp);
+        {
+            const QPointF pt = doc->paths().pathAt(0)->subPaths[0].anchors[1].point;
+            tm.dispatchPress(makePress(pt), ctx, vp);
+        }
+        r.check(doc->paths().pathAt(0)->subPaths[0].anchors.size() == 3,
+                QStringLiteral("DeleteAnchor 后锚点数 -1"));
+
+        // ConvertPoint：corner 取反
+        tm.setActiveTool(ToolId::ConvertPoint, vp);
+        const bool corner0 = doc->paths().pathAt(0)->subPaths[0].anchors[0].corner;
+        {
+            const QPointF pt = doc->paths().pathAt(0)->subPaths[0].anchors[0].point;
+            tm.dispatchPress(makePress(pt), ctx, vp);
+        }
+        r.check(doc->paths().pathAt(0)->subPaths[0].anchors[0].corner != corner0,
+                QStringLiteral("ConvertPoint 后 corner 取反"));
     }
 
     return r.fails;

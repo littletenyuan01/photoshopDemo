@@ -10,7 +10,10 @@
 #include "domain/layermask.h"
 #include "engine/compositor.h"
 #include "engine/op/opname.h"
+#include "engine/op/pathfillop.h"
+#include "engine/op/pathstrokeop.h"
 #include "engine/paintengine.h"
+#include "engine/selectiontopath.h"
 #include "io/rasterio.h"
 
 #include <QFileInfo>
@@ -240,6 +243,82 @@ bool ImageDocument::setPathVisible(int index, bool visible)
         return true;
     p->visible = visible;
     emit pathsChanged();
+    return true;
+}
+
+bool ImageDocument::pathToSelection(ChannelOp op)
+{
+    const Path *p = activePath();
+    if (!p || p->isEmpty())
+        return false;
+    pushSelectionUndo(tr("路径转为选区"));
+    const QImage mask = PathFillOp::rasterize(*p, QSize(m_width, m_height));
+    m_selection.combineShapeMask(mask, op, p->bounds().toAlignedRect());
+    emit selectionChanged();
+    return true;
+}
+
+int ImageDocument::selectionToPath()
+{
+    if (m_selection.isEmpty())
+        return -1;
+    Path path = SelectionToPath::fromMask(m_selection.mask());
+    if (path.isEmpty())
+        return -1;
+    pushPathUndo(tr("选区建立工作路径"));
+    return addPath(std::move(path));
+}
+
+bool ImageDocument::fillActivePath(const QColor &color)
+{
+    const Path *p = activePath();
+    Layer *layer = activeLayer();
+    if (!p || p->isEmpty() || !layer || !layer->isVisible() || !layer->allowsPixelEdit())
+        return false;
+
+    const QImage mask = PathFillOp::rasterize(*p, QSize(m_width, m_height));
+    // 临时选区裁剪填充，不改用户选区
+    Selection clipSel(m_width, m_height);
+    clipSel.combineShapeMask(mask, ChannelOp::Replace, p->bounds().toAlignedRect());
+
+    const int ox = layer->offsetX();
+    const int oy = layer->offsetY();
+    pushLayerPixelsUndo(m_activeLayerIndex, tr("填充路径"));
+    PaintSelectionClip clip;
+    clip.selection = &clipSel;
+    clip.layerOffsetX = ox;
+    clip.layerOffsetY = oy;
+    const QRect dirtyLocal = PaintEngine::solidFill(layer->tiles(), color, clip);
+    if (dirtyLocal.isEmpty())
+        return false;
+    markDirty(dirtyLocal.translated(ox, oy));
+    return true;
+}
+
+bool ImageDocument::strokeActivePath(const QColor &color, qreal halfWidth)
+{
+    const Path *p = activePath();
+    Layer *layer = activeLayer();
+    if (!p || p->isEmpty() || !layer || !layer->isVisible() || !layer->allowsPixelEdit())
+        return false;
+
+    const int ox = layer->offsetX();
+    const int oy = layer->offsetY();
+    // 路径在文档坐标，瓦片在层局部：先平移路径
+    Path local = *p;
+    local.translate(QPointF(-ox, -oy));
+
+    pushLayerPixelsUndo(m_activeLayerIndex, tr("描边路径"));
+    PaintSelectionClip clip;
+    clip.selection = m_selection.isEmpty() ? nullptr : &m_selection;
+    clip.layerOffsetX = ox;
+    clip.layerOffsetY = oy;
+    const QRect dirtyLocal =
+        PathStrokeOp::stroke(local, layer->tiles(), color, halfWidth, 0.25,
+                             PaintMode::Paint, 0.85, clip);
+    if (dirtyLocal.isEmpty())
+        return false;
+    markDirty(dirtyLocal.translated(ox, oy));
     return true;
 }
 
