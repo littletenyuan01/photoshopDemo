@@ -129,14 +129,48 @@ void CanvasView::setDocument(Ps::ImageDocument *document)
         // 图层属性变化（显隐/透明度）也走 contentChanged，画布需重投影，
         // 合成细节在 Projection / Compositor，画布不必区分。
         connect(m_document, &Ps::ImageDocument::contentChanged, this, [this]() {
-            // 移动 / 调整层 live：跳过 Projection::sync，直接重画
-            if (activeLiveProjection()) {
+            // 仅「工具 live」（如移动）跳过 sync。调整层 m_adjLive 绝不能挡文档刷新：
+            // 换层也会发 contentChanged；若因 adj live 非空直接 return，会卡在未完成的
+            // ROI 预览上（表现为某一截缺了 / 再点才恢复）。拖参本身不发 contentChanged。
+            Ps::Tool *tool = m_toolManager ? m_toolManager->activeTool() : nullptr;
+            const QImage *toolLive = tool ? tool->liveProjection() : nullptr;
+            if (toolLive && !toolLive->isNull()) {
                 update();
                 return;
             }
             clearAdjustmentLive();
             // 对照 GIMP projection_flush：吸入脏区，视口优先，其余 idle
             const QRect painted = syncProjection();
+            if (!painted.isEmpty()) {
+                const QRectF wr(imageToWidget(painted.topLeft()),
+                                imageToWidget(QPointF(painted.right() + 1,
+                                                      painted.bottom() + 1)));
+                update(wr.normalized().toAlignedRect().adjusted(-1, -1, 1, 1));
+            } else {
+                update();
+            }
+        });
+        // 换活动层：必须结束调整层 live，并尽量把视口挂起块刷完（新建调整层后的
+        // 大脏区常分帧未完；再点图层若只 update 会短暂露出透明/旧块「缺一截」）。
+        connect(m_document, &Ps::ImageDocument::activeLayerChanged, this, [this](int) {
+            const bool hadAdjLive = !m_adjLive.isNull();
+            clearAdjustmentLive();
+            if (!m_document)
+                return;
+            if (hadAdjLive) {
+                // 拖参可能已把节点写入文档但未 markDirty；清 live 后要按真相重合成
+                const QRect vis = visibleDocumentRect();
+                if (!vis.isEmpty())
+                    m_document->markDirty(vis);
+                else
+                    m_document->markDirty();
+            }
+            updateProjectionPriorityRect();
+            QRect painted = syncProjection();
+            if (m_projection.hasPendingChunks())
+                painted = painted.united(m_projection.flushPriority(16));
+            if (m_projection.hasPendingChunks() && !m_projIdleTimer->isActive())
+                m_projIdleTimer->start();
             if (!painted.isEmpty()) {
                 const QRectF wr(imageToWidget(painted.topLeft()),
                                 imageToWidget(QPointF(painted.right() + 1,
@@ -1406,7 +1440,12 @@ void CanvasView::onAdjustmentPreviewCommit(int layerIndex)
     }
 
     // 文档参数已提交；视口优先分块合成（勿主线程全幅 rebuild）
-    const QRect painted = syncProjection();
+    // 多刷一截 priority，避免清 live 后立刻露出未合成透明块（「缺一截」）
+    QRect painted = syncProjection();
+    if (m_projection.hasPendingChunks())
+        painted = painted.united(m_projection.flushPriority(16));
+    if (m_projection.hasPendingChunks() && !m_projIdleTimer->isActive())
+        m_projIdleTimer->start();
     m_adjLive = QImage();
     if (!painted.isEmpty()) {
         const QRectF wr(imageToWidget(painted.topLeft()),

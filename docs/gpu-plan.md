@@ -278,26 +278,26 @@ QImage FilterStack::apply(const QImage &source, const QRect &srcRect, const QRec
 
 ```
               ┌──────── 调用方（不改签名）────────┐
-  Layer::compositeRasterRegion / LayerFilterJob / 测试
+   Layer::compositeRasterRegion / LayerFilterJob / 测试
               └────────────────┬────────────────┘
                                │ apply(source, srcRect, outRect, abort)
-                    ┌──────────▼──────────┐
+                          ┌──────────▼──────────┐
                     │  FilterStack::apply │   ← 唯一改动的接缝（签名不变）
-                    └──────────┬──────────┘
-                               │
-              ┌────────────────▼─────────────────┐
+                          └──────────┬──────────┘
+                                     │
+                    ┌────────────────▼─────────────────┐
               │      RasterScheduler（新）        │
               │  ① 探测（惰性一次）               │
               │  ② 决策：链成本 + 像素数 + 开关    │
               │  ③ 执行；失败 → 退回 CPU 重算      │
               │  ④ 熔断（原子计数）                │
-              └───────┬───────────────┬──────────┘
-                      │               │
-            ┌─────────▼──────┐  ┌─────▼──────────┐
+                    └───────┬───────────────┬──────────┘
+                            │               │
+                  ┌─────────▼──────┐  ┌─────▼──────────┐
             │ CpuRasterBackend│  │ GpuRasterBackend│
             │ = 现有图路径     │  │ 上传→链→回读     │
             │ **永远可用**     │  │ 可选 / 可能不存在 │
-            └────────────────┘  └────────────────┘
+                  └────────────────┘  └────────────────┘
 ```
 
 ### 3.1 接口（P0 定稿，**签名照抄**）
@@ -368,7 +368,7 @@ public:
      */
     virtual ApplyStackResult applyStack(QImage &image, const FilterStack &stack,
                                         const QRect &srcRect, const QRect &outRect,
-                                        const std::function<bool()> &shouldAbort) = 0;
+                            const std::function<bool()> &shouldAbort) = 0;
 };
 
 } // namespace Ps

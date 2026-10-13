@@ -29,6 +29,9 @@ public:
     void setNode(const Ps::FilterNode &node);
     Ps::FilterNode node() const { return m_node; }
     void clear();
+    /** 换层前：若有未提交预览，先 commit（避免参数已写入文档却无 undo / 画布 live 残留）。 */
+    bool hasPendingPreview() const { return m_pendingPreview; }
+    void commitPendingIfAny() { emitCommit(); }
 
 signals:
     void previewChanged(const Ps::FilterNode &node);

@@ -277,6 +277,26 @@ sliderReleased → setLayerFilterNode(..., pushUndo=true)
 
 **已知限制**：首次建栈（大文档+多层）后台仍需时间，画布可能晚一两帧；已涂黑的蒙版走慢路径；平移/缩放会丢 below 缓存（下次预览重建）。
 
+### 已修复：换层后画面「缺一截」、再点才恢复（2026-10）
+
+**现象**：加任意调整层（不限色彩平衡）→ 点下方图层 → 再点另一图层时，画布上方（或局部）像少了一截；再点一次又正常。
+
+**根因（两条叠在一起）**：
+
+| # | 错误路径 | 后果 |
+|---|----------|------|
+| 1 | `contentChanged` 把 **调整层 `m_adjLive`** 和工具 live 一视同仁：有 live 就 `update()` 并 **跳过** `clearAdjustmentLive` + `syncProjection` | 换层也发 `contentChanged`；未松手的 ROI 预览或半成品 live 会卡住画面 |
+| 2 | 新建调整层 → 整幅 `markDirty` → 投影分帧未完；换层时若只 `update`、idle 被拖参停过 | 未合成块仍透明/旧像素 → 「缺一截」；再点一次碰巧刷完 → 「恢复」 |
+
+**改法**：
+
+- `contentChanged`：**仅**工具 `liveProjection()` 跳过 sync；调整层 live 一律清掉再 sync。  
+- 订阅 `activeLayerChanged`：清 adj live；若刚丢掉 live 则 `markDirty(视口)`；`flushPriority` + 确保 idle 继续。  
+- `adjustmentPreviewCommit`：同样多刷一截 priority，避免清 live 瞬间露洞。  
+- 属性面板：换层前若有 `pendingPreview`，对 **上一张** 调整层 `commit`（`m_boundAdjLayer`），避免参数已写入却无 undo、或 clear 丢掉提交。
+
+**影响范围**：所有调整层种（共享 live / FilterStack 路径），非色彩平衡独有。
+
 ---
 
 ## 自由变换（Ctrl+T）— 已实现

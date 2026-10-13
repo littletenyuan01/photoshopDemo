@@ -56,6 +56,8 @@ private:
     FilterStackWidget *m_filterStack = nullptr; ///< 像素层的非破坏滤镜栈列表
     Ps::AppSession *m_session = nullptr;
     Ps::ImageDocument *m_document = nullptr;
+    /** 上次展示调整参数的图层索引；换层前提交未完成的预览时用。 */
+    int m_boundAdjLayer = -1;
 };
 
 #endif // PROPERTIESPANEL_H

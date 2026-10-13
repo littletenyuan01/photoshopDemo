@@ -142,6 +142,7 @@ void PropertiesPanel::onAdjPreview(const Ps::FilterNode &node)
     if (!m_document)
         return;
     const int li = m_document->activeLayerIndex();
+    m_boundAdjLayer = li;
     m_document->setLayerFilterNode(li, 0, node, /*pushUndo=*/false);
 }
 
@@ -149,7 +150,8 @@ void PropertiesPanel::onAdjCommit(const Ps::FilterNode &node)
 {
     if (!m_document)
         return;
-    const int li = m_document->activeLayerIndex();
+    // 换层后 active 可能已变：提交到绑定过的调整层，而不是误写到新活动层
+    const int li = (m_boundAdjLayer >= 0) ? m_boundAdjLayer : m_document->activeLayerIndex();
     m_document->setLayerFilterNode(li, 0, node, /*pushUndo=*/true);
 }
 
@@ -161,7 +163,15 @@ void PropertiesPanel::refreshFromDocument()
         ui->editH->setText(QStringLiteral("0"));
         setAdjustmentMode(false);
         m_adjHost->clear();
+        m_boundAdjLayer = -1;
         return;
+    }
+
+    // 换层前：把未松手的预览正式提交到「上一张」调整层（clear 不会发 commit）
+    if (m_adjHost->hasPendingPreview() && m_boundAdjLayer >= 0) {
+        const Ps::Layer *prev = m_document->layers().layerAt(m_boundAdjLayer);
+        if (prev && prev->isAdjustmentLayer())
+            m_adjHost->commitPendingIfAny();
     }
 
     const Ps::Layer *layer = m_document->activeLayer();
@@ -182,10 +192,12 @@ void PropertiesPanel::refreshFromDocument()
 
     if (layer && layer->isAdjustmentLayer() && layer->filters().count() > 0) {
         setAdjustmentMode(true);
+        m_boundAdjLayer = m_document->activeLayerIndex();
         m_adjHost->setNode(layer->filters().at(0));
     } else {
         setAdjustmentMode(false);
         m_adjHost->clear();
+        m_boundAdjLayer = -1;
     }
 
     // 像素层的滤镜栈：让「非破坏」真的可见、可管（调整层走上面的参数页，不进这个列表）
