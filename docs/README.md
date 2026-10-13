@@ -10,6 +10,14 @@
 | `wiki/` | 目标、路线、构建入口、简历话术 |
 | `docs/` | 实现级文档（随代码演进） |
 
+## 学习路径（按用户工作流）
+
+| 入口 | 内容 |
+|------|------|
+| [学习路径/README.md](学习路径/README.md) | 新建→编辑操作→导出；L0～L10 主流程 + L11 GPU 进阶 + 测验 |
+| [简历-项目经验.md](简历-项目经验.md) | 简历条目与口述骨架 |
+| [面试题-PhotoshopLite.md](面试题-PhotoshopLite.md) | 按故事线问答要点 |
+
 ## 专题目录
 
 | 目录 | 内容 |
@@ -17,6 +25,7 @@
 | [ui/](ui/README.md) | 界面壳：审查收口、图标清单 |
 | [layers/](layers/README.md) | 文档 / 画布 / 图层 / 合成 / 视图概念 |
 | [engine/](engine/README.md) | 算法与算子：注册、调度、三段式生命周期、脏区上行 |
+| [学习路径/](学习路径/README.md) | 按用户工作流跟读：启动→文档→画布→绘制→撤销→选区→图层→滤镜→路径→存盘 |
 
 ## 文档列表
 
@@ -24,12 +33,16 @@
 |------|------|
 | [overview.md](overview.md) | 工程总览与当前能力 |
 | [architecture.md](architecture.md) | 模块结构与数据流 |
+| [学习路径/README.md](学习路径/README.md) | **按用户工作流跟代码**（新建→导出；测验-工作流.html） |
+| [简历-项目经验.md](简历-项目经验.md) | 简历话术提纲（需能对应仓库） |
+| [面试题-PhotoshopLite.md](面试题-PhotoshopLite.md) | 面试问答按故事线 |
 | [graph-engine.md](graph-engine.md) | **图引擎（engine/graph）**：DAG / ROI 反向传播 / 节点缓存与脏传播 / 合成入图，对照 GEGL |
 | [features.md](features.md) | 功能清单与使用说明 |
 | [pending-dev.md](pending-dev.md) | **待开发**：已有功能的已知风险与完善方向 |
 | [dev-plan.md](dev-plan.md) | **开发计划**：异步定稿 / 中值增量 cum / ROI 通用化 / 位移算子四条需求的可验证开发步骤、验收标准与踩坑 |
 | [filter-roadmap.md](filter-roadmap.md) | **滤镜现状与开发计划**：68 项菜单项逐项状态（已接线 14 / 未做 54）、优先级判断标准、A–F 六档分批与「不做的项及其理由」 |
 | [gpu-plan.md](gpu-plan.md) | **GPU 加速开发计划**：定位为**可选加速后端**（有 GPU 就加速、没有就 CPU，**不是替换**）；硬约束、链级决策规则与 5 ns/px 阈值、P0（只做壳与调度、不写 GPU）～P3 分期与验收 |
+| [page-cache-plan.md](page-cache-plan.md) | **瓦片页缓存（Tile Page Cache）开发计划**：评估本工程为何**没有**页缓存（`tilebuffer.h` 明写"去掉 COW/交换/全局空瓦片池"）、GIMP `gimptile.c` 主逻辑的可移植裁剪、**为何不能照搬 per-tile 引用计数**（`QImage*` 裸指针 ⇒ 悬垂）、A/B/C 三档与 1.5–2 周工期、验收与风险 |
 | [tests.md](tests.md) | **常驻测试**：11 个无 GUI 断言用例、构建运行方式、写测试的约定与坑 |
 | [code-map.md](code-map.md) | 重点代码与文件索引 |
 | [tech-notes.md](tech-notes.md) | 技术点与设计决策 |
