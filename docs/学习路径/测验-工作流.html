@@ -24,10 +24,10 @@
 <body>
 <main>
   <h1>工作流测验（新建 → 导出）</h1>
-  <p class="sub">按用户流程出题。建议 ≥10/12 再写简历口述。L11 GPU 仅 1 题。</p>
+  <p class="sub">按用户流程出题（含内存横切，不按功能开发顺序）。建议 ≥11/13 再写简历口述。L11 GPU 仅 1 题。</p>
   <form id="quiz">
     <div class="q" data-ans="b"><h2><span class="tag">L0</span>学习路径主顺序应是？</h2>
-      <label><input type="radio" name="q0" value="a" /> 先 GPU，再 UI，再文档</label>
+      <label><input type="radio" name="q0" value="a" /> 先 GPU / 页缓存专章，再 UI，再文档</label>
       <label><input type="radio" name="q0" value="b" /> 启动→新建/打开→看见→编辑→保存/导出</label>
       <label><input type="radio" name="q0" value="c" /> 先通读全部 engine/op</label></div>
     <div class="q" data-ans="a"><h2><span class="tag">L1</span>新建文档后，文档所有权在？</h2>
@@ -37,7 +37,11 @@
     <div class="q" data-ans="c"><h2><span class="tag">L2</span>用户正在编辑的像素主要在？</h2>
       <label><input type="radio" name="q2" value="a" /> 工程文件头</label>
       <label><input type="radio" name="q2" value="b" /> HistoryStack 里</label>
-      <label><input type="radio" name="q2" value="c" /> Layer 的 TileBuffer</label></div>
+      <label><input type="radio" name="q2" value="c" /> Layer 的 TileBuffer（稀疏瓦片）</label></div>
+    <div class="q" data-ans="a"><h2><span class="tag">L2·内存</span>画笔涂过很多格子后，默认内存行为？</h2>
+      <label><input type="radio" name="q2m" value="a" /> 写过的瓦片常驻；大图才设 PSLITE_TILE_CACHE_MB 换页</label>
+      <label><input type="radio" name="q2m" value="b" /> 自动换页，无需环境变量</label>
+      <label><input type="radio" name="q2m" value="c" /> HistoryStack 会释放图层瓦片</label></div>
     <div class="q" data-ans="b"><h2><span class="tag">L3</span>画了之后屏幕更新的核心链？</h2>
       <label><input type="radio" name="q3" value="a" /> 直接写窗口 DC 绕过文档</label>
       <label><input type="radio" name="q3" value="b" /> markDirty → Projection → compositeRegion → update</label>
@@ -58,6 +62,10 @@
       <label><input type="radio" name="q7" value="a" /> 走 ImageDocument 语义化 setter</label>
       <label><input type="radio" name="q7" value="b" /> 只改面板文字</label>
       <label><input type="radio" name="q7" value="c" /> 改 Compositor 静态变量</label></div>
+    <div class="q" data-ans="b"><h2><span class="tag">L7·内存</span>复制图层正确做法？</h2>
+      <label><input type="radio" name="q7m" value="a" /> materialize 再 setFromImage（整层深拷）</label>
+      <label><input type="radio" name="q7m" value="b" /> sharePixelsFrom，靠 QImage COW 共享瓦片</label>
+      <label><input type="radio" name="q7m" value="c" /> 只复制图层名，像素指向投影缓冲</label></div>
     <div class="q" data-ans="c"><h2><span class="tag">L8</span>默认加滤镜会？</h2>
       <label><input type="radio" name="q8" value="a" /> 立刻永久覆盖 tiles</label>
       <label><input type="radio" name="q8" value="b" /> 必须有 GPU</label>
@@ -81,7 +89,7 @@
 </main>
 <script>
 (function(){
-  const back=["L0 工作流","L1 AppSession","L2 TileBuffer","L3 Projection","L4 PaintTool","L5 History","L6 Selection","L7 图层 API","L8 FilterStack","L9 Path","L10 ProjectFormat","L11 GPU 定位"];
+  const back=["L0 工作流","L1 AppSession","L2 TileBuffer","L2 内存/页缓存","L3 Projection","L4 PaintTool","L5 History","L6 Selection","L7 图层 API","L7 复制 COW","L8 FilterStack","L9 Path","L10 ProjectFormat","L11 GPU 定位"];
   document.getElementById("grade").onclick=function(){
     const cards=document.querySelectorAll(".q"); let score=0; const weak=[];
     cards.forEach(function(card,i){

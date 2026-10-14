@@ -21,17 +21,23 @@
 ## B. 文档与像素
 
 **Q4. 像素存在哪里？为什么用瓦片？**  
-要点：`Layer::TileBuffer` 稀疏 64×64；大画布省内存、脏区对齐 chunk。
+要点：`Layer::TileBuffer` 稀疏 64×64；透明层 0 块；大画布省内存、脏区对齐 chunk。
+
+**Q4b. 画了很多之后内存只涨不降，你们怎么应对？**  
+要点：默认不换页（opt-in）；`PSLITE_TILE_CACHE_MB` + 粗粒度 pin + 静默点 trim；**不做** per-tile ref（裸 `QImage*` 会悬垂）。投影稠密缓冲不能换出。撤销另有字节上限丢最老历史——两套机制别混。学习路径嵌在 L2～L5，不是单独「页缓存课」。
 
 **Q5. 改不透明度为什么走 ImageDocument？**  
 要点：语义化 API、通知、撤销、统一广播；避免 UI 拧 Layer 漏刷新。
+
+**Q5b. 复制图层如何避免内存翻倍？**  
+要点：`sharePixelsFrom` / QImage COW；禁止 `materialize` 打断共享（P4）。
 
 ---
 
 ## C. 合成与画布
 
 **Q6. 画一笔从脏到屏幕经过谁？**  
-要点：`markDirty` → Projection sync → `compositeRegion` → `update`；视口优先与时间预算。
+要点：`markDirty` → Projection sync → `compositeRegion` → `update`；视口优先与时间预算；sync 后才可能 trim。
 
 **Q7. Compositor 能改图层吗？**  
 要点：不能；只读消费者。
