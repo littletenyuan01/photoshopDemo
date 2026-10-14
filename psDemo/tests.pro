@@ -56,7 +56,8 @@ SOURCES += \
     tests/t_pathgeom.cpp \
     tests/t_pathraster.cpp \
     tests/t_pentool.cpp \
-    tests/t_pathtree.cpp
+    tests/t_pathtree.cpp \
+    tests/t_tilecache.cpp
 
 HEADERS += \
     tests/testutil.h

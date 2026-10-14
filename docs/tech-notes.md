@@ -546,10 +546,17 @@ return QIcon(pm);                                 // 这个 QIcon 只有一张 2
     （`out = src + dst * (1 - src.a)`，src 已含图层不透明度）
 - `LayerStack` 使用 `std::vector<unique_ptr>`，因 Qt6 `QVector` 对不可拷贝类型不友好。
 
+### 2026-10 — 瓦片页缓存（默认关）
+
+- 缺口曾是「写过的瓦片永不释放」；投影/滤镜区域缓存/undo 上限本就有界。
+- **不做** per-tile `ref_count`（`ensureTile` 交出裸 `QImage*` ⇒ 淘汰会悬垂）；改粗粒度钉住 + 静默点淘汰。
+- `PSLITE_TILE_CACHE_MB=0` 默认；`PSLITE_MEM=1` 打口径；swap 失败降级关换页（与 GPU opt-in 同一纪律）。
+- P4：复制图层必须 `sharePixelsFrom`，禁止 `materialize` 打断 `QImage` COW。
+- 计划与验收：[page-cache-plan.md](page-cache-plan.md)；概念：[layers/tiles-and-memory.md](layers/tiles-and-memory.md)。
+
 ### 待记
 
 - `QImage` ↔ `cv::Mat` 生命周期
 - CUDA 上传开销
-- 撤销瓦片内存
 - 工具元数据收成 `ToolInfo` 注册表（现分散在 `toolid.h` / `toolbox.cpp` / `tooloptionsbar.cpp`）
 - `Compositor` 用起 `pixelsChanged(rect)` 的脏区（Phase 7）

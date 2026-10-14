@@ -55,6 +55,7 @@ int tPathGeom();
 int tPathRaster();
 int tPenTool();
 int tPathTree();
+int tTileCache();
 
 namespace {
 
@@ -99,6 +100,7 @@ const Case kCases[] = {
     { "pathraster", "路径栅格化：WindingFill/选区合并/描边 dab", tPathRaster },
     { "pentool", "钢笔工具：落点/控制柄/修饰键/弯度/撤销", tPenTool },
     { "pathtree", "路径树：新建删除/选区互转/撤销", tPathTree },
+    { "tilecache", "瓦片页缓存：往返 bit-exact / 预算 / LRU / 失败降级 / COW 复制", tTileCache },
 };
 
 } // namespace

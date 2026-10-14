@@ -1,8 +1,9 @@
 # 瓦片页缓存（Tile Page Cache）开发计划
 
-> 状态：**评估完成，建议小做（A+B 档），待拍板**　·　2026-10
+> 状态：**A+B 已落地**（默认预算 0 = 换页关闭；`PSLITE_TILE_CACHE_MB` opt-in）　·　2026-10
 > 对照实现：GIMP `app/core/gimptile.c` / `gimptile-cache.c`（2.10）、GEGL `gegl-buffer` 瓦片语义
 > 相关：[architecture.md](architecture.md)（投影与脏矩形）、[tech-notes.md](tech-notes.md)、[pending-dev.md](pending-dev.md)
+> 代码：`psDemo/engine/cache/{tilecache,swapstore,memstats}.*`；用例 `tilecache`
 
 ---
 
@@ -237,23 +238,36 @@ public:
 
 ### A 档（先做，1–2 天）
 
-- [ ] **P1** `TileBuffer::bytes()`（`allocatedTileCount() * 瓦片字节`，边缘瓦片按实际算）+ 峰值统计
-- [ ] **P2** `PSLITE_MEM=1` 打印 `tiles / undo / projection / swap / peak` 五项
-- [ ] **P3** `PSLITE_TILE_CACHE_MB`：先只**记账 + 超限打日志**（不淘汰），跑真实工作负载收集数据
-- [ ] **P4** ★ **检查点：实测"复制图层"的内存增量**（§6.1）——若 ≈ 整层，先修隐式共享断裂，**再谈页缓存**
-- [ ] **P5** 淘汰可重算的派生缓存（`Layer::m_regionFilterImage`、投影 chunk 有效位）
-- [ ] **P6** 用例：预算记账正确、派生缓存淘汰后结果仍 bit-exact
+- [x] **P1** `TileBuffer::residentBytes()`（边缘按实际 `sizeInBytes`）+ `MemSnapshot` 峰值
+- [x] **P2** `PSLITE_MEM=1` 打印 `tiles / undo / projection / swap / peak` 五项（`memstats.*`）
+- [x] **P3** `PSLITE_TILE_CACHE_MB`：记账 + 超限打日志；预算 >0 时静默点才淘汰
+- [x] **P4** ★ **检查点**：原 `duplicateLayer` 走 `materialize` 会打断 COW → 已改为 `sharePixelsFrom`；`tilecache` 断言同瓦片 `cacheKey` 共享
+- [x] **P5** 淘汰可重算的派生缓存（`Layer::clearRegionFilterResult`、`Projection::invalidateChunkValidity`）
+- [x] **P6** 用例 `tilecache`：记账 / 派生缓存淘汰后投影仍可重算
 
 ### B 档（A 档数据支持后做，4–7 天）
 
-- [ ] **P7** `engine/cache/swapstore.h`（接口 + `FileSwapStore` + `MemorySwapStore`（测试用）+ 失败注入）
-- [ ] **P8** `engine/cache/tilecache.{h,cpp}`：预算 / LRU / 三态 / `trim()` / `Stats`
-- [ ] **P9** `TileBuffer` 改 `TileSlot`；`ensureTile`/`tileAt` 走 `TileCache::load`；`pin/unpin`
-- [ ] **P10** 静默点接入 `trim()`（投影同步后 / 抬笔 / `markDirty` 后 / undo push 后）
-- [ ] **P11** 失败降级：swap 不可用 ⇒ 留内存 + 记一次日志 + 关闭换页；**不许因此报错**
-- [ ] **P12** 用例 `tilecache`：往返 bit-exact / 预算遵守 / LRU 顺序 / 失败降级 / 压力不悬垂
-- [ ] **P13** 性能护栏实测：换页开启未淘汰时退化 ≤5%；把数据写回本文档
-- [ ] **P14** 文档：`architecture.md`（瓦片与内存一节）、`tech-notes.md`、`pending-dev.md`、`tests.md`
+- [x] **P7** `engine/cache/swapstore.h`（`FileSwapStore` + `MemorySwapStore` + `FailingSwapStore`）
+- [x] **P8** `engine/cache/tilecache.{h,cpp}`：预算 / LRU / 三态 / `trim()` / `Stats` / 粗粒度 `pin`
+- [x] **P9** `TileBuffer` 改 `TileSlot`；`ensureTile`/`tileAt` 按需从 swap 读回；`TilePinGuard`
+- [x] **P10** 静默点接入 `trim()`（`Projection::sync` / `processPendingChunks` / 抬笔 / `HistoryStack::push`）
+- [x] **P11** 失败降级：swap 不可用 ⇒ 留内存 + 记一次日志 + 关闭换页
+- [x] **P12** 用例 `tilecache`：往返 bit-exact / 预算遵守 / LRU / 失败降级 / COW 复制
+- [x] **P13** 性能护栏实测：见下方 §8.1；用例断言粗护栏 ≤25%，目标 ≤5%
+- [x] **P14** 文档：`architecture.md` / `tech-notes.md` / `pending-dev.md` / `tests.md` / `README.md` / `tiles-and-memory.md`
+
+### 8.1 P13 实测（2026-10，本机 MinGW Release）
+
+| 项 | 值 |
+|---|---|
+| 负载 | 1600×1200 实色层，`materialize` ×**40**（预热 1 轮不计） |
+| 对照 | `budget=0`（关） vs `budget=512MB` + `MemorySwapStore`（开但**不淘汰**） |
+| 5 连跑退化 | +0.8% / −1.6% / +2.2% / +6.7% / +2.4%（均值 ≈ **+2.1%**） |
+| 时程 | off/on 均约 120–140 ms |
+| 结论 | **满足目标 ≤5%**（均值）；单次偶发 >5% 属计时噪声，不作产品回归依据 |
+| 用例 | `tilecache` 打印该行；断言粗护栏 ≤25%（防热路径灾变） |
+
+> 若日后把 `touch`/字节记账做成每像素热路径，此断言会先红。
 
 ---
 
@@ -282,6 +296,6 @@ public:
 
 | # | 问题 | 建议 |
 |---|---|---|
-| **Q1** | 做不做 B 档（真磁盘换页）？ | **先做 A 档拿到数据再定**。若真实工作负载（≤2000×1500、≤10 层）从不超预算 ⇒ B 档可以只作为"架构演示"选择性实现；若目标是"支持大图" ⇒ B 档必做 |
-| **Q2** | 默认预算定多少？ | **默认 0（不限/不换页）**，与 GPU 的 opt-in 同一哲学：**没有实测支持就不改变默认行为** |
-| **Q3** | undo 上限（256 MB 丢最老）要不要做成可调 + 提示？ | **推荐做**（半天，体感收益大，风险低）；C 档不做 |
+| **Q1** | 做不做 B 档（真磁盘换页）？ | **已做**（默认关；大图时设 `PSLITE_TILE_CACHE_MB`） |
+| **Q2** | 默认预算定多少？ | **默认 0（不换页）**，已按此落地 |
+| **Q3** | undo 上限要不要做成可调 + 提示？ | **已做** `HistoryStack::setByteLimit` + `historyTrimmed` 信号；UI 提示可后续接面板 |

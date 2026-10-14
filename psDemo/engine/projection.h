@@ -82,10 +82,19 @@ public:
     void invalidate();
 
     /**
+     * 仅把全部块标为无效（保留投影像素缓冲）。
+     * 页缓存压力下淘汰「可重算」派生缓存时用；下次 sync 会重算。
+     */
+    void invalidateChunkValidity();
+
+    /**
      * 用整幅图像替换投影缓冲并标全部块有效。
      * 供移动工具松手时把 live 无缝交给投影，避免「先消失再重算」。
      */
     bool adoptImage(const QImage &image);
+
+    /** 投影缓冲占用字节（空则为 0）。 */
+    qint64 bufferBytes() const;
 
 private:
     enum class ScanMode {

@@ -2,9 +2,12 @@
  * tilebuffer.h — 64×64 稀疏瓦片像素缓冲（domain 层）。
  *
  * 透明层不分配瓦片；首次写入或 fill 才 ensureTile；格式 ARGB32 预乘。
+ * 可选接入 TileCache 换页（默认关闭，见 docs/page-cache-plan.md）。
  */
 #ifndef TILEBUFFER_H
 #define TILEBUFFER_H
+
+#include "engine/cache/tilecache.h"
 
 #include <QColor>
 #include <QHash>
@@ -19,104 +22,87 @@ namespace Ps {
 /**
  * 按 64×64 网格存放图层像素（对照 GIMP/GEGL 瓦片缓冲的瘦身版）。
  *
- * 【功能】一层像素的真正容器：不整层 malloc，只在被写到的格子上分配 QImage。
+ * 【功能】一层像素的真正容器：不整层 malloc，只在被写到的格子上分配。
  *
  * 【关键约定】
  * - 创建时只记 extent（宽高）与格数，**不**分配整层像素。
  * - ensureTile：第一次碰到某格才分配该块（边缘块可小于 64）。
  * - 透明层 hash 为空 ≈ 逻辑全透明；无全局共享 zero-tile / scratch。
  * - 像素格式固定为 Format_ARGB32_Premultiplied。
+ * - 换页开启时，槽可为「仅在 swap」；ensureTile/tileAt 会按需读回。
  *
- * 【对照】GIMP GeglBuffer 瓦片语义；本 Demo 去掉 COW / 交换 / 全局空瓦片池。
- * 详见 docs/layers/tiles-and-memory.md。
+ * 【对照】GIMP GeglBuffer 瓦片语义；本 Demo 可选交换（默认关），不做 per-tile ref_count。
  */
 class TileBuffer
 {
 public:
-    /** 单瓦片边长（像素）；与 GIMP 默认瓦片尺寸同量级，取 64 便于心算。 */
     static constexpr int kTileSize = 64;
 
-    TileBuffer() = default;
-    /** 预定 extent；不分配任何瓦片块。 */
-    TileBuffer(int width, int height);
+    TileBuffer();
+    explicit TileBuffer(int width, int height);
+    ~TileBuffer();
+
+    TileBuffer(const TileBuffer &) = delete;
+    TileBuffer &operator=(const TileBuffer &) = delete;
+    TileBuffer(TileBuffer &&other) noexcept;
+    TileBuffer &operator=(TileBuffer &&other) noexcept;
 
     int width() const { return m_width; }
     int height() const { return m_height; }
-    /** 横向 / 纵向瓦片格数（含边缘不足 64 的一格）。 */
     int tilesX() const { return m_tilesX; }
     int tilesY() const { return m_tilesY; }
-    /** 已分配的瓦片块数（透明新建层为 0）。 */
+    /** 已分配槽数（含仅在 swap、当前不在内存的）。 */
     int allocatedTileCount() const { return m_tiles.size(); }
-    /** hash 为空：逻辑全透明，尚未写过任何像素。 */
     bool isEmpty() const { return m_tiles.isEmpty(); }
 
-    /**
-     * 重置 extent 并清空全部瓦片。
-     * 用于打开图片、画布/图像大小改尺寸后重建缓冲。
-     */
+    /** 当前驻留内存的瓦片字节合计（边缘按实际宽高）。 */
+    qint64 residentBytes() const;
+    /** 单槽驻留字节；img null 时为 0。 */
+    qint64 slotResidentBytes(const TileSlot &slot) const;
+
     void reset(int width, int height);
-    /** 只释放已分配瓦片，extent（宽高/格数）不变——等价「整层变透明」。 */
     void clearTiles();
 
     /**
-     * 确保 (tx,ty) 有独立像素块；越界返回 nullptr。
-     * 新分配块填透明（预乘全 0）。画笔首次碰到该格时走这里。
+     * 从另一缓冲**共享**像素（QImage 隐式共享），不走 materialize。
+     * 复制图层用：内存增量应远小于整层（P4 检查点）。
+     * 会先把源侧 swap 中的瓦片读回再共享。
      */
+    void sharePixelsFrom(const TileBuffer &other);
+
     QImage *ensureTile(int tx, int ty);
-    /** 已存在则返回，否则 nullptr（**不**分配）——合成只读路径用。 */
     QImage *tileAt(int tx, int ty);
     const QImage *tileAt(int tx, int ty) const;
 
-    /** 该瓦片在图像坐标中的矩形（右/下边缘可小于 kTileSize）。 */
     QRect tileBounds(int tx, int ty) const;
 
-    /**
-     * 整缓冲填充。
-     * 全透明 → clearTiles（释放内存）；否则 ensure 覆盖范围内全部瓦片并填色。
-     */
     void fill(const QColor &color);
-
-    /**
-     * 用整图替换缓冲内容：先 reset 到图像尺寸，再按格拆入。
-     * 打开图片、图层 replaceFromImage（图像大小/画布大小）走这里。
-     */
     void setFromImage(const QImage &image);
-
-    /**
-     * 拼成整层临时图（缩略图、重采样用）。
-     * 无瓦片时返回全透明同尺寸图，**不会**为此分配持久瓦片。
-     */
     QImage materialize() const;
 
-    /** 可写瓦片遍历回调：(格索引, 瓦片引用, 该格在图像中的矩形)。 */
     using TileCallback = std::function<void(int tx, int ty, QImage &tile, const QRect &bounds)>;
-    /** 只读已分配瓦片遍历回调。 */
     using ConstTileCallback = std::function<void(int tx, int ty, const QImage &tile, const QRect &bounds)>;
 
-    /**
-     * 遍历与 rect 相交的瓦片格。
-     * @param allocateMissing true → ensureTile（绘制写路径）；false → 只走已分配块（合成读路径）
-     */
     void forEachTileInRect(const QRect &rect, bool allocateMissing, const TileCallback &fn);
-    /**
-     * **只读**重载：遍历与 rect 相交且**已分配**的瓦片格（不分配、不改缓冲）。
-     * 合成只读路径用它，避免「遍历整层瓦片再逐个判交」的 O(总瓦片数) 开销。
-     */
     void forEachTileInRect(const QRect &rect, const ConstTileCallback &fn) const;
-    /** 只遍历已分配瓦片（materialize / 缩略图）。 */
     void forEachAllocatedTile(const ConstTileCallback &fn) const;
 
+    /** 供 TileCache LRU 扫描：只访问当前驻留内存的槽。 */
+    void visitResidentSlots(const std::function<void(qint64 key, TileSlot &slot)> &fn);
+
 private:
-    /** 把 (tx,ty) 编成 hash 键；要求 m_tilesX > 0。 */
+    friend class TileCache;
+
     qint64 key(int tx, int ty) const { return qint64(ty) * m_tilesX + tx; }
     bool validTileIndex(int tx, int ty) const;
+    QImage *makeResident(qint64 k, TileSlot &slot, int tx, int ty);
+    const QImage *makeResidentConst(qint64 k, TileSlot &slot, int tx, int ty) const;
 
-    int m_width = 0;   ///< 逻辑宽度（像素）
-    int m_height = 0;  ///< 逻辑高度（像素）
-    int m_tilesX = 0;  ///< 横向格数
-    int m_tilesY = 0;  ///< 纵向格数
-    /** 稀疏存储：键 = ty*tilesX+tx，值 = 该格预乘 ARGB 图。 */
-    QHash<qint64, QImage> m_tiles;
+    int m_width = 0;
+    int m_height = 0;
+    int m_tilesX = 0;
+    int m_tilesY = 0;
+    QHash<qint64, TileSlot> m_tiles;
 };
 
 } // namespace Ps

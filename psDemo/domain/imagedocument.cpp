@@ -1384,8 +1384,12 @@ int ImageDocument::duplicateLayer(int index)
                                  ? QStringLiteral("图层 副本")
                                  : src->name() + QStringLiteral(" 副本");
     auto copy = std::make_unique<Layer>(copyName, src->width(), src->height());
-    if (src->hasPixelData())
-        copy->replaceFromImage(src->materialize());
+    // P4：共享瓦片像素（QImage COW），禁止 materialize 打断隐式共享
+    if (src->hasPixelData()) {
+        copy->tiles().sharePixelsFrom(src->tiles());
+        copy->invalidateContentBounds();
+        copy->invalidateCompositeRaster();
+    }
     copy->setVisible(src->isVisible());
     copy->setOpacity(src->opacity());
     copy->setBlendMode(src->blendMode());

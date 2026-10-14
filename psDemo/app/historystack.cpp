@@ -4,12 +4,21 @@
 #include "historystack.h"
 
 #include "domain/imagedocument.h"
+#include "engine/cache/tilecache.h"
+
+#include <cstdio>
 
 namespace Ps {
 
 HistoryStack::HistoryStack(QObject *parent)
     : QObject(parent)
 {
+}
+
+void HistoryStack::setByteLimit(quint64 bytes)
+{
+    m_byteLimit = bytes;
+    trimUndo();
 }
 
 QString HistoryStack::undoText() const
@@ -30,6 +39,8 @@ void HistoryStack::push(std::unique_ptr<UndoItem> item)
     m_undoBytes += item->byteSize();
     m_undo.push_back(std::move(item));
     trimUndo();
+    // 静默点：undo push 之后可淘汰瓦片（文档指针由调用方持有；此处无 Projection）
+    TileCache::instance().trim();
     emit changed();
 }
 
@@ -76,6 +87,7 @@ void HistoryStack::clear()
 
 void HistoryStack::trimUndo()
 {
+    int dropped = 0;
     while (m_undoBytes > m_byteLimit && m_undo.size() > 1) {
         const quint64 sz = m_undo.front()->byteSize();
         m_undo.erase(m_undo.begin());
@@ -83,6 +95,13 @@ void HistoryStack::trimUndo()
             m_undoBytes -= sz;
         else
             m_undoBytes = 0;
+        ++dropped;
+    }
+    if (dropped > 0) {
+        std::printf("[history] trimmed %d oldest undo entr%s (limit=%.0fMB)\n", dropped,
+                    dropped == 1 ? "y" : "ies", m_byteLimit / (1024.0 * 1024.0));
+        std::fflush(stdout);
+        emit historyTrimmed(dropped);
     }
 }
 

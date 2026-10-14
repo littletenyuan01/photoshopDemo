@@ -10,6 +10,7 @@
 #include "domain/layer.h"
 #include "domain/layermask.h"
 #include "domain/selection.h"
+#include "engine/cache/tilecache.h"
 #include "engine/compositor.h"
 #include "engine/layerfilterjob.h"
 #include "engine/premul.h"
@@ -850,6 +851,8 @@ void CanvasView::mouseReleaseEvent(QMouseEvent *event)
 
     if (m_toolManager->dispatchRelease(e, m_toolContext, *this)) {
         endSpaceHandIfIdle();
+        // 静默点：抬笔后再 trim（笔画中钉住/不淘汰，避免悬垂 QImage*）
+        Ps::TileCache::instance().trim(m_document, &m_projection);
         event->accept();
         return;
     }

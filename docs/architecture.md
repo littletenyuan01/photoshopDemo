@@ -200,6 +200,10 @@ classDiagram
   **并通过 `owner()` 回指 `ImageDocument`** —— `setName/setVisible/setOpacity/setBlendMode`
   内部改值后自动广播 `layerPropertiesChanged`，UI 无需手动 notify。
   细节见 [`docs/layers/`](layers/README.md)。
+- **瓦片页缓存**（`engine/cache/`，默认关）：`PSLITE_TILE_CACHE_MB>0` 时按全局字节预算 LRU 换页；
+  **粗粒度钉住**（不 per-tile `ref_count`，避免 `QImage*` 悬垂）+ 只在静默点 `trim`；
+  失败降级关换页。复制图层走 `sharePixelsFrom`（QImage COW）。见 [page-cache-plan.md](page-cache-plan.md)、
+  [layers/tiles-and-memory.md](layers/tiles-and-memory.md)。
 - **`ImageDocument`**：除尺寸/栈/活动层外，还有**分级信号**与**累计脏区**（`markDirty(rect)`），
   以及供 UI 使用的**语义化 setter**（`setLayerVisible/Opacity/Name/BlendMode`）。
 - 蒙版 `LayerMask`：**已实现** — 层局部 `Format_Grayscale8`；合成时 `alpha *= mask`（白显黑藏）；

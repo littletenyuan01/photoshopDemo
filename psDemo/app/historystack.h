@@ -56,9 +56,17 @@ public:
     /** 正在 pop 时禁止再 push（递归守卫）。 */
     void setApplying(bool on) { m_applying = on; }
 
+    /** undo 栈累计字节（供 PSLITE_MEM / 页缓存口径）。 */
+    quint64 undoBytes() const { return m_undoBytes; }
+    /** 超限丢最老 undo 的字节上限（默认 256MB；可调）。 */
+    quint64 byteLimit() const { return m_byteLimit; }
+    void setByteLimit(quint64 bytes);
+
 signals:
     /** undo/redo 栈或 canUndo/canRedo 状态变化时发出。 */
     void changed();
+    /** 因超限丢弃了最老 undo（至少一条）时发出。 */
+    void historyTrimmed(int droppedCount);
 
 private:
     /** 当 m_undoBytes 超过 m_byteLimit 时丢弃最老条目。 */

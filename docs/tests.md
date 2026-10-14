@@ -25,7 +25,7 @@ release\psdemo_tests.exe composite regionraster   :: 只跑指定用例
 
 ## 用例
 
-> 当前 **29+ 个用例**（含 GPU 条件项）：`… / c1pixelate / c1stylize / webexport` 等；完整列表见下表与 `testmain.cpp`。
+> 当前 **30+ 个用例**（含 GPU 条件项与 `tilecache`）；完整列表见下表与 `testmain.cpp`。
 
 | 名字 | 守住什么 |
 |---|---|
@@ -66,6 +66,7 @@ release\psdemo_tests.exe composite regionraster   :: 只跑指定用例
 | `c1stylize` | C1 风/等高线/径向/表面/特殊模糊/拼贴：上风向最大亮度 / 跨电平描边 / 旋转·缩放 / 保边均值·边缘模式 / 切块偏移 oracle；分块==整幅；往返 |
 | `webexport` | **存储为 Web**：JPEG 低质量体积更小；PNG 保留/去掉透明；50% 缩放尺寸；`exportWithOptions` / `exportFile` 写盘可回读 |
 | `psdio` | **PSD 子集**：自产文件导出→导入；层数/名/offset/混合/不透明度；合成 diffs=0 或 maxCh≤1 |
+| `tilecache` | **瓦片页缓存**（[page-cache-plan.md](page-cache-plan.md)）：预算 0 行为不变；换页往返 bit-exact；预算遵守（+1 瓦片余量）；LRU 最久未用先出；`FailingSwapStore` 降级；复制图层 `cacheKey` 共享（P4 COW）；派生缓存淘汰后投影可重算；`PSLITE_MEM` 快照字段；**P13** 换页开启未淘汰时 materialize 退化粗护栏 ≤25%（目标 ≤5%，实测写入计划文档） |
 
 ## 约定
 

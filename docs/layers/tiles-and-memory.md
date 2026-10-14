@@ -63,7 +63,9 @@ Layer(名, w, h)           ← TileBuffer 只记 W/H 与格数（尚无瓦片块
 
 `fill(透明)` 会 `clearTiles()`，与「逻辑全透明、释放块」一致。
 
-**尚未做**：GEGL 式全局共享 zero-tile COW、scratch 盘、投影分块缓存（见 Roadmap Phase 7）；面板尚无「新建时选填充类型」对话框（目前新建层固定等价透明填充）。
+**页缓存（已落地，默认关）**：`engine/cache/tilecache.*` + `swapstore.*`；`PSLITE_TILE_CACHE_MB>0` 才换页；粗粒度 `pin`、静默点 `trim`；失败降级关换页。详见 [page-cache-plan.md](../page-cache-plan.md)。复制图层走 `TileBuffer::sharePixelsFrom`（QImage COW），不 `materialize`。
+
+**尚未做**：GEGL 式全局共享 zero-tile；投影缓冲稀疏化；undo 瓦片化（计划明确不做 C 档）。面板尚无「新建时选填充类型」对话框（目前新建层固定等价透明填充）。
 
 ## 5. 关键代码
 

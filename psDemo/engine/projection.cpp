@@ -12,6 +12,8 @@
 #include "compositor.h"
 #include "domain/imagedocument.h"
 #include "domain/tilebuffer.h"
+#include "engine/cache/memstats.h"
+#include "engine/cache/tilecache.h"
 
 #include <QElapsedTimer>
 #include <QPair>
@@ -55,6 +57,17 @@ void Projection::invalidate()
     m_chunkValid.clear();
     m_chunkCols = 0;
     m_chunkRows = 0;
+}
+
+void Projection::invalidateChunkValidity()
+{
+    if (!m_chunkValid.isEmpty())
+        m_chunkValid.fill(false);
+}
+
+qint64 Projection::bufferBytes() const
+{
+    return m_buffer.isNull() ? 0 : qint64(m_buffer.sizeInBytes());
 }
 
 bool Projection::adoptImage(const QImage &image)
@@ -334,6 +347,11 @@ QRect Projection::sync(int maxMs)
         }
     }
 
+    // 静默点：投影同步后再 trim（绝不在 ensureTile 里淘汰）
+    TileCache::instance().trim(m_document, this);
+    maybeLogMem(captureMemSnapshot(m_document, this,
+                                   m_document ? &m_document->history() : nullptr));
+
     return painted;
 }
 
@@ -341,7 +359,9 @@ QRect Projection::processPendingChunks(int maxChunks, int maxMs)
 {
     if (!hasPendingChunks())
         return {};
-    return recomposeInvalidChunks(maxChunks, ScanMode::PriorityThenRest, maxMs);
+    const QRect painted = recomposeInvalidChunks(maxChunks, ScanMode::PriorityThenRest, maxMs);
+    TileCache::instance().trim(m_document, this);
+    return painted;
 }
 
 QRect Projection::flushPriority(int maxMs)

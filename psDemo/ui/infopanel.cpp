@@ -116,10 +116,7 @@ void InfoPanel::refreshDocumentMemory()
         const Ps::Layer *layer = stack.layerAt(i);
         if (!layer)
             continue;
-        layer->tiles().forEachAllocatedTile(
-            [&](int, int, const QImage &tile, const QRect &) {
-                used += qint64(tile.sizeInBytes());
-            });
+        used += layer->tiles().residentBytes();
     }
     const QImage &mask = m_document->selection().mask();
     if (!mask.isNull())

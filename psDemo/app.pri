@@ -45,6 +45,9 @@ SOURCES += \
     engine/backend/cpurasterbackend.cpp \
     engine/backend/gpurasterbackend.cpp \
     engine/backend/rasterscheduler.cpp \
+    engine/cache/swapstore.cpp \
+    engine/cache/tilecache.cpp \
+    engine/cache/memstats.cpp \
     engine/op/layermodeop.cpp \
     engine/op/boxblurfilterop.cpp \
     engine/op/embossfilterop.cpp \
@@ -183,6 +186,9 @@ HEADERS += \
     engine/backend/cpurasterbackend.h \
     engine/backend/gpurasterbackend.h \
     engine/backend/rasterscheduler.h \
+    engine/cache/swapstore.h \
+    engine/cache/tilecache.h \
+    engine/cache/memstats.h \
     engine/paintselectionclip.h \
     engine/painttypes.h \
     engine/premul.h \
