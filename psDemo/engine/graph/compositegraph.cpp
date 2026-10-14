@@ -209,17 +209,53 @@ GraphNode::Id CompositeGraph::build(PsGraph &graph, const ImageDocument &doc)
             continue;
         }
 
-        // 栅格层：ensureCompositeRaster 已烘焙滤镜 + 样式（含样式外扩 origin）
-        if (!layer->hasPixelData() && !layer->hasCompositePreview())
-            continue;
-        const Layer::CompositeRaster raster = layer->ensureCompositeRaster();
-        if (raster.image.isNull())
+        // 栅格层：有活动预览时与 Compositor 同口径（瓦片 + preview），否则整层烘焙（A33）
+        const bool hasPreview = layer->hasCompositePreview();
+        if (!layer->hasPixelData() && !hasPreview)
             continue;
 
-        const int docOx = layer->offsetX() + raster.originDx;
-        const int docOy = layer->offsetY() + raster.originDy;
+        QImage rasterImg;
+        int docOx = 0;
+        int docOy = 0;
+        if (hasPreview) {
+            // 合成层局部瓦片 + 文档坐标 preview → 一张栅格源
+            QRect cover = layer->boundsInDocument();
+            const QImage &prev = layer->compositePreview();
+            if (!prev.isNull()) {
+                cover = cover.united(QRect(layer->compositePreviewDocX(),
+                                           layer->compositePreviewDocY(),
+                                           prev.width(), prev.height()));
+            }
+            if (cover.isEmpty())
+                continue;
+            rasterImg = QImage(cover.size(), QImage::Format_ARGB32_Premultiplied);
+            rasterImg.fill(Qt::transparent);
+            if (layer->hasPixelData()) {
+                const QImage tiles = layer->materialize();
+                QPainter p(&rasterImg);
+                p.setCompositionMode(QPainter::CompositionMode_Source);
+                p.drawImage(layer->offsetX() - cover.left(),
+                            layer->offsetY() - cover.top(), tiles);
+            }
+            if (!prev.isNull()) {
+                QPainter p(&rasterImg);
+                p.setCompositionMode(QPainter::CompositionMode_SourceOver);
+                p.drawImage(layer->compositePreviewDocX() - cover.left(),
+                            layer->compositePreviewDocY() - cover.top(), prev);
+            }
+            docOx = cover.left();
+            docOy = cover.top();
+        } else {
+            const Layer::CompositeRaster raster = layer->ensureCompositeRaster();
+            if (raster.image.isNull())
+                continue;
+            rasterImg = raster.image;
+            docOx = layer->offsetX() + raster.originDx;
+            docOy = layer->offsetY() + raster.originDy;
+        }
+
         const GraphNode::Id src = graph.addNode(std::make_shared<SourceOp>(
-            std::make_shared<LayerRasterSource>(raster.image, docOx, docOy)));
+            std::make_shared<LayerRasterSource>(rasterImg, docOx, docOy)));
 
         const GraphNode::Id blend = graph.addNode(std::make_shared<BlendOp>(
             layer->blendMode(), layer->opacity(), makeMaskSource(layer)));

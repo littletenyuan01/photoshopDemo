@@ -88,10 +88,12 @@ public:
     void invalidateChunkValidity();
 
     /**
-     * 用整幅图像替换投影缓冲并标全部块有效。
-     * 供移动工具松手时把 live 无缝交给投影，避免「先消失再重算」。
+     * 用图像替换投影缓冲。尺寸须等于文档。
+     * @param coveredDoc 已覆盖的文档区域；空或盖住整幅 → 全部块有效；
+     *        否则仅 covered 内块有效，其余保持无效以便 idle 重算（A32）。
+     * 供移动/变换松手时把 live 无缝交给投影，避免「先消失再重算」。
      */
-    bool adoptImage(const QImage &image);
+    bool adoptImage(const QImage &image, const QRect &coveredDoc = QRect());
 
     /** 投影缓冲占用字节（空则为 0）。 */
     qint64 bufferBytes() const;

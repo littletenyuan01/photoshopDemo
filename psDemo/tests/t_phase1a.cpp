@@ -26,10 +26,13 @@
 #include "engine/paintengine.h"
 #include "engine/paintselectionclip.h"
 #include "engine/painttypes.h"
+#include "io/projectio.h"
 #include "io/rasterio.h"
 #include "testutil.h"
 #include "tools/croptool.h"
+#include "tools/movetool.h"
 #include "tools/tool.h"
+#include "tools/transformtool.h"
 #include "ui/canvassizedialog.h"
 
 #include <QBuffer>
@@ -665,6 +668,170 @@ int checkA20CanvasSizeHeightUnit(Reporter &r)
     return r.fails;
 }
 
+/** A27：变换会话期间删掉会话层，取消不得把还原写进别的层。 */
+int checkA27TransformSessionLayerIdentity(Reporter &r)
+{
+    struct StubVp : ViewPort {
+        void zoomAt(const QPointF &, qreal) override {}
+        void panBy(const QPointF &) override {}
+        void requestRepaint() override {}
+    } vp;
+
+    auto doc = ImageDocument::createBlank(32, 32, Qt::white);
+    QImage blue(32, 32, QImage::Format_ARGB32_Premultiplied);
+    blue.fill(qRgba(40, 40, 200, 255));
+    doc->placeImageAsLayer(blue, QStringLiteral("top"));
+    r.check(doc->layers().count() == 2, QStringLiteral("A27：两层"));
+    doc->setActiveLayerIndex(1);
+
+    const QRgb bottomBefore = doc->layers().layerAt(0)->materialize().pixel(8, 8);
+
+    ToolContext ctx;
+    ctx.document = doc.get();
+    ctx.viewZoom = 1.0;
+
+    TransformTool tool;
+    tool.activate(ctx, vp);
+    r.check(tool.isSessionActive(), QStringLiteral("A27：会话已开"));
+
+    r.check(doc->removeLayer(1), QStringLiteral("A27：删除会话层"));
+    tool.cancelFromUi(ctx);
+    r.check(!tool.isSessionActive(), QStringLiteral("A27：取消后会话结束"));
+
+    r.check(doc->layers().count() == 1, QStringLiteral("A27：只剩底层"));
+    const QRgb bottomAfter = doc->layers().layerAt(0)->materialize().pixel(8, 8);
+    r.check(bottomAfter == bottomBefore,
+            QStringLiteral("A27：取消未污染底层（%1→%2）")
+                .arg(bottomBefore, 0, 16).arg(bottomAfter, 0, 16));
+    return r.fails;
+}
+
+/** A29：无瓦片壳层存读须保留自身 extent，不得涨成画布尺寸。 */
+int checkA29EmptyLayerExtentRoundtrip(Reporter &r)
+{
+    QTemporaryDir dir;
+    r.check(dir.isValid(), QStringLiteral("A29：临时目录"));
+    if (!dir.isValid())
+        return r.fails;
+
+    auto doc = ImageDocument::createBlank(200, 200, Qt::white);
+    auto shell = std::make_unique<Layer>(QStringLiteral("shell"), 50, 40);
+    r.check(!shell->hasPixelData(), QStringLiteral("A29：壳层无瓦片"));
+    doc->addLayer(std::move(shell));
+    const int idx = doc->layers().count() - 1;
+    r.check(doc->layers().layerAt(idx)->width() == 50
+                && doc->layers().layerAt(idx)->height() == 40,
+            QStringLiteral("A29：保存前 extent 50×40"));
+
+    const QString path = dir.filePath(QStringLiteral("extent.pslite"));
+    QString err;
+    r.check(ProjectIo::save(*doc, path, &err),
+            QStringLiteral("A29：保存（%1）").arg(err));
+    auto loaded = ProjectIo::load(path, &err);
+    r.check(loaded != nullptr, QStringLiteral("A29：加载（%1）").arg(err));
+    if (!loaded)
+        return r.fails;
+    r.check(loaded->layers().count() >= 2, QStringLiteral("A29：加载后至少两层"));
+    const Layer *L = loaded->layers().layerAt(loaded->layers().count() - 1);
+    r.check(L && L->width() == 50 && L->height() == 40,
+            QStringLiteral("A29：读回 extent=%1×%2（期望 50×40）")
+                .arg(L ? L->width() : -1).arg(L ? L->height() : -1));
+    r.check(L && !L->hasPixelData(), QStringLiteral("A29：读回仍无瓦片"));
+    return r.fails;
+}
+
+/** A30：markDirty 须失效脏区相交层，而非只绑活动层。 */
+int checkA30MarkDirtyInvalidatesIntersecting(Reporter &r)
+{
+    auto doc = ImageDocument::createBlank(64, 64, QColor(200, 40, 40));
+    QImage top(64, 64, QImage::Format_ARGB32_Premultiplied);
+    top.fill(qRgba(40, 200, 40, 255));
+    doc->placeImageAsLayer(top, QStringLiteral("top"));
+
+    Layer *bottom = doc->layers().layerAt(0);
+    r.check(bottom != nullptr, QStringLiteral("A30：有底层"));
+    if (!bottom)
+        return r.fails;
+
+    const Layer::CompositeRaster before = bottom->ensureCompositeRaster();
+    r.check(!before.image.isNull(), QStringLiteral("A30：底层复合栅格已缓存"));
+    const QRgb cachedRed = before.image.pixel(4, 4);
+
+    // 绕过 Layer API 直接改瓦片（不主动失效复合缓存）
+    bottom->tiles().fill(QColor(40, 40, 200));
+    doc->setActiveLayerIndex(1);
+    doc->markDirty(bottom->boundsInDocument());
+
+    const Layer::CompositeRaster after = bottom->ensureCompositeRaster();
+    const QRgb rebuilt = after.image.pixel(4, 4);
+    r.check(rebuilt != cachedRed,
+            QStringLiteral("A30：markDirty 后底层复合缓存已按新像素重建"));
+    r.check(qBlue(rebuilt) > 150, QStringLiteral("A30：重建色偏蓝（实际 %1）").arg(rebuilt, 0, 16));
+    return r.fails;
+}
+
+/** A34：双线性在预乘空间插值（不透明白|透明 → 中点预乘 ≈128）。 */
+int checkA34PremulBilinear(Reporter &r)
+{
+    QImage src(2, 1, QImage::Format_ARGB32_Premultiplied);
+    src.fill(0);
+    src.setPixel(0, 0, qRgba(255, 255, 255, 255));
+    src.setPixel(1, 0, qRgba(0, 0, 0, 0));
+
+    TileBuffer tiles(1, 1);
+    QPointF dest[4] = {{0, 0}, {1, 0}, {1, 1}, {0, 1}};
+    // 源 [0,0]–[2,1] 映射到 dest [0,0]–[1,1] ⇒ 中心采样 src (1.0, 0.5)
+    const QRect dirty = PaintEngine::freeTransform(
+        tiles, QRect(0, 0, 2, 1), src, dest,
+        /*clearSource=*/false, PaintSelectionClip(),
+        TransformInterpolation::Bilinear);
+    r.check(!dirty.isEmpty(), QStringLiteral("A34：写出非空"));
+    const QImage out = tiles.materialize();
+    r.check(!out.isNull(), QStringLiteral("A34：可物化"));
+    if (out.isNull())
+        return r.fails;
+    const QRgb p = out.pixel(0, 0);
+    const int a = qAlpha(p);
+    const int red = qRed(p);
+    r.check(a >= 120 && a <= 136,
+            QStringLiteral("A34：中点 alpha≈128（实际 %1）").arg(a));
+    r.check(red >= 120 && red <= 136,
+            QStringLiteral("A34：中点预乘红≈128（实际 %1）").arg(red));
+    return r.fails;
+}
+
+/** A35：移动工具纯单击不压撤销。 */
+int checkA35MoveClickNoUndo(Reporter &r)
+{
+    struct StubVp : ViewPort {
+        void zoomAt(const QPointF &, qreal) override {}
+        void panBy(const QPointF &) override {}
+        void requestRepaint() override {}
+    } vp;
+
+    auto doc = ImageDocument::createBlank(64, 64, Qt::white);
+    ToolContext ctx;
+    ctx.document = doc.get();
+    ctx.viewZoom = 1.0;
+
+    const int depth0 = doc->history().undoDepth();
+    MoveTool tool;
+    ToolEvent press;
+    press.imagePos = QPointF(10, 10);
+    press.widgetPos = QPointF(10, 10);
+    press.button = Qt::LeftButton;
+    press.buttons = Qt::LeftButton;
+    tool.mousePress(press, ctx, vp);
+    ToolEvent release = press;
+    release.buttons = Qt::NoButton;
+    tool.mouseRelease(release, ctx, vp);
+
+    r.check(doc->history().undoDepth() == depth0,
+            QStringLiteral("A35：单击不增加 undo（%1→%2）")
+                .arg(depth0).arg(doc->history().undoDepth()));
+    return r.fails;
+}
+
 int tPhase1A()
 {
     Reporter r;
@@ -687,5 +854,10 @@ int tPhase1A()
     checkA24WindIsPositional(r);
     checkA25A26HistoryAccounting(r);
     checkA28ExportAtomic(r);
+    checkA27TransformSessionLayerIdentity(r);
+    checkA29EmptyLayerExtentRoundtrip(r);
+    checkA30MarkDirtyInvalidatesIntersecting(r);
+    checkA34PremulBilinear(r);
+    checkA35MoveClickNoUndo(r);
     return r.fails;
 }

@@ -59,9 +59,9 @@ CanvasView::CanvasView(QWidget *parent)
     connect(m_toolManager, &Ps::ToolManager::repaintRequested,
             this, qOverload<>(&QWidget::update));
     connect(m_toolManager, &Ps::ToolManager::liveProjectionCommitted,
-            this, [this](const QImage &image) {
-                // 移动松手：live 直接成为投影，块全有效，无「消失再出现」
-                if (m_projection.adoptImage(image) && m_document)
+            this, [this](const QImage &image, const QRect &coveredDoc) {
+                // 移动松手：live 写入投影；covered 外块保持无效以便 idle 重算（A32）
+                if (m_projection.adoptImage(image, coveredDoc) && m_document)
                     m_document->clearDirtyRect();
                 update();
             });

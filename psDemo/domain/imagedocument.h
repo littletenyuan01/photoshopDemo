@@ -264,14 +264,14 @@ public:
     /** 整文档 markDirty。 */
     void markDirty();
     /**
-     * **静默**标脏：与 `markDirty` 一样累计脏区、失效活动层的内容包围盒与复合栅格缓存，
+     * **静默**标脏：与 `markDirty` 一样累计脏区、失效与脏区相交层的内容包围盒与复合栅格缓存，
      * 但**不发** `pixelsChanged` / `contentChanged`。
      *
      * 【谁需要它】异步滤镜任务（`engine/layerfilterjob.*`）的收尾必须是
      * 「失效缓存 → 写区域缓存 → 一次性通知」这三步，顺序不能换：
      *  · 先 `markDirty` 会**同步**发 contentChanged，画布当场就会合成一次 —— 而此刻
      *    区域缓存还没写，于是刚挪到后台的那次重算又在 UI 线程上跑了一遍（白干）；
-     *  · 反过来「先写缓存、后标脏」也不行：`markDirty` 会失效活动层缓存，把刚写的清掉。
+     *  · 反过来「先写缓存、后标脏」也不行：`markDirty` 会失效相交层缓存，把刚写的清掉。
      * 故拆成「静默标脏 + 写缓存 + 自己通知」。
      */
     void markDirtyQuiet(const QRect &rect);

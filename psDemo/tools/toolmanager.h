@@ -97,7 +97,7 @@ signals:
     /** 吸管取背景色（透传）。 */
     void backgroundPicked(const QColor &color);
     /** live 预览定稿写入投影（透传）。 */
-    void liveProjectionCommitted(const QImage &image);
+    void liveProjectionCommitted(const QImage &image, const QRect &coveredDoc = QRect());
 
 private:
     /** 注册工具，key 取自 tool->id()。 */

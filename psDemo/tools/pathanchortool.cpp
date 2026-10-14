@@ -39,7 +39,8 @@ Qt::CursorShape PathAnchorTool::cursorShape() const
 
 bool PathAnchorTool::hasOverlay() const
 {
-    return m_hasPath;
+    // 始终允许 drawOverlay 自检文档真值，避免删路径后幽灵残留（A36）
+    return true;
 }
 
 qreal PathAnchorTool::tolDoc(const ToolContext &ctx) const
@@ -61,6 +62,17 @@ bool PathAnchorTool::loadActive(const ToolContext &ctx)
     m_docIndex = ctx.document->activePathIndex();
     m_hasPath = true;
     return true;
+}
+
+/** 叠加用：以文档路径栈为准（可见且仍存在），不画幽灵副本。 */
+const Path *PathAnchorTool::livePathForOverlay(const ToolContext &ctx) const
+{
+    if (!ctx.document || m_docIndex < 0)
+        return nullptr;
+    const Path *p = ctx.document->paths().pathAt(m_docIndex);
+    if (!p || p->isEmpty() || !p->visible)
+        return nullptr;
+    return p;
 }
 
 void PathAnchorTool::commit(const ToolContext &ctx, const QString &label)
@@ -122,13 +134,16 @@ bool PathAnchorTool::mousePress(const ToolEvent &e, const ToolContext &ctx, View
 
 void PathAnchorTool::drawOverlay(QPainter &painter, const ToolContext &ctx) const
 {
-    if (!m_hasPath)
+    const Path *live = livePathForOverlay(ctx);
+    if (!live)
         return;
+    const Path &path = *live; // 始终画文档真值，避免删/撤后幽灵（A36）
+
     painter.save();
     painter.setRenderHint(QPainter::Antialiasing, true);
 
     QPainterPath wpp;
-    for (const SubPath &sp : m_path.subPaths) {
+    for (const SubPath &sp : path.subPaths) {
         if (sp.anchors.isEmpty())
             continue;
         wpp.moveTo(ctx.imageToWidget(sp.anchors.first().point));
@@ -153,7 +168,7 @@ void PathAnchorTool::drawOverlay(QPainter &painter, const ToolContext &ctx) cons
     painter.setPen(pathPen);
     painter.drawPath(wpp);
 
-    for (const SubPath &sp : m_path.subPaths) {
+    for (const SubPath &sp : path.subPaths) {
         for (const PathAnchor &a : sp.anchors) {
             const QPointF c = ctx.imageToWidget(a.point);
             const QRectF box(c.x() - kAnchorHalf, c.y() - kAnchorHalf, kAnchorHalf * 2,

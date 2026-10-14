@@ -48,6 +48,7 @@ private:
 
     bool m_dragging = false;
     bool m_movingMaskOnly = false;
+    bool m_undoPushed = false; ///< 首次真实位移后再压撤销（A35）
     bool m_useLive = false;
     bool m_liveApplyAbove = false; ///< true：每帧对补丁 blend 上方栈（含调整层）
     bool m_belowFromSnapshot = false; ///< below 由投影挖洞而来（无调整层上方）

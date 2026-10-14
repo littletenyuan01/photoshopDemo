@@ -1,13 +1,13 @@
 # 一期代码审计：bug / 逻辑错误候选清单
 
-> 状态：**候选清单；A1–A26/A28 等已修，低危余项待续**　·　2026-10
+> 状态：**候选清单；A1–A36 已修，余 GPU #22**　·　2026-10
 > 方法：按 8 个子系统（domain / app / io / engine·op / engine·graph / backend·cache / tools / ui）并行深审，
 > 覆盖 **344 个真实源文件 / 47.8k 行**（已排除 `debug/`、`release/`、`build*/`、生成的 `moc_*`/`ui_*`）
 > ⚠️ **诚实声明**：本清单由并行审计产出，**其余条目尚未逐条人工复核**。`确定` 级也可能存在误报
 > （审计者可能读错了调用方）。**复核通过后才进 [pending-dev.md](pending-dev.md) 的缺陷台账并编号。**
 > 相关：[architecture.md](architecture.md)、[tech-notes.md](tech-notes.md)、[pending-dev.md](pending-dev.md)
 >
-> **已修**：A1–A26、A28。余下低危：A27、A29–A36；GPU #22。
+> **已修**：A1–A36。余下：GPU #22。
 
 ## 0. 总体判断
 
@@ -119,16 +119,16 @@ ROI 反向传播、`.pslite` append-only 参数块都经得起逐行核对。
 |---|---|---|
 | A25 | `DocumentGeomUndo` / `LayerStructureUndo` | **已修**：byteSize 计入 maskGray / 层蒙版（`phase1a`） |
 | A26 | `HistoryStack` | **已修**：`m_redoBytes` + `historyBytes()`；memstats 用合计（`phase1a`） |
-| A27 | `tools/transformtool.cpp:577` | 会话只缓存 `m_layerIndex`（`:352`），而会话从 Ctrl+T 起一直存活到 Enter/Esc，期间图层面板全程可用；`cancelSession`/`commitSession` 每次都重新 `layerAt(m_layerIndex)` **不校验是否还是进会话时那一层**。触发：图层 2 进入自由变换 → 删除/重排图层 → Esc ⇒ `:581-582` `layer->replaceFromImage(m_preSessionPixels)` 把**另一个图层**的整层像素+偏移盖上去；下标越界时 `commitSession` 在 `:612` 直接 `return false`，会话仍 active 而**源像素只存在于 `m_srcPixels`**，界面停在半途 |
+| A27 | `tools/transformtool.cpp` | **已修**：会话存 `m_sessionLayer*`，`resolveSessionLayer` 校验/重定位；删层后 cancel/commit 不写错层（`phase1a`） |
 | A28 | `RasterIo::writeEncoded` | **已修**：改 `QSaveFile + commit`（`phase1a`） |
-| A29 | `io/projectio.cpp:497` | 保存时若无瓦片就写长度 0 的 PNG（`:660-667`），文件里**没有该层宽高**；读取时空 PNG 走 `:496-497` 用**文档**宽高建层。但层 extent 本可≠画布（`LayerStack` 允许"有 extent 但没瓦片"：`TileBuffer::setFromImage` 遇整块全透明不分配瓦片，`domain/tilebuffer.cpp:264-275`，而 `m_width/m_height` 保留）⇒ 500×500 文档里"置入"一张 100×100 **全透明** PNG（层 100×100 无瓦片）→ 保存再打开 → 该层变成 500×500，`boundsInDocument`/变换框/后续蒙版尺寸全变 |
-| A30 | `domain/imagedocument.cpp:1175` | `markDirty`/`markDirtyQuiet` **只对 `activeLayer()`** 调 `invalidateContentBounds`/`invalidateCompositeRaster`。凡"写 A 层、活动层是 B"的路径都会留过期缓存：`tools/transformtool.cpp` 会话开始记 `m_layerIndex`（`:352`），若期间切走活动层，提交时 `markDocumentDirty`（`:665`）失效的是 B；A 若带样式或位置相关算子会走 `ensureCompositeRaster` 的整层缓存（`layer.cpp:214-238`）⇒ **继续显示变换前的像素**。把"谁失效谁"绑在 activeLayer 上是隐式约定 |
-| A31 | `engine/projection.cpp:276` | 串行分支会检查 `if (!Compositor::compositeRegion(...)) continue;`（`:283-285`）后才 `markChunksValid`，**并行分支在 `blockingMap` 里完全丢弃返回值**、事后无条件把每个 piece 标有效（`:275-278`）。`compositeRegion` 只在 dst 尺寸/格式与文档不一致时返回 false（`compositor.cpp:289-294`）⇒ 一旦出现"chunk 网格基于旧缓冲、文档尺寸已变"的窗口，会把**根本没被合成**的块标成有效，`hasPendingChunks()` 立刻变 false（`canvasview.cpp:1503-1504` 停掉 idle 定时器）⇒ 画布**永久保留旧/空块**。窗口存在的原因：网格只由 `ensureBuffer()`/`adoptImage()` 按**缓冲尺寸**建立（`:95-100`/`:85-86`），而 `recomposeInvalidChunks` 的 `full` 按**文档尺寸**现算（`:181`），且 `processPendingChunks()`/`flushPriority()`（`:358-372`）**都不调 `ensureBuffer()`** |
-| A32 | `engine/projection.cpp:85` | `adoptImage` 只校验"尺寸等于文档"，随后 `resetChunkGrid + m_chunkValid.fill(true)` 并返回 true，等于宣布"整幅投影就是这张图"，而调用方拿到 true 后立刻 `clearDirtyRect()`（`canvasview.cpp:64-65`）⇒ 没有"这张图是否真覆盖整幅文档当前状态"的校验也不留脏区。一旦传入的图只在子矩形内有效（`movetool.cpp:166-171` 的 `m_below/m_live` 正是只 `fillRect(work, transparent)`），**错像素被当成全图真相且不再重算**。现有唯一调用方需 `snapOk==false` 才走到，故不常触发，但契约极易被下一个调用方踩 |
-| A33 | `engine/graph/compositegraph.cpp:213` | `CompositeGraph::build` 的栅格层分支只用 `ensureCompositeRaster()` 的整层烘焙结果，**从不看 `layer->hasCompositePreview()`**；而生产路径 `compositor.cpp:226-243` 在 hasPreview 时会先叠瓦片再叠预览 ⇒ 只要某层存在活动预览（自由变换拖拽期间），`compositeViaGraph` 与 `composite` 就**不同**，违反 `compositor.h:79-84`/`docs/graph-engine.md:155` 的"逐像素一致"承诺。今天 `compositeViaGraph` 无生产调用方（仅自检），影响面是**护栏失效** |
-| A34 | `engine/op/freetransformop.cpp:113` | 采样先对每个 tap 解预乘（`:113`/`:152`），权重只取 `wx*wy`（`:114`，**不含 alpha**），最后再由 `premulFromFloat` 乘上插值出的 alpha（`:121→:78`）⇒ 算出的是 `(Σw·c)·(Σw·a)` 而正确口径是 `Σw·(c·a)`。核内 alpha 有变化就**偏小**：相邻"不透明白"与"a=0"各 w=0.5 时，正确预乘红=128，当前得 64（相当于边缘**被压暗一半**）。硬边不透明图不受影响，故 `t_transform` 用例照常绿 |
-| A35 | `tools/movetool.cpp:409` | press 中**无条件** `pushLayerOffsetUndo(index)`，而"是否真移动过"要到 mouseMove 才知道（`:428-429` `dx==dy==0` 直接 return）⇒ 纯单击（尤其 `:382-385` `pickLayerAt` 自动切活动层的单击）也压一条内容全等的 `LayerPropUndo`：Ctrl+Z 看起来"没反应"却消耗一步、**清空 redo 栈**、历史列表被空操作灌满。`paintbuckettool.cpp:45` 同一形状（先 push，`:70-74` 无脏区时直接返回） |
-| A36 | `tools/pathanchortool.cpp:42` | `m_path` 是活动路径的**副本**，只在 `mousePress` 里经 `loadActive` 刷新（`:60`），此后**无任何失效途径**（`hasOverlay` 只看 `m_hasPath`，`drawOverlay` 直接画 `m_path` 且忽略 `Path::visible`）⇒ 路径面板删除该路径、或 Ctrl+Z 撤销路径创建（`PathUndo::pop`）后，画布重绘仍画出**幽灵路径**的轮廓与锚点方框，直到用户在画布上再点一次；隐藏的路径同样照画 |
+| A29 | `io/projectio.cpp` | **已修**：`ProjectFormat::Current=5`，空 PNG 另存/读 `extentW/H`（`phase1a`） |
+| A30 | `domain/imagedocument.cpp` | **已修**：`markDirty`/`Quiet` 失效与脏区相交的层缓存（`phase1a`） |
+| A31 | `engine/projection.cpp` | **已修**：并行分支检查 `compositeRegion` 返回值；`processPendingChunks`/`flushPriority` 先 `ensureBuffer` |
+| A32 | `engine/projection.cpp` | **已修**：`adoptImage(image, coveredDoc)` 仅标 covered 内块有效；Move/Transform 传入覆盖区 |
+| A33 | `engine/graph/compositegraph.cpp` | **已修**：有 `compositePreview` 时与 Compositor 同口径叠瓦片+预览 |
+| A34 | `engine/op/freetransformop.cpp` | **已修**：双线性/双三次在预乘空间加权（`phase1a` 中点≈128） |
+| A35 | `tools/movetool.cpp` / `paintbuckettool.cpp` | **已修**：首次真实位移/有脏填充再压撤销（`phase1a`） |
+| A36 | `tools/pathanchortool.cpp` | **已修**：overlay 读文档真值并尊重 `visible`；已删/隐藏不画幽灵 |
 
 ## 4. 已知且仍未修（不重复编号）
 

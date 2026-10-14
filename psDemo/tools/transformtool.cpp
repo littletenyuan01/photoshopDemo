@@ -350,6 +350,7 @@ bool TransformTool::beginSession(const ToolContext &ctx)
         return false;
 
     m_layerIndex = ctx.document->activeLayerIndex();
+    m_sessionLayer = layer;
     // 扩层前整层快照：取消/提交都先回到此状态，避免 expand 泄漏
     m_preSessionPixels = layer->materialize();
     m_preSessionOx = layer->offsetX();
@@ -506,7 +507,7 @@ void TransformTool::updateLayerPreview(ImageDocument *doc)
 {
     if (!m_session || !doc || m_layerIndex < 0)
         return;
-    Layer *layer = doc->layers().layerAt(m_layerIndex);
+    Layer *layer = resolveSessionLayer(doc);
     if (!layer || m_srcPixels.isNull())
         return;
 
@@ -568,6 +569,23 @@ void TransformTool::updateLayerPreview(ImageDocument *doc)
     rebuildLive(mark.isEmpty() ? QRect(0, 0, doc->width(), doc->height()) : mark);
 }
 
+Layer *TransformTool::resolveSessionLayer(ImageDocument *doc)
+{
+    if (!doc || !m_sessionLayer)
+        return nullptr;
+    if (Layer *at = doc->layers().layerAt(m_layerIndex)) {
+        if (at == m_sessionLayer)
+            return at;
+    }
+    for (int i = 0; i < doc->layers().count(); ++i) {
+        if (doc->layers().layerAt(i) == m_sessionLayer) {
+            m_layerIndex = i;
+            return m_sessionLayer;
+        }
+    }
+    return nullptr; // 会话层已删
+}
+
 void TransformTool::cancelSession(const ToolContext &ctx, bool userExit)
 {
     if (!m_session)
@@ -576,7 +594,7 @@ void TransformTool::cancelSession(const ToolContext &ctx, bool userExit)
     m_drag = Handle::None;
     clearLive();
     if (ctx.document) {
-        if (Layer *layer = ctx.document->layers().layerAt(m_layerIndex)) {
+        if (Layer *layer = resolveSessionLayer(ctx.document)) {
             layer->clearCompositePreview();
             // 整层还原到进会话前（瓦片真相未在拖中被改过，除源矩形挖空）
             if (!m_preSessionPixels.isNull()) {
@@ -598,6 +616,7 @@ void TransformTool::cancelSession(const ToolContext &ctx, bool userExit)
     m_srcPixelsOriginal = QImage();
     m_preSessionPixels = QImage();
     m_preSrcLocal = QRect();
+    m_sessionLayer = nullptr;
     m_doc = nullptr;
     clearSessionHistory();
     emit sessionChanged(false);
@@ -610,15 +629,33 @@ bool TransformTool::commitSession(const ToolContext &ctx)
 {
     if (!m_session || !ctx.document || m_layerIndex < 0)
         return false;
-    Layer *layer = ctx.document->layers().layerAt(m_layerIndex);
-    if (!layer)
+    Layer *layer = resolveSessionLayer(ctx.document);
+    if (!layer) {
+        // 会话层已不在栈中：丢弃会话态，勿按下标写别层
+        m_session = false;
+        m_drag = Handle::None;
+        clearLive();
+        m_lifted = false;
+        m_previewDirtyDoc = {};
+        m_srcPixels = QImage();
+        m_srcPixelsOriginal = QImage();
+        m_preSessionPixels = QImage();
+        m_preSrcLocal = QRect();
+        m_sessionLayer = nullptr;
+        m_doc = nullptr;
+        clearSessionHistory();
+        emit sessionChanged(false);
+        emit returnToMoveRequested();
         return false;
+    }
 
     layer->clearCompositePreview();
 
     // 先 adopt live 到投影，避免松手瞬间回落到旧投影再重算（对照 MoveTool finishDrag）
-    if (m_useLive && !m_live.isNull())
-        emit liveProjectionCommitted(m_live);
+    if (m_useLive && !m_live.isNull()) {
+        const QRect full(0, 0, ctx.document->width(), ctx.document->height());
+        emit liveProjectionCommitted(m_live, full);
+    }
     clearLive();
 
     // 还原进会话前几何 → push → 再扩层 + 正式栅格化
@@ -675,6 +712,7 @@ bool TransformTool::commitSession(const ToolContext &ctx)
     m_srcPixelsOriginal = QImage();
     m_preSessionPixels = QImage();
     m_preSrcLocal = QRect();
+    m_sessionLayer = nullptr;
     m_doc = nullptr;
     m_drag = Handle::None;
     clearSessionHistory();

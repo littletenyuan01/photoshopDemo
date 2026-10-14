@@ -21,7 +21,7 @@ class ImageDocument;
  * 仅 Current；不兼容变更时改此值。滤镜参数块大小见 projectio.cpp `kFilterNodeParamBytes`。
  */
 enum class ProjectFormat : quint32 {
-    Current = 4, ///< v4：图层段后追加路径栈；v3 = 滤镜 1024B 参数块、无路径段
+    Current = 5, ///< v5：空 PNG 层另存 extent 宽高；v4 = 路径栈；v3 = 滤镜 1024B 参数块
 };
 
 /**
@@ -31,7 +31,8 @@ enum class ProjectFormat : quint32 {
  *
  * 格式：单文件 `.pslite`（魔数 PSLT + QDataStream）
  * - 魔数、ProjectFormat、文档宽高、活动层
- * - 每层：名 / 显隐 / 不透明度 / 混合 / offset + PNG 像素（无瓦片则长度 0）
+ * - 每层：名 / 显隐 / 不透明度 / 混合 / offset + PNG 像素
+ *   （无瓦片：长度 0，随后 qint32 extentW/extentH，可≠画布）
  *   + 样式栈 + 可选蒙版 + 链接路径 + kind + 滤镜栈
  *   （滤镜：count × {op, enabled, 固定长度参数 blob，尾部预留填 0}）
  * - 选区：灰度 PNG（空选区则长度 0）

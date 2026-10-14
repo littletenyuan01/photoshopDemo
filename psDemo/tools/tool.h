@@ -120,10 +120,10 @@ signals:
     /** 吸管 Alt+单击取到背景色。 */
     void backgroundPicked(const QColor &color);
     /**
-     * 拖拽 live 预览定稿：画布应写入 Projection 并标块有效（无缝交接）。
-     * 对照移动松手后投影已是最终画面，不必再闪一帧旧缓冲。
+     * 拖拽 live 预览定稿：画布应写入 Projection（无缝交接）。
+     * @param coveredDoc 图像中已合成有效的文档区域；空 = 整幅可信（A32）。
      */
-    void liveProjectionCommitted(const QImage &image);
+    void liveProjectionCommitted(const QImage &image, const QRect &coveredDoc = QRect());
 
 protected:
     /**

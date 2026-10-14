@@ -48,39 +48,6 @@ inline QRgb pixelAt(const QImage &src, int x, int y)
     return reinterpret_cast<const QRgb *>(src.constScanLine(y))[x];
 }
 
-/** 解预乘到 float rgba [0,1]。 */
-inline void unpremul(QRgb p, qreal *r, qreal *g, qreal *b, qreal *a)
-{
-    const int ai = qAlpha(p);
-    *a = ai / 255.0;
-    if (ai <= 0) {
-        *r = *g = *b = 0.0;
-        return;
-    }
-    *r = qRed(p) / 255.0;
-    *g = qGreen(p) / 255.0;
-    *b = qBlue(p) / 255.0;
-    // 预乘 → 直通色
-    *r /= *a;
-    *g /= *a;
-    *b /= *a;
-}
-
-inline QRgb premulFromFloat(qreal r, qreal g, qreal b, qreal a)
-{
-    a = qBound(0.0, a, 1.0);
-    if (a <= 1e-8)
-        return 0;
-    r = qBound(0.0, r, 1.0);
-    g = qBound(0.0, g, 1.0);
-    b = qBound(0.0, b, 1.0);
-    const int ai = int(a * 255.0 + 0.5);
-    const int ri = int(r * a * 255.0 + 0.5);
-    const int gi = int(g * a * 255.0 + 0.5);
-    const int bi = int(b * a * 255.0 + 0.5);
-    return qRgba(ri, gi, bi, ai);
-}
-
 QRgb sampleNearest(const QImage &src, qreal sx, qreal sy)
 {
     const int x = clampi(int(qFloor(sx)), 0, src.width() - 1);
@@ -102,6 +69,7 @@ QRgb sampleBilinear(const QImage &src, qreal sx, qreal sy)
     const qreal fx = x - x0;
     const qreal fy = y - y0;
 
+    // 在预乘空间加权：Σw·(c·a)，而非 (Σw·c)·(Σw·a)（A34）
     qreal r = 0, g = 0, b = 0, a = 0;
     for (int j = 0; j < 2; ++j) {
         const qreal wy = (j == 0) ? (1.0 - fy) : fy;
@@ -109,16 +77,22 @@ QRgb sampleBilinear(const QImage &src, qreal sx, qreal sy)
         for (int i = 0; i < 2; ++i) {
             const qreal wx = (i == 0) ? (1.0 - fx) : fx;
             const int xx = clampi(x0 + i, 0, w - 1);
-            qreal pr, pg, pb, pa;
-            unpremul(pixelAt(src, xx, yy), &pr, &pg, &pb, &pa);
+            const QRgb p = pixelAt(src, xx, yy);
             const qreal wgt = wx * wy;
-            r += pr * wgt;
-            g += pg * wgt;
-            b += pb * wgt;
-            a += pa * wgt;
+            r += (qRed(p) / 255.0) * wgt;
+            g += (qGreen(p) / 255.0) * wgt;
+            b += (qBlue(p) / 255.0) * wgt;
+            a += (qAlpha(p) / 255.0) * wgt;
         }
     }
-    return premulFromFloat(r, g, b, a);
+    a = qBound(0.0, a, 1.0);
+    if (a <= 1e-8)
+        return 0;
+    const int ai = int(a * 255.0 + 0.5);
+    const int ri = int(qBound(0.0, r, 1.0) * 255.0 + 0.5);
+    const int gi = int(qBound(0.0, g, 1.0) * 255.0 + 0.5);
+    const int bi = int(qBound(0.0, b, 1.0) * 255.0 + 0.5);
+    return qRgba(ri, gi, bi, ai);
 }
 
 /** 双三次：4×4 邻域 × Keys 立方核。 */
@@ -137,6 +111,7 @@ QRgb sampleBicubic(const QImage &src, qreal sx, qreal sy)
     const qreal fx = x - x0;
     const qreal fy = y - y0;
 
+    // 预乘空间加权（与双线性同口径，A34）
     qreal r = 0, g = 0, b = 0, a = 0;
     for (int j = -1; j <= 2; ++j) {
         const qreal wy = cubicWeight(fy - j);
@@ -148,16 +123,26 @@ QRgb sampleBicubic(const QImage &src, qreal sx, qreal sy)
             if (wx == 0.0)
                 continue;
             const int xx = clampi(x0 + i, 0, w - 1);
-            qreal pr, pg, pb, pa;
-            unpremul(pixelAt(src, xx, yy), &pr, &pg, &pb, &pa);
+            const QRgb p = pixelAt(src, xx, yy);
             const qreal wgt = wx * wy;
-            r += pr * wgt;
-            g += pg * wgt;
-            b += pb * wgt;
-            a += pa * wgt;
+            r += (qRed(p) / 255.0) * wgt;
+            g += (qGreen(p) / 255.0) * wgt;
+            b += (qBlue(p) / 255.0) * wgt;
+            a += (qAlpha(p) / 255.0) * wgt;
         }
     }
-    return premulFromFloat(r, g, b, a);
+    a = qBound(0.0, a, 1.0);
+    if (a <= 1e-8)
+        return 0;
+    // 三次核可能短暂越界，钳制预乘通道
+    r = qBound(0.0, r, a);
+    g = qBound(0.0, g, a);
+    b = qBound(0.0, b, a);
+    const int ai = int(a * 255.0 + 0.5);
+    const int ri = int(r * 255.0 + 0.5);
+    const int gi = int(g * 255.0 + 0.5);
+    const int bi = int(b * 255.0 + 0.5);
+    return qRgba(ri, gi, bi, ai);
 }
 
 QRgb sample(const QImage &src, qreal sx, qreal sy, TransformInterpolation interp)

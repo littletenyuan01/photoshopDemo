@@ -493,10 +493,20 @@ std::unique_ptr<ImageDocument> loadDocumentBody(QDataStream &in,
         const QString layerName = name.isEmpty()
                                       ? QObject::tr("图层 %1").arg(i + 1)
                                       : name;
-        // 空 PNG = 无瓦片壳层（调整层 / 透明新建）
+        // 空 PNG = 无瓦片壳层（调整层 / 透明新建）；随后读 extent（可≠画布）
         std::unique_ptr<Layer> layer;
         if (png.isEmpty()) {
-            layer = std::make_unique<Layer>(layerName, width, height);
+            qint32 layerW = 0;
+            qint32 layerH = 0;
+            in >> layerW >> layerH;
+            if (in.status() != QDataStream::Ok
+                || layerW <= 0 || layerH <= 0
+                || layerW > 32768 || layerH > 32768) {
+                if (errorMessage)
+                    *errorMessage = QObject::tr("图层 %1 extent 无效").arg(i);
+                return nullptr;
+            }
+            layer = std::make_unique<Layer>(layerName, layerW, layerH);
         } else {
             const QImage pixels = pngBytesToImage(png);
             if (pixels.isNull()) {
@@ -671,6 +681,15 @@ bool ProjectIo::save(const ImageDocument &doc, const QString &filePath,
             if (errorMessage)
                 *errorMessage = QObject::tr("写入图层像素失败");
             return false;
+        }
+        // 无瓦片时 PNG 不含尺寸；显式写 extent（A29）
+        if (png.isEmpty()) {
+            out << qint32(layer->width()) << qint32(layer->height());
+            if (out.status() != QDataStream::Ok) {
+                if (errorMessage)
+                    *errorMessage = QObject::tr("写入图层 extent 失败");
+                return false;
+            }
         }
         if (!writeLayerStyles(out, layer->styles())) {
             if (errorMessage)

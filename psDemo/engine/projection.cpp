@@ -70,7 +70,7 @@ qint64 Projection::bufferBytes() const
     return m_buffer.isNull() ? 0 : qint64(m_buffer.sizeInBytes());
 }
 
-bool Projection::adoptImage(const QImage &image)
+bool Projection::adoptImage(const QImage &image, const QRect &coveredDoc)
 {
     if (image.isNull() || !m_document)
         return false;
@@ -83,7 +83,16 @@ bool Projection::adoptImage(const QImage &image)
         m_buffer = image.convertToFormat(QImage::Format_ARGB32_Premultiplied);
 
     resetChunkGrid(m_buffer.size());
-    m_chunkValid.fill(true);
+    const QRect full(0, 0, m_document->width(), m_document->height());
+    const QRect covered = coveredDoc.isNull() ? full : coveredDoc.intersected(full);
+    if (covered.isEmpty()) {
+        m_chunkValid.fill(false);
+    } else if (covered.contains(full)) {
+        m_chunkValid.fill(true);
+    } else {
+        m_chunkValid.fill(false);
+        markChunksValid(covered);
+    }
     return true;
 }
 
@@ -256,15 +265,20 @@ QRect Projection::recomposeInvalidChunks(int maxChunks, ScanMode mode, int maxMs
             break;
 
         if (take >= 2 && threads > 1) {
-            QVector<QRect> pieces;
-            pieces.reserve(take);
+            struct PieceJob {
+                QRect rect;
+                bool ok = false;
+            };
+            QVector<PieceJob> jobs;
+            jobs.reserve(take);
             for (int k = 0; k < take; ++k)
-                pieces.append(chunkRectAt(cand[start + k].first, cand[start + k].second, full));
+                jobs.append({chunkRectAt(cand[start + k].first, cand[start + k].second, full),
+                             false});
 
             QElapsedTimer batchClock;
             batchClock.start();
-            QtConcurrent::blockingMap(pieces, [this](const QRect &piece) {
-                Compositor::compositeRegion(m_buffer, *m_document, piece);
+            QtConcurrent::blockingMap(jobs, [this](PieceJob &job) {
+                job.ok = Compositor::compositeRegion(m_buffer, *m_document, job.rect);
             });
             // 只用「足够大」的批次更新估计：小批次被固定开销主导，会把估计越推越高
             if (take >= threads) {
@@ -273,9 +287,11 @@ QRect Projection::recomposeInvalidChunks(int maxChunks, ScanMode mode, int maxMs
                     qBound(0.05, 0.7 * m_msPerChunkParallel + 0.3 * per, 2.0);
             }
 
-            for (const QRect &piece : pieces) {
-                markChunksValid(piece);
-                painted = painted.isNull() ? piece : painted.united(piece);
+            for (const PieceJob &job : jobs) {
+                if (!job.ok)
+                    continue;
+                markChunksValid(job.rect);
+                painted = painted.isNull() ? job.rect : painted.united(job.rect);
             }
         } else {
             for (int k = 0; k < take; ++k) {
@@ -358,6 +374,11 @@ QRect Projection::sync(int maxMs)
 
 QRect Projection::processPendingChunks(int maxChunks, int maxMs)
 {
+    if (!m_document)
+        return {};
+    // A31：与 sync 一样先对齐缓冲/网格，避免按旧尺寸标有效
+    if (!ensureBuffer(QSize(m_document->width(), m_document->height())))
+        return {};
     if (!hasPendingChunks())
         return {};
     const QRect painted = recomposeInvalidChunks(maxChunks, ScanMode::PriorityThenRest, maxMs);
@@ -367,6 +388,10 @@ QRect Projection::processPendingChunks(int maxChunks, int maxMs)
 
 QRect Projection::flushPriority(int maxMs)
 {
+    if (!m_document)
+        return {};
+    if (!ensureBuffer(QSize(m_document->width(), m_document->height())))
+        return {};
     if (!hasPendingChunks())
         return {};
     return recomposeInvalidChunks(-1, ScanMode::PriorityOnly, maxMs);

@@ -168,9 +168,13 @@ private:
     void clearSessionHistory();
     bool cornersDiffer(const QPointF a[4], const QPointF b[4]) const;
 
+    /** 按指针校验会话层仍在栈中；删层/重排后避免写错下标。 */
+    Layer *resolveSessionLayer(ImageDocument *doc);
+
     bool m_session = false;
     bool m_lifted = false;  ///< 源像素已从层上提起（未进 HistoryStack）
     int m_layerIndex = -1;
+    Layer *m_sessionLayer = nullptr; ///< 进会话时的层身份（A27；下标可变）
     ImageDocument *m_doc = nullptr; ///< 会话期文档（选项栏改参时刷新预览用）
     QRect m_srcLocal;       ///< 源矩形（层内）
     QImage m_srcPixels;     ///< 会话快照（预览与提交共用；拖拽只改四角/矩阵）

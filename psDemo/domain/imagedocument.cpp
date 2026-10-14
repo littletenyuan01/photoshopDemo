@@ -1179,7 +1179,22 @@ void ImageDocument::replaceSelectionMask(const QImage &mask)
     emit selectionChanged();
 }
 
-/** 累计脏区；像素改动时使活动层内容包围盒与复合栅格缓存失效。 */
+/** 失效与脏区相交的层缓存（A30：勿只绑 activeLayer）。 */
+static void invalidateLayersIntersecting(LayerStack &layers, const QRect &area)
+{
+    for (int i = 0; i < layers.count(); ++i) {
+        Layer *layer = layers.layerAt(i);
+        if (!layer)
+            continue;
+        const QRect bounds = layer->styleBoundsInDocument();
+        if (bounds.isEmpty() || bounds.intersects(area)) {
+            layer->invalidateContentBounds();
+            layer->invalidateCompositeRaster();
+        }
+    }
+}
+
+/** 累计脏区；像素改动时使相交层内容包围盒与复合栅格缓存失效。 */
 void ImageDocument::markDirty(const QRect &rect)
 {
     if (rect.isEmpty())
@@ -1188,10 +1203,7 @@ void ImageDocument::markDirty(const QRect &rect)
     m_dirty = true;
     m_dirtyRect = m_dirtyRect.isNull() ? rect : m_dirtyRect.united(rect);
 
-    if (Layer *layer = activeLayer()) {
-        layer->invalidateContentBounds();
-        layer->invalidateCompositeRaster();
-    }
+    invalidateLayersIntersecting(m_layers, rect);
 
     emit pixelsChanged(rect);
     emit contentChanged();
@@ -1211,10 +1223,7 @@ void ImageDocument::markDirtyQuiet(const QRect &rect)
     m_dirty = true;
     m_dirtyRect = m_dirtyRect.isNull() ? rect : m_dirtyRect.united(rect);
 
-    if (Layer *layer = activeLayer()) {
-        layer->invalidateContentBounds();
-        layer->invalidateCompositeRaster();
-    }
+    invalidateLayersIntersecting(m_layers, rect);
 }
 
 void ImageDocument::setLayerVisible(int index, bool visible)

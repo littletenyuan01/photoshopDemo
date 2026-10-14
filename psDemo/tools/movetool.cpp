@@ -314,7 +314,7 @@ void MoveTool::finishDrag(ImageDocument *doc)
 
     // adopt 后再清 live：CanvasView 同步处理信号，同一帧内投影已更新
     if (m_useLive && !m_live.isNull()) {
-        emit liveProjectionCommitted(m_live);
+        emit liveProjectionCommitted(m_live, m_stackRect);
         if (doc)
             doc->clearDirtyRect();
     } else if (doc) {
@@ -327,6 +327,7 @@ void MoveTool::finishDrag(ImageDocument *doc)
 
     clearLive();
     m_layerIndex = -1;
+    m_undoPushed = false;
 }
 
 void MoveTool::drawOverlay(QPainter &painter, const ToolContext &ctx) const
@@ -391,6 +392,7 @@ bool MoveTool::mousePress(const ToolEvent &event, const ToolContext &ctx, ViewPo
     const int index = ctx.document->activeLayerIndex();
     m_dragging = true;
     m_movingMaskOnly = false;
+    m_undoPushed = false;
     m_layerIndex = index;
     m_lastImagePos = event.imagePos;
     clearLive();
@@ -401,12 +403,10 @@ bool MoveTool::mousePress(const ToolEvent &event, const ToolContext &ctx, ViewPo
         && layer->mask() && !layer->mask()->isNull()
         && !layer->mask()->isLinked()) {
         m_movingMaskOnly = true;
-        ctx.document->pushLayerPropertiesUndo(index, QObject::tr("移动蒙版"));
+        // A35：首次真实位移再压撤销
         emit repaintRequested();
         return true;
     }
-
-    ctx.document->pushLayerOffsetUndo(index);
 
     if (buildLiveStacks(ctx.document, index, ctx.projectionSnapshot, ctx.visibleDocRect))
         rebuildLive(ctx.document); // 内部只刷层占位 ROI，不整幅滤镜
@@ -427,6 +427,14 @@ bool MoveTool::mouseMove(const ToolEvent &event, const ToolContext &ctx, ViewPor
     const int dy = qRound(event.imagePos.y() - m_lastImagePos.y());
     if (dx == 0 && dy == 0)
         return true;
+
+    if (!m_undoPushed) {
+        if (m_movingMaskOnly)
+            ctx.document->pushLayerPropertiesUndo(m_layerIndex, QObject::tr("移动蒙版"));
+        else
+            ctx.document->pushLayerOffsetUndo(m_layerIndex);
+        m_undoPushed = true;
+    }
 
     if (m_movingMaskOnly) {
         ctx.document->shiftLayerMask(m_layerIndex, dx, dy);

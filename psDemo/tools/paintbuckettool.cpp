@@ -42,9 +42,6 @@ bool PaintBucketTool::mousePress(const ToolEvent &event, const ToolContext &ctx,
         || seed.x() >= layer->width() || seed.y() >= layer->height())
         return false;
 
-    ctx.document->pushLayerPixelsUndo(ctx.document->activeLayerIndex(),
-                                      QObject::tr("油漆桶"));
-
     // fill-mode：FG / BG（PATTERN 对应 GIMP_BUCKET_FILL_PATTERN，未实现 → 回退前景）
     QColor fill = ctx.foreground;
     switch (ctx.fillSource) {
@@ -67,13 +64,23 @@ bool PaintBucketTool::mousePress(const ToolEvent &event, const ToolContext &ctx,
     clip.layerOffsetY = layer->offsetY();
     const bool hadSelection = !ctx.document->selection().isEmpty();
 
-    const QRect dirtyLocal = PaintEngine::floodFill(layer->tiles(), seed, fill,
-                                                    ctx.fillTolerance, ctx.fillContiguous,
-                                                    clip);
+    // A35：先试填；无脏区则不压撤销（也不清 redo）。有脏区则还原→push→再填。
+    const QImage before = layer->materialize();
+    QRect dirtyLocal = PaintEngine::floodFill(layer->tiles(), seed, fill,
+                                              ctx.fillTolerance, ctx.fillContiguous,
+                                              clip);
     if (dirtyLocal.isEmpty())
-        return true; // 已消费点击，只是无需改像素
+        return true;
 
-    // 脏区映回文档坐标
+    layer->replaceFromImage(before);
+    ctx.document->pushLayerPixelsUndo(ctx.document->activeLayerIndex(),
+                                      QObject::tr("油漆桶"));
+    dirtyLocal = PaintEngine::floodFill(layer->tiles(), seed, fill,
+                                        ctx.fillTolerance, ctx.fillContiguous,
+                                        clip);
+    if (dirtyLocal.isEmpty())
+        return true;
+
     markDocumentDirty(ctx, dirtyLocal.translated(layer->offsetX(), layer->offsetY()));
 
     // 填充用完选区后取消（本 Demo 约定；PS 默认保留选区）

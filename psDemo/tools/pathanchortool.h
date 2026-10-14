@@ -30,6 +30,8 @@ private:
     qreal tolDoc(const ToolContext &ctx) const;
     bool loadActive(const ToolContext &ctx);
     void commit(const ToolContext &ctx, const QString &label);
+    /** 文档栈中仍存在且可见的路径；已删/隐藏则 nullptr（A36）。 */
+    const Path *livePathForOverlay(const ToolContext &ctx) const;
 
     Path m_path;
     int m_docIndex = -1;
