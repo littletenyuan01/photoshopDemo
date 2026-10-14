@@ -1,14 +1,13 @@
 # 一期代码审计：bug / 逻辑错误候选清单
 
-> 状态：**候选清单；A1/A2/A5 已复核并修复**　·　2026-10
+> 状态：**候选清单；高危 A1–A7/A10 已复核并修复（其余待续）**　·　2026-10
 > 方法：按 8 个子系统（domain / app / io / engine·op / engine·graph / backend·cache / tools / ui）并行深审，
 > 覆盖 **344 个真实源文件 / 47.8k 行**（已排除 `debug/`、`release/`、`build*/`、生成的 `moc_*`/`ui_*`）
 > ⚠️ **诚实声明**：本清单由并行审计产出，**其余条目尚未逐条人工复核**。`确定` 级也可能存在误报
 > （审计者可能读错了调用方）。**复核通过后才进 [pending-dev.md](pending-dev.md) 的缺陷台账并编号。**
 > 相关：[architecture.md](architecture.md)、[tech-notes.md](tech-notes.md)、[pending-dev.md](pending-dev.md)
 >
-> **已修**：A1（`freetransformop` + `t_phase1a`）、A2（`pushLayerPixelsUndo` 跟踪蒙版）、
-> A5（`TileSharedReadGuard`：并行前钉住+预加载，shared-read 期间禁 touch/换页）
+> **已修**：A1、A2、A4（预览包围盒∩文档）、A5、A6、A7、A10（`boundLayer`）；回归 `phase1a` / `filterpanel`
 
 ## 0. 总体判断
 
@@ -62,15 +61,10 @@ ROI 反向传播、`.pslite` append-only 参数块都经得起逐行核对。
 - **验证**：在 `t_filterasync` 区域缓存段后加：先记 `contentGeneration()`，`translateLayer(1,10,0,false)` 后断言世代号前进
   且 `regionFilterCovers(bounds)==false`（**当前两条都红**）。
 
-### A4 —— 自由变换预览按未求交的包围盒分配工作缓冲（可 OOM）`确定`
-- **位置**：`tools/transformtool.cpp:528`（`TileBuffer work(destDoc.width(), destDoc.height())`）、
-  `:502`（`previewDestDoc` 只取四角包围盒，从不与文档求交）、`engine/op/freetransformop.cpp:249`（再分配同尺寸 patch）、
-  `:259`（**无 null 检查**就写 `patch.scanLine()`）
-- **问题**：事件坐标不做裁剪（`ui/canvasview.cpp:1535` 只减偏移除缩放），位移直接加到四角（`:729/:802`）。
-  最小缩放 5%（`canvasview.cpp:349`）⇒ 1 控件像素 = 20 文档像素。把变换框拖出视图 1000~2000 控件像素：
-  `destDoc` 可达 ~4 万×3508 ≈ 1.4 亿像素 ⇒ 单帧 **~560MB 工作瓦片 + ~560MB patch**，且拖拽中每帧重来。
-- **验证**：`transformtool.cpp:528` 前加 `qDebug() << destDoc;`，把缩放拉到 5%、Ctrl+T 拖角出视图，
-  断言 `destDoc` 必须已与 `QRect(0,0,doc->width(),doc->height())` 求交（**当前不会**）。
+### A4 —— 自由变换预览按未求交的包围盒分配工作缓冲（可 OOM）`已修`
+- **位置**：`tools/transformtool.cpp`（`updateLayerPreview`）
+- **问题**：`previewDestDoc` 只取四角包围盒，从不与文档求交 ⇒ 拖出视图可分配数亿像素工作缓冲。
+- **修复**：`destDoc = previewDestDoc().intersected(文档矩形)`；空则清预览返回。
 
 ### A5 —— 分块并行合成让 worker 线程并发读瓦片，而瓦片读写无锁共享状态（数据竞争）`已修`
 - **位置**：`engine/projection.cpp`（`blockingMap`）、`engine/compositor.cpp`（`blendLayerRangeParallel`）、
@@ -83,24 +77,15 @@ ROI 反向传播、`.pslite` append-only 参数块都经得起逐行核对。
   `makeResident` 在非驻留时 `Q_ASSERT`；`m_clock` 改为 `atomic`。接入 `Projection` 分块路径与
   `Compositor::blendLayerRangeParallel`。回归：`t_phase1a` A5（换页 + 并行/串行 bit-exact）。
 
-### A6 —— 直线工具向左/向上画线不绘制 `确定`
-- **位置**：`engine/op/shapefillop.cpp:104`（`:100-103` 刻意保留非 normalized 矩形以取真实端点、`:131-132` 用 `left/top`、`right/bottom`）
-- **问题**：同一个非 normalized 的 `QRectF` 又被用来算包围盒。`QRectF::adjusted` 不改符号；
-  宽或高为负时 `toAlignedRect()` 得到 `ymax<ymin`，`QRect::isEmpty()` 为真 ⇒ `bounds` 为空 ⇒ `:105-106` 直接 `return {}`，
-  **既不绘制也不返回脏矩形**。工具侧确实会传非 normalized 矩形（`tools/shapetool.cpp:204-207/231-234`）。
-- **验证**：`PaintEngine::drawShape(..., ShapeKind::Line, QRectF(QPointF(30,20), QPointF(10,10)), ...)`，
-  断言返回脏矩形非空且线上有像素（**当前返回空矩形**）。手动：从右下往左上拖一条线，松手后画布上没有任何内容。
+### A6 —— 直线工具向左/向上画线不绘制 `已修`
+- **位置**：`engine/op/shapefillop.cpp`
+- **问题**：非 normalized 的 `QRectF` 被用来算包围盒 ⇒ 向左/上拖时 `bounds` 为空，不绘制。
+- **修复**：包围盒一律 `m_rect.normalized()`；端点仍用原始 `left/top/right/bottom`。回归：`phase1a` A6。
 
-### A7 —— `.pslite` 路径锚点数无上限 ⇒ 坏文件把 load 拖成近无限循环直到 OOM `确定`
-- **位置**：`domain/path.cpp:481`（`for (qint32 i = 0; i < nA; ++i)`）、`:475`（`nSub` 同理）、
-  触发点 `io/projectio.cpp:609-616`（`Path::read` 返回后才查 `in.status()`）
-- **问题**：`Path::read` 直接用文件里的 `nSub/nA` 当循环次数，循环体内**既不检查 `in.status()` 也不设上限**，
-  每轮还执行 `sp.anchors.append(a)`。`QDataStream` 在 EOF 后每次读取立即失败但**循环照样跑满** ⇒
-  一个把 `nA` 声明为 `0x7FFFFFFF` 的文件会让进程在几十秒内吃光内存（`PathAnchor` ≈80B × 2^31 ≈ **160GB**）后 `bad_alloc` 被杀。
-- **旁证**：同子系统**其它所有**来自文件的计数都有硬上限（图层 ≤4096 `:467`、样式 ≤64 `:55`、滤镜 ≤64 `:377`、
-  路径数 ≤4096 `:604`、PNG blob ≤512MB `:446`）——唯独路径内部计数漏了，**不像有意省略**。
-- **验证**：复制一份正常 `.pslite`，把某路径段的 `nA`（4 字节）改成 `0x7FFFFFFF` 后 `ProjectIo::load`，观察内存曲线。
-- **修法**：`Path::read` 内每轮/每层检查 `in.status()` 并给 `nSub/nA` 设上限；用例钉住"声明 2^31 必须立刻失败且不分配"。
+### A7 —— `.pslite` 路径锚点数无上限 ⇒ 坏文件把 load 拖成近无限循环直到 OOM `已修`
+- **位置**：`domain/path.cpp`（`Path::read`）
+- **问题**：`nSub/nA` 无上限、不查流状态 ⇒ 声明 `0x7FFFFFFF` 锚点可 OOM。
+- **修复**：`nSub≤4096`、`nA≤65536`，循环内查 `in.status()`，超限/`ReadCorruptData` 立即返回空路径。回归：`phase1a` A7。
 
 ### A8 —— 撤销图像/画布大小、裁剪后选区 mask 与文档尺寸失配 `确定`
 - **位置**：`app/undoitem.cpp:342`（`DocumentGeomUndo::pop`）、`domain/selection.cpp:64-77`（`replaceFromImage` 会缩放成**当前** mask 尺寸）、
@@ -130,14 +115,10 @@ ROI 反向传播、`.pslite` append-only 参数块都经得起逐行核对。
   断言 `live(area) == Compositor::composite(doc)(area)`（**现在 diffs>0**）。
   把 L2 换成点算子后同一断言通过 ⇒ 证明是**分支不对称**而非算子问题。
 
-### A10 —— 非模态滤镜对话框用可变成员定位目标层，会写进另一图层 `可疑`
-- **位置**：`ui/filterstackwidget.cpp:195`（`m_layer`）、`:96-101`（`setContext` 会改 `m_layer`）、`:190-210`（`dlg->show()` 非模态）
-- **问题**：`onEdit` 只捕获了 `index` 与 `original`，却用**成员** `m_layer` 定位目标层。
-  对话框非模态 ⇒ 打开期间用户可切图层，`PropertiesPanel::refreshFromDocument → setContext` 把 `m_layer` 改掉。
-  此后三个槽全部"读新 `m_layer`、配旧 `index`"：预览写进另一层；确定把节点提交到另一层（并压 undo）；
-  **取消更严重** —— 把从原层读来的 `original` 写回另一层同一槽位 ⇒ **静默改掉另一层的滤镜参数**，而面板刷新后显示的是另一层，用户看不出异常。
-- **验证**：两层各放一个滤镜；编辑 A 层滤镜（不关对话框）→ 点选 B 层 → 松手/点取消 → 检查 B 层第 0 个滤镜参数是否被改。
-  最快断言：`onEdit` 里 `const int boundLayer = m_layer;`，三个 lambda 顶部 `Q_ASSERT(m_layer == boundLayer)`。
+### A10 —— 非模态滤镜对话框用可变成员定位目标层，会写进另一图层 `已修`
+- **位置**：`ui/filterstackwidget.cpp`（`onEdit`）
+- **问题**：非模态期间 `setContext` 改 `m_layer` ⇒ Cancel 把 A 的 `original` 写进 B。
+- **修复**：捕获 `boundLayer`（对照 `MainWindow::runFilterDialog`）。回归：`filterpanel` A10。
 
 ## 2. 中危（明显逻辑错）
 
@@ -190,10 +171,10 @@ ROI 反向传播、`.pslite` append-only 参数块都经得起逐行核对。
 | 1 | **A1** | ~~椭圆/旋转变换不可逆抹像素~~ | **已修**（`phase1a`） |
 | 2 | **A2** | ~~蒙版永久丢失~~ | **已修**（`phase1a`） |
 | 3 | **A5** | ~~并行读瓦片数据竞争~~ | **已修**（`TileSharedReadGuard` + `phase1a`） |
-| 4 | **A10** | 非模态对话框**静默改掉另一层**的滤镜参数 | 手动：编辑 A 层滤镜→切 B 层→点取消 |
+| 4 | **A10** | ~~非模态对话框写错层~~ | **已修**（`filterpanel`） |
 
 **第二步：改动小、收益明确的稳定性修补**
-A4（与文档求交，防 OOM）、A7（计数上限，防坏文件 OOM）、A6（直线不绘制）、A20（死控件）
+~~A4 / A6 / A7~~ **已修**；下一项：**A20**（死控件）、以及 A3/A8/A9 等
 
 **第三步**：其余按"用户能否撞到"排序，**不要一次全修**。
 

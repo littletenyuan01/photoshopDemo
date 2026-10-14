@@ -4,10 +4,13 @@
  * A1：自由变换 + 非矩形选区抹掉外接框内选区外像素
  * A2：扩层类像素 undo 不带蒙版 ⇒ 撤销后蒙版变全白
  * A5：并行合成前钉住/预加载瓦片，换页开启时与串行逐像素一致
+ * A6：向左/上拖直线须能绘制
+ * A7：Path::read 对超大 nA 立即失败且不巨量分配
  */
 #include "domain/imagedocument.h"
 #include "domain/layer.h"
 #include "domain/layermask.h"
+#include "domain/path.h"
 #include "domain/selection.h"
 #include "domain/tilebuffer.h"
 #include "engine/cache/swapstore.h"
@@ -15,10 +18,14 @@
 #include "engine/compositor.h"
 #include "engine/paintengine.h"
 #include "engine/paintselectionclip.h"
+#include "engine/painttypes.h"
 #include "testutil.h"
 
+#include <QBuffer>
 #include <QColor>
+#include <QDataStream>
 #include <QImage>
+#include <QIODevice>
 #include <QPointF>
 #include <QRect>
 #include <QThreadPool>
@@ -227,11 +234,60 @@ int checkA5ParallelSharedRead(Reporter &r)
     return r.fails;
 }
 
+/** A6：非 normalized 直线矩形（向左上拖）须返回非空脏区且线上有像素。 */
+int checkA6LineUpLeft(Reporter &r)
+{
+    TileBuffer tiles(64, 64);
+    tiles.fill(Qt::transparent);
+    const QRect dirty = PaintEngine::fillShape(
+        tiles, ShapeKind::Line, QRectF(QPointF(30, 20), QPointF(10, 10)),
+        QColor(255, 0, 0, 255), /*fill=*/false, /*stroke=*/true, /*strokeWidth=*/2.0);
+    r.check(!dirty.isEmpty(), QStringLiteral("A6：向左上画线返回非空脏区"));
+    const QImage img = tiles.materialize();
+    int painted = 0;
+    for (int y = 0; y < 64; ++y) {
+        for (int x = 0; x < 64; ++x) {
+            if (qAlpha(img.pixel(x, y)) > 0)
+                ++painted;
+        }
+    }
+    r.check(painted > 0, QStringLiteral("A6：线上有不透明像素（count=%1）").arg(painted));
+    return r.fails;
+}
+
+/** A7：声明超大锚点数必须立刻 Corrupt，且不把内存撑爆。 */
+int checkA7PathReadCap(Reporter &r)
+{
+    QByteArray blob;
+    {
+        QBuffer buf(&blob);
+        buf.open(QIODevice::WriteOnly);
+        QDataStream out(&buf);
+        out.setVersion(QDataStream::Qt_6_0);
+        out << QStringLiteral("bad") << quint8(1) << qint32(1); // 1 subpath
+        out << quint8(0) << qint32(0x7FFFFFFF);                 // nA = 2^31-1
+        // 不写任何锚点载荷
+    }
+
+    QBuffer inBuf(&blob);
+    inBuf.open(QIODevice::ReadOnly);
+    QDataStream in(&inBuf);
+    in.setVersion(QDataStream::Qt_6_0);
+    const Path path = Path::read(in);
+    r.check(in.status() != QDataStream::Ok,
+            QStringLiteral("A7：超大 nA 后流状态非 Ok"));
+    r.check(path.subPaths.isEmpty(),
+            QStringLiteral("A7：损坏路径不返回半截数据"));
+    return r.fails;
+}
+
 int tPhase1A()
 {
     Reporter r;
     checkA1FreeTransformClip(r);
     checkA2MaskSurvivesExpandUndo(r);
     checkA5ParallelSharedRead(r);
+    checkA6LineUpLeft(r);
+    checkA7PathReadCap(r);
     return r.fails;
 }

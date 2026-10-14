@@ -467,21 +467,38 @@ void Path::write(QDataStream &out) const
 
 Path Path::read(QDataStream &in)
 {
+    // A7：nSub/nA 必须有硬上限并检查流状态，否则坏文件可声明 2^31 锚点拖到 OOM
+    constexpr qint32 kMaxSubPaths = 4096;
+    constexpr qint32 kMaxAnchorsPerSub = 65536;
+
     Path path;
     quint8 vis = 1;
     qint32 nSub = 0;
     in >> path.name >> vis >> nSub;
+    if (in.status() != QDataStream::Ok || nSub < 0 || nSub > kMaxSubPaths) {
+        in.setStatus(QDataStream::ReadCorruptData);
+        return Path();
+    }
     path.visible = (vis != 0);
     for (qint32 s = 0; s < nSub; ++s) {
         SubPath sp;
         quint8 closed = 0;
         qint32 nA = 0;
         in >> closed >> nA;
+        if (in.status() != QDataStream::Ok || nA < 0 || nA > kMaxAnchorsPerSub) {
+            in.setStatus(QDataStream::ReadCorruptData);
+            return Path();
+        }
         sp.closed = (closed != 0);
+        sp.anchors.reserve(nA);
         for (qint32 i = 0; i < nA; ++i) {
             PathAnchor a;
             quint8 inEx = 0, outEx = 0, corner = 0;
             in >> a.point >> a.inHandle >> a.outHandle >> inEx >> outEx >> corner;
+            if (in.status() != QDataStream::Ok) {
+                in.setStatus(QDataStream::ReadCorruptData);
+                return Path();
+            }
             a.inExplicit = (inEx != 0);
             a.outExplicit = (outEx != 0);
             a.corner = (corner != 0);

@@ -179,7 +179,9 @@ void FilterStackWidget::onEdit()
     const int index = currentIndex();
     if (!m_doc || index < 0)
         return;
-    Ps::Layer *layer = m_doc->layers().layerAt(m_layer);
+    // A10：非模态期间 setContext 会改 m_layer；三个槽必须钉住打开时的层下标（对照 MainWindow::runFilterDialog）
+    const int boundLayer = m_layer;
+    Ps::Layer *layer = m_doc->layers().layerAt(boundLayer);
     if (!layer || index >= layer->filters().count())
         return;
 
@@ -190,19 +192,19 @@ void FilterStackWidget::onEdit()
     auto *dlg = new FilterDialog(this);
     dlg->setAttribute(Qt::WA_DeleteOnClose);
     dlg->setNode(original);
-    connect(dlg, &FilterDialog::previewChanged, this, [this, index](const Ps::FilterNode &n) {
+    connect(dlg, &FilterDialog::previewChanged, this, [this, boundLayer, index](const Ps::FilterNode &n) {
         if (m_doc)
-            m_doc->setLayerFilterNodePreview(m_layer, index, n, QRect());
+            m_doc->setLayerFilterNodePreview(boundLayer, index, n, QRect());
     });
-    connect(dlg, &QDialog::accepted, this, [this, index, dlg]() {
-        if (m_doc && m_doc->setLayerFilterNode(m_layer, index, dlg->node(), /*pushUndo=*/true)) {
+    connect(dlg, &QDialog::accepted, this, [this, boundLayer, index, dlg]() {
+        if (m_doc && m_doc->setLayerFilterNode(boundLayer, index, dlg->node(), /*pushUndo=*/true)) {
             refresh();
             emit stackChanged();
         }
     });
-    connect(dlg, &QDialog::rejected, this, [this, index, original]() {
+    connect(dlg, &QDialog::rejected, this, [this, boundLayer, index, original]() {
         // 取消：预览只刷过可见区，屏幕外仍是预览值 ⇒ 必须用整层标脏把原参数写回去
-        if (m_doc && m_doc->setLayerFilterNode(m_layer, index, original, /*pushUndo=*/false)) {
+        if (m_doc && m_doc->setLayerFilterNode(boundLayer, index, original, /*pushUndo=*/false)) {
             refresh();
             emit stackChanged();
         }

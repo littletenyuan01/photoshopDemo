@@ -96,11 +96,9 @@ QRect ShapeFillOp::process(OpContext &ctx)
     const QRect layerRect(0, 0, tiles.width(), tiles.height());
 
     const qreal pad = m_stroke ? (m_strokeWidth * 0.5 + 2.0) : 2.0;
-    QRectF geom = m_rect.normalized();
-    if (m_kind == ShapeKind::Line) {
-        // 直线：m_rect 的对角为两端点（不必 normalized 交换语义）
-        geom = QRectF(m_rect.topLeft(), m_rect.bottomRight());
-    }
+    // 包围盒必须用 normalized（A6：向左/上拖直线时宽高为负，非 normalized 的 toAlignedRect 为空）
+    // 直线端点仍取自原始 m_rect.left/top/right/bottom（见下方 p0/p1），不被 normalize 交换
+    const QRectF geom = m_rect.normalized();
     QRect bounds = geom.adjusted(-pad, -pad, pad, pad).toAlignedRect().intersected(layerRect);
     if (bounds.isEmpty())
         return {};

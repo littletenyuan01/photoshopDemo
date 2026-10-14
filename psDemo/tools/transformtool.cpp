@@ -510,7 +510,9 @@ void TransformTool::updateLayerPreview(ImageDocument *doc)
     if (!layer || m_srcPixels.isNull())
         return;
 
-    const QRect destDoc = previewDestDoc();
+    // A4：与文档求交，避免拖出视图时分配数亿像素工作缓冲
+    const QRect destDoc =
+        previewDestDoc().intersected(QRect(0, 0, doc->width(), doc->height()));
     const QRect oldDirty = m_previewDirtyDoc;
 
     if (destDoc.isEmpty() || destDoc.width() <= 0 || destDoc.height() <= 0) {
@@ -524,7 +526,7 @@ void TransformTool::updateLayerPreview(ImageDocument *doc)
         return;
     }
 
-    // 工作缓冲 = 目标包围盒；四角映射到缓冲局部坐标（不碰层 extent）
+    // 工作缓冲 = 目标包围盒∩文档；四角映射到缓冲局部坐标（不碰层 extent）
     TileBuffer work(destDoc.width(), destDoc.height());
     QPointF destLocal[4];
     for (int i = 0; i < 4; ++i) {

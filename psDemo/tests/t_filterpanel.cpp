@@ -12,8 +12,10 @@
 #include "engine/op/opname.h"
 #include "engine/projection.h"
 #include "testutil.h"
+#include "ui/filterdialog.h"
 #include "ui/filterstackwidget.h"
 
+#include <QDialog>
 #include <QListWidget>
 #include <QPushButton>
 
@@ -140,6 +142,53 @@ int tFilterPanel()
                     .arg(list2 ? list2->count() : -1));
         auto *edit2 = p2.findChild<QPushButton *>(QStringLiteral("btnFilterEdit"));
         r.check(edit2 && !edit2->isEnabled(), QStringLiteral("无滤镜时编辑按钮禁用"));
+    }
+
+    // —— A10：编辑 A 层滤镜时切到 B 层再取消，不得把 A 的原参数写进 B ——
+    {
+        auto docA = ImageDocument::createBlank(W, H, Qt::white);
+        docA->placeImageAsLayer(PsTests::makeLayerImage(W, H, 3, 255), QStringLiteral("A"));
+        docA->placeImageAsLayer(PsTests::makeLayerImage(W, H, 5, 255), QStringLiteral("B"));
+        Layer *layerA = docA->layers().layerAt(1);
+        Layer *layerB = docA->layers().layerAt(2);
+        r.check(layerA && layerB, QStringLiteral("A10：两像素层就绪"));
+        if (layerA && layerB) {
+            FilterNode fa(OpName::BoxBlur);
+            fa.setBlurRadius(3);
+            FilterNode fb(OpName::BoxBlur);
+            fb.setBlurRadius(9);
+            docA->setActiveLayerIndex(1);
+            docA->addLayerFilter(fa, /*pushUndo=*/false);
+            docA->setActiveLayerIndex(2);
+            docA->addLayerFilter(fb, /*pushUndo=*/false);
+
+            FilterStackWidget pA;
+            pA.setContext(docA.get(), 1);
+            auto *listA = pA.findChild<QListWidget *>(QStringLiteral("filterList"));
+            auto *editA = pA.findChild<QPushButton *>(QStringLiteral("btnFilterEdit"));
+            r.check(listA && editA && listA->count() == 1,
+                    QStringLiteral("A10：A 层面板有 1 个滤镜"));
+            if (listA && editA) {
+                listA->setCurrentRow(0);
+                editA->click();
+                auto *dlg = pA.findChild<FilterDialog *>();
+                r.check(dlg != nullptr, QStringLiteral("A10：编辑对话框已打开"));
+                if (dlg) {
+                    // 模拟切层：PropertiesPanel 会 setContext(B)
+                    pA.setContext(docA.get(), 2);
+                    dlg->reject();
+                    r.check(layerB->filters().count() == 1
+                                && layerB->filters().at(0).blurRadius() == 9,
+                            QStringLiteral("A10：取消后 B 层半径仍为 9（实际 %1）")
+                                .arg(layerB->filters().count() > 0
+                                         ? layerB->filters().at(0).blurRadius()
+                                         : -1));
+                    r.check(layerA->filters().count() == 1
+                                && layerA->filters().at(0).blurRadius() == 3,
+                            QStringLiteral("A10：A 层半径仍为 3"));
+                }
+            }
+        }
     }
 
     return r.fails;
