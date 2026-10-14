@@ -85,17 +85,25 @@ void Layer::setOffset(int x, int y)
 
 void Layer::setOffsetSilent(int x, int y)
 {
+    if (m_offsetX == x && m_offsetY == y)
+        return;
     m_offsetX = x;
     m_offsetY = y;
+    // A3：区域滤镜缓存是文档坐标，offset 变了必须丢弃并作废在途任务
+    clearRegionFilterResult();
+    ++m_contentGeneration;
 }
 
 void Layer::translate(int dx, int dy)
 {
     // 只改数值；广播由 ImageDocument::translateLayer 按脏区统一发
+    // 复合栅格是层局部可保留；区域滤镜缓存是文档坐标（A3）必须失效
     if (dx == 0 && dy == 0)
         return;
     m_offsetX += dx;
     m_offsetY += dy;
+    clearRegionFilterResult();
+    ++m_contentGeneration;
 }
 
 QPointF Layer::toLayerLocal(const QPointF &imagePos) const

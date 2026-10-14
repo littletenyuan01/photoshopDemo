@@ -102,7 +102,7 @@ const Case kCases[] = {
     { "pentool", "钢笔工具：落点/控制柄/修饰键/弯度/撤销", tPenTool },
     { "pathtree", "路径树：新建删除/选区互转/撤销", tPathTree },
     { "tilecache", "瓦片页缓存：往返 bit-exact / 预算 / LRU / 失败降级 / COW 复制", tTileCache },
-    { "phase1a", "phase1-audit A1/A2/A5/A6/A7：选区/蒙版/并行瓦片/直线/路径上限", tPhase1A },
+    { "phase1a", "phase1-audit A1–A8 高危回归（选区/蒙版/平移缓存/并行瓦片/直线/路径）", tPhase1A },
 };
 
 } // namespace

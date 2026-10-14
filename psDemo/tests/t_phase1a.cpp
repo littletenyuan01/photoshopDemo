@@ -6,6 +6,8 @@
  * A5：并行合成前钉住/预加载瓦片，换页开启时与串行逐像素一致
  * A6：向左/上拖直线须能绘制
  * A7：Path::read 对超大 nA 立即失败且不巨量分配
+ * A3：平移图层须失效文档坐标区域滤镜缓存
+ * A8：撤销裁剪后选区 mask 须与文档同尺寸
  */
 #include "domain/imagedocument.h"
 #include "domain/layer.h"
@@ -255,6 +257,56 @@ int checkA6LineUpLeft(Reporter &r)
     return r.fails;
 }
 
+/** A3：translate 后 regionFilter 缓存失效且世代前进。 */
+int checkA3TranslateInvalidatesRegionFilter(Reporter &r)
+{
+    auto doc = ImageDocument::createBlank(64, 64, Qt::white);
+    Layer *layer = doc->activeLayer();
+    r.check(layer != nullptr, QStringLiteral("A3：有活动层"));
+    if (!layer)
+        return r.fails;
+
+    const QRect bounds = layer->boundsInDocument();
+    QImage fake(bounds.size(), QImage::Format_ARGB32_Premultiplied);
+    fake.fill(qRgba(10, 20, 30, 255));
+    layer->setRegionFilterResult(bounds, fake);
+    r.check(layer->regionFilterCovers(bounds), QStringLiteral("A3：写入后缓存覆盖"));
+
+    const quint32 genBefore = layer->contentGeneration();
+    doc->translateLayer(0, 10, 0, /*emitContent=*/false);
+    r.check(layer->contentGeneration() > genBefore,
+            QStringLiteral("A3：平移后 contentGeneration 前进"));
+    r.check(!layer->regionFilterCovers(bounds),
+            QStringLiteral("A3：平移后旧文档矩形不再命中缓存"));
+    r.check(!layer->regionFilterCovers(layer->boundsInDocument()),
+            QStringLiteral("A3：平移后区域滤镜缓存已清空"));
+    return r.fails;
+}
+
+/** A8：裁剪后 undo，选区 mask 尺寸须等于文档尺寸。 */
+int checkA8SelectionSizeAfterCropUndo(Reporter &r)
+{
+    auto doc = ImageDocument::createBlank(400, 400, Qt::white);
+    doc->selectRectangle(QRect(0, 0, 400, 400), ChannelOp::Replace);
+    r.check(doc->selection().mask().size() == QSize(400, 400),
+            QStringLiteral("A8：裁剪前选区 400×400"));
+
+    doc->cropTo(QRect(0, 0, 200, 200));
+    r.check(doc->width() == 200 && doc->height() == 200, QStringLiteral("A8：已裁到 200"));
+    r.check(doc->selection().mask().size() == QSize(200, 200),
+            QStringLiteral("A8：裁剪后选区随文档变 200"));
+
+    doc->undo();
+    r.check(doc->width() == 400 && doc->height() == 400, QStringLiteral("A8：undo 后文档 400"));
+    r.check(doc->selection().mask().size() == QSize(doc->width(), doc->height()),
+            QStringLiteral("A8：undo 后选区与文档同尺寸（mask=%1×%2 doc=%3×%4）")
+                .arg(doc->selection().mask().width())
+                .arg(doc->selection().mask().height())
+                .arg(doc->width())
+                .arg(doc->height()));
+    return r.fails;
+}
+
 /** A7：声明超大锚点数必须立刻 Corrupt，且不把内存撑爆。 */
 int checkA7PathReadCap(Reporter &r)
 {
@@ -286,8 +338,10 @@ int tPhase1A()
     Reporter r;
     checkA1FreeTransformClip(r);
     checkA2MaskSurvivesExpandUndo(r);
+    checkA3TranslateInvalidatesRegionFilter(r);
     checkA5ParallelSharedRead(r);
     checkA6LineUpLeft(r);
     checkA7PathReadCap(r);
+    checkA8SelectionSizeAfterCropUndo(r);
     return r.fails;
 }

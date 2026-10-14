@@ -339,6 +339,8 @@ void DocumentGeomUndo::pop(ImageDocument &doc)
 
     doc.m_width = m_width;
     doc.m_height = m_height;
+    // A8：先按恢复后的文档尺寸重建 mask，再填回快照（replaceFromImage 只会缩放到「当前」mask 尺寸）
+    doc.m_selection.reset(m_width, m_height);
     doc.m_selection.replaceFromImage(m_selectionMask);
 
     for (LayerState &st : m_layers) {

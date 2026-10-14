@@ -1,13 +1,13 @@
 # 一期代码审计：bug / 逻辑错误候选清单
 
-> 状态：**候选清单；高危 A1–A7/A10 已复核并修复（其余待续）**　·　2026-10
+> 状态：**候选清单；高危 A1–A8/A10 已复核并修复（其余待续）**　·　2026-10
 > 方法：按 8 个子系统（domain / app / io / engine·op / engine·graph / backend·cache / tools / ui）并行深审，
 > 覆盖 **344 个真实源文件 / 47.8k 行**（已排除 `debug/`、`release/`、`build*/`、生成的 `moc_*`/`ui_*`）
 > ⚠️ **诚实声明**：本清单由并行审计产出，**其余条目尚未逐条人工复核**。`确定` 级也可能存在误报
 > （审计者可能读错了调用方）。**复核通过后才进 [pending-dev.md](pending-dev.md) 的缺陷台账并编号。**
 > 相关：[architecture.md](architecture.md)、[tech-notes.md](tech-notes.md)、[pending-dev.md](pending-dev.md)
 >
-> **已修**：A1、A2、A4（预览包围盒∩文档）、A5、A6、A7、A10（`boundLayer`）；回归 `phase1a` / `filterpanel`
+> **已修**：A1–A8、A10；回归 `phase1a` / `filterpanel`。未修高危余下见正文（A9 等）。
 
 ## 0. 总体判断
 
@@ -48,18 +48,10 @@ ROI 反向传播、`.pslite` append-only 参数块都经得起逐行核对。
 - **验证**：64×64 单层 + `addLayerMask` 并把左半涂黑 → 记 mask 快照 → 模拟变换提交（push undo + expand + `replaceFromImage(74×74)`）
   → `undo()` → 断言 mask 与快照逐字节相同 —— **已修**：`pushLayerPixelsUndo` 始终跟踪蒙版。
 
-### A3 —— 区域滤镜缓存是文档坐标，但平移图层不失效它（图层"跳回原位"）`确定`
-- **位置**：`domain/layer.cpp:250`（命中判定与取子图）、`layer.cpp:92-99`（`Layer::translate`）、
-  `domain/imagedocument.cpp:1257-1265`（`translateLayer`，注释明说"平移不改像素，勿走 `markDirty`"）
-- **问题**：`m_regionFilterRect/m_regionFilterImage`（`layer.h:336-337` 注释写明**文档坐标**）由 `LayerFilterJob`
-  按**快照时刻的 offset** 写入；但改 offset 的两条路径**都不失效它**，`contentGeneration` 也只在
-  `invalidateCompositeRaster` 里自增 ⇒ 平移既不清缓存、也不作废在途任务。
-  注释给的理由只对**层局部**的 `m_compositeRaster` 成立，对**文档坐标**的区域缓存不成立。
-- **触发**：对某层跑过重滤镜（异步定稿把区域缓存写成整层矩形）→ 移动工具拖动该层（live 路径 `finishDrag` 不发 `markDirty`、
-  还清掉 dirtyRect，`tools/movetool.cpp:316-326`）→ 此后任何整幅 dirty（Ctrl+Z、增删层、切显隐）让投影重算该块
-  → 命中旧缓存 → **图层回到移动前的位置**。
-- **验证**：在 `t_filterasync` 区域缓存段后加：先记 `contentGeneration()`，`translateLayer(1,10,0,false)` 后断言世代号前进
-  且 `regionFilterCovers(bounds)==false`（**当前两条都红**）。
+### A3 —— 区域滤镜缓存是文档坐标，但平移图层不失效它（图层"跳回原位"）`已修`
+- **位置**：`domain/layer.cpp`（`translate` / `setOffsetSilent`）
+- **问题**：区域滤镜缓存是文档坐标；改 offset 不清缓存 ⇒ 合成命中旧位置。
+- **修复**：`translate`/`setOffsetSilent` 调用 `clearRegionFilterResult` 并 `++contentGeneration`（复合栅格仍保留）。回归：`phase1a` A3。
 
 ### A4 —— 自由变换预览按未求交的包围盒分配工作缓冲（可 OOM）`已修`
 - **位置**：`tools/transformtool.cpp`（`updateLayerPreview`）
@@ -87,16 +79,10 @@ ROI 反向传播、`.pslite` append-only 参数块都经得起逐行核对。
 - **问题**：`nSub/nA` 无上限、不查流状态 ⇒ 声明 `0x7FFFFFFF` 锚点可 OOM。
 - **修复**：`nSub≤4096`、`nA≤65536`，循环内查 `in.status()`，超限/`ReadCorruptData` 立即返回空路径。回归：`phase1a` A7。
 
-### A8 —— 撤销图像/画布大小、裁剪后选区 mask 与文档尺寸失配 `确定`
-- **位置**：`app/undoitem.cpp:342`（`DocumentGeomUndo::pop`）、`domain/selection.cpp:64-77`（`replaceFromImage` 会缩放成**当前** mask 尺寸）、
-  `domain/imagedocument.cpp:1508/1563/1649`（三个正向入口）
-- **问题**：pop 先把文档尺寸写回旧值，再用 `replaceFromImage` 恢复选区 —— 而它**不按文档尺寸重建 mask**，
-  把旧 mask 缩放/裁剪成**操作后新尺寸**。于是撤销后文档回到旧尺寸、选区仍是新尺寸（**违反 `selection.h:58/125` 的"与文档同尺寸"不变量**）。
-- **后果**：① 选区是被最近邻重采样的错内容且只覆盖左上角；`Selection::value` 越界返回 0 ⇒
-  填充/描边/反选/变换 clip 被静默裁掉。② 任何按**文档尺寸**造 shapeMask 的路径会被 `selection.cpp:231-232` 的尺寸守卫直接 return ——
-  `imagedocument.cpp:255` `pathToSelection` 撤销后**静默什么都不做**，却已 push 一条 undo 并 `return true`。
-- **验证**：`createBlank(400,400)` → `selectRectangle(QRect(0,0,400,400))` → `cropTo(QRect(0,0,200,200))` → `undo()`
-  → 断言 `selection().mask().size() == QSize(doc->width(), doc->height())`（**现在 200×200 ≠ 400×400**）。
+### A8 —— 撤销图像/画布大小、裁剪后选区 mask 与文档尺寸失配 `已修`
+- **位置**：`app/undoitem.cpp`（`DocumentGeomUndo::pop`）
+- **问题**：pop 恢复文档尺寸后 `replaceFromImage` 仍缩放到旧（裁剪后）mask 尺寸。
+- **修复**：先 `selection.reset(m_width, m_height)` 再 `replaceFromImage`。回归：`phase1a` A8。
 
 ### A9 —— 调整层「面积算子」分支重算 `below` 时丢掉 dst 中已有内容 `确定`
 - **位置**：`engine/compositor.cpp:133`（关联 `:131` 点算子分支用 `dst.copy(area)`、`lo=qMax(0,layerBegin)`）、
