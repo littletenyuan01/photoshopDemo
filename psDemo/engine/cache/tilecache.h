@@ -11,7 +11,9 @@
 
 #include <QImage>
 #include <QSet>
+#include <QVector>
 
+#include <atomic>
 #include <functional>
 #include <memory>
 
@@ -75,6 +77,15 @@ public:
     bool isPinned(const TileBuffer *b) const;
 
     /**
+     * 并行合成前（主线程）：钉住文档全部层瓦片并确保驻留内存。
+     * 期间 touch/换页记账对 worker 只读路径关闭（A5：跨线程 makeResident/touch 数据竞争）。
+     * 必须与 endSharedRead 成对。
+     */
+    void beginSharedRead(const ImageDocument *doc);
+    void endSharedRead(const ImageDocument *doc);
+    bool sharedReadActive() const { return m_sharedReadDepth.load(std::memory_order_acquire) > 0; }
+
+    /**
      * 静默点淘汰：先丢可重算派生缓存，再按 LRU 换出未钉住瓦片。
      * @p doc / @p projection 可空。
      */
@@ -102,7 +113,7 @@ private:
 
     qint64 m_budgetBytes = 0;
     qint64 m_usedBytes = 0;
-    qint64 m_clock = 1;
+    std::atomic<qint64> m_clock{1};
     int m_evicted = 0;
     int m_loaded = 0;
     int m_swapFailures = 0;
@@ -110,10 +121,34 @@ private:
     bool m_overBudgetLogged = false;
     bool m_log = false;
     bool m_trimming = false;
+    std::atomic<int> m_sharedReadDepth{0};
 
     std::unique_ptr<SwapStore> m_swap;
     QSet<const TileBuffer *> m_pinned;
     QSet<TileBuffer *> m_buffers;
+    QVector<const TileBuffer *> m_sharedReadPinned;
+};
+
+/** RAII：并行读文档瓦片（主线程构造/析构）。 */
+class TileSharedReadGuard
+{
+public:
+    explicit TileSharedReadGuard(const ImageDocument *doc)
+        : m_doc(doc)
+    {
+        if (m_doc)
+            TileCache::instance().beginSharedRead(m_doc);
+    }
+    ~TileSharedReadGuard()
+    {
+        if (m_doc)
+            TileCache::instance().endSharedRead(m_doc);
+    }
+    TileSharedReadGuard(const TileSharedReadGuard &) = delete;
+    TileSharedReadGuard &operator=(const TileSharedReadGuard &) = delete;
+
+private:
+    const ImageDocument *m_doc = nullptr;
 };
 
 /** RAII：钉住一个 TileBuffer。 */

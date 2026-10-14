@@ -390,7 +390,9 @@ void Layer::replaceFromImage(const QImage &pixels)
     const int oldH = height();
     m_tiles.setFromImage(pixels);
     if (m_mask && (m_mask->width() != width() || m_mask->height() != height())) {
-        // 尺寸变了：蒙版跟到新尺寸，缺省全白（避免错位）；undo 会整栈恢复
+        // 尺寸变了：蒙版跟到新尺寸，缺省全白（避免错位）。
+        // 像素 undo 须用带 trackMask 的 LayerPixelsUndo（见 pushLayerPixelsUndo），
+        // 否则撤销后蒙版灰度无法恢复（phase1-audit A2）。
         m_mask = std::make_unique<LayerMask>(width(), height(), 255);
     }
     Q_UNUSED(oldW);

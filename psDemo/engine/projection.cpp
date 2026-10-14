@@ -225,8 +225,9 @@ QRect Projection::recomposeInvalidChunks(int maxChunks, ScanMode mode, int maxMs
     const int threads = qMax(1, QThreadPool::globalInstance()->maxThreadCount());
     const int batchCap = qMax(1, threads * 4);
 
-    // 并行前在主线程做两件事：预热各层 mutable 缓存、确保投影缓冲独占（否则 worker
-    // 首次 scanLine 会各自 detach）。缓存不变，循环外做一次即可。
+    // 并行前在主线程：钉住并预加载层瓦片（A5）、预热 mutable 缓存、确保投影缓冲独占
+    // （否则 worker 首次 scanLine 会各自 detach）。
+    TileSharedReadGuard sharedTiles(m_document);
     Compositor::warmLayerCaches(*m_document);
     (void)m_buffer.bits();
 

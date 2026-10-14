@@ -156,6 +156,9 @@ QImage *TileBuffer::makeResident(qint64 k, TileSlot &slot, int tx, int ty)
         cache.touch(slot);
         return &slot.img;
     }
+    // 并行共享读应已在主线程预加载；worker 走到这里说明护栏漏了
+    Q_ASSERT_X(!cache.sharedReadActive(), "TileBuffer::makeResident",
+               "tile not resident during shared parallel read (A5)");
     const QRect bounds = tileBounds(tx, ty);
     if (bounds.isEmpty())
         return nullptr;

@@ -1,11 +1,14 @@
 # 一期代码审计：bug / 逻辑错误候选清单
 
-> 状态：**候选清单，待逐条复核**　·　2026-10
+> 状态：**候选清单；A1/A2/A5 已复核并修复**　·　2026-10
 > 方法：按 8 个子系统（domain / app / io / engine·op / engine·graph / backend·cache / tools / ui）并行深审，
 > 覆盖 **344 个真实源文件 / 47.8k 行**（已排除 `debug/`、`release/`、`build*/`、生成的 `moc_*`/`ui_*`）
-> ⚠️ **诚实声明**：本清单由并行审计产出，**尚未逐条人工复核**。`确定` 级也可能存在误报
+> ⚠️ **诚实声明**：本清单由并行审计产出，**其余条目尚未逐条人工复核**。`确定` 级也可能存在误报
 > （审计者可能读错了调用方）。**复核通过后才进 [pending-dev.md](pending-dev.md) 的缺陷台账并编号。**
 > 相关：[architecture.md](architecture.md)、[tech-notes.md](tech-notes.md)、[pending-dev.md](pending-dev.md)
+>
+> **已修**：A1（`freetransformop` + `t_phase1a`）、A2（`pushLayerPixelsUndo` 跟踪蒙版）、
+> A5（`TileSharedReadGuard`：并行前钉住+预加载，shared-read 期间禁 touch/换页）
 
 ## 0. 总体判断
 
@@ -24,7 +27,7 @@ ROI 反向传播、`.pslite` append-only 参数块都经得起逐行核对。
 
 ## 1. 高危（会造成内容丢失或崩溃）
 
-### A1 —— 自由变换抹掉选区外接框内的像素（不可逆内容丢失）`确定`
+### A1 —— 自由变换抹掉选区外接框内的像素（不可逆内容丢失）`已修`
 - **位置**：`engine/op/freetransformop.cpp:283`（关联 `:213-225` 求脏区、`:249-250` 清 patch、`:263-277` 写入）
 - **问题**：脏区 `dirty` 只是**选区的外接矩形**，而 patch 被整块清零后只有「选区内 **且** 目标四边形内」的像素被写回，
   最后 `TilePatch::blit(tiles, dirty, patch)` 把 patch **整块 memcpy** 回去（`tilepatch.h:57` 不做掩码）
@@ -33,9 +36,9 @@ ROI 反向传播、`.pslite` append-only 参数块都经得起逐行核对。
 - **旁证**：其余绘制类算子（`stampdabop`/`focusdabop`/`tonedabop`/`clonestampdabop`/`shapefillop`）
   都用 `OpPaintClip::restoreOutsideSelection` 回滚选区外像素 ⇒ 这里是**漏了**，不是有意语义。
 - **验证**：64×64 全不透明层 + `selectEllipse(QRect(8,8,32,32))`，取源快照后 `PaintEngine::freeTransform(..., 整体右移10px, clearSource=true, clip)`；
-  断言外接框内、椭圆外的像素（如 `(9,9)`）仍等于原层颜色 —— **当前会变透明**。
+  断言外接框内、椭圆外的像素（如 `(9,9)`）仍等于原层颜色 —— **已修**：`restoreOutsideSelection` + `phase1a` 绿。
 
-### A2 —— 撤销"扩层类"像素操作时蒙版被重置为全白且不可恢复 `确定`
+### A2 —— 撤销"扩层类"像素操作时蒙版被重置为全白且不可恢复 `已修`
 - **位置**：`domain/layer.cpp:392`（重置点）、`app/undoitem.cpp:112`（`LayerPixelsUndo::pop`）、
   `domain/imagedocument.cpp:128-129`（4 参构造 ⇒ `m_trackMask=false`）
 - **问题**：`replaceFromImage` 在**尺寸变化**时执行
@@ -44,7 +47,7 @@ ROI 反向传播、`.pslite` append-only 参数块都经得起逐行核对。
 - **触发**：带蒙版的层 → 自由变换向外拖角（`transformtool.cpp:632` push 像素 undo、`:642` `expandToIncludeLocal` 同时扩层与蒙版）
   → Ctrl+Z：`m_pixels` 是变换前的**小尺寸**栅格 ⇒ 判定尺寸变了 ⇒ 用户蒙版灰度被换成全白，画卷重新显示，**redo 也回不来**。
 - **验证**：64×64 单层 + `addLayerMask` 并把左半涂黑 → 记 mask 快照 → 模拟变换提交（push undo + expand + `replaceFromImage(74×74)`）
-  → `undo()` → 断言 mask 与快照逐字节相同（**现在整幅变 255**）。
+  → `undo()` → 断言 mask 与快照逐字节相同 —— **已修**：`pushLayerPixelsUndo` 始终跟踪蒙版。
 
 ### A3 —— 区域滤镜缓存是文档坐标，但平移图层不失效它（图层"跳回原位"）`确定`
 - **位置**：`domain/layer.cpp:250`（命中判定与取子图）、`layer.cpp:92-99`（`Layer::translate`）、
@@ -69,18 +72,16 @@ ROI 反向传播、`.pslite` append-only 参数块都经得起逐行核对。
 - **验证**：`transformtool.cpp:528` 前加 `qDebug() << destDoc;`，把缩放拉到 5%、Ctrl+T 拖角出视图，
   断言 `destDoc` 必须已与 `QRect(0,0,doc->width(),doc->height())` 求交（**当前不会**）。
 
-### A5 —— 分块并行合成让 worker 线程并发读瓦片，而瓦片读写无锁共享状态（数据竞争）`确定`
-- **位置**：`engine/projection.cpp:265`（`QtConcurrent::blockingMap`）、`engine/compositor.cpp:228/258`（worker 里访问 `layer->tiles()`）、
-  `domain/tilebuffer.cpp:156/166/178`（`makeResident` 里 `cache.touch(slot)`、被换出时 `slot.img = std::move(loaded)`）、
-  `engine/cache/tilecache.cpp:159-166`（`nextClock()` 对单例 `m_clock` **非原子** `++`）、`engine/cache/swapstore.cpp:73-75`（同一 `QTemporaryFile` 并发 `seek()+read()`）
+### A5 —— 分块并行合成让 worker 线程并发读瓦片，而瓦片读写无锁共享状态（数据竞争）`已修`
+- **位置**：`engine/projection.cpp`（`blockingMap`）、`engine/compositor.cpp`（`blendLayerRangeParallel`）、
+  `domain/tilebuffer.cpp`（`makeResident`）、`engine/cache/tilecache.*`（时钟 / swap I/O）
 - **问题**：瓦片**读不是只读**。worker 并发 ⇒ `m_clock`/`m_usedBytes` 记账丢失（预算失控）；
   **开启换页（`PSLITE_TILE_CACHE_MB>0`）时并发 seek/read 可能读到交错数据 → 静默错像素**，
-  读失败还会走降级路径把该瓦片换成全透明（`tilebuffer.cpp:172-176`）→ 静默丢像素。
-- **旁证**：工程自己的线程纪律写着"工作线程只读主线程抽好的快照，绝不碰 `ImageDocument`/`Layer`/`TileBuffer`；
-  跨线程读稀疏瓦片是数据竞争"（`pending-dev.md:1063`）；"三处线程安全前置"清单（`pending-dev.md:421-429`）**漏了瓦片缓存**；
-  `projection.cpp:229` 的注释"缓存不变，循环外做一次即可"就是那个被违反的假不变量。
-- **验证**：Debug 下在 `TileCache::nextClock()` / `TileBuffer::makeResident()` 开头加
-  `Q_ASSERT(QThread::currentThread() == qApp->thread())`，跑整幅 `sync`（如 `t_dirtybudget` 的 warmup 段）——多核上立刻命中。
+  读失败还会走降级路径把该瓦片换成全透明 → 静默丢像素。
+- **修复**：`TileSharedReadGuard` / `TileCache::beginSharedRead` —— 主线程钉住文档全部层瓦片并
+  `forEachAllocatedTile` 预加载；shared-read 期间 `touch` 空操作、`trim` 跳过；
+  `makeResident` 在非驻留时 `Q_ASSERT`；`m_clock` 改为 `atomic`。接入 `Projection` 分块路径与
+  `Compositor::blendLayerRangeParallel`。回归：`t_phase1a` A5（换页 + 并行/串行 bit-exact）。
 
 ### A6 —— 直线工具向左/向上画线不绘制 `确定`
 - **位置**：`engine/op/shapefillop.cpp:104`（`:100-103` 刻意保留非 normalized 矩形以取真实端点、`:131-132` 用 `left/top`、`right/bottom`）
@@ -186,9 +187,9 @@ ROI 反向传播、`.pslite` append-only 参数块都经得起逐行核对。
 
 | 顺序 | ID | 为什么先它 | 复核方式 |
 |---|---|---|---|
-| 1 | **A1** | 椭圆/旋转变换**不可逆抹像素** | 单测断言外接框内、椭圆外像素不变 |
-| 2 | **A2** | 蒙版**永久丢失**（undo/redo 都回不来） | 单测断言撤销后 mask 与快照逐字节相同 |
-| 3 | **A5** | 数据竞争，开换页时**静默错/丢像素** | Debug 加 `Q_ASSERT(主线程)` 跑整幅 sync |
+| 1 | **A1** | ~~椭圆/旋转变换不可逆抹像素~~ | **已修**（`phase1a`） |
+| 2 | **A2** | ~~蒙版永久丢失~~ | **已修**（`phase1a`） |
+| 3 | **A5** | ~~并行读瓦片数据竞争~~ | **已修**（`TileSharedReadGuard` + `phase1a`） |
 | 4 | **A10** | 非模态对话框**静默改掉另一层**的滤镜参数 | 手动：编辑 A 层滤镜→切 B 层→点取消 |
 
 **第二步：改动小、收益明确的稳定性修补**

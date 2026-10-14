@@ -11,6 +11,7 @@
 #include "domain/layermask.h"
 #include "domain/tilebuffer.h"
 #include "engine/blend.h"
+#include "engine/cache/tilecache.h"
 #include "engine/op/layermodecatalog.h"
 #include "engine/op/layermodeop.h"
 #include "engine/op/pointopregistry.h"
@@ -363,7 +364,8 @@ bool Compositor::blendLayerRangeParallel(QImage &dst, const ImageDocument &doc,
     if (cols * rows < 2 || threads <= 1)
         return blendLayerRange(dst, doc, area, layerBegin, layerEnd, skipLayer);
 
-    // 并行前置（与投影分块合成同一套）：主线程预热 mutable 缓存 + 确保 dst 独占
+    // 并行前置：钉住+预加载瓦片（A5）+ 预热 mutable 缓存 + 确保 dst 独占
+    TileSharedReadGuard sharedTiles(&doc);
     warmLayerCaches(doc);
     (void)dst.bits();
 

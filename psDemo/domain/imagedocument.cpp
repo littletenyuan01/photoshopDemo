@@ -125,8 +125,20 @@ void ImageDocument::pushLayerPixelsUndo(int layerIndex, const QString &label)
     Layer *layer = m_layers.layerAt(layerIndex);
     if (!layer)
         return;
+    // 始终走「像素+蒙版」快照：replaceFromImage 在尺寸变化时会把蒙版重置为全白（A2）；
+    // 若不 trackMask，undo 后用户蒙版灰度无法恢复。无蒙版时 hasMask=false，pop 会清掉误建的 mask。
+    const bool hasMask = layer->hasMask() && layer->mask() && !layer->mask()->isNull();
+    QImage maskGray;
+    bool maskEnabled = true;
+    bool maskLinked = true;
+    if (hasMask) {
+        maskGray = layer->mask()->image().copy();
+        maskEnabled = layer->mask()->isEnabled();
+        maskLinked = layer->mask()->isLinked();
+    }
     m_history->push(std::make_unique<LayerPixelsUndo>(
-        layerIndex, layer->materialize(), layer->offsetX(), layer->offsetY(), label));
+        layerIndex, layer->materialize(), layer->offsetX(), layer->offsetY(), hasMask,
+        maskEnabled, maskLinked, std::move(maskGray), label));
 }
 
 void ImageDocument::pushLayerOffsetUndo(int layerIndex)

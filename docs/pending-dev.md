@@ -17,7 +17,8 @@
 
 每个缺陷单独成节（现象含栈/复现步骤、根因、改法与被否掉的方案、防复发、仍欠）；这里只做索引。
 
-> **一期代码审计产出的候选清单见 [phase1-audit.md](phase1-audit.md)（A1–A36）** ——
+> **一期代码审计产出的候选清单见 [phase1-audit.md](phase1-audit.md)（A1–A36）**；
+> 其中 **A1 / A2 / A5 已复核并修复**（回归 `phase1a`）——
 > 8 路并行深审 344 文件 / 47.8k 行，含 10 条高危（自由变换抹像素、蒙版丢失、区域缓存不随平移失效、
 > 瓦片并发数据竞争、直线不绘制、坏文件 OOM …）。
 > ⚠️ **该清单尚未逐条人工复核**：**复核为真**的按顺序进本台账（从 **#23** 起编号），
@@ -424,15 +425,16 @@ sliderReleased → setLayerFilterNode(..., pushUndo=true)
 `Projection::recomposeInvalidChunks` 改为「收集候选 chunk → 分批 `QtConcurrent::blockingMap`
 并行合成」，各 worker 只写投影缓冲的**不相交区域**。
 
-### 三处线程安全前置（不做就是数据竞争）
+### 线程安全前置（不做就是数据竞争）
 
 | 前置 | 处理 |
 |---|---|
-| `Layer::ensureCompositeRaster()` 是 `mutable` 缓存 | 并行前在**主线程** `warmLayerCachesForParallel()` 预热；只预热**有启用样式**的层（纯滤镜层后来改为按区域求值、不碰该缓存，见下节），调整层不走这条 |
+| `Layer::ensureCompositeRaster()` 是 `mutable` 缓存 | 并行前在**主线程** `warmLayerCaches` 预热；只预热**有启用样式**的层（纯滤镜层后来改为按区域求值、不碰该缓存，见下节），调整层不走这条 |
 | `LayerMask::isFullyOpaque()` 是 `mutable` 缓存 | 同上预热 |
 | `PointOpRegistry` 常驻 `LayerModeOp` 实例是**共享可变**（`setMode` 写 `m_mode`，两线程不同图层会互踩） | 合成器不再取实例：`blendTileOnto` 改收 **`BlendMode` 按值**；注册表只保留只读的 `find()` 校验 |
 | 同一 `QImage` 被多线程 `scanLine` 触发 detach | 并行前 `(void)m_buffer.bits()` 确保独占 |
 | `QPainter` 对同一 paint device 不可同时绘制 | 清屏改 `memset`；调整层「整区替换」改逐行 `memcpy` |
+| `TileBuffer`/`TileCache` 读路径会 `touch`/换页（A5） | 并行前 `TileSharedReadGuard`：主线程钉住并预加载；shared-read 期间禁 `touch`/`trim` |
 
 ### 自适应批大小
 

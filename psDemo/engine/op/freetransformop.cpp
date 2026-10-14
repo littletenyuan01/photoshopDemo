@@ -280,6 +280,13 @@ QRect FreeTransformOp::process(OpContext &ctx)
         }
     }
 
+    // A1：dirty 外接框内、选区外的像素不得被 patch 透明覆盖（对齐 stampdab 等）
+    if (OpPaintClip::clipActive(ctx.clip)) {
+        const QImage before = TilePatch::extract(tiles, dirty);
+        OpPaintClip::restoreOutsideSelection(patch, before, QPoint(0, 0), dirty.topLeft(),
+                                             ctx.clip);
+    }
+
     TilePatch::blit(tiles, dirty, patch);
     return dirty;
 }

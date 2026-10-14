@@ -108,13 +108,15 @@ void TileCache::resetForTest()
     m_budgetBytes = envBudgetBytes();
     m_log = cacheLogEnabled();
     m_usedBytes = 0;
-    m_clock = 1;
+    m_clock.store(1, std::memory_order_relaxed);
     m_evicted = 0;
     m_loaded = 0;
     m_swapFailures = 0;
     m_swapEnabled = m_budgetBytes > 0;
     m_overBudgetLogged = false;
     m_trimming = false;
+    m_sharedReadDepth.store(0, std::memory_order_relaxed);
+    m_sharedReadPinned.clear();
     m_swap.reset();
     m_pinned.clear();
 }
@@ -156,13 +158,51 @@ bool TileCache::isPinned(const TileBuffer *b) const
     return b && m_pinned.contains(b);
 }
 
+void TileCache::beginSharedRead(const ImageDocument *doc)
+{
+    if (!doc)
+        return;
+
+    // 最外层：主线程钉住并预加载；嵌套调用只加深 depth
+    if (m_sharedReadDepth.load(std::memory_order_relaxed) == 0) {
+        const LayerStack &stack = doc->layers();
+        for (int i = 0; i < stack.count(); ++i) {
+            Layer *layer = const_cast<Layer *>(stack.layerAt(i));
+            if (!layer)
+                continue;
+            TileBuffer *buf = &layer->tiles();
+            pin(buf);
+            m_sharedReadPinned.append(buf);
+            // forEachAllocatedTile → makeResident：把 swap 中的瓦片读回主线程
+            buf->forEachAllocatedTile(
+                [](int, int, const QImage &, const QRect &) {});
+        }
+    }
+    m_sharedReadDepth.fetch_add(1, std::memory_order_release);
+}
+
+void TileCache::endSharedRead(const ImageDocument *doc)
+{
+    Q_UNUSED(doc);
+    const int prev = m_sharedReadDepth.fetch_sub(1, std::memory_order_acq_rel);
+    Q_ASSERT(prev > 0);
+    if (prev != 1)
+        return;
+    for (const TileBuffer *b : m_sharedReadPinned)
+        unpin(b);
+    m_sharedReadPinned.clear();
+}
+
 qint64 TileCache::nextClock()
 {
-    return ++m_clock;
+    return m_clock.fetch_add(1, std::memory_order_relaxed) + 1;
 }
 
 void TileCache::touch(TileSlot &slot)
 {
+    // 并行共享读期间禁止写 LRU / 时钟（worker 只读已驻留瓦片）
+    if (sharedReadActive())
+        return;
     slot.lastUse = nextClock();
 }
 
@@ -325,7 +365,7 @@ void TileCache::evictOneTile()
 
 void TileCache::trim(ImageDocument *doc, Projection *projection)
 {
-    if (m_trimming || m_budgetBytes <= 0)
+    if (m_trimming || m_budgetBytes <= 0 || sharedReadActive())
         return;
     if (m_usedBytes <= m_budgetBytes)
         return;
