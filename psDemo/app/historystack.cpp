@@ -36,6 +36,7 @@ void HistoryStack::push(std::unique_ptr<UndoItem> item)
     if (!item || m_applying)
         return;
     m_redo.clear();
+    m_redoBytes = 0; // A26：新 push 清空 redo 时同步清记账
     m_undoBytes += item->byteSize();
     m_undo.push_back(std::move(item));
     trimUndo();
@@ -57,6 +58,7 @@ void HistoryStack::undo(ImageDocument &doc)
     else
         m_undoBytes = 0;
     item->pop(doc);
+    m_redoBytes += sz; // A26：迁入 redo 后计入
     m_redo.push_back(std::move(item));
     m_applying = false;
     emit changed();
@@ -69,8 +71,13 @@ void HistoryStack::redo(ImageDocument &doc)
     m_applying = true;
     auto item = std::move(m_redo.back());
     m_redo.pop_back();
+    const quint64 sz = item->byteSize();
+    if (m_redoBytes >= sz)
+        m_redoBytes -= sz;
+    else
+        m_redoBytes = 0;
     item->pop(doc);
-    m_undoBytes += item->byteSize();
+    m_undoBytes += sz;
     m_undo.push_back(std::move(item));
     trimUndo();
     m_applying = false;
@@ -82,6 +89,7 @@ void HistoryStack::clear()
     m_undo.clear();
     m_redo.clear();
     m_undoBytes = 0;
+    m_redoBytes = 0;
     emit changed();
 }
 

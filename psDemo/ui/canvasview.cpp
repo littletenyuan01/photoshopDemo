@@ -611,7 +611,7 @@ void CanvasView::endSpaceHandIfIdle()
     if (m_spaceHeld || m_panning || !m_toolManager)
         return;
     if (m_toolManager->hasTemporaryTool())
-        m_toolManager->endTemporaryTool();
+        m_toolManager->endTemporaryTool(*this);
     updateToolCursor();
     update(); // 恢复原工具浮层（套索橡皮筋等）
 }
@@ -905,10 +905,10 @@ void CanvasView::keyPressEvent(QKeyEvent *event)
 {
     if (event->key() == Qt::Key_Space && !event->isAutoRepeat()) {
         m_spaceHeld = true;
-        // 其他工具下：临时切到抓手（不 deactivate 原工具，松键后恢复）
+        // 其他工具下：临时切到抓手（松键后恢复；会 deactivate 原工具以清拖拽态）
         if (m_toolManager && m_document) {
             refreshToolContext();
-            if (m_toolManager->beginTemporaryTool(Ps::ToolId::Hand))
+            if (m_toolManager->beginTemporaryTool(Ps::ToolId::Hand, *this))
                 update();
         }
         if (!m_panning)
@@ -1397,9 +1397,10 @@ void CanvasView::flushAdjustmentPreview()
         const bool storeStacks = !haveStacks;
         QMetaObject::invokeMethod(this, [this, gen, viewPatch, patchImg, storeStacks, layerIndex,
                                          belowPad, aboveCrop]() {
-            m_adjPreviewBusy = false;
+            // A21：先判世代再解锁；过期回调不得清 busy（否则与新任务并发）
             if (gen != m_adjPreviewGen || !m_document)
                 return;
+            m_adjPreviewBusy = false;
             if (storeStacks) {
                 m_adjBelow = belowPad;
                 m_adjAbove = aboveCrop;

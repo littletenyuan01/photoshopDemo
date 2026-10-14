@@ -61,9 +61,10 @@ bool FilterStack::hasPositionalOp() const
     for (const FilterNode &n : m_nodes) {
         if (!n.isEnabled())
             continue;
+        // Wind 交错用绝对行奇偶选方向（A24）：条带并行会相位错乱
         if (n.op() == OpName::AddNoise || n.op() == OpName::Ripple
             || n.op() == OpName::Mosaic || n.op() == OpName::RadialBlur
-            || n.op() == OpName::Tiles)
+            || n.op() == OpName::Tiles || n.op() == OpName::Wind)
             return true;
     }
     return false;

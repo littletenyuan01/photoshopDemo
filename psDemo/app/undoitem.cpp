@@ -204,8 +204,13 @@ std::unique_ptr<LayerStructureUndo> LayerStructureUndo::forRemoved(int index,
 quint64 LayerStructureUndo::byteSize() const
 {
     quint64 n = 128;
-    if (m_layer && m_layer->hasPixelData())
+    if (!m_layer)
+        return n;
+    if (m_layer->hasPixelData())
         n += quint64(m_layer->materialize().sizeInBytes());
+    // A25：被删层的蒙版也计入
+    if (m_layer->hasMask() && m_layer->mask())
+        n += quint64(m_layer->mask()->image().sizeInBytes());
     return n;
 }
 
@@ -327,8 +332,11 @@ DocumentGeomUndo::DocumentGeomUndo(int width, int height, QImage selectionMask,
 quint64 DocumentGeomUndo::byteSize() const
 {
     quint64 n = quint64(m_selectionMask.sizeInBytes()) + 64;
-    for (const LayerState &ls : m_layers)
+    for (const LayerState &ls : m_layers) {
         n += quint64(ls.pixels.sizeInBytes()) + 64;
+        // A25：与 LayerPropUndo 同口径，计入每层 maskGray
+        n += quint64(ls.props.maskGray.sizeInBytes());
+    }
     return n;
 }
 

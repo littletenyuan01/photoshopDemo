@@ -85,6 +85,7 @@ AdjustmentPropsHost::AdjustmentPropsHost(QWidget *parent)
 
 void AdjustmentPropsHost::clear()
 {
+    m_pendingPreview = false; // A22：丢弃未决预览，勿在换文档后误 commit
     m_node = Ps::FilterNode();
     m_title->setText(QStringLiteral("未选中调整图层"));
     if (m_stack->count() > 0)

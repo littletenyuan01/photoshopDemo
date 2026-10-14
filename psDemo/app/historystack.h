@@ -58,6 +58,10 @@ public:
 
     /** undo 栈累计字节（供 PSLITE_MEM / 页缓存口径）。 */
     quint64 undoBytes() const { return m_undoBytes; }
+    /** redo 栈累计字节（A26：与 undo 一并计入内存上限口径）。 */
+    quint64 redoBytes() const { return m_redoBytes; }
+    /** undo+redo 合计（PSLITE_MEM / trim 决策用）。 */
+    quint64 historyBytes() const { return m_undoBytes + m_redoBytes; }
     /** 超限丢最老 undo 的字节上限（默认 256MB；可调）。 */
     quint64 byteLimit() const { return m_byteLimit; }
     void setByteLimit(quint64 bytes);
@@ -75,6 +79,7 @@ private:
     std::vector<std::unique_ptr<UndoItem>> m_undo;  ///< undo 栈（底→顶 = 旧→新）
     std::vector<std::unique_ptr<UndoItem>> m_redo;  ///< redo 栈
     quint64 m_undoBytes = 0;                        ///< undo 栈累计字节（用于 trim）
+    quint64 m_redoBytes = 0;                        ///< redo 栈累计字节（A26）
     quint64 m_byteLimit = 256ull * 1024ull * 1024ull; ///< 超限丢最老 undo
     bool m_applying = false;                        ///< pop 进行中，禁止嵌套 push
 };

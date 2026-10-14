@@ -1,13 +1,13 @@
 # 一期代码审计：bug / 逻辑错误候选清单
 
-> 状态：**候选清单；确定级高/中危大部分已修（其余待续）**　·　2026-10
+> 状态：**候选清单；A1–A26/A28 等已修，低危余项待续**　·　2026-10
 > 方法：按 8 个子系统（domain / app / io / engine·op / engine·graph / backend·cache / tools / ui）并行深审，
 > 覆盖 **344 个真实源文件 / 47.8k 行**（已排除 `debug/`、`release/`、`build*/`、生成的 `moc_*`/`ui_*`）
 > ⚠️ **诚实声明**：本清单由并行审计产出，**其余条目尚未逐条人工复核**。`确定` 级也可能存在误报
 > （审计者可能读错了调用方）。**复核通过后才进 [pending-dev.md](pending-dev.md) 的缺陷台账并编号。**
 > 相关：[architecture.md](architecture.md)、[tech-notes.md](tech-notes.md)、[pending-dev.md](pending-dev.md)
 >
-> **已修**：A1–A15、A17–A18、A20、A23。下一批可疑/低危：A16/A19/A21/A22/A24–A36。
+> **已修**：A1–A26、A28。余下低危：A27、A29–A36；GPU #22。
 
 ## 0. 总体判断
 
@@ -103,24 +103,24 @@ ROI 反向传播、`.pslite` append-only 参数块都经得起逐行核对。
 | **A13** | `resizeCanvas` | **已修**：扩展色作底 + Source 贴回旧像素（`phase1a`） | 确定 |
 | **A14** | `selectfloodop.cpp` | **已修**：合并选区前把非 255 清 0（`phase1a`） | 确定 |
 | **A15** | `FilterStack::kMaxFilters` | **已修**：append/addLayerFilter/写端均 ≤64（`phase1a`） | 确定 |
-| **A16** | `io/psdio.cpp:847` | 画布尺寸在 `:705` 校验（≤30000），但**图层矩形**（`:760-765` 只做截断检查）从不与画布或任何上限比较就参与 `planeBytes = lw*lh`；`readChannelPlane` 第一件事是 `out->resize(expectedBytes)`（`:173`），且 a/r/g/b **四个平面同时存活**（`:849-898`）⇒ 一条 `30000×30000` 的层记录就要 **~3.6GB**；若 `lw*lh > 2^31` 则 signed int **溢出**（UB）。触发条件是用户能打开的任意 `.psd`，后果是 `bad_alloc` 未捕获 ⇒ 进程终止 | 可疑 |
+| **A16** | `psdio.cpp` | **已修**：层矩形 ≤30000 且 w*h 不溢出 int，否则拒载 | 可疑→已修 |
 | **A17** | `croptool` | **已修**：有框时 press 不改框角；拖≥3px 才替换；双击可确认（`phase1a`） | 确定 |
 | **A18** | `pentool` | **已修**：删锚后 `clampActiveAnchor` + 读写下标守卫（`pentool`） | 确定 |
-| **A19** | `tools/toolmanager.cpp:146` | `beginTemporaryTool` 直接改写 `m_activeTool` 并重连信号，**既不 deactivate 旧工具也不 activate 新工具**（对比 `setActiveTool:185-186`）。而 `CanvasView::mouseReleaseEvent`（`ui/canvasview.cpp:852`）只把 release 派发给"当时的活动工具"⇒ 选框拖拽中按空格（`:906`）→ 松左键（release 落到 Hand）→ 松空格恢复选框，此时选框 `m_dragging` 仍为 true、`hasOverlay()` 为 true ⇒ **橡皮筋冻结**、本次选区不提交。画笔/仿制图章/磁性套索同类残留 | 可疑 |
+| **A19** | `toolmanager` | **已修**：临时工具 begin/end 会 deactivate/activate（清拖拽态） | 可疑→已修 |
 | **A20** | `canvassizedialog.cpp` | **已修**：高/宽单位分别换算（`phase1a`） | 确定 |
-| **A21** | `ui/canvasview.cpp:1400` | `flushAdjustmentPreview` 用 `m_adjPreviewBusy` 做单飞（`:1195-1198`），但主路径回调**先在 `:1400` 把 busy 置 false，之后才在 `:1401` 判世代**（同文件另三处 `:1279-1282`/`:1294-1303`/`:1326-1334` 都是先判后置）⇒ 过期回调提前解锁 ⇒ 每个 32ms tick 都能再起一个任务，且都走 `haveStacks=false` 分支 ⇒ 在主线程之外分配**两张文档全幅 QImage**（`:1287-1290`，2480×3508 ≈ 35MB/张）并**并发调 `Compositor::blendLayerRange`** | 可疑 |
-| **A22** | `ui/propertiespanel.cpp:171` | `refreshFromDocument` 开头用 `m_boundAdjLayer` 直接索引**当前** `m_document` 提交未决预览，只用 `prev->isAdjustmentLayer()` 校验、**不校验身份**；而 `onSessionDocumentChanged` 在调用它**之前**就把 `m_document` 换成新文档（`:87-90 → :114`）⇒ 打开/新建文档时，上一文档的调整参数被写进**新文档**同下标的调整层并压一条 undo（触发：点调整层滑条后用方向键改值，只发 previewChanged，`m_pendingPreview` 一直为 true）。文档内结构变化（`moveLayer` 发 `structureChanged`）同理会写错层 | 可疑 |
+| **A21** | `canvasview` | **已修**：adj preview 回调先判世代再清 busy | 可疑→已修 |
+| **A22** | `propertiespanel` | **已修**：换文档清 pending；仅切走活动层时 commit | 可疑→已修 |
 | **A23** | `LayerPropUndo` / `LayerPixelsUndo` | **已修**：去掉蒙版时清 `m_editingLayerMask`（`phase1a`） | 确定 |
-| **A24** | `engine/op/windfilterop.cpp:55` | 风-交错用 `(y & 1)` 选方向，而 `y` 是传入图**内部**的行号（`engine/graph/pointfilterop.h:45-47` 把几何整体平移掉，算子拿不到层内绝对行号）；Wind **不在** `FilterStack::hasPositionalOp` 名单（`domain/filterstack.cpp:62-65` 只有 AddNoise/Ripple/Mosaic/RadialBlur/Tiles）⇒ `LayerFilterJob` 的"位置相关 ⇒ strips=1"护栏（`layerfilterjob.cpp:136-141`）对它无效 ⇒ 条带求值（`:143-154`，条带高为 base/base+1，二者之一是奇数）时**每条带第 0 行相位重新起算** ⇒ 同一层行在不同条带里**方向相反**，且与同步的 64 块路径（`layer.cpp:242-269`）不一致。触发：交错风 + 层高 ≥128 | 可疑 |
+| **A24** | `FilterStack::hasPositionalOp` | **已修**：Wind 列入位置相关（`phase1a`） | 可疑→已修 |
 
 ## 3. 低危 / 设计隐患
 
 | ID | 位置 | 问题 |
 |---|---|---|
-| A25 | `app/undoitem.cpp:311` | `DocumentGeomUndo::byteSize` 每个 `LayerState` 都持有 `props.maskGray`（整幅 Grayscale8，`imagedocument.cpp:347` 填充、`applyLayerProps` 会真正恢复），但 byteSize **只算 selectionMask + pixels**；同文件 `LayerPropUndo::byteSize:150` 却显式加了 `m_snap.maskGray.sizeInBytes()` ⇒ **同一份快照两种口径，这里是漏算**。`LayerStructureUndo::byteSize:194-197` 同理（被删层的蒙版完全不计）⇒ 256MB 上限与 `PSLITE_MEM` 的 `undoBytes`（`engine/cache/memstats.cpp:42`）**少报**（4000×3000 文档每层少计 12MB） |
-| A26 | `app/historystack.cpp:39` | `m_undoBytes` 只在 push 时 `+=`（`:39`），`undo()` 搬去 `m_redo` 前先减（`:55-58`）⇒ 每按一次 Ctrl+Z，就有一份完整快照（可达整幅 `w*h*4`）滞留在**完全不计账、也没有 trim** 的 `m_redo` 里，只被下一次 push 的 `m_redo.clear()` 释放 ⇒ `historystack.h:32/78` 宣称的"约 256MB 上限"**实际可达约 2×**，而 `PSLITE_MEM` 把它当"撤销内存"上报，会低估真实占用 |
+| A25 | `DocumentGeomUndo` / `LayerStructureUndo` | **已修**：byteSize 计入 maskGray / 层蒙版（`phase1a`） |
+| A26 | `HistoryStack` | **已修**：`m_redoBytes` + `historyBytes()`；memstats 用合计（`phase1a`） |
 | A27 | `tools/transformtool.cpp:577` | 会话只缓存 `m_layerIndex`（`:352`），而会话从 Ctrl+T 起一直存活到 Enter/Esc，期间图层面板全程可用；`cancelSession`/`commitSession` 每次都重新 `layerAt(m_layerIndex)` **不校验是否还是进会话时那一层**。触发：图层 2 进入自由变换 → 删除/重排图层 → Esc ⇒ `:581-582` `layer->replaceFromImage(m_preSessionPixels)` 把**另一个图层**的整层像素+偏移盖上去；下标越界时 `commitSession` 在 `:612` 直接 `return false`，会话仍 active 而**源像素只存在于 `m_srcPixels`**，界面停在半途 |
-| A28 | `io/rasterio.cpp:194` | `RasterIo::writeEncoded` 用 `QFile + QIODevice::Truncate` **原地截断**目标文件（"导出为 PNG/JPEG"与"存储为 Web"都走它，`:227`/`saveforwebdialog.cpp:268`）⇒ 中途失败（磁盘满/断电/被杀）会**毁掉用户原有的同名图片**且不回滚不删残留，只返回 false（`:199-202`）。同 io 层另两条落盘路径都用 `QSaveFile + commit`（`projectio.cpp:632-637/727`、`psdio.cpp:522-527/557`）⇒ **三处写法不一致** |
+| A28 | `RasterIo::writeEncoded` | **已修**：改 `QSaveFile + commit`（`phase1a`） |
 | A29 | `io/projectio.cpp:497` | 保存时若无瓦片就写长度 0 的 PNG（`:660-667`），文件里**没有该层宽高**；读取时空 PNG 走 `:496-497` 用**文档**宽高建层。但层 extent 本可≠画布（`LayerStack` 允许"有 extent 但没瓦片"：`TileBuffer::setFromImage` 遇整块全透明不分配瓦片，`domain/tilebuffer.cpp:264-275`，而 `m_width/m_height` 保留）⇒ 500×500 文档里"置入"一张 100×100 **全透明** PNG（层 100×100 无瓦片）→ 保存再打开 → 该层变成 500×500，`boundsInDocument`/变换框/后续蒙版尺寸全变 |
 | A30 | `domain/imagedocument.cpp:1175` | `markDirty`/`markDirtyQuiet` **只对 `activeLayer()`** 调 `invalidateContentBounds`/`invalidateCompositeRaster`。凡"写 A 层、活动层是 B"的路径都会留过期缓存：`tools/transformtool.cpp` 会话开始记 `m_layerIndex`（`:352`），若期间切走活动层，提交时 `markDocumentDirty`（`:665`）失效的是 B；A 若带样式或位置相关算子会走 `ensureCompositeRaster` 的整层缓存（`layer.cpp:214-238`）⇒ **继续显示变换前的像素**。把"谁失效谁"绑在 activeLayer 上是隐式约定 |
 | A31 | `engine/projection.cpp:276` | 串行分支会检查 `if (!Compositor::compositeRegion(...)) continue;`（`:283-285`）后才 `markChunksValid`，**并行分支在 `blockingMap` 里完全丢弃返回值**、事后无条件把每个 piece 标有效（`:275-278`）。`compositeRegion` 只在 dst 尺寸/格式与文档不一致时返回 false（`compositor.cpp:289-294`）⇒ 一旦出现"chunk 网格基于旧缓冲、文档尺寸已变"的窗口，会把**根本没被合成**的块标成有效，`hasPendingChunks()` 立刻变 false（`canvasview.cpp:1503-1504` 停掉 idle 定时器）⇒ 画布**永久保留旧/空块**。窗口存在的原因：网格只由 `ensureBuffer()`/`adoptImage()` 按**缓冲尺寸**建立（`:95-100`/`:85-86`），而 `recomposeInvalidChunks` 的 `full` 按**文档尺寸**现算（`:181`），且 `processPendingChunks()`/`flushPriority()`（`:358-372`）**都不调 `ensureBuffer()`** |

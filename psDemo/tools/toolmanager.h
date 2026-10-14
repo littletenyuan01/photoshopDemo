@@ -62,13 +62,13 @@ public:
     bool setActiveTool(Ps::ToolId id, ViewPort &view);
 
     /**
-     * 临时切换活动工具（对照 PS 空格抓手）：不 deactivate 原工具、不发 activeToolChanged，
-     * 工具箱高亮保持原工具；事件与光标切到 @p id。不可嵌套。
-     * @return 是否进入了临时态（已是该工具 / 已在临时态则 false）
+     * 临时切换活动工具（对照 PS 空格抓手）：不发 activeToolChanged，工具箱高亮保持原工具。
+     * A19：会 deactivate 原工具并 activate 临时工具，避免拖拽态粘在已挂起的工具上。
+     * 不可嵌套。@return 是否进入了临时态（已是该工具 / 已在临时态则 false）
      */
-    bool beginTemporaryTool(Ps::ToolId id);
-    /** 结束临时工具，恢复 begin 前的活动工具（不 deactivate）。 */
-    void endTemporaryTool();
+    bool beginTemporaryTool(Ps::ToolId id, ViewPort &view);
+    /** 结束临时工具：deactivate 临时工具，activate 恢复原工具。 */
+    void endTemporaryTool(ViewPort &view);
     bool hasTemporaryTool() const { return m_toolBeforeTemporary != nullptr; }
 
     // —— 事件分发：返回 true 表示已被工具消费 ——

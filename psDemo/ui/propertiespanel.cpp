@@ -84,6 +84,10 @@ void PropertiesPanel::setSession(Ps::AppSession *session)
 
 void PropertiesPanel::onSessionDocumentChanged(Ps::ImageDocument *document)
 {
+    // A22：换文档前丢弃未决预览并清绑定，禁止把旧层参数 commit 进新文档同下标
+    m_adjHost->clear();
+    m_boundAdjLayer = -1;
+
     if (m_document)
         disconnect(m_document, nullptr, this, nullptr);
 
@@ -167,11 +171,14 @@ void PropertiesPanel::refreshFromDocument()
         return;
     }
 
-    // 换层前：把未松手的预览正式提交到「上一张」调整层（clear 不会发 commit）
-    if (m_adjHost->hasPendingPreview() && m_boundAdjLayer >= 0) {
+    // 仅在「切走活动层」时提交未决预览（A22：结构变化时下标可能已不是同一层，勿盲写）
+    if (m_adjHost->hasPendingPreview() && m_boundAdjLayer >= 0
+        && m_document->activeLayerIndex() != m_boundAdjLayer) {
         const Ps::Layer *prev = m_document->layers().layerAt(m_boundAdjLayer);
         if (prev && prev->isAdjustmentLayer())
             m_adjHost->commitPendingIfAny();
+        else
+            m_adjHost->clear();
     }
 
     const Ps::Layer *layer = m_document->activeLayer();

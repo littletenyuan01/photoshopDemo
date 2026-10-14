@@ -133,7 +133,7 @@ void ToolManager::setContext(const ToolContext &ctx)
     m_context = ctx;
 }
 
-bool ToolManager::beginTemporaryTool(Ps::ToolId id)
+bool ToolManager::beginTemporaryTool(Ps::ToolId id, ViewPort &view)
 {
     // 不可嵌套；已是目标工具则无需切换
     if (m_toolBeforeTemporary)
@@ -142,21 +142,31 @@ bool ToolManager::beginTemporaryTool(Ps::ToolId id)
     if (!next || next == m_activeTool)
         return false;
 
+    // A19：必须 deactivate 原工具，否则选框/画笔拖拽中按空格后松键，
+    // release 落到抓手，原工具 m_dragging 残留 → 橡皮筋冻结
+    if (m_activeTool)
+        m_activeTool->deactivate(m_context, view);
+
     m_toolBeforeTemporary = m_activeTool;
     m_activeTool = next;
     rewriteConnections();
+    m_activeTool->activate(m_context, view);
     // 故意不 emit activeToolChanged：工具箱/选项栏仍显示用户选定的原工具（对照 PS）
     emit cursorChangeRequested(activeCursor());
     return true;
 }
 
-void ToolManager::endTemporaryTool()
+void ToolManager::endTemporaryTool(ViewPort &view)
 {
     if (!m_toolBeforeTemporary)
         return;
+    if (m_activeTool)
+        m_activeTool->deactivate(m_context, view);
     m_activeTool = m_toolBeforeTemporary;
     m_toolBeforeTemporary = nullptr;
     rewriteConnections();
+    if (m_activeTool)
+        m_activeTool->activate(m_context, view);
     emit cursorChangeRequested(activeCursor());
 }
 

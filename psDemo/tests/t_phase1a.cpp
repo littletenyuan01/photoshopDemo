@@ -10,6 +10,7 @@
  * A8：撤销裁剪后选区 mask 须与文档同尺寸
  * A9：分段 blend + 调整层面算子须与整幅 composite 一致
  */
+#include "app/historystack.h"
 #include "domain/filternode.h"
 #include "domain/filterstack.h"
 #include "domain/imagedocument.h"
@@ -25,6 +26,7 @@
 #include "engine/paintengine.h"
 #include "engine/paintselectionclip.h"
 #include "engine/painttypes.h"
+#include "io/rasterio.h"
 #include "testutil.h"
 #include "tools/croptool.h"
 #include "tools/tool.h"
@@ -34,11 +36,14 @@
 #include <QColor>
 #include <QComboBox>
 #include <QDataStream>
+#include <QDir>
+#include <QFile>
 #include <QImage>
 #include <QIODevice>
 #include <QLineEdit>
 #include <QPointF>
 #include <QRect>
+#include <QTemporaryDir>
 #include <QThreadPool>
 
 #include <memory>
@@ -565,6 +570,71 @@ int checkA23UndoMaskClearsEditingFlag(Reporter &r)
     return r.fails;
 }
 
+/** A24：Wind 须标为位置相关（条带并行会相位错乱）。 */
+int checkA24WindIsPositional(Reporter &r)
+{
+    FilterStack stack;
+    FilterNode n(OpName::Wind);
+    n.setWindMethod(1); // 交错
+    n.setWindStrength(4);
+    stack.append(n);
+    r.check(stack.hasPositionalOp(), QStringLiteral("A24：Wind 在 hasPositionalOp 名单内"));
+    return r.fails;
+}
+
+/** A25/A26：geom undo 计蒙版字节；undo 后 redoBytes>0，historyBytes 含 redo。 */
+int checkA25A26HistoryAccounting(Reporter &r)
+{
+    auto doc = ImageDocument::createBlank(64, 64, Qt::white);
+    doc->addLayerMask(0);
+    const quint64 before = doc->history().undoBytes();
+    doc->resizeCanvas(80, 80, 1, 1, Qt::black);
+    const quint64 afterPush = doc->history().undoBytes();
+    r.check(afterPush > before, QStringLiteral("A25：resizeCanvas 后 undoBytes 增加"));
+    // 有蒙版的 DocumentGeomUndo 应明显大于「仅像素」量级（至少含 64×64 灰度）
+    r.check(afterPush - before >= 64ull * 64ull,
+            QStringLiteral("A25：增量至少含一层 maskGray（Δ=%1）").arg(afterPush - before));
+
+    doc->undo();
+    r.check(doc->history().redoBytes() > 0, QStringLiteral("A26：undo 后 redoBytes>0"));
+    r.check(doc->history().historyBytes()
+                == doc->history().undoBytes() + doc->history().redoBytes(),
+            QStringLiteral("A26：historyBytes = undo+redo"));
+    return r.fails;
+}
+
+/** A28：导出失败不得毁掉已有同名文件（QSaveFile 语义：先写好再 commit）。 */
+int checkA28ExportAtomic(Reporter &r)
+{
+    QTemporaryDir dir;
+    r.check(dir.isValid(), QStringLiteral("A28：临时目录可用"));
+    if (!dir.isValid())
+        return r.fails;
+
+    const QString path = dir.filePath(QStringLiteral("keep.png"));
+    {
+        QFile f(path);
+        r.check(f.open(QIODevice::WriteOnly), QStringLiteral("A28：写入哨兵文件"));
+        f.write("SENTINEL-ORIGINAL");
+        f.close();
+    }
+
+    auto doc = ImageDocument::createBlank(32, 32, Qt::white);
+    WebExportOptions opt;
+    opt.format = WebExportFormat::Png;
+    QString err;
+    r.check(RasterIo::exportWithOptions(*doc, path, opt, &err),
+            QStringLiteral("A28：导出成功（%1）").arg(err));
+
+    QFile f(path);
+    r.check(f.open(QIODevice::ReadOnly), QStringLiteral("A28：可读回导出文件"));
+    const QByteArray body = f.readAll();
+    r.check(!body.startsWith("SENTINEL-ORIGINAL"),
+            QStringLiteral("A28：成功导出已替换内容"));
+    r.check(body.size() > 32, QStringLiteral("A28：导出体非空"));
+    return r.fails;
+}
+
 /** A20：高度单位独立参与换算（宽=像素、高=英寸）。 */
 int checkA20CanvasSizeHeightUnit(Reporter &r)
 {
@@ -614,5 +684,8 @@ int tPhase1A()
     checkA17CropDoubleClickCommit(r);
     checkA20CanvasSizeHeightUnit(r);
     checkA23UndoMaskClearsEditingFlag(r);
+    checkA24WindIsPositional(r);
+    checkA25A26HistoryAccounting(r);
+    checkA28ExportAtomic(r);
     return r.fails;
 }

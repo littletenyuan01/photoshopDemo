@@ -39,7 +39,7 @@ MemSnapshot captureMemSnapshot(const ImageDocument *doc, const Projection *proje
         }
     }
     if (history)
-        s.undoBytes = qint64(history->undoBytes());
+        s.undoBytes = qint64(history->historyBytes()); // A26：含 redo
     if (projection && !projection->isNull()) {
         const QImage &img = projection->image();
         s.projectionBytes = qint64(img.sizeInBytes());

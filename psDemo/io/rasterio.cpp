@@ -12,6 +12,7 @@
 #include <QPainter>
 #include <QFile>
 #include <QFileInfo>
+#include <QSaveFile>
 
 namespace Ps {
 namespace {
@@ -190,8 +191,9 @@ bool RasterIo::writeEncoded(const QByteArray &bytes, const QString &filePath,
             *errorMessage = QObject::tr("路径为空。");
         return false;
     }
-    QFile file(filePath);
-    if (!file.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
+    // A28：QSaveFile + commit，失败不毁掉已有同名文件（对齐 projectio/psdio）
+    QSaveFile file(filePath);
+    if (!file.open(QIODevice::WriteOnly)) {
         if (errorMessage)
             *errorMessage = QObject::tr("无法写入：%1").arg(filePath);
         return false;
@@ -199,6 +201,11 @@ bool RasterIo::writeEncoded(const QByteArray &bytes, const QString &filePath,
     if (file.write(bytes) != bytes.size()) {
         if (errorMessage)
             *errorMessage = QObject::tr("写入不完整：%1").arg(filePath);
+        return false;
+    }
+    if (!file.commit()) {
+        if (errorMessage)
+            *errorMessage = QObject::tr("无法提交文件：%1").arg(filePath);
         return false;
     }
     return true;

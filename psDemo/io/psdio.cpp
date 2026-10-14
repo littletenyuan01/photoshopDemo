@@ -18,6 +18,7 @@
 #include <QtEndian>
 
 #include <cstring>
+#include <limits>
 
 namespace Ps {
 namespace {
@@ -842,8 +843,20 @@ std::unique_ptr<ImageDocument> PsdIo::load(const QString &filePath,
 
             for (int i = 0; i < records.size(); ++i) {
                 PsdLayerRecord &rec = records[i];
-                const int lw = qMax(0, int(rec.right - rec.left));
-                const int lh = qMax(0, int(rec.bottom - rec.top));
+                const qint64 lw64 = qint64(rec.right) - qint64(rec.left);
+                const qint64 lh64 = qint64(rec.bottom) - qint64(rec.top);
+                // A16：层矩形须非负、不超过画布上限，且 w*h 不溢出 int（防 OOM / UB）
+                if (lw64 < 0 || lh64 < 0 || lw64 > 30000 || lh64 > 30000
+                    || lw64 * lh64 > qint64(std::numeric_limits<int>::max())) {
+                    if (errorMessage)
+                        *errorMessage = QObject::tr("图层 %1 矩形无效或过大（%2×%3）")
+                                            .arg(i)
+                                            .arg(lw64)
+                                            .arg(lh64);
+                    return nullptr;
+                }
+                const int lw = int(lw64);
+                const int lh = int(lh64);
                 const int planeBytes = lw * lh;
 
                 QByteArray a, r, g, b;
