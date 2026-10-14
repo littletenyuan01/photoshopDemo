@@ -1,13 +1,13 @@
 # 一期代码审计：bug / 逻辑错误候选清单
 
-> 状态：**候选清单；A1–A36 已修，余 GPU #22**　·　2026-10
+> 状态：**候选清单；A1–A36 与 GPU #22 均已收口**　·　2026-10
 > 方法：按 8 个子系统（domain / app / io / engine·op / engine·graph / backend·cache / tools / ui）并行深审，
 > 覆盖 **344 个真实源文件 / 47.8k 行**（已排除 `debug/`、`release/`、`build*/`、生成的 `moc_*`/`ui_*`）
 > ⚠️ **诚实声明**：本清单由并行审计产出，**其余条目尚未逐条人工复核**。`确定` 级也可能存在误报
 > （审计者可能读错了调用方）。**复核通过后才进 [pending-dev.md](pending-dev.md) 的缺陷台账并编号。**
 > 相关：[architecture.md](architecture.md)、[tech-notes.md](tech-notes.md)、[pending-dev.md](pending-dev.md)
 >
-> **已修**：A1–A36。余下：GPU #22。
+> **已修**：A1–A36；GPU #22（T5.1，见下 §4）。本清单无未收口余项。
 
 ## 0. 总体判断
 
@@ -130,11 +130,12 @@ ROI 反向传播、`.pslite` append-only 参数块都经得起逐行核对。
 | A35 | `tools/movetool.cpp` / `paintbuckettool.cpp` | **已修**：首次真实位移/有脏填充再压撤销（`phase1a`） |
 | A36 | `tools/pathanchortool.cpp` | **已修**：overlay 读文档真值并尊重 `visible`；已删/隐藏不画幽灵 |
 
-## 4. 已知且仍未修（不重复编号）
+## 4. 已知项（与台账交叉，不重复开号）
 
-- **GPU r≥5 越界**（缺陷台账 **#22**）：`median.comp:106` 的 `chR[81]` 只支持 **r ≤ 4**，
-  而 host `qbound(1,radius,8)` 与 UI 1..8 滑块都允许到 8 ⇒ **r=5..8 静默错像素**。
-  详见 [gpu-plan.md](gpu-plan.md) §17.1。**至今未修。**
+- **GPU r≥5 越界**（缺陷台账 **#22**）—— **已修（T5.1）**：`median.comp` 的 `chR[81]` 仍只支持 **r ≤ 4**；
+  host/`supports()`/`gpuParamsSupported` 校验半径，**r=5..8 走 CPU**（非扩 kernel）。
+  回归：`gpumedian` 钉住 r=5..8 bit-exact。权威叙述见 [pending-dev.md](pending-dev.md) #22、[gpu-plan.md](gpu-plan.md) §17.1 / T5.1。
+  （本清单曾误标「至今未修」，与台账不同步；以台账为准。）
 
 ## 5. 建议的复核与修复顺序
 
