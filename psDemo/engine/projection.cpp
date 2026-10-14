@@ -376,9 +376,8 @@ QRect Projection::processPendingChunks(int maxChunks, int maxMs)
 {
     if (!m_document)
         return {};
-    // A31：与 sync 一样先对齐缓冲/网格，避免按旧尺寸标有效
-    if (!ensureBuffer(QSize(m_document->width(), m_document->height())))
-        return {};
+    // A31：先对齐缓冲/网格（重建时 ensureBuffer 返回 false，网格全无效，须继续合成）
+    (void)ensureBuffer(QSize(m_document->width(), m_document->height()));
     if (!hasPendingChunks())
         return {};
     const QRect painted = recomposeInvalidChunks(maxChunks, ScanMode::PriorityThenRest, maxMs);
@@ -390,8 +389,7 @@ QRect Projection::flushPriority(int maxMs)
 {
     if (!m_document)
         return {};
-    if (!ensureBuffer(QSize(m_document->width(), m_document->height())))
-        return {};
+    (void)ensureBuffer(QSize(m_document->width(), m_document->height()));
     if (!hasPendingChunks())
         return {};
     return recomposeInvalidChunks(-1, ScanMode::PriorityOnly, maxMs);

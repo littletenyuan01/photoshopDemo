@@ -67,6 +67,8 @@ release\psdemo_tests.exe composite regionraster   :: 只跑指定用例
 | `webexport` | **存储为 Web**：JPEG 低质量体积更小；PNG 保留/去掉透明；50% 缩放尺寸；`exportWithOptions` / `exportFile` 写盘可回读 |
 | `psdio` | **PSD 子集**：自产文件导出→导入；层数/名/offset/混合/不透明度；合成 diffs=0 或 maxCh≤1 |
 | `tilecache` | **瓦片页缓存**（[page-cache-plan.md](page-cache-plan.md)）：预算 0 行为不变；换页往返 bit-exact；预算遵守（+1 瓦片余量）；LRU 最久未用先出；`FailingSwapStore` 降级；复制图层 `cacheKey` 共享（P4 COW）；派生缓存淘汰后投影可重算；`PSLITE_MEM` 快照字段；**P13** 换页开启未淘汰时 materialize 退化粗护栏 ≤25%（目标 ≤5%，实测写入计划文档） |
+| `phase1a` | phase1-audit 回归（选区/蒙版/并行瓦片/历史字节/导出原子/空层 extent/预乘插值等） |
+| `projectionvalid` | A31/A32/A33/A36：半幅 `adoptImage`、改尺寸后 idle `processPending`、`compositePreview` 图口径、路径 overlay 无幽灵 |
 
 ## 约定
 

@@ -73,6 +73,9 @@ public:
     /** 是否还有未合成的无效块。 */
     bool hasPendingChunks() const;
 
+    /** 当前无效块数量（A32 回归 / 调试）。 */
+    int invalidChunkCount() const;
+
     /** 当前投影缓冲（预乘 ARGB32，文档尺寸）。 */
     const QImage &image() const { return m_buffer; }
 
@@ -110,7 +113,6 @@ private:
     void markChunksValid(const QRect &pixelRect);
     bool ensureBuffer(const QSize &pixelSize);
     QRect chunkRectAt(int col, int row, const QRect &full) const;
-    int invalidChunkCount() const;
     /**
      * 合成无效块。
      * @param maxChunks ≤0 表示不限（仅用于「剩余很少」时一次收尾）

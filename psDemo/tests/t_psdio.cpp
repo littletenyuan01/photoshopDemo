@@ -7,6 +7,11 @@
 #include "io/psdio.h"
 #include "testutil.h"
 
+#include <QBuffer>
+#include <QDataStream>
+#include <QFile>
+#include <QIODevice>
+
 using namespace Ps;
 using PsTests::Reporter;
 
@@ -70,6 +75,49 @@ int tPsdIo()
     // 非法路径
     auto bad = PsdIo::load(QStringLiteral("no-such-file.psd"), &err);
     r.check(bad == nullptr && !err.isEmpty(), QStringLiteral("缺文件失败有原因"));
+
+    // A16：层矩形过大须拒载（改写合法 PSD 里的层 bottom/right）
+    {
+        auto tiny = ImageDocument::createBlank(16, 16, Qt::white);
+        const QString badPath = PsTests::tempFilePath(QStringLiteral("a16-huge-layer.psd"));
+        QFile::remove(badPath);
+        QString e2;
+        r.check(PsdIo::save(*tiny, badPath, &e2),
+                QStringLiteral("A16：写出样本（%1）").arg(e2));
+
+        QFile f(badPath);
+        r.check(f.open(QIODevice::ReadWrite), QStringLiteral("A16：打开样本"));
+        QByteArray all = f.readAll();
+        // 层矩形：top,left,bottom,right 大端 int32 = 0,0,16,16
+        QByteArray needle;
+        {
+            QDataStream ns(&needle, QIODevice::WriteOnly);
+            ns.setByteOrder(QDataStream::BigEndian);
+            ns << qint32(0) << qint32(0) << qint32(16) << qint32(16);
+        }
+        const int at = all.indexOf(needle);
+        r.check(at >= 0, QStringLiteral("A16：找到层矩形字节"));
+        if (at >= 0) {
+            QBuffer buf(&all);
+            buf.open(QIODevice::ReadWrite);
+            buf.seek(at);
+            QDataStream ws(&buf);
+            ws.setByteOrder(QDataStream::BigEndian);
+            // bottom/right → 0x7FFFFFFF ⇒ 宽高远超 30000
+            ws << qint32(0) << qint32(0) << qint32(0x7FFFFFFF) << qint32(0x7FFFFFFF);
+            buf.close();
+            f.seek(0);
+            f.resize(0);
+            f.write(all);
+            f.close();
+
+            auto rejected = PsdIo::load(badPath, &e2);
+            r.check(rejected == nullptr, QStringLiteral("A16：过大层矩形拒载"));
+            r.check(e2.contains(QStringLiteral("矩形无效或过大")),
+                    QStringLiteral("A16：错误含「矩形无效或过大」（%1）").arg(e2));
+        }
+        QFile::remove(badPath);
+    }
 
     return r.fails;
 }

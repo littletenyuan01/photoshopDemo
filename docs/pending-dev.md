@@ -23,7 +23,7 @@
 > 回归：`phase1a`（A1–A9/A11–A15/A17/A20/A23–A30/A34/A35）、`filterpanel`（A10）、`pentool`（A18）、`gpumedian`（#22）。
 > 逐条判定、证据与返修项见 **[phase1-audit-review.md](phase1-audit-review.md)**。
 > 本轮**不**再逐条开 #23+ 号：`phase1-audit.md` + 该评估报告已按条目留痕并做索引，重复编号只会造成两处对不上账。
-> A28/A29 的回归脚手架（R1：改 `tempFilePath`）已修；余 9 条无回归项见评估报告 §2 R3。
+> R1–R3 优先项已落地（含 `projectionvalid`、`psdio` A16）；余 A4/A19/A21/A22 见评估报告 §2。
 
 | # | 现象 | 根因 | 防复发 | 详情 |
 |---|------|------|--------|------|

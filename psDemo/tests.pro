@@ -58,7 +58,8 @@ SOURCES += \
     tests/t_pentool.cpp \
     tests/t_pathtree.cpp \
     tests/t_tilecache.cpp \
-    tests/t_phase1a.cpp
+    tests/t_phase1a.cpp \
+    tests/t_projectionvalid.cpp
 
 HEADERS += \
     tests/testutil.h

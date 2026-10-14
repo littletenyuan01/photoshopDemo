@@ -57,6 +57,7 @@ int tPenTool();
 int tPathTree();
 int tTileCache();
 int tPhase1A();
+int tProjectionValid();
 
 namespace {
 
@@ -103,6 +104,7 @@ const Case kCases[] = {
     { "pathtree", "路径树：新建删除/选区互转/撤销", tPathTree },
     { "tilecache", "瓦片页缓存：往返 bit-exact / 预算 / LRU / 失败降级 / COW 复制", tTileCache },
     { "phase1a", "phase1-audit A1–A8 高危回归（选区/蒙版/平移缓存/并行瓦片/直线/路径）", tPhase1A },
+    { "projectionvalid", "A31/A32/A33/A36：投影半幅 adopt、改尺寸 idle、preview 图口径、路径 overlay", tProjectionValid },
 };
 
 } // namespace
