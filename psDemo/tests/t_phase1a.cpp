@@ -39,14 +39,12 @@
 #include <QColor>
 #include <QComboBox>
 #include <QDataStream>
-#include <QDir>
 #include <QFile>
 #include <QImage>
 #include <QIODevice>
 #include <QLineEdit>
 #include <QPointF>
 #include <QRect>
-#include <QTemporaryDir>
 #include <QThreadPool>
 
 #include <memory>
@@ -609,15 +607,14 @@ int checkA25A26HistoryAccounting(Reporter &r)
 /** A28：导出失败不得毁掉已有同名文件（QSaveFile 语义：先写好再 commit）。 */
 int checkA28ExportAtomic(Reporter &r)
 {
-    QTemporaryDir dir;
-    r.check(dir.isValid(), QStringLiteral("A28：临时目录可用"));
-    if (!dir.isValid())
-        return r.fails;
-
-    const QString path = dir.filePath(QStringLiteral("keep.png"));
+    // 扁平临时路径（R1）：避免 QTemporaryDir 在受限 ACL 下不可写
+    const QString path = PsTests::tempFilePath(QStringLiteral("phase1a_a28.png"));
+    QFile::remove(path);
     {
         QFile f(path);
         r.check(f.open(QIODevice::WriteOnly), QStringLiteral("A28：写入哨兵文件"));
+        if (!f.isOpen())
+            return r.fails;
         f.write("SENTINEL-ORIGINAL");
         f.close();
     }
@@ -631,10 +628,11 @@ int checkA28ExportAtomic(Reporter &r)
 
     QFile f(path);
     r.check(f.open(QIODevice::ReadOnly), QStringLiteral("A28：可读回导出文件"));
-    const QByteArray body = f.readAll();
+    const QByteArray body = f.isOpen() ? f.readAll() : QByteArray();
     r.check(!body.startsWith("SENTINEL-ORIGINAL"),
             QStringLiteral("A28：成功导出已替换内容"));
     r.check(body.size() > 32, QStringLiteral("A28：导出体非空"));
+    QFile::remove(path);
     return r.fails;
 }
 
@@ -709,10 +707,8 @@ int checkA27TransformSessionLayerIdentity(Reporter &r)
 /** A29：无瓦片壳层存读须保留自身 extent，不得涨成画布尺寸。 */
 int checkA29EmptyLayerExtentRoundtrip(Reporter &r)
 {
-    QTemporaryDir dir;
-    r.check(dir.isValid(), QStringLiteral("A29：临时目录"));
-    if (!dir.isValid())
-        return r.fails;
+    const QString path = PsTests::tempFilePath(QStringLiteral("phase1a_a29.pslite"));
+    QFile::remove(path);
 
     auto doc = ImageDocument::createBlank(200, 200, Qt::white);
     auto shell = std::make_unique<Layer>(QStringLiteral("shell"), 50, 40);
@@ -723,20 +719,22 @@ int checkA29EmptyLayerExtentRoundtrip(Reporter &r)
                 && doc->layers().layerAt(idx)->height() == 40,
             QStringLiteral("A29：保存前 extent 50×40"));
 
-    const QString path = dir.filePath(QStringLiteral("extent.pslite"));
     QString err;
     r.check(ProjectIo::save(*doc, path, &err),
             QStringLiteral("A29：保存（%1）").arg(err));
     auto loaded = ProjectIo::load(path, &err);
     r.check(loaded != nullptr, QStringLiteral("A29：加载（%1）").arg(err));
-    if (!loaded)
+    if (!loaded) {
+        QFile::remove(path);
         return r.fails;
+    }
     r.check(loaded->layers().count() >= 2, QStringLiteral("A29：加载后至少两层"));
     const Layer *L = loaded->layers().layerAt(loaded->layers().count() - 1);
     r.check(L && L->width() == 50 && L->height() == 40,
             QStringLiteral("A29：读回 extent=%1×%2（期望 50×40）")
                 .arg(L ? L->width() : -1).arg(L ? L->height() : -1));
     r.check(L && !L->hasPixelData(), QStringLiteral("A29：读回仍无瓦片"));
+    QFile::remove(path);
     return r.fails;
 }
 

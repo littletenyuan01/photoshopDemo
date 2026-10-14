@@ -8,6 +8,9 @@
 > 相关：[architecture.md](architecture.md)、[tech-notes.md](tech-notes.md)、[pending-dev.md](pending-dev.md)
 >
 > **已修**：A1–A36；GPU #22（T5.1，见下 §4）。本清单无未收口余项。
+> **评估**：2026-10-14 复核实跑，37 项全部有实现且与声明一致；
+> **R1 后 28 项有回归实跑绿**，余 9 项无回归用例（R3：A4/A16/A19/A21/A22/A31–A33/A36）。
+> 逐条判定与返修项见 **[phase1-audit-review.md](phase1-audit-review.md)**。
 
 ## 0. 总体判断
 
