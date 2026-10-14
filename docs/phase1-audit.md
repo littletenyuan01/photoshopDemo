@@ -1,13 +1,13 @@
 # 一期代码审计：bug / 逻辑错误候选清单
 
-> 状态：**候选清单；高危 A1–A8/A10 已复核并修复（其余待续）**　·　2026-10
+> 状态：**候选清单；A1–A12/A14/A20 已复核并修复（其余待续）**　·　2026-10
 > 方法：按 8 个子系统（domain / app / io / engine·op / engine·graph / backend·cache / tools / ui）并行深审，
 > 覆盖 **344 个真实源文件 / 47.8k 行**（已排除 `debug/`、`release/`、`build*/`、生成的 `moc_*`/`ui_*`）
 > ⚠️ **诚实声明**：本清单由并行审计产出，**其余条目尚未逐条人工复核**。`确定` 级也可能存在误报
 > （审计者可能读错了调用方）。**复核通过后才进 [pending-dev.md](pending-dev.md) 的缺陷台账并编号。**
 > 相关：[architecture.md](architecture.md)、[tech-notes.md](tech-notes.md)、[pending-dev.md](pending-dev.md)
 >
-> **已修**：A1–A8、A10；回归 `phase1a` / `filterpanel`。未修高危余下见正文（A9 等）。
+> **已修**：A1–A12、A14、A20；回归 `phase1a` / `filterpanel`。下一批：A13/A15/A17/A18/A23 等。
 
 ## 0. 总体判断
 
@@ -84,22 +84,10 @@ ROI 反向传播、`.pslite` append-only 参数块都经得起逐行核对。
 - **问题**：pop 恢复文档尺寸后 `replaceFromImage` 仍缩放到旧（裁剪后）mask 尺寸。
 - **修复**：先 `selection.reset(m_width, m_height)` 再 `replaceFromImage`。回归：`phase1a` A8。
 
-### A9 —— 调整层「面积算子」分支重算 `below` 时丢掉 dst 中已有内容 `确定`
-- **位置**：`engine/compositor.cpp:133`（关联 `:131` 点算子分支用 `dst.copy(area)`、`lo=qMax(0,layerBegin)`）、
-  调用侧 `tools/movetool.cpp:297`、`tools/transformtool.cpp:492`
-- **问题**：调整层两条分支**互不等价**：`srcWant==area`（点算子）时直接用 `dst.copy(area)` 当滤镜输入（dst 里是"下方全部层 + 正在拖动的图章"）；
-  否则（**面积算子**，本项目明确支持的"调整层 + 面积算子"特性）在私有子缓冲里用 `blendLayerRangeImpl(below, ..., lo, i, ...)`
-  从图层栈 `[lo,i)` **从零重搭** `below`，**完全不看 dst 里 `layerBegin` 之前已合成好的内容**。
-  `lo=qMax(0,layerBegin)` ⇒ 只要 `layerBegin>0` 两条分支输入就不同。
-- **后果**：调整层滤的是"被移动层之上、调整层之下那几层"，既看不到下方层也看不到被移动的图章；
-  不透明度通常 1.0 ⇒ 走整像素替换 ⇒ 补丁区被替换成近乎空白。**更糟**：移动松手时 `MoveTool::finishDrag`
-  会 `emit liveProjectionCommitted(m_live)`，`CanvasView` 执行 `Projection::adoptImage` 并清脏区 ⇒
-  **这份错像素被当成全图真相写进投影且不再重算**。
-- **旁证**：违反工具自己的注释（`movetool.cpp:295`「调整层依赖移动后的下方结果」、`pending-dev.md:126`「调整吃到 below+图章」）。
-- **验证**：3 层文档（L0 像素、L1 像素、L2=`addAdjustmentLayer(BoxBlur, r=6)`），
-  先 `blendLayerRange(live, doc, area, 0, 1, -1)` 再 `blendLayerRange(live, doc, area, 1, 3, -1)`，
-  断言 `live(area) == Compositor::composite(doc)(area)`（**现在 diffs>0**）。
-  把 L2 换成点算子后同一断言通过 ⇒ 证明是**分支不对称**而非算子问题。
+### A9 —— 调整层「面积算子」分支重算 `below` 时丢掉 dst 中已有内容 `已修`
+- **位置**：`engine/compositor.cpp`（面积算子分支）
+- **问题**：`blendLayerRangeImpl(below, ..., lo, i)` 从 `layerBegin` 起算 ⇒ 丢掉更下层与 live 图章。
+- **修复**：私有缓冲从图层 **0** 重搭到 `i`。回归：`phase1a` A9。
 
 ### A10 —— 非模态滤镜对话框用可变成员定位目标层，会写进另一图层 `已修`
 - **位置**：`ui/filterstackwidget.cpp`（`onEdit`）
@@ -110,16 +98,16 @@ ROI 反向传播、`.pslite` append-only 参数块都经得起逐行核对。
 
 | ID | 位置 | 问题 | 置信 |
 |---|---|---|---|
-| **A11** | `domain/imagedocument.cpp:1537` | `scaleImage` 把**每层自身栅格**拉伸到整幅新画布（`src.scaled(newWidth,newHeight)`），而 offset 用**文档**系数 `:1542-1543` ⇒ 两个系数不一致：200×200 文档里 100×100、offset(50,50) 的层（`placeImageAsLayer` 置入的就是这种）在 `scaleImage(400,400)` 后变成 400×400、内容被**拉伸 4 倍**（应 2 倍）并超出画布被裁。凡尺寸≠画布的层都会在「图像大小」后失真 | 确定 |
-| **A12** | `domain/imagedocument.cpp:1438` | `removeLayer` 只修活动层下标、**不清 `m_editingLayerMask`**（该标志的清理散落在 `:502-507`/`:1009-1012`/`:1082-1085`）⇒ 删掉正在编辑蒙版的层后：新活动层无蒙版 ⇒ 画笔在 `painttool.cpp:78-81/123-126` **直接 return false（"没反应"）**；新活动层有蒙版 ⇒ 笔画**静默写进另一层的蒙版**。`LayerStructureUndo::pop`（`undoitem.cpp:200-236`）同样漏了 | 确定 |
+| **A11** | `imagedocument.cpp` `scaleImage` | **已修**：按文档 sx/sy 缩放层 extent+offset+mask（`phase1a`） | 确定 |
+| **A12** | `removeLayer` / `LayerStructureUndo` | **已修**：删层清 `m_editingLayerMask` 并发 `editingTargetChanged` | 确定 |
 | **A13** | `domain/imagedocument.cpp:1598` | `resizeCanvas` 用扩展色 `neu.fill(扩展色)` 填**整张**新画布再 SourceOver 贴旧像素 ⇒ (a) 底层原本**透明**的内部像素被涂成扩展色（UI 选项名是"扩展颜色"，语义只该作用于**新增区域**）；(b) 原本**半透明**的像素与不透明扩展色混合后变成不透明 ⇒ **图层 alpha 被永久烘焙掉**。选"透明"时走 else 分支 ⇒ 正常（所以没被测出来） | 确定 |
-| **A14** | `engine/op/selectfloodop.cpp:119` | 魔棒 BFS 把"**探测过但颜色不匹配**"的邻居在**同一张 mask** 上标为 `1`（255 才是命中，见 `:80-85`），随后整张 mask 交给 `combineShapeMask`（`:135`）；而 `Selection::isSelected` 定义为 `value > 0` ⇒ 这些像素**被判为已选**。落在返回 area 内的（如白底上黑色物体轮廓那一圈）会被真正拷进选区 ⇒ 填充/删除/绘制连带改到它们。`FloodFillOp` 在同一张 mask 上用的是 `== 255`（`floodfillop.cpp:179`）⇒ **口径不一致，本算子漏了**。仅影响连续模式 | 确定 |
+| **A14** | `selectfloodop.cpp` | **已修**：合并选区前把非 255 清 0（`phase1a`） | 确定 |
 | **A15** | `io/projectio.cpp:377` | 读端把 `count > 64` 当损坏直接失败（整份工程打不开），**写端 `:343` 对滤镜数完全无检查**，`FilterStack::append` 与 `ImageDocument::addLayerFilter` 也无上限 ⇒「连续加 65 个滤镜 → 保存成功 → 再也打不开」= **用户数据事实丢失**，保存时还没有任何提示。图层数/路径数（读端 ≤4096 `:467`/`:604`）同一模式 | 确定 |
 | **A16** | `io/psdio.cpp:847` | 画布尺寸在 `:705` 校验（≤30000），但**图层矩形**（`:760-765` 只做截断检查）从不与画布或任何上限比较就参与 `planeBytes = lw*lh`；`readChannelPlane` 第一件事是 `out->resize(expectedBytes)`（`:173`），且 a/r/g/b **四个平面同时存活**（`:849-898`）⇒ 一条 `30000×30000` 的层记录就要 **~3.6GB**；若 `lw*lh > 2^31` 则 signed int **溢出**（UB）。触发条件是用户能打开的任意 `.psd`，后果是 `bad_alloc` 未捕获 ⇒ 进程终止 | 可疑 |
 | **A17** | `tools/croptool.cpp:141` | 注释与 `croptool.h:5` 都声明"双击确认"，但 Qt 双击序列是 press→release→**dblclick-press**→release，第一次 press **不置** `doubleClick`，会落到 `:140-141` 把 `m_hasFrame` 清掉 ⇒ dblclick 分支里 `m_hasFrame` **恒为 false**，裁剪框被静默丢弃（Enter 路径 `:209-211` 正常）。**反向更糟**：双击时鼠标抖动 ≥1 文档像素（100% 缩放下 1 控件像素=1 文档像素）⇒ 第一次 click 的 release 把 1~2px 小框置为 `m_hasFrame=true` ⇒ dblclick 确认**裁出 1~2px 的画布** | 确定 |
 | **A18** | `tools/pentool.cpp:243` | Ctrl+点锚点会 `PathEditOps::deleteAnchorAt → Path::deleteAnchor → sp.anchors.removeAt(...)`（`domain/path.cpp:164`），但 `m_activeIdx` **既不重选也不做边界检查**；`drawOverlay:517-519` 只判 `m_activeIdx >= 0` 就索引 `anchors[m_activeIdx]`（`mouseMove:355` 同）⇒ 删最后一个锚点后**越界读**（UB）。删中间点时下标整体前移，后续拖拽/橡皮带静默作用到**另一个锚点** | 确定 |
 | **A19** | `tools/toolmanager.cpp:146` | `beginTemporaryTool` 直接改写 `m_activeTool` 并重连信号，**既不 deactivate 旧工具也不 activate 新工具**（对比 `setActiveTool:185-186`）。而 `CanvasView::mouseReleaseEvent`（`ui/canvasview.cpp:852`）只把 release 派发给"当时的活动工具"⇒ 选框拖拽中按空格（`:906`）→ 松左键（release 落到 Hand）→ 松空格恢复选框，此时选框 `m_dragging` 仍为 true、`hasOverlay()` 为 true ⇒ **橡皮筋冻结**、本次选区不提交。画笔/仿制图章/磁性套索同类残留 | 可疑 |
-| **A20** | `ui/canvassizedialog.cpp:123` | `absolutePixelSize()` 只读 `widthUnitCombo` 得到 `unit`，然后**同时**用于宽和高（`:132-133`）；构造函数只连了 `widthUnitCombo→syncHeightUnitFromWidth`（`:56-57`）。`heightUnitCombo` 全工程**只被写、从未被读** ⇒ **死控件**：宽度单位=像素、高度单位=英寸、高度填 2、PPI 72 ⇒ 期望 144px，**实际得到 2px** | 确定 |
+| **A20** | `canvassizedialog.cpp` | **已修**：高/宽单位分别换算（`phase1a`） | 确定 |
 | **A21** | `ui/canvasview.cpp:1400` | `flushAdjustmentPreview` 用 `m_adjPreviewBusy` 做单飞（`:1195-1198`），但主路径回调**先在 `:1400` 把 busy 置 false，之后才在 `:1401` 判世代**（同文件另三处 `:1279-1282`/`:1294-1303`/`:1326-1334` 都是先判后置）⇒ 过期回调提前解锁 ⇒ 每个 32ms tick 都能再起一个任务，且都走 `haveStacks=false` 分支 ⇒ 在主线程之外分配**两张文档全幅 QImage**（`:1287-1290`，2480×3508 ≈ 35MB/张）并**并发调 `Compositor::blendLayerRange`** | 可疑 |
 | **A22** | `ui/propertiespanel.cpp:171` | `refreshFromDocument` 开头用 `m_boundAdjLayer` 直接索引**当前** `m_document` 提交未决预览，只用 `prev->isAdjustmentLayer()` 校验、**不校验身份**；而 `onSessionDocumentChanged` 在调用它**之前**就把 `m_document` 换成新文档（`:87-90 → :114`）⇒ 打开/新建文档时，上一文档的调整参数被写进**新文档**同下标的调整层并压一条 undo（触发：点调整层滑条后用方向键改值，只发 previewChanged，`m_pendingPreview` 一直为 true）。文档内结构变化（`moveLayer` 发 `structureChanged`）同理会写错层 | 可疑 |
 | **A23** | `app/undoitem.cpp:154` | `LayerPropUndo::pop` 通过 `applyLayerProps` 把快照写回，快照 `hasMask=false` 时会 `layer.setMask(nullptr)`（`:52-54`）即**蒙版消失**，但全程**不碰 `doc.m_editingLayerMask` 也不发 `editingTargetChanged`**（正向路径都会同步：`imagedocument.cpp:985-987`/`:1009-1011`/`:1082-1084`/`:502-507`）⇒「加蒙版 → Ctrl+Z」后文档一直声称在编辑蒙版，而活动层已无蒙版 ⇒ 画笔**静默失效**、面板仍画编辑目标（`ui/layertreepanel.cpp:908-911`） | 确定 |

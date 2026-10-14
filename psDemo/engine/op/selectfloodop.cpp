@@ -131,6 +131,15 @@ QRect SelectFloodOp::process(OpContext &ctx)
         return {};
     }
 
+    // A14：BFS 用 1 标记「已访未命中」防重入；选区口径是 value>0，合并前必须清掉
+    for (int y = 0; y < h; ++y) {
+        uchar *line = m_region.scanLine(y);
+        for (int x = 0; x < w; ++x) {
+            if (line[x] != 255)
+                line[x] = 0;
+        }
+    }
+
     const QRect area(QPoint(minX, minY), QPoint(maxX, maxY));
     ctx.selection->combineShapeMask(m_region, m_op, area);
     return area;

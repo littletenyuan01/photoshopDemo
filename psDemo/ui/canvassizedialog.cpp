@@ -55,6 +55,9 @@ CanvasSizeDialog::CanvasSizeDialog(Ps::ImageDocument *document,
     connect(ui->heightEdit, &QLineEdit::editingFinished, this, &CanvasSizeDialog::updateLabels);
     connect(ui->widthUnitCombo, QOverload<int>::of(&QComboBox::currentIndexChanged),
             this, &CanvasSizeDialog::syncHeightUnitFromWidth);
+    // A20：高度单位独立生效（不再是只被写的死控件）
+    connect(ui->heightUnitCombo, QOverload<int>::of(&QComboBox::currentIndexChanged),
+            this, &CanvasSizeDialog::updateLabels);
     connect(ui->relativeCheck, &QCheckBox::toggled, this, &CanvasSizeDialog::updateLabels);
     connect(ui->extColorCombo, QOverload<int>::of(&QComboBox::currentIndexChanged),
             this, &CanvasSizeDialog::onExtColorChanged);
@@ -120,7 +123,8 @@ void CanvasSizeDialog::syncHeightUnitFromWidth()
 
 QSizeF CanvasSizeDialog::absolutePixelSize() const
 {
-    const DimUnit unit = DimUnit(ui->widthUnitCombo->currentIndex());
+    const DimUnit unitW = DimUnit(ui->widthUnitCombo->currentIndex());
+    const DimUnit unitH = DimUnit(ui->heightUnitCombo->currentIndex());
     bool okW = false;
     bool okH = false;
     double w = ui->widthEdit->text().trimmed().toDouble(&okW);
@@ -129,8 +133,8 @@ QSizeF CanvasSizeDialog::absolutePixelSize() const
         w = 0;
     if (!okH)
         h = 0;
-    w = toPixels(w, unit, m_ppi);
-    h = toPixels(h, unit, m_ppi);
+    w = toPixels(w, unitW, m_ppi);
+    h = toPixels(h, unitH, m_ppi);
     if (ui->relativeCheck->isChecked()) {
         w += m_origW;
         h += m_origH;

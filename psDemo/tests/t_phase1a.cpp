@@ -8,7 +8,9 @@
  * A7：Path::read 对超大 nA 立即失败且不巨量分配
  * A3：平移图层须失效文档坐标区域滤镜缓存
  * A8：撤销裁剪后选区 mask 须与文档同尺寸
+ * A9：分段 blend + 调整层面算子须与整幅 composite 一致
  */
+#include "domain/filternode.h"
 #include "domain/imagedocument.h"
 #include "domain/layer.h"
 #include "domain/layermask.h"
@@ -18,16 +20,20 @@
 #include "engine/cache/swapstore.h"
 #include "engine/cache/tilecache.h"
 #include "engine/compositor.h"
+#include "engine/op/opname.h"
 #include "engine/paintengine.h"
 #include "engine/paintselectionclip.h"
 #include "engine/painttypes.h"
 #include "testutil.h"
+#include "ui/canvassizedialog.h"
 
 #include <QBuffer>
 #include <QColor>
+#include <QComboBox>
 #include <QDataStream>
 #include <QImage>
 #include <QIODevice>
+#include <QLineEdit>
 #include <QPointF>
 #include <QRect>
 #include <QThreadPool>
@@ -283,6 +289,39 @@ int checkA3TranslateInvalidatesRegionFilter(Reporter &r)
     return r.fails;
 }
 
+/**
+ * A9：先 blend [0,1) 再 [1,end) 到子矩形；调整层为面积算子时须与整幅 composite 一致。
+ * （子矩形迫使 BoxBlur 走 srcWant!=area 分支。）
+ */
+int checkA9AdjAreaBlendSeed(Reporter &r)
+{
+    constexpr int W = 64, H = 64;
+    auto doc = ImageDocument::createBlank(W, H, Qt::white);
+    doc->placeImageAsLayer(PsTests::makeLayerImage(W, H, 3, 255), QStringLiteral("L1"));
+    const int adj = doc->addAdjustmentLayer(OpName::BoxBlur);
+    r.check(adj == 2, QStringLiteral("A9：调整层在 index 2（实际 %1）").arg(adj));
+    Layer *adjLayer = doc->layers().layerAt(adj);
+    r.check(adjLayer && adjLayer->isAdjustmentLayer() && adjLayer->filters().count() == 1,
+            QStringLiteral("A9：调整层就绪"));
+    if (adjLayer && adjLayer->filters().count() == 1)
+        adjLayer->filters().at(0).setBlurRadius(6);
+
+    const QRect area(20, 20, 24, 24); // 小于画布 ⇒ blur pad 使 srcWant != area
+    QImage live(W, H, QImage::Format_ARGB32_Premultiplied);
+    live.fill(Qt::transparent);
+    r.check(Compositor::blendLayerRange(live, *doc, area, 0, 1, -1),
+            QStringLiteral("A9：第一段 blend [0,1)"));
+    r.check(Compositor::blendLayerRange(live, *doc, area, 1, doc->layers().count(), -1),
+            QStringLiteral("A9：第二段 blend [1,end)"));
+
+    const QImage full = Compositor::composite(*doc);
+    const long long diffs = PsTests::diffCount(live.copy(area), full.copy(area));
+    r.check(diffs == 0,
+            QStringLiteral("A9：分段 blend 与整幅 composite 在 area 内一致（diffs=%1）")
+                .arg(diffs));
+    return r.fails;
+}
+
 /** A8：裁剪后 undo，选区 mask 尺寸须等于文档尺寸。 */
 int checkA8SelectionSizeAfterCropUndo(Reporter &r)
 {
@@ -333,6 +372,100 @@ int checkA7PathReadCap(Reporter &r)
     return r.fails;
 }
 
+/** A11：置入的小层在 scaleImage 后应按文档系数缩放，而非拉成整幅画布。 */
+int checkA11ScaleImagePreservesLayerExtent(Reporter &r)
+{
+    auto doc = ImageDocument::createBlank(200, 200, Qt::white);
+    QImage patch(100, 100, QImage::Format_ARGB32_Premultiplied);
+    patch.fill(qRgba(20, 40, 60, 255));
+    const int idx = doc->placeImageAsLayer(patch, QStringLiteral("P"));
+    Layer *layer = doc->layers().layerAt(idx);
+    r.check(layer && layer->width() == 100 && layer->height() == 100,
+            QStringLiteral("A11：置入层 100×100"));
+    if (!layer)
+        return r.fails;
+    const int ox = layer->offsetX();
+    const int oy = layer->offsetY();
+
+    doc->scaleImage(400, 400);
+    r.check(layer->width() == 200 && layer->height() == 200,
+            QStringLiteral("A11：放大 2× 后层 extent 200×200（实际 %1×%2）")
+                .arg(layer->width())
+                .arg(layer->height()));
+    r.check(layer->offsetX() == ox * 2 && layer->offsetY() == oy * 2,
+            QStringLiteral("A11：offset 按同一系数缩放"));
+    return r.fails;
+}
+
+/** A12：删掉正在编辑蒙版的层后，编辑蒙版标志须清除。 */
+int checkA12RemoveLayerClearsEditingMask(Reporter &r)
+{
+    auto doc = ImageDocument::createBlank(64, 64, Qt::white);
+    doc->placeImageAsLayer(PsTests::makeLayerImage(64, 64, 3, 255), QStringLiteral("L"));
+    r.check(doc->addLayerMask(1), QStringLiteral("A12：加蒙版"));
+    doc->setActiveLayerIndex(1);
+    r.check(doc->setEditingLayerMask(true), QStringLiteral("A12：进入编辑蒙版"));
+    r.check(doc->isEditingLayerMask(), QStringLiteral("A12：标志已开"));
+    r.check(doc->removeLayer(1), QStringLiteral("A12：删除该层"));
+    r.check(!doc->isEditingLayerMask(), QStringLiteral("A12：删层后编辑蒙版标志已清"));
+    return r.fails;
+}
+
+/** A14：魔棒连续模式不得把「已访未命中」像素算进选区。 */
+int checkA14FloodSelectVisitedNotSelected(Reporter &r)
+{
+    constexpr int W = 32, H = 32;
+    auto doc = ImageDocument::createBlank(W, H, Qt::white);
+    // 中心 8×8 黑块；种子在黑块内，邻居白边会被 BFS 探测但不匹配
+    Layer *layer = doc->activeLayer();
+    QImage img = layer->materialize();
+    for (int y = 12; y < 20; ++y)
+        for (int x = 12; x < 20; ++x)
+            img.setPixel(x, y, qRgba(0, 0, 0, 255));
+    layer->replaceFromImage(img);
+
+    doc->selectFlood(QPoint(16, 16), /*tolerance=*/0, /*contiguous=*/true,
+                     /*sampleMerged=*/false, ChannelOp::Replace);
+    // 紧贴黑块外的白像素不得被选中
+    r.check(!doc->selection().isSelected(11, 16),
+            QStringLiteral("A14：黑块左邻白像素未入选"));
+    r.check(!doc->selection().isSelected(20, 16),
+            QStringLiteral("A14：黑块右邻白像素未入选"));
+    r.check(doc->selection().isSelected(16, 16),
+            QStringLiteral("A14：种子黑像素已选中"));
+    return r.fails;
+}
+
+/** A20：高度单位独立参与换算（宽=像素、高=英寸）。 */
+int checkA20CanvasSizeHeightUnit(Reporter &r)
+{
+    auto doc = ImageDocument::createBlank(100, 100, Qt::white);
+    CanvasSizeDialog dlg(doc.get(), Qt::black, Qt::white);
+    auto *wEdit = dlg.findChild<QLineEdit *>(QStringLiteral("widthEdit"));
+    auto *hEdit = dlg.findChild<QLineEdit *>(QStringLiteral("heightEdit"));
+    auto *wUnit = dlg.findChild<QComboBox *>(QStringLiteral("widthUnitCombo"));
+    auto *hUnit = dlg.findChild<QComboBox *>(QStringLiteral("heightUnitCombo"));
+    r.check(wEdit && hEdit && wUnit && hUnit, QStringLiteral("A20：对话框控件就绪"));
+    if (!wEdit || !hEdit || !wUnit || !hUnit)
+        return r.fails;
+
+    wUnit->blockSignals(true);
+    hUnit->blockSignals(true);
+    wUnit->setCurrentIndex(0); // Pixels
+    hUnit->setCurrentIndex(1); // Inches
+    wUnit->blockSignals(false);
+    hUnit->blockSignals(false);
+    wEdit->setText(QStringLiteral("100"));
+    hEdit->setText(QStringLiteral("2"));
+    // 默认 PPI 72 ⇒ 2 英寸 = 144 像素
+    const QSize sz = dlg.resultPixelSize();
+    r.check(sz.width() == 100 && sz.height() == 144,
+            QStringLiteral("A20：高 2 英寸@72ppi → 144px（实际 %1×%2）")
+                .arg(sz.width())
+                .arg(sz.height()));
+    return r.fails;
+}
+
 int tPhase1A()
 {
     Reporter r;
@@ -343,5 +476,10 @@ int tPhase1A()
     checkA6LineUpLeft(r);
     checkA7PathReadCap(r);
     checkA8SelectionSizeAfterCropUndo(r);
+    checkA9AdjAreaBlendSeed(r);
+    checkA11ScaleImagePreservesLayerExtent(r);
+    checkA12RemoveLayerClearsEditingMask(r);
+    checkA14FloodSelectVisitedNotSelected(r);
+    checkA20CanvasSizeHeightUnit(r);
     return r.fails;
 }

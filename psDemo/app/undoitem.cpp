@@ -210,6 +210,10 @@ void LayerStructureUndo::pop(ImageDocument &doc)
         else if (doc.m_activeLayerIndex > m_index)
             --doc.m_activeLayerIndex;
 
+        // A12：结构撤销删层时同步清编辑蒙版标志
+        const bool wasEditingMask = doc.m_editingLayerMask;
+        doc.m_editingLayerMask = false;
+
         m_kind = Kind::Removed;
         m_layer = std::move(taken);
         m_activeIndex = doc.m_activeLayerIndex;
@@ -217,6 +221,8 @@ void LayerStructureUndo::pop(ImageDocument &doc)
         doc.m_dirtyRect = QRect(0, 0, doc.m_width, doc.m_height);
         emit doc.structureChanged();
         emit doc.activeLayerChanged(doc.m_activeLayerIndex);
+        if (wasEditingMask)
+            emit doc.editingTargetChanged();
         emit doc.contentChanged();
         return;
     }

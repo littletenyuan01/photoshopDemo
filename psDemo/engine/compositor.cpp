@@ -131,9 +131,12 @@ bool blendLayerRangeImpl(QImage &dst,
                 // 点算子快路径：下方结果已在投影 dst 的 area 里
                 filtered = layer->filters().apply(dst.copy(area));
             } else {
+                // A9：面积算子私有缓冲必须从图层 0 重搭下方（不能用 lo=layerBegin）。
+                // layerBegin>0 时 dst 里已有「更下层 + 可能的 live 图章」，点算子走
+                // dst.copy 能吃到；若这里从 lo 起算会丢掉 [0,layerBegin)，滤镜输入变空。
                 QImage below(srcWant.size(), QImage::Format_ARGB32_Premultiplied);
                 below.fill(Qt::transparent);
-                if (!blendLayerRangeImpl(below, doc, srcWant, lo, i, skipLayer,
+                if (!blendLayerRangeImpl(below, doc, srcWant, /*layerBegin=*/0, i, skipLayer,
                                          srcWant.topLeft()))
                     return false;
                 QImage work = layer->filters().apply(below, srcWant, area, nullptr);

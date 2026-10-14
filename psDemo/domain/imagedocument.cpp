@@ -1452,10 +1452,16 @@ bool ImageDocument::removeLayer(int index)
     else if (m_activeLayerIndex > index)
         --m_activeLayerIndex;
 
+    // A12：删层后不再处于「编辑蒙版」——否则画笔可能静默失效或写到另一层蒙版
+    const bool wasEditingMask = m_editingLayerMask;
+    m_editingLayerMask = false;
+
     m_dirty = true;
     m_dirtyRect = QRect(0, 0, m_width, m_height);
     emit structureChanged();
     emit activeLayerChanged(m_activeLayerIndex);
+    if (wasEditingMask)
+        emit editingTargetChanged();
     emit contentChanged();
     return true;
 }
@@ -1526,16 +1532,23 @@ void ImageDocument::scaleImage(int newWidth, int newHeight)
 
     pushDocumentGeomUndo(tr("图像大小"));
 
+    // A11：按文档缩放系数缩放「层自身栅格」与 offset，勿把每层硬拉成整幅新画布
+    const qreal sx = qreal(newWidth) / qreal(m_width);
+    const qreal sy = qreal(newHeight) / qreal(m_height);
+
     for (int i = 0; i < m_layers.count(); ++i) {
         Layer *layer = m_layers.layerAt(i);
         if (!layer)
             continue;
 
+        const int newLw = qMax(1, qRound(layer->width() * sx));
+        const int newLh = qMax(1, qRound(layer->height() * sy));
+
         QImage maskGray;
         bool maskEnabled = true;
         if (layer->hasMask() && layer->mask()) {
             maskGray = layer->mask()->image().scaled(
-                newWidth, newHeight, Qt::IgnoreAspectRatio, Qt::FastTransformation);
+                newLw, newLh, Qt::IgnoreAspectRatio, Qt::FastTransformation);
             if (maskGray.format() != QImage::Format_Grayscale8)
                 maskGray = maskGray.convertToFormat(QImage::Format_Grayscale8);
             maskEnabled = layer->mask()->isEnabled();
@@ -1543,16 +1556,16 @@ void ImageDocument::scaleImage(int newWidth, int newHeight)
 
         QImage src = layer->materialize();
         if (src.isNull()) {
-            src = QImage(m_width, m_height, QImage::Format_ARGB32_Premultiplied);
+            src = QImage(layer->width(), layer->height(), QImage::Format_ARGB32_Premultiplied);
             src.fill(0);
         }
-        QImage scaled = src.scaled(newWidth, newHeight, Qt::IgnoreAspectRatio,
+        QImage scaled = src.scaled(newLw, newLh, Qt::IgnoreAspectRatio,
                                    Qt::SmoothTransformation);
         if (scaled.format() != QImage::Format_ARGB32_Premultiplied)
             scaled = scaled.convertToFormat(QImage::Format_ARGB32_Premultiplied);
         layer->replaceFromImage(scaled);
-        layer->setOffsetSilent(qRound(layer->offsetX() * qreal(newWidth) / m_width),
-                               qRound(layer->offsetY() * qreal(newHeight) / m_height));
+        layer->setOffsetSilent(qRound(layer->offsetX() * sx),
+                               qRound(layer->offsetY() * sy));
         if (!maskGray.isNull()) {
             auto mask = std::make_unique<LayerMask>();
             mask->setFromImage(maskGray);
