@@ -1,7 +1,8 @@
 /**
  * projectio.cpp — ProjectIo::save/load（io 层）。
  *
- * 只读写 ProjectFormat::Current；不做旧版兼容。
+ * 写入仅 ProjectFormat::Current（v5）。读取接受 v5 与 v4：
+ * v5 空 PNG 层后跟 extentW/H；v4 空 PNG 层默认画布尺寸（A29 升版前布局）。
  * 滤镜参数写入固定 kFilterNodeParamBytes 块：已用字段从前排，尾部预留 0；
  * 后续加 FilterNode 字段只占用预留，勿再无长度追加（用尽再改 ProjectFormat）。
  */
@@ -457,6 +458,7 @@ bool readBytes(QDataStream &in, QByteArray *bytes)
 
 std::unique_ptr<ImageDocument> loadDocumentBody(QDataStream &in,
                                                 const QString &filePath,
+                                                quint32 format,
                                                 QString *errorMessage)
 {
     qint32 width = 0;
@@ -493,18 +495,22 @@ std::unique_ptr<ImageDocument> loadDocumentBody(QDataStream &in,
         const QString layerName = name.isEmpty()
                                       ? QObject::tr("图层 %1").arg(i + 1)
                                       : name;
-        // 空 PNG = 无瓦片壳层（调整层 / 透明新建）；随后读 extent（可≠画布）
+        // 空 PNG = 无瓦片壳层（调整层 / 透明新建）
+        // v5 起随后有 extent（可≠画布）；v4 无该字段，默认画布尺寸
+        constexpr quint32 kFormatWithEmptyExtent = 5;
         std::unique_ptr<Layer> layer;
         if (png.isEmpty()) {
-            qint32 layerW = 0;
-            qint32 layerH = 0;
-            in >> layerW >> layerH;
-            if (in.status() != QDataStream::Ok
-                || layerW <= 0 || layerH <= 0
-                || layerW > 32768 || layerH > 32768) {
-                if (errorMessage)
-                    *errorMessage = QObject::tr("图层 %1 extent 无效").arg(i);
-                return nullptr;
+            qint32 layerW = width;
+            qint32 layerH = height;
+            if (format >= kFormatWithEmptyExtent) {
+                in >> layerW >> layerH;
+                if (in.status() != QDataStream::Ok
+                    || layerW <= 0 || layerH <= 0
+                    || layerW > 32768 || layerH > 32768) {
+                    if (errorMessage)
+                        *errorMessage = QObject::tr("图层 %1 extent 无效").arg(i);
+                    return nullptr;
+                }
             }
             layer = std::make_unique<Layer>(layerName, layerW, layerH);
         } else {
@@ -773,13 +779,20 @@ std::unique_ptr<ImageDocument> ProjectIo::load(const QString &filePath,
             *errorMessage = QObject::tr("不是 PhotoshopLite 工程文件（魔数不匹配）");
         return nullptr;
     }
-    if (formatRaw != quint32(ProjectFormat::Current)) {
+    // Current=5；v4 仍可读（空层无 extent）。更早版本布局差太多，继续拒绝。
+    constexpr quint32 kMinReadableFormat = 4;
+    if (formatRaw < kMinReadableFormat
+        || formatRaw > quint32(ProjectFormat::Current)) {
         if (errorMessage)
-            *errorMessage = QObject::tr("工程格式不匹配（当前仅支持 ProjectFormat::Current）");
+            *errorMessage = QObject::tr(
+                "工程格式不匹配（文件为 v%1，当前支持 v%2–v%3）")
+                .arg(formatRaw)
+                .arg(kMinReadableFormat)
+                .arg(quint32(ProjectFormat::Current));
         return nullptr;
     }
 
-    return loadDocumentBody(in, filePath, errorMessage);
+    return loadDocumentBody(in, filePath, formatRaw, errorMessage);
 }
 
 } // namespace Ps

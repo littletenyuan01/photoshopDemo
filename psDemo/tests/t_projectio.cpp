@@ -196,7 +196,7 @@ int tProjectIo()
         }
     }
 
-    // —— 政策护栏：v3（旧格式）必须拒绝 ——
+    // —— 政策护栏：v3 必须拒绝；v4 空层（无 extent）必须仍可开 ——
     {
         const QString oldPath = PsTests::tempFilePath(QStringLiteral("v3-reject.pslite"));
         QFile f(oldPath);
@@ -204,13 +204,46 @@ int tProjectIo()
         if (f.isOpen()) {
             QDataStream out(&f);
             out.setVersion(QDataStream::Qt_6_0);
-            out << ProjectIo::kMagic << quint32(3); // 旧 Current
+            out << ProjectIo::kMagic << quint32(3);
             f.close();
             QString err;
             auto rejected = ProjectIo::load(oldPath, &err);
             r.check(rejected == nullptr, QStringLiteral("v3 样本 load 失败"));
             r.check(err.contains(QStringLiteral("格式不匹配")),
                     QStringLiteral("错误信息含格式不匹配（%1）").arg(err));
+        }
+    }
+    {
+        // 最小合法 v4：1 个空壳层 + 空选区 + 0 路径（无 extent 字段）
+        const QString v4Path = PsTests::tempFilePath(QStringLiteral("v4-empty-layer.pslite"));
+        QFile f(v4Path);
+        r.check(f.open(QIODevice::WriteOnly), QStringLiteral("写 v4 样本"));
+        if (f.isOpen()) {
+            QDataStream out(&f);
+            out.setVersion(QDataStream::Qt_6_0);
+            out << ProjectIo::kMagic << quint32(4);
+            out << qint32(64) << qint32(48) << qint32(0) << qint32(1); // wh, active, layers
+            out << QStringLiteral("壳") << quint8(1) << double(1.0) << qint32(0)
+                << qint32(0) << qint32(0);
+            out << quint32(0); // 空 PNG，无随后 extent（v4）
+            out << qint32(0);  // styles
+            out << quint8(0);  // no mask
+            out << QString();  // linkPath
+            out << quint8(0);  // Raster
+            out << qint32(0);  // filters
+            out << quint32(0); // 空选区
+            out << qint32(0);  // paths
+            f.close();
+            QString err;
+            auto loaded = ProjectIo::load(v4Path, &err);
+            r.check(loaded != nullptr, QStringLiteral("v4 空层可加载（%1）").arg(err));
+            if (loaded) {
+                const Layer *L = loaded->layers().layerAt(0);
+                r.check(L && L->width() == 64 && L->height() == 48,
+                        QStringLiteral("v4 空层默认画布 extent=%1×%2")
+                            .arg(L ? L->width() : -1)
+                            .arg(L ? L->height() : -1));
+            }
         }
     }
 

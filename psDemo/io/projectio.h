@@ -2,8 +2,8 @@
  * projectio.h — `.pslite` 工程文件读写（io 层）。
  *
  * 对照 GIMP XCF 的最小子集；与 ImageDocument / Layer / Selection 配合。
- * 单一 ProjectFormat::Current；滤镜参数用固定字节块+预留，避免每加字段就撑爆旧档。
- * Demo 完成前不保证更早布局的文件可开。
+ * 写入仅 Current；读取接受 Current 与紧邻旧版（见 projectio.cpp）。
+ * 滤镜参数用固定字节块+预留，避免每加字段就撑爆旧档。
  */
 #ifndef PROJECTIO_H
 #define PROJECTIO_H
@@ -47,7 +47,7 @@ public:
     static bool save(const ImageDocument &doc, const QString &filePath,
                      QString *errorMessage = nullptr);
 
-    /** 读取工程文件；失败返回 nullptr。格式须为 ProjectFormat::Current。 */
+    /** 读取工程文件；失败返回 nullptr。接受 Current 与 v4（空层无 extent）。 */
     static std::unique_ptr<ImageDocument> load(const QString &filePath,
                                                QString *errorMessage = nullptr);
 
