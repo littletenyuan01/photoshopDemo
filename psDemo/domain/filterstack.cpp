@@ -8,9 +8,11 @@
 
 namespace Ps {
 
-/** 追加到栈顶，返回新下标。 */
+/** 追加到栈顶，返回新下标；已满返回 -1。 */
 int FilterStack::append(const FilterNode &node)
 {
+    if (m_nodes.size() >= kMaxFilters)
+        return -1;
     m_nodes.append(node);
     return m_nodes.size() - 1;
 }

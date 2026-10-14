@@ -340,8 +340,10 @@ bool readFilterNodeParams(QDataStream &p, FilterNode *n)
 
 bool writeLayerFilters(QDataStream &out, const FilterStack &filters)
 {
-    out << qint32(filters.count());
-    for (int i = 0; i < filters.count(); ++i) {
+    // A15：写端截断到读端上限，避免写出打不开的工程
+    const int n = qMin(filters.count(), FilterStack::kMaxFilters);
+    out << qint32(n);
+    for (int i = 0; i < n; ++i) {
         const FilterNode &n = filters.at(i);
         out << qint32(static_cast<int>(n.op()));
         out << quint8(n.isEnabled() ? 1 : 0);
@@ -374,7 +376,7 @@ bool readLayerFilters(QDataStream &in, FilterStack *filters)
     filters->replaceAll({});
     qint32 count = 0;
     in >> count;
-    if (in.status() != QDataStream::Ok || count < 0 || count > 64)
+    if (in.status() != QDataStream::Ok || count < 0 || count > FilterStack::kMaxFilters)
         return false;
     QVector<FilterNode> nodes;
     nodes.reserve(count);

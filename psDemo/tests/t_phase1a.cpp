@@ -11,6 +11,7 @@
  * A9：分段 blend + 调整层面算子须与整幅 composite 一致
  */
 #include "domain/filternode.h"
+#include "domain/filterstack.h"
 #include "domain/imagedocument.h"
 #include "domain/layer.h"
 #include "domain/layermask.h"
@@ -25,6 +26,8 @@
 #include "engine/paintselectionclip.h"
 #include "engine/painttypes.h"
 #include "testutil.h"
+#include "tools/croptool.h"
+#include "tools/tool.h"
 #include "ui/canvassizedialog.h"
 
 #include <QBuffer>
@@ -436,6 +439,132 @@ int checkA14FloodSelectVisitedNotSelected(Reporter &r)
     return r.fails;
 }
 
+/** A13：扩展色不得烘焙进旧像素的透明/半透明区。 */
+int checkA13ResizeCanvasPreservesAlpha(Reporter &r)
+{
+    auto doc = ImageDocument::createBlank(32, 32, Qt::transparent);
+    Layer *layer = doc->activeLayer();
+    QImage src(32, 32, QImage::Format_ARGB32_Premultiplied);
+    src.fill(0);
+    // 半透明红块
+    for (int y = 8; y < 24; ++y)
+        for (int x = 8; x < 24; ++x)
+            src.setPixel(x, y, qRgba(128, 0, 0, 128)); // 预乘约 (64,0,0,128)
+    // 强制预乘格式正确值
+    src.fill(0);
+    for (int y = 8; y < 24; ++y) {
+        QRgb *line = reinterpret_cast<QRgb *>(src.scanLine(y));
+        for (int x = 8; x < 24; ++x)
+            line[x] = qRgba(64, 0, 0, 128);
+    }
+    layer->replaceFromImage(src);
+    const QRgb before = layer->materialize().pixel(16, 16);
+
+    doc->resizeCanvas(48, 48, /*anchorRow=*/1, /*anchorCol=*/1, QColor(0, 255, 0, 255));
+    const QRgb after = layer->materialize().pixel(16 + 8, 16 + 8); // 居中锚点偏移 +8
+    r.check(qAlpha(after) == qAlpha(before) && qRed(after) == qRed(before),
+            QStringLiteral("A13：半透明像素未被扩展色烘焙（before=0x%1 after=0x%2）")
+                .arg(before, 8, 16, QLatin1Char('0'))
+                .arg(after, 8, 16, QLatin1Char('0')));
+    return r.fails;
+}
+
+/** A15：第 65 个滤镜必须被拒绝。 */
+int checkA15FilterCap(Reporter &r)
+{
+    auto doc = ImageDocument::createBlank(32, 32, Qt::white);
+    doc->placeImageAsLayer(PsTests::makeLayerImage(32, 32, 2, 255), QStringLiteral("L"));
+    int added = 0;
+    for (int i = 0; i < FilterStack::kMaxFilters; ++i) {
+        FilterNode n(OpName::BoxBlur);
+        n.setBlurRadius(1);
+        if (doc->addLayerFilter(n, /*pushUndo=*/false) >= 0)
+            ++added;
+    }
+    r.check(added == FilterStack::kMaxFilters,
+            QStringLiteral("A15：可加满 %1 个").arg(FilterStack::kMaxFilters));
+    FilterNode extra(OpName::BoxBlur);
+    r.check(doc->addLayerFilter(extra, /*pushUndo=*/false) < 0,
+            QStringLiteral("A15：第 65 个被拒绝"));
+    r.check(doc->activeLayer()->filters().count() == FilterStack::kMaxFilters,
+            QStringLiteral("A15：栈内仍为上限个数"));
+    return r.fails;
+}
+
+/** A17：有裁剪框时双击须确认，首击不得清框。 */
+int checkA17CropDoubleClickCommit(Reporter &r)
+{
+    struct StubVp : ViewPort {
+        void zoomAt(const QPointF &, qreal) override {}
+        void panBy(const QPointF &) override {}
+        void requestRepaint() override {}
+    } vp;
+
+    auto doc = ImageDocument::createBlank(100, 100, Qt::white);
+    ToolContext ctx;
+    ctx.document = doc.get();
+    ctx.viewZoom = 1.0;
+
+    auto makeEv = [](QPointF p, bool dbl = false) {
+        ToolEvent e;
+        e.imagePos = p;
+        e.widgetPos = p;
+        e.button = Qt::LeftButton;
+        e.buttons = Qt::LeftButton;
+        e.doubleClick = dbl;
+        return e;
+    };
+    auto makeRel = [](QPointF p) {
+        ToolEvent e;
+        e.imagePos = p;
+        e.widgetPos = p;
+        e.button = Qt::LeftButton;
+        e.buttons = Qt::NoButton;
+        return e;
+    };
+    auto makeMv = [](QPointF p) {
+        ToolEvent e;
+        e.imagePos = p;
+        e.widgetPos = p;
+        e.buttons = Qt::LeftButton;
+        return e;
+    };
+
+    CropTool crop;
+    crop.mousePress(makeEv({10, 10}), ctx, vp);
+    crop.mouseMove(makeMv({60, 60}), ctx, vp);
+    crop.mouseRelease(makeRel({60, 60}), ctx, vp);
+    r.check(crop.hasOverlay(), QStringLiteral("A17：已有裁剪框"));
+
+    // 双击第一下（非 doubleClick）不得清框
+    crop.mousePress(makeEv({30, 30}, false), ctx, vp);
+    crop.mouseRelease(makeRel({30, 30}), ctx, vp);
+    r.check(crop.hasOverlay(), QStringLiteral("A17：单击后框仍在"));
+
+    // 第二下 doubleClick → 确认裁剪
+    const bool ok = crop.mousePress(makeEv({30, 30}, true), ctx, vp);
+    r.check(ok, QStringLiteral("A17：双击被处理"));
+    r.check(doc->width() < 100 && doc->height() < 100,
+            QStringLiteral("A17：双击后文档已裁剪（%1×%2）")
+                .arg(doc->width())
+                .arg(doc->height()));
+    return r.fails;
+}
+
+/** A23：加蒙版并进入编辑后 undo，编辑标志须清除。 */
+int checkA23UndoMaskClearsEditingFlag(Reporter &r)
+{
+    auto doc = ImageDocument::createBlank(32, 32, Qt::white);
+    r.check(doc->addLayerMask(0), QStringLiteral("A23：加蒙版"));
+    doc->setActiveLayerIndex(0);
+    r.check(doc->setEditingLayerMask(true), QStringLiteral("A23：进入编辑蒙版"));
+    r.check(doc->isEditingLayerMask(), QStringLiteral("A23：标志已开"));
+    doc->undo(); // 撤销加蒙版（LayerPropUndo）
+    r.check(!doc->activeLayer()->hasMask(), QStringLiteral("A23：undo 后无蒙版"));
+    r.check(!doc->isEditingLayerMask(), QStringLiteral("A23：编辑蒙版标志已清"));
+    return r.fails;
+}
+
 /** A20：高度单位独立参与换算（宽=像素、高=英寸）。 */
 int checkA20CanvasSizeHeightUnit(Reporter &r)
 {
@@ -479,7 +608,11 @@ int tPhase1A()
     checkA9AdjAreaBlendSeed(r);
     checkA11ScaleImagePreservesLayerExtent(r);
     checkA12RemoveLayerClearsEditingMask(r);
+    checkA13ResizeCanvasPreservesAlpha(r);
     checkA14FloodSelectVisitedNotSelected(r);
+    checkA15FilterCap(r);
+    checkA17CropDoubleClickCommit(r);
     checkA20CanvasSizeHeightUnit(r);
+    checkA23UndoMaskClearsEditingFlag(r);
     return r.fails;
 }

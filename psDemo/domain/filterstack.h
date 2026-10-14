@@ -21,6 +21,9 @@ namespace Ps {
 class FilterStack
 {
 public:
+    /** 与 projectio 读端上限一致；超过则 append 失败，避免「能存打不开」。 */
+    static constexpr int kMaxFilters = 64;
+
     bool isEmpty() const { return m_nodes.isEmpty(); }
     /** 栈内节点个数（自底向顶顺序）。 */
     int count() const { return m_nodes.size(); }
@@ -28,7 +31,7 @@ public:
     const FilterNode &at(int index) const { return m_nodes.at(index); }
     FilterNode &at(int index) { return m_nodes[index]; }
 
-    /** @return 新节点下标。 */
+    /** @return 新节点下标；已满（≥kMaxFilters）返回 -1（A15）。 */
     int append(const FilterNode &node);
     /** 移除指定下标节点；越界返回 false。 */
     bool removeAt(int index);

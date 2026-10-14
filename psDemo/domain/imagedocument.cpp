@@ -629,10 +629,14 @@ int ImageDocument::addLayerFilter(const FilterNode &node, bool pushUndo)
     Layer *layer = activeLayer();
     if (!layer || !layer->isVisible() || layer->isAdjustmentLayer())
         return -1;
+    if (layer->filters().count() >= FilterStack::kMaxFilters)
+        return -1; // A15：与读端 64 上限对齐，拒绝后再也不要 push 空 undo
 
     if (pushUndo)
         pushLayerPropUndo(m_activeLayerIndex, tr("添加滤镜"));
     const int index = layer->filters().append(node);
+    if (index < 0)
+        return -1;
     layer->invalidateCompositeRaster();
     markDirty(layer->boundsInDocument().intersected(QRect(0, 0, m_width, m_height)));
     return index;
@@ -1619,6 +1623,7 @@ void ImageDocument::resizeCanvas(int newWidth, int newHeight,
             src.fill(0);
         }
 
+        // A13：扩展色只铺新画布底；旧像素用 Source 整块贴回，保留透明/半透明（勿 SourceOver 烘焙）
         QImage neu(newWidth, newHeight, QImage::Format_ARGB32_Premultiplied);
         if (i == 0 && extensionColor.alpha() > 0)
             neu.fill(extensionColor);
@@ -1629,7 +1634,7 @@ void ImageDocument::resizeCanvas(int newWidth, int newHeight,
         const int placeY = offsetY + layer->offsetY();
 
         QPainter painter(&neu);
-        painter.setCompositionMode(QPainter::CompositionMode_SourceOver);
+        painter.setCompositionMode(QPainter::CompositionMode_Source);
         painter.drawImage(placeX, placeY, src);
         painter.end();
 

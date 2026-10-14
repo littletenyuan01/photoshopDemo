@@ -51,6 +51,8 @@ private:
     void discardEdit();
     void commitEditToDocument(const ToolContext &ctx, const QString &label);
     void loadActiveFromDocument(const ToolContext &ctx);
+    /** A18：删锚点后把 m_activeIdx 钳到合法范围（可 -1）。 */
+    void clampActiveAnchor();
     static QPointF snap45(const QPointF &origin, const QPointF &pos);
 
     State m_state = State::Idle;

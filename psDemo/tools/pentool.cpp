@@ -154,6 +154,23 @@ void PenTool::loadActiveFromDocument(const ToolContext &ctx)
     m_dirtySinceCommit = false;
 }
 
+void PenTool::clampActiveAnchor()
+{
+    if (m_activeSub < 0 || m_activeSub >= m_edit.subPaths.size()) {
+        m_activeSub = -1;
+        m_activeIdx = -1;
+        return;
+    }
+    const int n = m_edit.subPaths[m_activeSub].anchors.size();
+    if (n <= 0) {
+        m_activeIdx = -1;
+        return;
+    }
+    if (m_activeIdx >= n)
+        m_activeIdx = n - 1;
+    // m_activeIdx < 0 保持 -1（无选中）合法
+}
+
 void PenTool::commitEditToDocument(const ToolContext &ctx, const QString &label)
 {
     if (!ctx.document || !m_hasEdit)
@@ -241,6 +258,12 @@ bool PenTool::mousePress(const ToolEvent &e, const ToolContext &ctx, ViewPort &v
             const Path::Hit ah = m_edit.hitTestAnchor(e.imagePos, tolDoc(ctx));
             if (ah.sub >= 0) {
                 PathEditOps::deleteAnchorAt(m_edit, ah.sub, ah.index);
+                // A18：删除后钳制活动下标，避免越界读
+                if (m_activeSub == ah.sub && m_activeIdx > ah.index)
+                    --m_activeIdx;
+                else if (m_activeSub == ah.sub && m_activeIdx == ah.index)
+                    m_activeIdx = ah.index; // 将由 clamp 收到 n-1 或 -1
+                clampActiveAnchor();
                 m_dirtySinceCommit = true;
                 if (m_docIndex >= 0)
                     commitEditToDocument(ctx, QObject::tr("删除锚点"));
@@ -256,6 +279,11 @@ bool PenTool::mousePress(const ToolEvent &e, const ToolContext &ctx, ViewPort &v
                 const int i1 = (sh.seg + 1 < sp.anchors.size()) ? (sh.seg + 1) : 0;
                 const int del = (sh.t < 0.5) ? i0 : i1;
                 PathEditOps::deleteAnchorAt(m_edit, sh.sub, del);
+                if (m_activeSub == sh.sub && m_activeIdx > del)
+                    --m_activeIdx;
+                else if (m_activeSub == sh.sub && m_activeIdx == del)
+                    m_activeIdx = del;
+                clampActiveAnchor();
                 m_dirtySinceCommit = true;
                 if (m_docIndex >= 0)
                     commitEditToDocument(ctx, QObject::tr("删除锚点"));
@@ -351,6 +379,11 @@ bool PenTool::mouseMove(const ToolEvent &e, const ToolContext &ctx, ViewPort &vi
 
     if (!m_hasEdit || m_activeSub < 0 || m_activeIdx < 0)
         return false;
+    if (m_activeSub >= m_edit.subPaths.size()
+        || m_activeIdx >= m_edit.subPaths[m_activeSub].anchors.size()) {
+        clampActiveAnchor();
+        return false;
+    }
 
     PathAnchor &a = m_edit.subPaths[m_activeSub].anchors[m_activeIdx];
     QPointF pos = e.imagePos;
@@ -513,9 +546,11 @@ void PenTool::drawOverlay(QPainter &painter, const ToolContext &ctx) const
     painter.setPen(pathPen);
     painter.drawPath(wpp);
 
-    // 橡皮带
+    // 橡皮带（A18：下标必须先校验）
     if (ctx.pathRubberBand && m_state == State::Idle && m_activeSub >= 0
-        && m_activeIdx >= 0 && !m_edit.subPaths[m_activeSub].closed) {
+        && m_activeSub < m_edit.subPaths.size() && m_activeIdx >= 0
+        && m_activeIdx < m_edit.subPaths[m_activeSub].anchors.size()
+        && !m_edit.subPaths[m_activeSub].closed) {
         const QPointF last = m_edit.subPaths[m_activeSub].anchors[m_activeIdx].point;
         QPen rb(QColor(13, 102, 208));
         rb.setCosmetic(true);

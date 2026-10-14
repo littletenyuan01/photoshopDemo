@@ -7,6 +7,7 @@
 
 #include "domain/imagedocument.h"
 
+#include <QLineF>
 #include <QPainter>
 #include <QPainterPath>
 #include <QPen>
@@ -57,6 +58,7 @@ void CropTool::clearFrame()
 {
     m_dragging = false;
     m_hasFrame = false;
+    m_replacingFrame = false;
     m_constrainSquare = false;
 }
 
@@ -137,13 +139,19 @@ bool CropTool::mousePress(const ToolEvent &event, const ToolContext &ctx, ViewPo
         return true;
     }
 
+    // A17：有框时 press 不立刻清框、也不改写框角。Qt 双击的第一下 press 会走到这里；
+    // 若清框/改角，dblclick 确认会失败或裁错。等 mouseMove 超阈值再开新橡皮筋。
     m_dragging = true;
-    m_hasFrame = false;
+    m_replacingFrame = false;
     m_constrainSquare = event.modifiers.testFlag(Qt::ShiftModifier);
-    m_startImage = event.imagePos;
-    m_endImage = event.imagePos;
-    m_startWidget = event.widgetPos;
-    m_endWidget = event.widgetPos;
+    m_pressImage = event.imagePos;
+    m_pressWidget = event.widgetPos;
+    if (!m_hasFrame) {
+        m_startImage = event.imagePos;
+        m_endImage = event.imagePos;
+        m_startWidget = event.widgetPos;
+        m_endWidget = event.widgetPos;
+    }
     emit repaintRequested();
     return true;
 }
@@ -158,6 +166,18 @@ bool CropTool::mouseMove(const ToolEvent &event, const ToolContext &ctx, ViewPor
         return false;
 
     m_constrainSquare = event.modifiers.testFlag(Qt::ShiftModifier);
+
+    // 有旧框时：拖过约 3 文档像素才开始替换（抑制双击抖动误裁 1~2px）
+    if (m_hasFrame && !m_replacingFrame) {
+        const qreal d = QLineF(m_pressImage, event.imagePos).length();
+        if (d < 3.0)
+            return true;
+        m_hasFrame = false;
+        m_replacingFrame = true;
+        m_startImage = m_pressImage;
+        m_startWidget = m_pressWidget;
+    }
+
     m_endImage = event.imagePos;
     m_endWidget = event.widgetPos;
     emit repaintRequested();
@@ -176,11 +196,19 @@ bool CropTool::mouseRelease(const ToolEvent &event, const ToolContext &ctx, View
     m_endWidget = event.widgetPos;
     m_dragging = false;
 
+    // 单击未拖：保留已有框，便于随后双击确认
+    if (m_hasFrame && !m_replacingFrame) {
+        m_replacingFrame = false;
+        emit repaintRequested();
+        return true;
+    }
+
     const QRectF rf = currentImageRect();
     if (rf.width() >= 1.0 && rf.height() >= 1.0)
         m_hasFrame = true;
     else
         clearFrame();
+    m_replacingFrame = false;
 
     emit repaintRequested();
     return true;

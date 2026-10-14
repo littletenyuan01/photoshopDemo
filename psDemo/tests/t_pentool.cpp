@@ -267,6 +267,30 @@ int tPenTool()
                 QStringLiteral("撤销后锚点数恢复"));
     }
 
+    // 8b) A18：删锚点后活动下标钳制，继续 move 不得崩
+    {
+        auto doc = ImageDocument::createBlank(400, 300, Qt::white);
+        ToolManager tm;
+        tm.setActiveTool(ToolId::Pen, vp);
+        ToolContext ctx = makeCtx(doc.get());
+        for (const QPointF &p : {QPointF(20, 20), QPointF(80, 20), QPointF(50, 80)}) {
+            tm.dispatchPress(makePress(p), ctx, vp);
+            tm.dispatchRelease(makeRelease(p), ctx, vp);
+        }
+        auto *pen = qobject_cast<PenTool *>(tm.activeTool());
+        r.check(pen && pen->hasEdit(), QStringLiteral("A18：编辑会话存在"));
+        if (pen) {
+            const int before = pen->editPath().totalAnchors();
+            tm.dispatchPress(makePress({20, 20}, Qt::ControlModifier), ctx, vp);
+            tm.dispatchPress(makePress({80, 20}, Qt::ControlModifier), ctx, vp);
+            tm.dispatchPress(makePress({50, 80}, Qt::ControlModifier), ctx, vp);
+            tm.dispatchMove(makeMove({40, 40}), ctx, vp); // 有越界会在 Debug 崩
+            const int after = pen->editPath().totalAnchors();
+            r.check(after < before,
+                    QStringLiteral("A18：删点后锚点数减少（%1→%2）").arg(before).arg(after));
+        }
+    }
+
     // 9) Alt+点锚点 ⇒ corner 取反
     {
         auto doc = ImageDocument::createBlank(400, 300, Qt::white);

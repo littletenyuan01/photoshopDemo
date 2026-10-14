@@ -42,10 +42,13 @@ private:
 
     bool m_dragging = false;   ///< 正在拖出框
     bool m_hasFrame = false;   ///< 已有待确认裁剪框
-    QPointF m_startImage;
+    bool m_replacingFrame = false; ///< 本次拖拽已确认替换旧框（A17：避免双击首击清框）
+    QPointF m_startImage;      ///< 当前框/橡皮筋起点（有框时勿被单击覆盖）
     QPointF m_endImage;
     QPointF m_startWidget;
     QPointF m_endWidget;
+    QPointF m_pressImage;      ///< 本次 press 位置；有框时延后写入 start
+    QPointF m_pressWidget;
     bool m_constrainSquare = false;
 };
 

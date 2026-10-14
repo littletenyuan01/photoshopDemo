@@ -132,6 +132,12 @@ void LayerPixelsUndo::pop(ImageDocument &doc)
     m_offsetX = curOx;
     m_offsetY = curOy;
     doc.markDirty();
+    // A23：像素 undo 去掉蒙版时同步清编辑标志
+    if (m_trackMask && m_layerIndex == doc.m_activeLayerIndex && doc.m_editingLayerMask
+        && !layer->hasMask()) {
+        doc.m_editingLayerMask = false;
+        emit doc.editingTargetChanged();
+    }
     emit doc.layerPropertiesChanged(m_layerIndex);
 }
 
@@ -163,6 +169,12 @@ void LayerPropUndo::pop(ImageDocument &doc)
     m_snap = std::move(live);
     const QRect newBounds = layer->styleBoundsInDocument().intersected(docRect);
     doc.markDirty(oldBounds.united(newBounds));
+    // A23：撤销去掉蒙版后须清编辑蒙版标志（否则画笔静默失效）
+    if (m_layerIndex == doc.m_activeLayerIndex && doc.m_editingLayerMask
+        && !layer->hasMask()) {
+        doc.m_editingLayerMask = false;
+        emit doc.editingTargetChanged();
+    }
     emit doc.layerPropertiesChanged(m_layerIndex);
 }
 
