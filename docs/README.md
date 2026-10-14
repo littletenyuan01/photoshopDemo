@@ -43,6 +43,7 @@
 | [filter-roadmap.md](filter-roadmap.md) | **滤镜现状与开发计划**：68 项菜单项逐项状态（已接线 14 / 未做 54）、优先级判断标准、A–F 六档分批与「不做的项及其理由」 |
 | [gpu-plan.md](gpu-plan.md) | **GPU 加速开发计划**：定位为**可选加速后端**（有 GPU 就加速、没有就 CPU，**不是替换**）；硬约束、链级决策规则与 5 ns/px 阈值、P0（只做壳与调度、不写 GPU）～P3 分期与验收 |
 | [page-cache-plan.md](page-cache-plan.md) | **瓦片页缓存（Tile Page Cache）**：A+B **已落地**（默认关）；粗粒度钉住 + 静默点换页；`PSLITE_TILE_CACHE_MB` / `PSLITE_MEM`；用例 `tilecache` |
+| [phase1-audit.md](phase1-audit.md) | **一期代码审计（候选清单）**：8 路并行深审 344 文件 / 47.8k 行 → **A1–A36**，含 10 条高危（自由变换抹像素、蒙版丢失、区域缓存不随平移失效、瓦片并发数据竞争、直线不绘制、坏文件 OOM…）；每条附**验证方式**；⚠️ **尚未逐条人工复核**，复核为真才进台账 |
 | [tests.md](tests.md) | **常驻测试**：30+ 无 GUI 断言用例、构建运行方式、写测试的约定与坑 |
 | [code-map.md](code-map.md) | 重点代码与文件索引 |
 | [tech-notes.md](tech-notes.md) | 技术点与设计决策 |
