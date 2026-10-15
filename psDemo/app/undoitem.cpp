@@ -1,4 +1,4 @@
-/**
+﻿/**
  * undoitem.cpp — 各 UndoItem 子类 pop() 与快照辅助函数的实现（app 层）。
  */
 #include "undoitem.h"
@@ -317,9 +317,9 @@ void LayerPixelsUndo::pop(ImageDocument &doc)
     if (m_trackMask && m_layerIndex == doc.m_activeLayerIndex && doc.m_editingLayerMask
         && !layer->hasMask()) {
         doc.m_editingLayerMask = false;
-        emit doc.editingTargetChanged();
+        doc.notifyEditingTargetChanged();
     }
-    emit doc.layerPropertiesChanged(m_layerIndex);
+    doc.notifyLayerPropertiesChanged(m_layerIndex);
 }
 
 LayerPropUndo::LayerPropUndo(int layerIndex, LayerPropSnapshot before, const QString &label)
@@ -354,9 +354,9 @@ void LayerPropUndo::pop(ImageDocument &doc)
     if (m_layerIndex == doc.m_activeLayerIndex && doc.m_editingLayerMask
         && !layer->hasMask()) {
         doc.m_editingLayerMask = false;
-        emit doc.editingTargetChanged();
+        doc.notifyEditingTargetChanged();
     }
-    emit doc.layerPropertiesChanged(m_layerIndex);
+    doc.notifyLayerPropertiesChanged(m_layerIndex);
 }
 
 std::unique_ptr<LayerStructureUndo> LayerStructureUndo::forAdded(int index, const QString &label)
@@ -417,11 +417,11 @@ void LayerStructureUndo::pop(ImageDocument &doc)
         m_activeIndex = doc.m_activeLayerIndex;
         doc.m_dirty = true;
         doc.m_dirtyRect = QRect(0, 0, doc.m_width, doc.m_height);
-        emit doc.structureChanged();
-        emit doc.activeLayerChanged(doc.m_activeLayerIndex);
+        doc.notifyStructureChanged();
+        doc.notifyActiveLayerChanged(doc.m_activeLayerIndex);
         if (wasEditingMask)
-            emit doc.editingTargetChanged();
-        emit doc.contentChanged();
+            doc.notifyEditingTargetChanged();
+        doc.notifyContentChanged();
         return;
     }
 
@@ -434,9 +434,9 @@ void LayerStructureUndo::pop(ImageDocument &doc)
         doc.m_activeLayerIndex = m_activeIndex;
     doc.m_dirty = true;
     doc.m_dirtyRect = QRect(0, 0, doc.m_width, doc.m_height);
-    emit doc.structureChanged();
-    emit doc.activeLayerChanged(doc.m_activeLayerIndex);
-    emit doc.contentChanged();
+    doc.notifyStructureChanged();
+    doc.notifyActiveLayerChanged(doc.m_activeLayerIndex);
+    doc.notifyContentChanged();
 }
 
 LayerMoveUndo::LayerMoveUndo(int from, int to, const QString &label)
@@ -561,10 +561,10 @@ void DocumentGeomUndo::pop(ImageDocument &doc)
     doc.m_activeLayerIndex = qBound(-1, m_activeIndex, doc.layers().count() - 1);
     doc.m_dirty = true;
     doc.m_dirtyRect = QRect(0, 0, doc.m_width, doc.m_height);
-    emit doc.structureChanged();
+    doc.notifyStructureChanged();
     emit doc.selectionChanged();
-    emit doc.activeLayerChanged(doc.m_activeLayerIndex);
-    emit doc.contentChanged();
+    doc.notifyActiveLayerChanged(doc.m_activeLayerIndex);
+    doc.notifyContentChanged();
 
     m_width = liveW;
     m_height = liveH;

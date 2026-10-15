@@ -62,6 +62,7 @@ int tUndoCow();
 int tUndoTile();
 int tUndoRegion();
 int tUndoDirty();
+int tUndoBatch();
 
 namespace {
 
@@ -113,6 +114,7 @@ const Case kCases[] = {
     { "undotile", "撤销 T2：TileRefSnapshot 交换对称 + 换页路径", tUndoTile },
     { "undoregion", "撤销 T3：tile-ref 撤销往返 + undoBytes 量级", tUndoRegion },
     { "undodirty", "撤销 T4：像素撤销只标受影响矩形", tUndoDirty },
+    { "undobatch", "撤销非线性 T1：ChangeBatch 合并 content/structure/pixels", tUndoBatch },
 };
 
 } // namespace

@@ -1,6 +1,6 @@
 # 非线性撤销（历史面板 + 任意跳转 + 命名书签）开发计划书
 
-> 状态：实施中（T0 已完成）
+> 状态：实施中（T0–T1 已完成）
 > 更新：2026-10-15 ｜ 本文件是交给实施方（Cursor）的唯一契约，不依赖任何对话上下文。
 > 前置：0+1 档（瓦片引用快照 / 区域重投影）已落地并于 `a31be4a` 通过评估，见 [undo-region-plan.md](undo-region-plan.md)、[undo-region-review.md](undo-region-review.md)。
 > 相关：[pending-dev.md](pending-dev.md)、[tests.md](tests.md)、[architecture.md](architecture.md)
@@ -10,7 +10,7 @@
 | 阶段 | 状态 | 关键数字 / 证据 |
 |---|---|---|
 | T0 记账按"触碰瓦片"（1 档收尾） | ✅ 2026-10-15 | `.build-clean\release\psdemo_tests.exe undoregion undocow undodirty` 退出码 0；T5①b TileRefs **16512**（前 16777344）；100 笔 `historyTrimmed=0` `undoDepth=100` `undoBytes=3682816` |
-| T1 `ChangeBatch`：跳转期信号批量 | ⬜ 未开始 | 新用例 `undobatch`：N 步跳转 `contentChanged` 发射 **1** 次 |
+| T1 `ChangeBatch`：跳转期信号批量 | ✅ 2026-10-15 | `.build-clean\release\psdemo_tests.exe undobatch phase1a filterundo` 退出码 0；批量内 10 dirty+2 增层 → content/structure/pixels 各 **1**；并集=10,20 75×51；批量外 3 次仍各发 3 次 |
 | T2 跳转 API（`stepCount/currentStep/jumpToStep`） | ⬜ 未开始 | `undojump`：任意跳转后 `materialize()` 逐像素等于目标步状态 |
 | T3 蒙版引用快照（跳转性能前置；**产品代码只有 2 行**） | ⬜ 未开始 | `undomaskcow`：共享蒙版被写时 detach；带蒙版 200 步跳转耗时从秒级降到 ≤100 ms 量级 |
 | T4 历史面板 `HistoryPanel` | ⬜ 未开始 | `undopanel`：行数 = `stepCount+1`；点行跳到该步；`historyTrimmed` 后重建 |

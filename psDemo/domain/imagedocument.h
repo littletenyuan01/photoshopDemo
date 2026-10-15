@@ -310,6 +310,21 @@ public:
         ImageDocument &m_doc;
     };
 
+    /**
+     * 批量变更守卫：期间所有「变更类」信号只累计，最外层析构时按固定顺序补发一次。
+     * 可嵌套（深度计数）。用于历史跳转等「多步一次生效」的场景。
+     */
+    class ChangeBatch
+    {
+    public:
+        explicit ChangeBatch(ImageDocument &doc);
+        ~ChangeBatch();
+        ChangeBatch(const ChangeBatch &) = delete;
+        ChangeBatch &operator=(const ChangeBatch &) = delete;
+    private:
+        ImageDocument &m_doc;
+    };
+
     /** 语义化 setter：改可见性并 push 撤销（UI 入口，勿直接调 Layer::setVisible）。 */
     void setLayerVisible(int index, bool visible);
     /** 语义化 setter：改不透明度并 push 撤销。 */
@@ -480,6 +495,7 @@ signals:
 
 private:
     friend class HistorySuppress;
+    friend class ChangeBatch;
     friend class LayerPixelsUndo;
     friend class LayerPropUndo;
     friend class LayerStructureUndo;
@@ -503,6 +519,16 @@ private:
     /** 执行重排并广播（不 push 历史；供 moveLayer / LayerMoveUndo 共用）。 */
     void applyMoveLayer(int from, int to);
 
+    /** 通知出口：批量深度 > 0 时只登记需求位，否则立刻 emit。 */
+    void notifyStructureChanged();
+    void notifyActiveLayerChanged(int index);
+    void notifyContentChanged();
+    void notifyPixelsChanged(const QRect &rect);
+    void notifyLayerPropertiesChanged(int index);
+    void notifyEditingTargetChanged();
+    /** 最外层 ChangeBatch 析构时调用：按固定顺序补发。 */
+    void flushPendingNotifications();
+
     int m_width = 0;                             ///< 文档宽度（像素）
     int m_height = 0;                            ///< 文档高度（像素）
     LayerStack m_layers;                         ///< 自底向顶图层栈
@@ -518,6 +544,16 @@ private:
     QRect m_previewRegionHint;                   ///< 「当前可见区」提示（见 setPreviewRegionHint）
     bool m_previewFrozen = false;                ///< 拖层中冻结面板广播
     bool m_editingLayerMask = false;             ///< 活动层是否在编辑蒙版
+
+    int m_batchDepth = 0;                        ///< ChangeBatch 嵌套深度
+    bool m_pendingStructure = false;
+    bool m_pendingActiveLayer = false;
+    int m_pendingActiveLayerIndex = -1;
+    bool m_pendingEditingTarget = false;
+    bool m_pendingContent = false;
+    bool m_pendingPixels = false;
+    QRect m_pendingPixelsRect;
+    QVector<int> m_pendingLayerProps;            ///< 待补发的层属性下标（去重）
 };
 
 } // namespace Ps

@@ -1,4 +1,4 @@
-/**
+﻿/**
  * imagedocument.cpp — ImageDocument 图层/选区/几何/撤销与脏区广播（domain 层）。
  */
 #include "imagedocument.h"
@@ -86,6 +86,113 @@ ImageDocument::HistorySuppress::HistorySuppress(ImageDocument &doc)
 ImageDocument::HistorySuppress::~HistorySuppress()
 {
     --m_doc.m_historySuppress;
+}
+
+ImageDocument::ChangeBatch::ChangeBatch(ImageDocument &doc)
+    : m_doc(doc)
+{
+    ++m_doc.m_batchDepth;
+}
+
+ImageDocument::ChangeBatch::~ChangeBatch()
+{
+    if (--m_doc.m_batchDepth == 0)
+        m_doc.flushPendingNotifications();
+}
+
+void ImageDocument::notifyStructureChanged()
+{
+    if (m_batchDepth > 0) {
+        m_pendingStructure = true;
+        return;
+    }
+    emit structureChanged();
+}
+
+void ImageDocument::notifyActiveLayerChanged(int index)
+{
+    if (m_batchDepth > 0) {
+        m_pendingActiveLayer = true;
+        m_pendingActiveLayerIndex = index;
+        return;
+    }
+    emit activeLayerChanged(index);
+}
+
+void ImageDocument::notifyContentChanged()
+{
+    if (m_batchDepth > 0) {
+        m_pendingContent = true;
+        return;
+    }
+    emit contentChanged();
+}
+
+void ImageDocument::notifyPixelsChanged(const QRect &rect)
+{
+    if (rect.isEmpty())
+        return;
+    if (m_batchDepth > 0) {
+        m_pendingPixels = true;
+        m_pendingPixelsRect =
+            m_pendingPixelsRect.isNull() ? rect : m_pendingPixelsRect.united(rect);
+        return;
+    }
+    emit pixelsChanged(rect);
+}
+
+void ImageDocument::notifyLayerPropertiesChanged(int index)
+{
+    if (m_batchDepth > 0) {
+        if (!m_pendingLayerProps.contains(index))
+            m_pendingLayerProps.append(index);
+        return;
+    }
+    emit layerPropertiesChanged(index);
+}
+
+void ImageDocument::notifyEditingTargetChanged()
+{
+    if (m_batchDepth > 0) {
+        m_pendingEditingTarget = true;
+        return;
+    }
+    emit editingTargetChanged();
+}
+
+void ImageDocument::flushPendingNotifications()
+{
+    // 顺序：structure → activeLayer → editingTarget → layerProps* → pixels → content
+    const bool structure = m_pendingStructure;
+    const bool activeLayer = m_pendingActiveLayer;
+    const int activeIdx = m_pendingActiveLayerIndex;
+    const bool editing = m_pendingEditingTarget;
+    const QVector<int> layerProps = m_pendingLayerProps;
+    const bool pixels = m_pendingPixels;
+    const QRect pixelsRect = m_pendingPixelsRect;
+    const bool content = m_pendingContent;
+
+    m_pendingStructure = false;
+    m_pendingActiveLayer = false;
+    m_pendingActiveLayerIndex = -1;
+    m_pendingEditingTarget = false;
+    m_pendingLayerProps.clear();
+    m_pendingPixels = false;
+    m_pendingPixelsRect = QRect();
+    m_pendingContent = false;
+
+    if (structure)
+        emit structureChanged();
+    if (activeLayer)
+        emit activeLayerChanged(activeIdx);
+    if (editing)
+        emit editingTargetChanged();
+    for (int idx : layerProps)
+        emit layerPropertiesChanged(idx);
+    if (pixels)
+        emit pixelsChanged(pixelsRect);
+    if (content)
+        emit contentChanged();
 }
 
 bool ImageDocument::shouldRecordHistory() const
@@ -406,8 +513,8 @@ int ImageDocument::addLayer(std::unique_ptr<Layer> layer, const QString &undoLab
 
     m_dirty = true;
     m_dirtyRect = QRect(0, 0, m_width, m_height);
-    emit structureChanged();
-    emit contentChanged();
+    notifyStructureChanged();
+    notifyContentChanged();
     return index;
 }
 
@@ -497,8 +604,8 @@ bool ImageDocument::updateLinkedLayer(int index)
     const QRect dirty = layer->styleBoundsInDocument()
                             .intersected(QRect(0, 0, m_width, m_height));
     markDirty(dirty.isEmpty() ? QRect(0, 0, m_width, m_height) : dirty);
-    emit layerPropertiesChanged(index);
-    emit contentChanged();
+    notifyLayerPropertiesChanged(index);
+    notifyContentChanged();
     return true;
 }
 
@@ -511,8 +618,8 @@ bool ImageDocument::rasterizeLinkedLayer(int index)
     // 对照 GimpRasterizable：栅格化后不再跟源文件
     pushLayerPropUndo(index, tr("栅格化链接图层"));
     layer->setLinkPathSilent(QString());
-    emit layerPropertiesChanged(index);
-    emit contentChanged();
+    notifyLayerPropertiesChanged(index);
+    notifyContentChanged();
     return true;
 }
 
@@ -525,10 +632,10 @@ void ImageDocument::setActiveLayerIndex(int index)
     const bool wasEditingMask = m_editingLayerMask;
     m_activeLayerIndex = index;
     m_editingLayerMask = false;
-    emit activeLayerChanged(index);
+    notifyActiveLayerChanged(index);
     if (wasEditingMask)
-        emit editingTargetChanged();
-    emit contentChanged();
+        notifyEditingTargetChanged();
+    notifyContentChanged();
 }
 
 Layer *ImageDocument::activeLayer()
@@ -732,9 +839,9 @@ bool ImageDocument::setLayerFilterNode(int layerIndex, int filterIndex,
             m_dirty = true;
             if (!dirty.isEmpty())
                 m_dirtyRect = m_dirtyRect.isNull() ? dirty : m_dirtyRect.united(dirty);
-            emit layerPropertiesChanged(layerIndex);
+            notifyLayerPropertiesChanged(layerIndex);
             emit adjustmentPreviewCommit(layerIndex);
-            emit pixelsChanged(dirty.isEmpty() ? QRect(0, 0, m_width, m_height) : dirty);
+            notifyPixelsChanged(dirty.isEmpty() ? QRect(0, 0, m_width, m_height) : dirty);
         } else {
             emit adjustmentPreviewChanged(layerIndex);
         }
@@ -743,7 +850,7 @@ bool ImageDocument::setLayerFilterNode(int layerIndex, int filterIndex,
 
     markDirty(layer->boundsInDocument().intersected(QRect(0, 0, m_width, m_height)));
     if (pushUndo)
-        emit layerPropertiesChanged(layerIndex);
+        notifyLayerPropertiesChanged(layerIndex);
     return true;
 }
 
@@ -847,7 +954,7 @@ int ImageDocument::ensureActiveLayerStyle(LayerStyleKind kind){
     layer->invalidateCompositeRaster();
     const QRect after = layer->styleBoundsInDocument();
     markDirty(before.united(after).intersected(QRect(0, 0, m_width, m_height)));
-    emit layerPropertiesChanged(activeLayerIndex());
+    notifyLayerPropertiesChanged(activeLayerIndex());
     return index;
 }
 
@@ -863,7 +970,7 @@ bool ImageDocument::replaceActiveLayerStyles(const QVector<LayerStyleEffect> &ef
     layer->invalidateCompositeRaster();
     const QRect after = layer->styleBoundsInDocument();
     markDirty(before.united(after).intersected(QRect(0, 0, m_width, m_height)));
-    emit layerPropertiesChanged(activeLayerIndex());
+    notifyLayerPropertiesChanged(activeLayerIndex());
     return true;
 }
 
@@ -878,7 +985,7 @@ bool ImageDocument::clearActiveLayerStyles()
     layer->styles().clear();
     layer->invalidateCompositeRaster();
     markDirty(before.intersected(QRect(0, 0, m_width, m_height)));
-    emit layerPropertiesChanged(activeLayerIndex());
+    notifyLayerPropertiesChanged(activeLayerIndex());
     return true;
 }
 
@@ -895,7 +1002,7 @@ bool ImageDocument::setLayerStyleEnabled(int layerIndex, int styleIndex, bool en
         return false;
     layer->invalidateCompositeRaster();
     markDirty(layer->styleBoundsInDocument().intersected(QRect(0, 0, m_width, m_height)));
-    emit layerPropertiesChanged(layerIndex);
+    notifyLayerPropertiesChanged(layerIndex);
     return true;
 }
 
@@ -1017,9 +1124,9 @@ bool ImageDocument::addLayerMask(int index, LayerMaskInit init)
                             .intersected(QRect(0, 0, m_width, m_height));
     markDirty(dirty.isEmpty() ? QRect(0, 0, m_width, m_height) : dirty);
     if (switchToMaskEdit)
-        emit editingTargetChanged();
-    emit layerPropertiesChanged(index);
-    emit contentChanged();
+        notifyEditingTargetChanged();
+    notifyLayerPropertiesChanged(index);
+    notifyContentChanged();
     return true;
 }
 
@@ -1035,11 +1142,11 @@ bool ImageDocument::removeLayerMask(int index)
     layer->setMask(nullptr);
     if (index == m_activeLayerIndex && m_editingLayerMask) {
         m_editingLayerMask = false;
-        emit editingTargetChanged();
+        notifyEditingTargetChanged();
     }
     markDirty(dirty.isEmpty() ? QRect(0, 0, m_width, m_height) : dirty);
-    emit layerPropertiesChanged(index);
-    emit contentChanged();
+    notifyLayerPropertiesChanged(index);
+    notifyContentChanged();
     return true;
 }
 
@@ -1108,14 +1215,14 @@ bool ImageDocument::applyLayerMask(int index)
     layer->setMask(nullptr);
     if (index == m_activeLayerIndex && m_editingLayerMask) {
         m_editingLayerMask = false;
-        emit editingTargetChanged();
+        notifyEditingTargetChanged();
     }
 
     const QRect dirty = layer->styleBoundsInDocument()
                             .intersected(QRect(0, 0, m_width, m_height));
     markDirty(dirty.isEmpty() ? QRect(0, 0, m_width, m_height) : dirty);
-    emit layerPropertiesChanged(index);
-    emit contentChanged();
+    notifyLayerPropertiesChanged(index);
+    notifyContentChanged();
     return true;
 }
 
@@ -1129,9 +1236,9 @@ bool ImageDocument::setEditingLayerMask(bool on)
             return false;
     }
     m_editingLayerMask = on;
-    emit editingTargetChanged();
+    notifyEditingTargetChanged();
     if (m_activeLayerIndex >= 0)
-        emit layerPropertiesChanged(m_activeLayerIndex);
+        notifyLayerPropertiesChanged(m_activeLayerIndex);
     return true;
 }
 
@@ -1148,8 +1255,8 @@ bool ImageDocument::setLayerMaskEnabled(int index, bool enabled)
     const QRect dirty = layer->styleBoundsInDocument()
                             .intersected(QRect(0, 0, m_width, m_height));
     markDirty(dirty.isEmpty() ? QRect(0, 0, m_width, m_height) : dirty);
-    emit layerPropertiesChanged(index);
-    emit contentChanged();
+    notifyLayerPropertiesChanged(index);
+    notifyContentChanged();
     return true;
 }
 
@@ -1163,7 +1270,7 @@ bool ImageDocument::setLayerMaskLinked(int index, bool linked)
 
     pushLayerPropUndo(index, linked ? tr("链接图层蒙版") : tr("取消链接图层蒙版"));
     layer->mask()->setLinked(linked);
-    emit layerPropertiesChanged(index);
+    notifyLayerPropertiesChanged(index);
     return true;
 }
 
@@ -1234,8 +1341,8 @@ void ImageDocument::markDirty(const QRect &rect)
         }
     }
 
-    emit pixelsChanged(rect);
-    emit contentChanged();
+    notifyPixelsChanged(rect);
+    notifyContentChanged();
 }
 
 void ImageDocument::markDirty()
@@ -1332,10 +1439,10 @@ void ImageDocument::translateLayer(int index, int dx, int dy, bool emitContent)
 
     // 对照 GIMP：拖中仍可 flush；preview_freeze 只冻缩略图
     if (!m_previewFrozen)
-        emit layerPropertiesChanged(index);
+        notifyLayerPropertiesChanged(index);
     if (!m_previewFrozen)
-        emit pixelsChanged(dirty);
-    emit contentChanged();
+        notifyPixelsChanged(dirty);
+    notifyContentChanged();
 }
 
 void ImageDocument::shiftLayerMask(int index, int dx, int dy)
@@ -1358,10 +1465,10 @@ void ImageDocument::shiftLayerMask(int index, int dx, int dy)
     m_dirtyRect = m_dirtyRect.isNull() ? dirty : m_dirtyRect.united(dirty);
 
     if (!m_previewFrozen)
-        emit layerPropertiesChanged(index);
+        notifyLayerPropertiesChanged(index);
     if (!m_previewFrozen)
-        emit pixelsChanged(dirty);
-    emit contentChanged();
+        notifyPixelsChanged(dirty);
+    notifyContentChanged();
 }
 
 void ImageDocument::beginPreviewFreeze()
@@ -1377,12 +1484,12 @@ void ImageDocument::endPreviewFreeze()
 
     // 对照 GIMP preview_thaw：补缩略图（拖中跳过了 pixelsChanged）
     if (m_activeLayerIndex >= 0)
-        emit layerPropertiesChanged(m_activeLayerIndex);
+        notifyLayerPropertiesChanged(m_activeLayerIndex);
     const QRect thumbDirty = m_dirtyRect.isEmpty()
                                  ? QRect(0, 0, m_width, m_height)
                                  : m_dirtyRect;
-    emit pixelsChanged(thumbDirty);
-    emit contentChanged();
+    notifyPixelsChanged(thumbDirty);
+    notifyContentChanged();
 }
 
 void ImageDocument::notifyLayerPropertiesChanged(const Layer &layer)
@@ -1401,8 +1508,8 @@ void ImageDocument::notifyLayerPropertiesChanged(const Layer &layer)
         m_dirtyRect = m_dirtyRect.isNull() ? dirty : m_dirtyRect.united(dirty);
     }
 
-    emit layerPropertiesChanged(index);
-    emit contentChanged();
+    notifyLayerPropertiesChanged(index);
+    notifyContentChanged();
 }
 
 void ImageDocument::notifyLayerLabelChanged(const Layer &layer)
@@ -1410,7 +1517,7 @@ void ImageDocument::notifyLayerLabelChanged(const Layer &layer)
     const int index = indexOfLayer(&layer);
     if (index < 0)
         return;
-    emit layerPropertiesChanged(index);
+    notifyLayerPropertiesChanged(index);
 }
 
 int ImageDocument::addTransparentLayer(const QString &name)
@@ -1468,10 +1575,10 @@ int ImageDocument::duplicateLayer(int index)
 
     m_dirty = true;
     m_dirtyRect = QRect(0, 0, m_width, m_height);
-    emit structureChanged();
+    notifyStructureChanged();
     m_activeLayerIndex = newIndex;
-    emit activeLayerChanged(newIndex);
-    emit contentChanged();
+    notifyActiveLayerChanged(newIndex);
+    notifyContentChanged();
     return newIndex;
 }
 
@@ -1500,11 +1607,11 @@ bool ImageDocument::removeLayer(int index)
 
     m_dirty = true;
     m_dirtyRect = QRect(0, 0, m_width, m_height);
-    emit structureChanged();
-    emit activeLayerChanged(m_activeLayerIndex);
+    notifyStructureChanged();
+    notifyActiveLayerChanged(m_activeLayerIndex);
     if (wasEditingMask)
-        emit editingTargetChanged();
-    emit contentChanged();
+        notifyEditingTargetChanged();
+    notifyContentChanged();
     return true;
 }
 
@@ -1558,10 +1665,10 @@ void ImageDocument::applyMoveLayer(int from, int to)
         m_dirtyRect = m_dirtyRect.isNull() ? dirty : m_dirtyRect.united(dirty);
     }
 
-    emit structureChanged();
-    emit activeLayerChanged(m_activeLayerIndex);
-    emit pixelsChanged(dirty);
-    emit contentChanged();
+    notifyStructureChanged();
+    notifyActiveLayerChanged(m_activeLayerIndex);
+    notifyPixelsChanged(dirty);
+    notifyContentChanged();
 }
 
 /** 图像大小：各层 Smooth 重采样，选区最近邻缩放。 */
@@ -1621,9 +1728,9 @@ void ImageDocument::scaleImage(int newWidth, int newHeight)
     m_height = newHeight;
     m_dirty = true;
     m_dirtyRect = QRect(0, 0, m_width, m_height);
-    emit structureChanged();
+    notifyStructureChanged();
     emit selectionChanged();
-    emit contentChanged();
+    notifyContentChanged();
 }
 
 /** 画布大小：按锚点偏移贴入各层，背景层可填扩展色。 */
@@ -1709,9 +1816,9 @@ void ImageDocument::resizeCanvas(int newWidth, int newHeight,
     m_height = newHeight;
     m_dirty = true;
     m_dirtyRect = QRect(0, 0, m_width, m_height);
-    emit structureChanged();
+    notifyStructureChanged();
     emit selectionChanged();
-    emit contentChanged();
+    notifyContentChanged();
 }
 
 void ImageDocument::cropTo(const QRect &rect)
@@ -1793,9 +1900,9 @@ void ImageDocument::cropTo(const QRect &rect)
     m_height = r.height();
     m_dirty = true;
     m_dirtyRect = QRect(0, 0, m_width, m_height);
-    emit structureChanged();
+    notifyStructureChanged();
     emit selectionChanged();
-    emit contentChanged();
+    notifyContentChanged();
 }
 
 } // namespace Ps
