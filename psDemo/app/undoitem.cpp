@@ -71,11 +71,11 @@ void swapLayerMask(Layer *layer, bool *hasMask, bool *maskEnabled, bool *maskLin
         curHasMask = true;
         curMaskEnabled = layer->mask()->isEnabled();
         curMaskLinked = layer->mask()->isLinked();
-        curMaskGray = layer->mask()->image().copy();
+        curMaskGray = layer->mask()->image(); // T3：浅拷贝，写路径靠 COW detach
     }
     if (*hasMask && !maskGray->isNull()) {
         auto mask = std::make_unique<LayerMask>();
-        mask->setFromImage(*maskGray);
+        mask->image() = *maskGray; // T3：引用赋值，避免 setFromImage 深拷贝
         mask->setEnabled(*maskEnabled);
         mask->setLinked(*maskLinked);
         layer->setMask(std::move(mask));
