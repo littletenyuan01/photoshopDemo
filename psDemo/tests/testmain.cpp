@@ -63,6 +63,7 @@ int tUndoTile();
 int tUndoRegion();
 int tUndoDirty();
 int tUndoBatch();
+int tUndoJump();
 
 namespace {
 
@@ -115,6 +116,7 @@ const Case kCases[] = {
     { "undoregion", "撤销 T3：tile-ref 撤销往返 + undoBytes 量级", tUndoRegion },
     { "undodirty", "撤销 T4：像素撤销只标受影响矩形", tUndoDirty },
     { "undobatch", "撤销非线性 T1：ChangeBatch 合并 content/structure/pixels", tUndoBatch },
+    { "undojump", "撤销非线性 T2：jumpToStep 任意跳转逐像素一致", tUndoJump },
 };
 
 } // namespace

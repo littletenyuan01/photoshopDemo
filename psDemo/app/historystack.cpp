@@ -6,6 +6,7 @@
 #include "domain/imagedocument.h"
 #include "engine/cache/tilecache.h"
 
+#include <QtGlobal>
 #include <cstdio>
 
 namespace Ps {
@@ -29,6 +30,18 @@ QString HistoryStack::undoText() const
 QString HistoryStack::redoText() const
 {
     return m_redo.empty() ? QString() : m_redo.back()->name();
+}
+
+QString HistoryStack::stepName(int step) const
+{
+    const int n = stepCount();
+    const int c = currentStep();
+    if (step < 0 || step >= n)
+        return {};
+    if (step < c)
+        return m_undo[size_t(step)]->name();
+    // redo 栈顶 = 最早被撤销的一步 ⇒ 时间序 i 对应 redo[n-1-i]
+    return m_redo[size_t(n - 1 - step)]->name();
 }
 
 void HistoryStack::syncTopAccounted()
@@ -55,6 +68,65 @@ void HistoryStack::refreshTopBytes()
     m_topAccounted = now;
 }
 
+void HistoryStack::undoOne(ImageDocument &doc)
+{
+    if (m_undo.empty())
+        return;
+    auto item = std::move(m_undo.back());
+    m_undo.pop_back();
+    const quint64 sz = item->byteSize();
+    if (m_undoBytes >= sz)
+        m_undoBytes -= sz;
+    else
+        m_undoBytes = 0;
+    item->pop(doc);
+    m_redoBytes += sz;
+    m_redo.push_back(std::move(item));
+    syncTopAccounted();
+}
+
+void HistoryStack::redoOne(ImageDocument &doc)
+{
+    if (m_redo.empty())
+        return;
+    auto item = std::move(m_redo.back());
+    m_redo.pop_back();
+    const quint64 sz = item->byteSize();
+    if (m_redoBytes >= sz)
+        m_redoBytes -= sz;
+    else
+        m_redoBytes = 0;
+    item->pop(doc);
+    m_undoBytes += sz;
+    m_undo.push_back(std::move(item));
+    syncTopAccounted();
+}
+
+bool HistoryStack::jumpToStep(int step, ImageDocument &doc)
+{
+    if (m_applying)
+        return false;
+    const int n = stepCount();
+    if (n == 0)
+        return false;
+    const int target = qBound(0, step, n);
+    if (target == currentStep())
+        return false;
+
+    m_applying = true;
+    {
+        ImageDocument::ChangeBatch batch(doc);
+        while (currentStep() > target)
+            undoOne(doc);
+        while (currentStep() < target)
+            redoOne(doc);
+    }
+    trimUndo(); // 跳转结束后统一 trim（单步 redoOne 不 trim）
+    m_applying = false;
+    emit changed();
+    return true;
+}
+
 void HistoryStack::push(std::unique_ptr<UndoItem> item)
 {
     if (!item || m_applying)
@@ -75,17 +147,7 @@ void HistoryStack::undo(ImageDocument &doc)
     if (m_undo.empty() || m_applying)
         return;
     m_applying = true;
-    auto item = std::move(m_undo.back());
-    m_undo.pop_back();
-    const quint64 sz = item->byteSize();
-    if (m_undoBytes >= sz)
-        m_undoBytes -= sz;
-    else
-        m_undoBytes = 0;
-    item->pop(doc);
-    m_redoBytes += sz; // A26：迁入 redo 后计入
-    m_redo.push_back(std::move(item));
-    syncTopAccounted();
+    undoOne(doc);
     m_applying = false;
     emit changed();
 }
@@ -95,17 +157,7 @@ void HistoryStack::redo(ImageDocument &doc)
     if (m_redo.empty() || m_applying)
         return;
     m_applying = true;
-    auto item = std::move(m_redo.back());
-    m_redo.pop_back();
-    const quint64 sz = item->byteSize();
-    if (m_redoBytes >= sz)
-        m_redoBytes -= sz;
-    else
-        m_redoBytes = 0;
-    item->pop(doc);
-    m_undoBytes += sz;
-    m_undo.push_back(std::move(item));
-    syncTopAccounted();
+    redoOne(doc);
     trimUndo();
     m_applying = false;
     emit changed();

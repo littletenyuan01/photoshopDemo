@@ -9,6 +9,7 @@
 #include "undoitem.h"
 
 #include <QObject>
+#include <QString>
 #include <memory>
 #include <vector>
 
@@ -71,6 +72,15 @@ public:
     /** 栈顶条目字节数变化后同步账面（T0；由 ImageDocument::markDirty 调用）。 */
     void refreshTopBytes();
 
+    /** 历史总步数（已发生 + 可重做）。 */
+    int stepCount() const { return int(m_undo.size() + m_redo.size()); }
+    /** 游标：已发生的步数。0 = 全撤到底，stepCount() = 全重做到顶。 */
+    int currentStep() const { return int(m_undo.size()); }
+    /** 第 step 步（0-based，从最老开始）的条目名；越界返回空串。 */
+    QString stepName(int step) const;
+    /** 跳转到第 step 步（clamp 到 [0, stepCount()]）。返回是否真的发生了跳转。 */
+    bool jumpToStep(int step, ImageDocument &doc);
+
 signals:
     /** undo/redo 栈或 canUndo/canRedo 状态变化时发出。 */
     void changed();
@@ -82,6 +92,10 @@ private:
     void trimUndo();
     /** 换栈后把 m_topAccounted 对齐到当前 undo 栈顶。 */
     void syncTopAccounted();
+    /** 单步撤销：无重入守卫、不发 changed()、不 trim。 */
+    void undoOne(ImageDocument &doc);
+    /** 单步重做：无重入守卫、不发 changed()、不 trim。 */
+    void redoOne(ImageDocument &doc);
 
     std::vector<std::unique_ptr<UndoItem>> m_undo;  ///< undo 栈（底→顶 = 旧→新）
     std::vector<std::unique_ptr<UndoItem>> m_redo;  ///< redo 栈
