@@ -1700,15 +1700,18 @@ Custom ≈48 ns/px、Gauss ≈19。Q11–Q13 关闭。维持 opt-in。
 
 **被否掉的方案**：按脏区矩形快照（需改压栈协议）；命令重放（位置相关/异步不等价）；蒙版也改引用（本期保留深拷贝）。
 
-**实测（同机，`undoregion` T5 info，2026-10-15）**：
+**实测（同机，`undoregion` T5 info，2026-10-15；口径按 [undo-region-review.md](undo-region-review.md) R1–R3 修正）**：
 
 | 指标 | WholeLayer / 改造前口径 | TileRefs |
 |------|-------------------------|----------|
-| ① 2048 稀疏层一笔 `undoBytes` 增量 | **16 777 280**（整幅 materialize） | **128** |
-| ② 1024 稀疏层 200 笔 `historyBytes` 峰值 | （未重跑旧路径；按①外推单笔≥16MB 量级会秒顶上限） | **≈17.04 MB**（17 867 776） |
-| ③ 2048 白底小笔撤销后 `Projection::sync` | — | **0 ms**，`painted=2048×128`（非整幅高） |
+| ①a 2048 **稀疏**层一笔 `undoBytes` | **16 777 280**（整幅 materialize） | **128**（空快照 + 条目开销） |
+| ①b 2048 **满幅白底**一笔 `undoBytes` | **16 777 280** | **16 777 344**（快照仍持全层引用按 `sizeInBytes` 记账；物理 COW 另计） |
+| ② 1024 稀疏 200 笔 `historyBytes` 峰值 | **≈252 MB**（264 245 184；触 256MB 上限反复 trim，深度被牺牲） | **≈17.04 MB**（17 867 776；200 笔全留） |
+| ③ 2048 白底小笔撤销后重投影（先排空积压，再 `sync`+循环 `processPending`） | **painted=2048×2048**（≈65 ms） | **painted=64×64**（≈31 ms） |
 
-另：`undoregion` 护栏稀疏 512 一笔增量=128；`undodirty` 400 文档小笔 dirty=64×64。全量 `psdemo_tests.exe` **47/47**。
+说明：①b 账面接近是因为 `TileRefSnapshot::bytes()` 按共享 `QImage::sizeInBytes` 累加；收益在物理内存（未写瓦片不 detach）与 ③ 的重投影脏区。③ 旧数字 `2048×128` 是误测「每帧 72 块预算积压带」，已废。
+
+另：`undoregion` 护栏稀疏 512 一笔增量=128；`undodirty` 400 文档小笔 dirty=64×64。
 
 **约定**：新增像素入栈点若会改层 extent，必须 `pushLayerPixelsUndo(..., PixelUndoMode::WholeLayer)`（见 `docs/cursor-role-prompt.md`）。
 

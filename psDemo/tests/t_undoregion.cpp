@@ -85,64 +85,128 @@ int tUndoRegion()
                 QStringLiteral("交替#%1 redo×2 == s2").arg(k));
     }
 
-    // —— T5 实测记账（info，不计入失败）——
+    // —— T5 实测记账（info，不计入失败；口径见 undo-region-review R1–R3）——
     {
-        // ① 同文档同笔：WholeLayer vs TileRefs 的 undoBytes 增量
-        auto d2 = ImageDocument::createBlank(2048, 2048, Qt::transparent);
-        Layer *L = d2->activeLayer();
-        L->tiles().clearTiles();
-        const quint64 b0 = d2->history().undoBytes();
-        d2->pushLayerPixelsUndo(0, QStringLiteral("WL"), PixelUndoMode::WholeLayer);
-        PaintEngine::stampDab(L->tiles(), QPointF(40, 40), 14.0, Qt::red, PaintMode::Paint);
-        const quint64 wlDelta = d2->history().undoBytes() - b0;
-        d2->undo();
-        L->tiles().clearTiles();
-        const quint64 b1 = d2->history().undoBytes();
-        d2->pushLayerPixelsUndo(0, QStringLiteral("TR"), PixelUndoMode::TileRefs);
-        PaintEngine::stampDab(L->tiles(), QPointF(40, 40), 14.0, Qt::red, PaintMode::Paint);
-        const quint64 trDelta = d2->history().undoBytes() - b1;
-        r.info(QStringLiteral("T5① 2048 稀疏一笔 undoBytes：WholeLayer=%1 TileRefs=%2")
-                   .arg(wlDelta)
-                   .arg(trDelta));
+        auto measureOneStroke = [](ImageDocument &d, PixelUndoMode mode) -> quint64 {
+            Layer *L = d.activeLayer();
+            const quint64 b0 = d.history().undoBytes();
+            d.pushLayerPixelsUndo(0, QStringLiteral("笔"), mode);
+            PaintEngine::stampDab(L->tiles(), QPointF(40, 40), 14.0, Qt::red, PaintMode::Paint);
+            return d.history().undoBytes() - b0;
+        };
 
-        // ② 200 笔历史峰值（TileRefs，稀疏层）
-        auto d3 = ImageDocument::createBlank(1024, 1024, Qt::transparent);
-        Layer *L3 = d3->activeLayer();
-        L3->tiles().clearTiles();
-        quint64 peak = 0;
-        for (int i = 0; i < 200; ++i) {
-            d3->pushLayerPixelsUndo(0, QStringLiteral("p%1").arg(i));
-            PaintEngine::stampDab(L3->tiles(), QPointF(20 + (i % 40) * 8, 20 + (i / 40) * 8),
-                                  6.0, QColor(i % 200, 40, 40), PaintMode::Paint);
-            L3->invalidateContentBounds();
-            peak = qMax(peak, d3->history().historyBytes());
+        // ①a 稀疏层（最有利）：快照几乎为空
+        {
+            auto d = ImageDocument::createBlank(2048, 2048, Qt::transparent);
+            d->activeLayer()->tiles().clearTiles();
+            const quint64 wl = measureOneStroke(*d, PixelUndoMode::WholeLayer);
+            d->undo();
+            d->activeLayer()->tiles().clearTiles();
+            const quint64 tr = measureOneStroke(*d, PixelUndoMode::TileRefs);
+            r.info(QStringLiteral("T5①a 2048 稀疏一笔 undoBytes：WholeLayer=%1 TileRefs=%2")
+                       .arg(wl)
+                       .arg(tr));
         }
-        r.info(QStringLiteral("T5② 200 笔 TileRefs historyBytes 峰值=%1 (≈%2 MB)")
-                   .arg(peak)
-                   .arg(peak / (1024.0 * 1024.0), 0, 'f', 2));
+        // ①b 满幅白底（最常见）：TileRefs 仍持全部瓦片引用，byteSize≈触碰瓦片深拷贝前的共享记账
+        {
+            auto d = ImageDocument::createBlank(2048, 2048, Qt::white);
+            const quint64 wl = measureOneStroke(*d, PixelUndoMode::WholeLayer);
+            d->undo();
+            // 重新白底一笔（undo 已恢复）
+            const quint64 b0 = d->history().undoBytes();
+            d->pushLayerPixelsUndo(0, QStringLiteral("TR"), PixelUndoMode::TileRefs);
+            PaintEngine::stampDab(d->activeLayer()->tiles(), QPointF(40, 40), 14.0, Qt::red,
+                                  PaintMode::Paint);
+            const quint64 tr = d->history().undoBytes() - b0;
+            const int touched = d->activeLayer()->tiles().allocatedTileCount(); // 参考：写后总槽数
+            Q_UNUSED(touched);
+            r.info(QStringLiteral("T5①b 2048 满幅白底一笔 undoBytes：WholeLayer=%1 TileRefs=%2")
+                       .arg(wl)
+                       .arg(tr));
+        }
 
-        // ③ 撤销后 Projection::sync 耗时（2048 白底小笔）
-        auto d4 = ImageDocument::createBlank(2048, 2048, Qt::white);
-        Layer *L4 = d4->activeLayer();
-        d4->pushLayerPixelsUndo(0, QStringLiteral("笔"));
-        const QRect loc = PaintEngine::stampDab(L4->tiles(), QPointF(2000, 2000), 12.0, Qt::blue,
-                                                PaintMode::Paint);
-        L4->invalidateContentBounds();
-        L4->invalidateCompositeRaster();
-        d4->markDirty(loc.translated(L4->offsetX(), L4->offsetY()));
-        Projection proj;
-        proj.bind(d4.get());
-        proj.setPriorityRect(QRect(0, 0, 2048, 2048));
-        proj.sync();
-        d4->undo();
+        // ② 200 笔峰值：TileRefs vs WholeLayer（后者预期触 256MB 上限被 trim）
+        auto peak200 = [](PixelUndoMode mode) -> quint64 {
+            auto d = ImageDocument::createBlank(1024, 1024, Qt::transparent);
+            Layer *L = d->activeLayer();
+            L->tiles().clearTiles();
+            quint64 peak = 0;
+            for (int i = 0; i < 200; ++i) {
+                d->pushLayerPixelsUndo(0, QStringLiteral("p%1").arg(i), mode);
+                PaintEngine::stampDab(L->tiles(), QPointF(20 + (i % 40) * 8, 20 + (i / 40) * 8),
+                                      6.0, QColor(i % 200, 40, 40), PaintMode::Paint);
+                L->invalidateContentBounds();
+                peak = qMax(peak, d->history().historyBytes());
+            }
+            return peak;
+        };
+        const quint64 peakTr = peak200(PixelUndoMode::TileRefs);
+        const quint64 peakWl = peak200(PixelUndoMode::WholeLayer);
+        r.info(QStringLiteral("T5② 1024 稀疏 200 笔 historyBytes 峰值：TileRefs=%1 (≈%2 MB) "
+                              "WholeLayer=%3 (≈%4 MB，上限 256MB 会 trim)")
+                   .arg(peakTr)
+                   .arg(peakTr / (1024.0 * 1024.0), 0, 'f', 2)
+                   .arg(peakWl)
+                   .arg(peakWl / (1024.0 * 1024.0), 0, 'f', 2));
+
+        // ③ 排空积压后再测撤销脏区重投影。
+        // 注意：sync() 即使 maxMs=0 仍有块数上限（48+24），测整幅必须循环 processPending。
+        auto drainProjection = [](Projection &proj) {
+            while (proj.hasPendingChunks())
+                proj.processPendingChunks(/*maxChunks=*/0); // 0 = 不限块数
+        };
+        auto measureUndoPainted = [&](PixelUndoMode mode) -> QRect {
+            auto d = ImageDocument::createBlank(2048, 2048, Qt::white);
+            Layer *L = d->activeLayer();
+            d->pushLayerPixelsUndo(0, QStringLiteral("笔"), mode);
+            const QRect loc = PaintEngine::stampDab(L->tiles(), QPointF(2000, 2000), 12.0, Qt::blue,
+                                                    PaintMode::Paint);
+            L->invalidateContentBounds();
+            L->invalidateCompositeRaster();
+            d->markDirty(loc.translated(L->offsetX(), L->offsetY()));
+
+            Projection proj;
+            proj.bind(d.get());
+            proj.setPriorityRect(QRect(0, 0, 2048, 2048));
+            // 首帧 sync 会 ensureBuffer（整幅无效）；必须排空，否则测到的是建缓冲积压带
+            (void)proj.sync(/*maxMs=*/0);
+            drainProjection(proj);
+            d->clearDirtyRect();
+            r.check(!proj.hasPendingChunks(),
+                    QStringLiteral("T5③ 排空后无积压（mode=%1）")
+                        .arg(mode == PixelUndoMode::TileRefs ? QStringLiteral("TR")
+                                                             : QStringLiteral("WL")));
+
+            d->undo(); // 只留下撤销产生的脏区
+            QRect painted = proj.sync(/*maxMs=*/0);
+            while (proj.hasPendingChunks())
+                painted = painted.united(proj.processPendingChunks(/*maxChunks=*/0));
+            return painted;
+        };
         QElapsedTimer clock;
         clock.start();
-        const QRect painted = proj.sync();
-        const qint64 ms = clock.elapsed();
-        r.info(QStringLiteral("T5③ 2048 撤销后 sync=%1 ms，painted=%2×%3")
-                   .arg(ms)
-                   .arg(painted.width())
-                   .arg(painted.height()));
+        const QRect paintedTr = measureUndoPainted(PixelUndoMode::TileRefs);
+        const qint64 msTr = clock.elapsed();
+        clock.restart();
+        const QRect paintedWl = measureUndoPainted(PixelUndoMode::WholeLayer);
+        const qint64 msWl = clock.elapsed();
+        r.info(QStringLiteral("T5③ 2048 白底小笔撤销后重投影（排空+循环）："
+                              "TileRefs painted=%1×%2 (%3 ms)；"
+                              "WholeLayer painted=%4×%5 (%6 ms)")
+                   .arg(paintedTr.width())
+                   .arg(paintedTr.height())
+                   .arg(msTr)
+                   .arg(paintedWl.width())
+                   .arg(paintedWl.height())
+                   .arg(msWl));
+        r.check(paintedTr.width() <= 128 && paintedTr.height() <= 128,
+                QStringLiteral("T5③ TileRefs painted ≤128×128（%1×%2）")
+                    .arg(paintedTr.width())
+                    .arg(paintedTr.height()));
+        r.check(paintedWl.width() == 2048 && paintedWl.height() == 2048,
+                QStringLiteral("T5③ WholeLayer painted 为整幅（%1×%2）")
+                    .arg(paintedWl.width())
+                    .arg(paintedWl.height()));
     }
 
     return r.fails;

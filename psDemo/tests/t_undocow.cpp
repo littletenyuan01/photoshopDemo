@@ -32,18 +32,14 @@ int tUndoCow()
         tile->fill(qRgba(10, 20, 30, 255));
         const QRgb before = tile->pixel(0, 0);
         QImage snap = *tile; // 共享引用
-        const auto keyBefore = snap.cacheKey();
         QRgb *line = reinterpret_cast<QRgb *>(tile->scanLine(0));
         line[0] = qRgba(200, 0, 0, 255);
-        r.check(snap.cacheKey() != tile->cacheKey() || snap.pixel(0, 0) == before,
-                QStringLiteral("scanLine：写后快照内容仍为写前（key 变或像素不变）"));
         r.check(pixelEquals(snap, 0, 0, before),
                 QStringLiteral("scanLine：快照像素未改"));
         r.check(tile->pixel(0, 0) == qRgba(200, 0, 0, 255),
                 QStringLiteral("scanLine：原瓦片已改"));
-        r.check(snap.cacheKey() != keyBefore || true,
-                QStringLiteral("scanLine：记录 cacheKey 行为"));
-        Q_UNUSED(keyBefore);
+        r.check(snap.cacheKey() != tile->cacheKey(),
+                QStringLiteral("scanLine：cacheKey 已分离"));
     }
 
     // ② QImage::fill

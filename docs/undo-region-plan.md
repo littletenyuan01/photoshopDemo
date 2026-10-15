@@ -12,7 +12,7 @@
 | T2 `TileBuffer` 快照/交换 + 记账 + 换页读回 | ✅ 2026-10-15 | `undotile tilecache`：交换对称 + 换页 bit-exact + allocated/resident 回初值 |
 | T3 `LayerPixelsUndo` tile-ref 模式 + 调用点声明 | ✅ 2026-10-15 | `undoregion phase1a filterundo transformlive`；稀疏一笔 undoBytes=128；链接/变换显式 WholeLayer |
 | T4 出栈只标受影响矩形（0 档） | ✅ 2026-10-15 | `undodirty`：400 文档小笔 dirty=64×64≪整幅；样式 pad 外扩；画布外整幅回退 |
-| T5 回归与实测记账 | ✅ 2026-10-15 | 全量 **47/47** 退出码 0；见 `pending-dev.md`「撤销粒度」节三组数字 |
+| T5 回归与实测记账 | ✅ 2026-10-15 | 全量绿；T5 数字经 review R1–R3 返修（③ 64×64 vs 整幅；① 稀疏/满幅；② 200 笔 trim 对照） |
 
 ---
 
@@ -204,7 +204,8 @@ enum class PixelUndoMode {
 
 ```cpp
 // 文件：psDemo/domain/imagedocument.h（ImageDocument）
-    /** 现有签名保持不变（= WholeLayer），仅供改 extent 的调用点使用。 */
+    /** 2 参重载 = **TileRefs 默认**（实现按 §4 落地：11 处不变 extent 的调用点用它）；
+     *  会改层 extent 的调用点必须用 3 参显式传 WholeLayer。 */
     void pushLayerPixelsUndo(int layerIndex, const QString &label);
     /** 新增：默认 tile-ref（extent 不变的像素操作）。 */
     void pushLayerPixelsUndo(int layerIndex, const QString &label,

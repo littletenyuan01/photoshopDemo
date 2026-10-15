@@ -38,7 +38,7 @@ int tUndoDirty()
                     .arg(dirty.width())
                     .arg(dirty.height()));
         const QRect strokeDoc = local.translated(layer->offsetX(), layer->offsetY());
-        r.check(dirty.contains(strokeDoc) || dirty.intersects(strokeDoc),
+        r.check(dirty.contains(strokeDoc),
                 QStringLiteral("① dirty 覆盖笔迹区"));
     }
 
