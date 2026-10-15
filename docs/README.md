@@ -43,7 +43,13 @@
 | [filter-roadmap.md](filter-roadmap.md) | **滤镜现状与开发计划**：68 项菜单项逐项状态（已接线 14 / 未做 54）、优先级判断标准、A–F 六档分批与「不做的项及其理由」 |
 | [gpu-plan.md](gpu-plan.md) | **GPU 加速开发计划**：定位为**可选加速后端**（有 GPU 就加速、没有就 CPU，**不是替换**）；硬约束、链级决策规则与 5 ns/px 阈值、P0（只做壳与调度、不写 GPU）～P3 分期与验收 |
 | [page-cache-plan.md](page-cache-plan.md) | **瓦片页缓存（Tile Page Cache）**：A+B **已落地**（默认关）；粗粒度钉住 + 静默点换页；`PSLITE_TILE_CACHE_MB` / `PSLITE_MEM`；用例 `tilecache` |
-| [phase1-audit.md](phase1-audit.md) | **一期代码审计（候选清单）**：8 路并行深审 344 文件 / 47.8k 行 → **A1–A36**，含 10 条高危（自由变换抹像素、蒙版丢失、区域缓存不随平移失效、瓦片并发数据竞争、直线不绘制、坏文件 OOM…）；每条附**验证方式**；⚠️ **尚未逐条人工复核**，复核为真才进台账 |
+| [phase1-audit.md](phase1-audit.md) | **一期代码审计（候选清单）**：8 路并行深审 344 文件 / 47.8k 行 → **A1–A36**，含 10 条高危（自由变换抹像素、蒙版丢失、区域缓存不随平移失效、瓦片并发数据竞争、直线不绘制、坏文件 OOM…）；**已全部复核修复**，回归见 `phase1a`/`filterpanel`/`pentool`/`gpumedian` |
+| [phase1-audit-review.md](phase1-audit-review.md) | **一期审计修复评估**：37 项逐条判定（26 项有实测回归绿 / 11 项缺行为证据）、A28/A29 回归在本机受限环境下假红的根因、返修项 R1–R3 |
+| [undo-region-plan.md](undo-region-plan.md) | **撤销粒度改造（0+1 档）开发计划**：整层深拷贝 → **瓦片引用快照（QImage 隐式共享 / 写时复制）**；出栈只重投影受影响矩形；T1–T5 任务、接口规格、验收与回退；**非线性撤销与层稳定 id 属 2 档，不在本计划**。T1–T4 已落地 |
+| [undo-region-review.md](undo-region-review.md) | **撤销粒度改造实施评估**：T1–T4 真做完、T5 实测口径问题（旧数字测到的是投影每帧 48 块积压带，已废）；返修项 R1–R5 已修；§7 独立复核 + **R6（记账口径把 TileRefs 收益吃掉：满幅层深度仍只有 ~15 步）** |
+| [undo-nonlinear-plan.md](undo-nonlinear-plan.md) | **非线性撤销（2 档）开发计划**：跳转 = 重复 pop/redo + `ChangeBatch` 合并信号（一次跳转一次重投影）、历史面板、命名书签（=位置标记）、T0 记账按触碰瓦片、T3 蒙版引用快照；**分支树/历史画笔/真快照克隆/层稳定 id 明确不做**。T0–T6 已落地 |
+| [undo-nonlinear-review.md](undo-nonlinear-review.md) | **非线性撤销实施评估**：T0–T6 **7/7 已收口**；R1 大图 **5–40 ms** / 带蒙版 **10–20 ms**；§10 D1–D3 已处置；O4 **已派单** |
+| [undo-maskcost-plan.md](undo-maskcost-plan.md) | **蒙版撤销成本外账（O4）**：属性类改引用 + 按「是否仍共享」记账；T2 下界须抬高 `byteLimit`（勿与默认 256MB 冲突）；**T3/D2 已预修**；明确不做 O1/O2/O3 |
 | [tests.md](tests.md) | **常驻测试**：30+ 无 GUI 断言用例、构建运行方式、写测试的约定与坑 |
 | [code-map.md](code-map.md) | 重点代码与文件索引 |
 | [tech-notes.md](tech-notes.md) | 技术点与设计决策 |

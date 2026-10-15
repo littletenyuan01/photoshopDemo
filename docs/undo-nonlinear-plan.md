@@ -15,7 +15,7 @@
 | T3 蒙版引用快照（跳转性能前置；**产品代码只有 2 行**） | ✅ 2026-10-15 | `.build-clean\release\psdemo_tests.exe undomaskcow phase1a` 退出码 0；stampMaskDab/fill COW 绿；undo diffs=0；A2 绿；带蒙版 512²×200 步 jump **1 ms** |
 | T4 历史面板 `HistoryPanel` | ✅ 2026-10-15 | `.build-clean\release\psdemo_tests.exe undopanel` 退出码 0；5 笔后 count=6；点第 3 行 currentStep=3 且 diffCount=0；trim 后 count=stepCount+1 |
 | T5 命名书签（快照=位置标记） | ✅ 2026-10-15 | `.build-clean\release\psdemo_tests.exe undobookmark undopanel` 退出码 0；jump 到书签 A 后 diffCount=0；trim dropped=6 后书签 A 删除；push 清 redo 删 Tip 留 Mid；上限 64 拒第 65 |
-| T6 回归与实测记账 | ✅ 2026-10-15 | ① Δ1/10/100/200=**0ms** 且 content=1；② 200→0 historyBytes 峰值 **4531200**；③ 满幅一笔 **16777280→16512**；④ 带蒙版 200 步 **1ms**。全量连跑 51/52（`tilecache` P13 计时偶发；单独绿）；本计划用例全绿 |
+| T6 回归与实测记账 | ✅ 2026-10-15 | ①a 256² Δ=**0ms**；①b **2048²** 200→0=**5–34 ms**（≥5 次采样，content=1）；②a/b historyBytes 4531200 / **7398400**；③ **16777280→16512**；④a/b 蒙版 512²/**2048²** = **1 / 10–12 ms**。评估 7/7 收口；见 [undo-nonlinear-review.md](undo-nonlinear-review.md)、pending-dev O1–O5 |
 
 ---
 

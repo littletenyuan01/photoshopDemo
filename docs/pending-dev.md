@@ -1705,52 +1705,83 @@ Custom ≈48 ns/px、Gauss ≈19。Q11–Q13 关闭。维持 opt-in。
 | 指标 | WholeLayer / 改造前口径 | TileRefs |
 |------|-------------------------|----------|
 | ①a 2048 **稀疏**层一笔 `undoBytes` | **16 777 280**（整幅 materialize） | **128**（空快照 + 条目开销） |
-| ①b 2048 **满幅白底**一笔 `undoBytes` | **16 777 280** | **16 777 344**（快照仍持全层引用按 `sizeInBytes` 记账；物理 COW 另计） |
+| ①b 2048 **满幅白底**一笔 `undoBytes`（0+1 档当时） | **16 777 280** | **16 777 344**（快照按 `sizeInBytes` 累加；物理 COW 另计） |
 | ② 1024 稀疏 200 笔 `historyBytes` 峰值 | **≈252 MB**（264 245 184；触 256MB 上限反复 trim，深度被牺牲） | **≈17.04 MB**（17 867 776；200 笔全留） |
 | ③ 2048 白底小笔撤销后重投影（先排空积压，再 `sync`+循环 `processPending`） | **painted=2048×2048**（≈65 ms） | **painted=64×64**（≈31 ms） |
 
-说明：①b 账面接近是因为 `TileRefSnapshot::bytes()` 按共享 `QImage::sizeInBytes` 累加；收益在物理内存（未写瓦片不 detach）与 ③ 的重投影脏区。③ 旧数字 `2048×128` 是误测「每帧 72 块预算积压带」，已废。
+说明：①b 在 0+1 档收口时账面接近整层——后由非线性 **T0** 改为按触碰瓦片记账（同场景现 **16 512**，见下节 ③）。收益在物理内存（未写瓦片不 detach）与 ③ 的重投影脏区。③ 旧数字 `2048×128` 是误测「每帧 72 块预算积压带」，已废。
 
 另：`undoregion` 护栏稀疏 512 一笔增量=128；`undodirty` 400 文档小笔 dirty=64×64。
 
 **约定**：新增像素入栈点若会改层 extent，必须 `pushLayerPixelsUndo(..., PixelUndoMode::WholeLayer)`（见 `docs/cursor-role-prompt.md`）。
 
-**仍欠（2 档，另立计划）**：~~非线性历史~~ → 见下节；空脏区仍压条目（R7）；蒙版粒度/记账口径（见下节「仍欠」）。
+**仍欠**：~~非线性历史 / 层稳定 id~~ → 下节已落地（层 id 已证伪不必做）；空脏区仍压条目（R7）；蒙版粒度/记账 → 见「未排期优化项」**O4**。
 
 ---
 
-## 非线性撤销：历史面板 + 跳转 + 书签（2026-10）—— **已落地**
+## 非线性撤销：历史面板 + 跳转 + 书签（2026-10）—— **已落地（评估 7/7 收口）**
 
-**计划书**：[undo-nonlinear-plan.md](undo-nonlinear-plan.md)（T0–T6）
+**计划书**：[undo-nonlinear-plan.md](undo-nonlinear-plan.md)（T0–T6）  
+**评估**：[undo-nonlinear-review.md](undo-nonlinear-review.md)（含 R1 大图对照、R2/`O5` 记档）
 
-**现象（改造前）**：历史只有菜单逐步撤销；长跳转要连按 N 次 Ctrl+Z，每次 `contentChanged` 触发一次重投影；满幅层一笔 `undoBytes` 按整层引用记账（≈16.78 MB）易触 trim；蒙版随 `LayerPropUndo` 深拷贝，长跳转逐步拷贝拖慢。
+**现象（改造前）**：历史只有菜单逐步撤销；长跳转要连按 N 次 Ctrl+Z，每次 `contentChanged` 触发一次重投影；满幅层一笔 `undoBytes` 按整层引用记账（≈16.78 MB）易触 trim；蒙版随像素撤销路径深拷贝，长跳转逐步拷贝拖慢。
 
 **改法**：
-- **T0**：`TileRefs` 账面按 `markDirty` 触碰瓦片累加（`HistoryStack::refreshTopBytes`）
+- **T0**：`TileRefs` 账面按 `markDirty` 触碰瓦片累加（`HistoryStack::refreshTopBytes`）——收口 0+1 档 R6
 - **T1**：`ImageDocument::ChangeBatch` 合并 content/structure/pixels
 - **T2**：`jumpToStep` = 双栈上重复 `undoOne`/`redoOne` + 一批信号
-- **T3**：`swapLayerMask` 两行改为浅拷贝（蒙版 COW；写路径已 detach）
+- **T3**：`swapLayerMask` 两行改为浅拷贝（蒙版 COW；写路径已 detach；**不扩散**到 `LayerPropSnapshot`）
 - **T4–T5**：`HistoryPanel`（`panelTabs`）+ 位置书签（trim 重基 / push 清 redo 丢失效书签；上限 64）
 
-**被否掉的方案**：分支树；真·状态快照克隆；图层稳定 id / 条目下标重映射（本计划不需要）。
+**被否掉的方案**：分支树；真·状态快照克隆；图层稳定 id / 条目下标重映射（重复 pop/redo 下绝对下标自洽，不必做）。
 
 **实测（同机 MinGW Release，`.build-clean`，2026-10-15）**：
 
+> **约定**：耗时类实测写**区间 + 采样次数**，不写单次值（同机冷/热差可达数倍；见评估 §9.1）。
+
 | # | 指标 | 数字 |
 |---|------|------|
-| ① | 256²×200 笔，跳转 Δ1 / Δ10 / Δ100 / Δ200 | **0 / 0 / 0 / 0 ms**；每次 `contentChanged==1` |
-| ② | 同上 200→0 跳转期间 `historyBytes` | 跳前=跳后=峰值 **4 531 200**（≈4.32 MB；条目在 undo/redo 间搬移，账面不阶梯暴涨） |
+| ①a | 256²×200 笔，跳转 Δ1 / Δ10 / Δ100 / Δ200 | **0 / 0 / 0 / 0 ms**；每次 `contentChanged==1` |
+| ①b | **2048²**×200 笔，200→0（最坏口径） | **5–40 ms**（≥5 次采样，含冷启动；评估方独立复跑上限 37 ms；`contentChanged` 恒为 1） |
+| ②a | 256² 200→0 `historyBytes` | 跳前=跳后=峰值 **4 531 200**（≈4.32 MB） |
+| ②b | 2048² 200→0 `historyBytes` | 跳前=跳后=峰值 **7 398 400**（≈7.05 MB；条目在 undo/redo 间搬移，不阶梯暴涨） |
 | ③ | 2048² 满幅白底一笔 `undoBytes`（T0 前后） | WholeLayer / 记账前口径 **16 777 280** → TileRefs 触碰瓦片 **16 512** |
-| ④ | 带蒙版 512²×200 步 `jumpToStep(0)`（T3 后） | **1 ms**（改造前未保留同口径压测；产品改动仅 `swapLayerMask` 两行浅拷贝） |
+| ④a | 带蒙版 512²×200 步 `jumpToStep(0)`（T3 后） | **1 ms**（稳定） |
+| ④b | 带蒙版 **2048²**×200 步（T3 后） | **10–20 ms**（≥3 次采样；评估方独立复跑 15 ms；改造前未保留同口径压测） |
+
+说明：①b/④b 均远低于 100 ms ⇒ 面板 `|Δstep|≥10` 的 WaitCursor **无需下调**。`jumpToStep` 每步含 `changedTilesDocRect` 的 O(已分配瓦片) 扫描——数字须看大图行，**勿只用 ①a 的 0 ms 外推**。优化项见下节 O2（结论：不做）。
 
 用例证据：`undojump`（①②）、`undoregion`（③）、`undomaskcow`（④）；面板/书签：`undopanel` / `undobookmark`。
 
-**全量回归**：`psdemo_tests.exe` 本计划相关用例全绿。连跑全套时 `tilecache` P13 计时粗护栏偶发超 25%（套件预热噪声；单独跑 `tilecache` 稳定绿）——与本计划改动无关，见 [page-cache-plan.md](page-cache-plan.md) §8.1。
+**全量回归**：本计划用例全绿。连跑全套时 `tilecache` P13 偶发超 25%（套件预热噪声；单独跑稳定绿）——与本计划无关，见下节 **O5** / 评估 R2。
 
-**仍欠**：
-- 蒙版成本外账：`LayerPropSnapshot` 整张深拷贝 + 蒙版记账口径（T3 明确不扩散）
+**仍欠（本档 Out of scope）**：
+- **O4** 蒙版成本外账 —— **已派单**：[undo-maskcost-plan.md](undo-maskcost-plan.md)（T1–T4；T3/D2 已预修；待实施 T1/T2/T4）
 - 空脏区仍压条目（undo-region R7）
-- 分支树 / 历史画笔 / 真·状态快照克隆（本计划 Out of scope）
+- 分支树 / 历史画笔 / 真·状态快照克隆（明确不做）
+
+---
+
+## 撤销/历史：未排期优化项（体积与常数项）
+
+> 来源：[undo-nonlinear-review.md](undo-nonlinear-review.md) §7 / §9。回看先看「建议」列。**O4** 已拆成独立任务书，不再算「未排期空想」。
+
+| # | 位置 | 现状 | 可优化点 | 收益 | 代价 / 风险 | 建议 |
+|---|------|------|----------|------|-------------|------|
+| O1 | `domain/imagedocument.cpp`（`ChangeBatch` + 6 个 `notify*` + flush）+ **≈68 处**调用点 | 批量期 6 类信号走包装，最外层按固定顺序补发 | 「`QSignalBlocker` + 结束按状态对比补发」 | 约省 150–200 行产品代码 | 补发粒度变粗；动热路径；破坏 `undobatch` 精确契约 | **暂不做**（高风险换体积；出现第三个批量场景再评） |
+| O2 | `app/undoitem.cpp` `changedTilesDocRect` | 每步 pop 扫快照全部 key ⇒ O(已分配瓦片)；2048²×200 = **5–40 ms** | 维护「自标记以来 detach 的 key」或回传触碰矩形 ⇒ O(触碰) | 大图长跳转线性项下降 | **新增失效点**（phase1-audit ①类） | **不做**（已远低于可感知阈值） |
+| O3 | `refreshTopBytes` + TileRefs `byteSize` 触碰循环 | 每个 `markDirty` 重算触碰→字节 | 增量累加 | 微秒级 | 状态多一份、易与记账纠缠 | **不做**，仅留记 |
+| O4 | `LayerPropSnapshot::maskGray` 深拷贝 + `LayerPropUndo::byteSize` 计整张蒙版（T3 明确不扩散） | 2048² 每次属性/蒙版笔画 ≈**4 MB**（见下表） | 浅拷贝 + 按触碰记账（对齐像素 T0/T3）。**注意两类要分开看**：①**属性类**（改显隐/不透明度/改名）根本没碰蒙版 ⇒ 浅拷贝后所有条目**共享同一张**蒙版，100 次显隐只占 1 张（这是主要收益）；②**蒙版笔画**每个条目需要自己那一版快照，**物理上不可省**（快照语义决定），只能靠记账准确 + 上限管理 | 带蒙版文档历史深度与 push 延迟 | 触及 `applyLayerProps`（`LayerMask::setFromImage` 也会深拷贝，恢复侧要一并改成引用赋值）/ 结构撤销 / 存读等多处 | **已派单**：[undo-maskcost-plan.md](undo-maskcost-plan.md)（T1–T4，≈0.3 批次）。验收：`2048²` 带蒙版改 100 次显隐 → `historyTrimmed==0`；蒙版 200 笔给下界防低报 |
+| O5 | `tests/t_tilecache.cpp` P13 | 全套连跑偶发 >25%；单独跑绿 | 预热 / 阈值 25%→40% / 保持并记档 | 减少复评噪声误判 | 放宽阈值降灵敏度 | **已记档、暂不改阈值**（与评估 R2 一致；真回归仍靠 ≤25% 粗护栏） |
+
+### O4 的实测依据（对照 T0 像素记账）
+
+| 场景（2048²） | 单条撤销条目账面 |
+|---|---|
+| 像素一笔（T0 后） | **16 512**（触碰瓦片） |
+| 属性变化 / 蒙版一笔（未修） | **≈4 194 304**（整张蒙版深拷贝） |
+
+⇒ 带蒙版文档上，「改一次显隐」比「画一笔」贵约 **250×**；256 MB 上限下两类操作的可撤销深度相差两个数量级。
 
 ---
 
