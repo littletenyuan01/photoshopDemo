@@ -185,5 +185,44 @@ int tUndoJump()
                    .arg(peakBytes));
     }
 
+    // T6 R1：2048² 大图 Δ200（最坏口径；pending-dev ①② 须同时记小图/大图）
+    {
+        auto d = ImageDocument::createBlank(2048, 2048, Qt::white);
+        Layer *L = d->activeLayer();
+        for (int i = 0; i < 200; ++i) {
+            d->pushLayerPixelsUndo(0, QStringLiteral("L%1").arg(i));
+            const QRect loc = PaintEngine::stampDab(
+                L->tiles(), QPointF(40 + (i % 20) * 16, 40 + (i / 20) * 16), 8.0,
+                QColor(i % 200, 50, 90), PaintMode::Paint);
+            L->invalidateContentBounds();
+            L->invalidateCompositeRaster();
+            d->markDirty(loc.translated(L->offsetX(), L->offsetY()));
+        }
+        HistoryStack &h = d->history();
+        r.check(h.stepCount() == 200, QStringLiteral("T6R1 2048² 建 200 笔"));
+
+        h.jumpToStep(200, *d);
+        int contentN = 0;
+        QMetaObject::Connection conn = QObject::connect(
+            d.get(), &ImageDocument::contentChanged, [&]() { ++contentN; });
+        const quint64 before = h.historyBytes();
+        quint64 peakBytes = before;
+        QElapsedTimer clock;
+        clock.start();
+        const bool ok = h.jumpToStep(0, *d);
+        const qint64 ms = clock.elapsed();
+        peakBytes = qMax(peakBytes, h.historyBytes());
+        QObject::disconnect(conn);
+        r.check(ok && contentN == 1,
+                QStringLiteral("T6R1 2048² 200→0 contentChanged==1（%1）").arg(contentN));
+        r.info(QStringLiteral(
+                   "T6R1 2048²×200 笔 200→0：%1 ms，contentChanged=%2，historyBytes 跳前=%3 跳后=%4 峰值≈%5")
+                   .arg(ms)
+                   .arg(contentN)
+                   .arg(before)
+                   .arg(h.historyBytes())
+                   .arg(peakBytes));
+    }
+
     return r.fails;
 }

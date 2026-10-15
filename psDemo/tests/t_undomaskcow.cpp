@@ -146,9 +146,11 @@ int tUndoMaskCow()
         LayerMask *mask = layer->mask();
         for (int i = 0; i < 200; ++i) {
             doc->pushLayerPixelsUndo(0, QStringLiteral("m%1").arg(i));
-            PaintEngine::stampMaskDab(mask->image(), QPointF(40 + (i % 20) * 8, 40 + (i / 20) * 8),
-                                      6.0, quint8(i % 200), PaintMode::Paint);
-            doc->markDirty(QRect(0, 0, 64, 64));
+            const QRect loc = PaintEngine::stampMaskDab(
+                mask->image(), QPointF(40 + (i % 20) * 8, 40 + (i / 20) * 8), 6.0,
+                quint8(i % 200), PaintMode::Paint);
+            // D2：markDirty 用真实写域（层局部→文档坐标）
+            doc->markDirty(loc.translated(layer->offsetX(), layer->offsetY()));
         }
         QElapsedTimer clock;
         clock.start();
@@ -156,6 +158,27 @@ int tUndoMaskCow()
         const qint64 ms = clock.elapsed();
         r.check(ok, QStringLiteral("200 步跳到 0 成功"));
         r.info(QStringLiteral("带蒙版 512² 层 200 步 jumpToStep(0) 耗时=%1 ms").arg(ms));
+    }
+
+    // T6 R1：带蒙版 2048²×200 步（与 512² 对照；最坏口径）
+    {
+        auto doc = ImageDocument::createBlank(2048, 2048, Qt::white);
+        Layer *layer = doc->activeLayer();
+        doc->addLayerMask(0);
+        LayerMask *mask = layer->mask();
+        for (int i = 0; i < 200; ++i) {
+            doc->pushLayerPixelsUndo(0, QStringLiteral("M%1").arg(i));
+            const QRect loc = PaintEngine::stampMaskDab(
+                mask->image(), QPointF(40 + (i % 20) * 16, 40 + (i / 20) * 16), 8.0,
+                quint8(i % 200), PaintMode::Paint);
+            doc->markDirty(loc.translated(layer->offsetX(), layer->offsetY()));
+        }
+        QElapsedTimer clock;
+        clock.start();
+        const bool ok = doc->history().jumpToStep(0, *doc);
+        const qint64 ms = clock.elapsed();
+        r.check(ok, QStringLiteral("T6R1 带蒙版 2048² 200 步跳到 0 成功"));
+        r.info(QStringLiteral("带蒙版 2048² 层 200 步 jumpToStep(0) 耗时=%1 ms").arg(ms));
     }
 
     return r.fails;
