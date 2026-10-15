@@ -76,6 +76,7 @@ release\psdemo_tests.exe composite regionraster   :: 只跑指定用例
 | `undobatch` | 非线性 T1：`ChangeBatch` 合并 content/structure/pixels；嵌套只发一次 |
 | `undojump` | 非线性 T2：`jumpToStep` 任意跳转逐像素一致；每次 `contentChanged==1`；附 T6 跳转耗时 info |
 | `undomaskcow` | 非线性 T3：蒙版写路径 COW（stampMaskDab/fill）；带蒙版 200 步跳转耗时 info |
+| `undomaskprop` | 蒙版成本 O4：属性类蒙版浅拷贝共享；100 次显隐不 trim；detach / 蒙版笔画下界 |
 | `undopanel` | 非线性 T4：`HistoryPanel` 行数=`stepCount+1`；点行跳转；trim 后重建 |
 | `undobookmark` | 非线性 T5：命名书签跨 trim 重基 / push 清 redo 丢失效 / 上限 64 |
 

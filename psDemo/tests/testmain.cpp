@@ -65,6 +65,7 @@ int tUndoDirty();
 int tUndoBatch();
 int tUndoJump();
 int tUndoMaskCow();
+int tUndoMaskProp();
 int tUndoPanel();
 int tUndoBookmark();
 
@@ -121,6 +122,7 @@ const Case kCases[] = {
     { "undobatch", "撤销非线性 T1：ChangeBatch 合并 content/structure/pixels", tUndoBatch },
     { "undojump", "撤销非线性 T2：jumpToStep 任意跳转逐像素一致", tUndoJump },
     { "undomaskcow", "撤销非线性 T3：蒙版引用快照 COW（stampMaskDab/fill）", tUndoMaskCow },
+    { "undomaskprop", "蒙版成本 O4：属性类引用快照 + 按是否共享记账", tUndoMaskProp },
     { "undopanel", "撤销非线性 T4：HistoryPanel 行数/跳转/trim 重建", tUndoPanel },
     { "undobookmark", "撤销非线性 T5：命名书签重基/跳转/清 redo", tUndoBookmark },
 };

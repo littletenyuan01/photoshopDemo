@@ -1756,7 +1756,7 @@ Custom ≈48 ns/px、Gauss ≈19。Q11–Q13 关闭。维持 opt-in。
 **全量回归**：本计划用例全绿。连跑全套时 `tilecache` P13 偶发超 25%（套件预热噪声；单独跑稳定绿）——与本计划无关，见下节 **O5** / 评估 R2。
 
 **仍欠（本档 Out of scope）**：
-- **O4** 蒙版成本外账 —— **已派单**：[undo-maskcost-plan.md](undo-maskcost-plan.md)（T1–T4；T3/D2 已预修；待实施 T1/T2/T4）
+- ~~**O4** 蒙版成本外账~~ —— **已落地**（见下节 O4 行与 [undo-maskcost-plan.md](undo-maskcost-plan.md)）
 - 空脏区仍压条目（undo-region R7）
 - 分支树 / 历史画笔 / 真·状态快照克隆（明确不做）
 
@@ -1771,17 +1771,17 @@ Custom ≈48 ns/px、Gauss ≈19。Q11–Q13 关闭。维持 opt-in。
 | O1 | `domain/imagedocument.cpp`（`ChangeBatch` + 6 个 `notify*` + flush）+ **≈68 处**调用点 | 批量期 6 类信号走包装，最外层按固定顺序补发 | 「`QSignalBlocker` + 结束按状态对比补发」 | 约省 150–200 行产品代码 | 补发粒度变粗；动热路径；破坏 `undobatch` 精确契约 | **暂不做**（高风险换体积；出现第三个批量场景再评） |
 | O2 | `app/undoitem.cpp` `changedTilesDocRect` | 每步 pop 扫快照全部 key ⇒ O(已分配瓦片)；2048²×200 = **5–40 ms** | 维护「自标记以来 detach 的 key」或回传触碰矩形 ⇒ O(触碰) | 大图长跳转线性项下降 | **新增失效点**（phase1-audit ①类） | **不做**（已远低于可感知阈值） |
 | O3 | `refreshTopBytes` + TileRefs `byteSize` 触碰循环 | 每个 `markDirty` 重算触碰→字节 | 增量累加 | 微秒级 | 状态多一份、易与记账纠缠 | **不做**，仅留记 |
-| O4 | `LayerPropSnapshot::maskGray` 深拷贝 + `LayerPropUndo::byteSize` 计整张蒙版（T3 明确不扩散） | 2048² 每次属性/蒙版笔画 ≈**4 MB**（见下表） | 浅拷贝 + 按触碰记账（对齐像素 T0/T3）。**注意两类要分开看**：①**属性类**（改显隐/不透明度/改名）根本没碰蒙版 ⇒ 浅拷贝后所有条目**共享同一张**蒙版，100 次显隐只占 1 张（这是主要收益）；②**蒙版笔画**每个条目需要自己那一版快照，**物理上不可省**（快照语义决定），只能靠记账准确 + 上限管理 | 带蒙版文档历史深度与 push 延迟 | 触及 `applyLayerProps`（`LayerMask::setFromImage` 也会深拷贝，恢复侧要一并改成引用赋值）/ 结构撤销 / 存读等多处 | **已派单**：[undo-maskcost-plan.md](undo-maskcost-plan.md)（T1–T4，≈0.3 批次）。验收：`2048²` 带蒙版改 100 次显隐 → `historyTrimmed==0`；蒙版 200 笔给下界防低报 |
+| O4 | `LayerPropSnapshot::maskGray` + `LayerPropUndo` | **已落地**（[undo-maskcost-plan.md](undo-maskcost-plan.md)） | 属性类浅拷贝 + `m_maskShared`；`markDirty` detach 后按整张计 | 见下表 | — | **已落地** |
 | O5 | `tests/t_tilecache.cpp` P13 | 全套连跑偶发 >25%；单独跑绿 | 预热 / 阈值 25%→40% / 保持并记档 | 减少复评噪声误判 | 放宽阈值降灵敏度 | **已记档、暂不改阈值**（与评估 R2 一致；真回归仍靠 ≤25% 粗护栏） |
 
-### O4 的实测依据（对照 T0 像素记账）
+### O4 落地实测（2026-10-15，`undomaskprop`）
 
-| 场景（2048²） | 单条撤销条目账面 |
+| 场景（2048²） | 数字 |
 |---|---|
-| 像素一笔（T0 后） | **16 512**（触碰瓦片） |
-| 属性变化 / 蒙版一笔（未修） | **≈4 194 304**（整张蒙版深拷贝） |
-
-⇒ 带蒙版文档上，「改一次显隐」比「画一笔」贵约 **250×**；256 MB 上限下两类操作的可撤销深度相差两个数量级。
+| 100 次显隐 `undoBytes` 增量 | **28 400**（`historyTrimmed=0`；改造前 ≈100×4 MB） |
+| LayerPropUndo 共享时 / detach 后 `byteSize` | **284** / **4 194 588** |
+| 50 笔蒙版（抬高 `byteLimit`）增量 | **211 212 544**（≥50×4 MB×0.75） |
+| 对照：像素一笔（T0） | **16 512** |
 
 ---
 

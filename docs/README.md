@@ -49,7 +49,7 @@
 | [undo-region-review.md](undo-region-review.md) | **撤销粒度改造实施评估**：T1–T4 真做完、T5 实测口径问题（旧数字测到的是投影每帧 48 块积压带，已废）；返修项 R1–R5 已修；§7 独立复核 + **R6（记账口径把 TileRefs 收益吃掉：满幅层深度仍只有 ~15 步）** |
 | [undo-nonlinear-plan.md](undo-nonlinear-plan.md) | **非线性撤销（2 档）开发计划**：跳转 = 重复 pop/redo + `ChangeBatch` 合并信号（一次跳转一次重投影）、历史面板、命名书签（=位置标记）、T0 记账按触碰瓦片、T3 蒙版引用快照；**分支树/历史画笔/真快照克隆/层稳定 id 明确不做**。T0–T6 已落地 |
 | [undo-nonlinear-review.md](undo-nonlinear-review.md) | **非线性撤销实施评估**：T0–T6 **7/7 已收口**；R1 大图 **5–40 ms** / 带蒙版 **10–20 ms**；§10 D1–D3 已处置；O4 **已派单** |
-| [undo-maskcost-plan.md](undo-maskcost-plan.md) | **蒙版撤销成本外账（O4）**：属性类改引用 + 按「是否仍共享」记账；T2 下界须抬高 `byteLimit`（勿与默认 256MB 冲突）；**T3/D2 已预修**；明确不做 O1/O2/O3 |
+| [undo-maskcost-plan.md](undo-maskcost-plan.md) | **蒙版撤销成本外账（O4）已落地**：属性类浅拷贝 + `m_maskShared`；100 次显隐增量 **28400**；detach/50 笔下界绿；明确不做 O1/O2/O3 |
 | [tests.md](tests.md) | **常驻测试**：30+ 无 GUI 断言用例、构建运行方式、写测试的约定与坑 |
 | [code-map.md](code-map.md) | 重点代码与文件索引 |
 | [tech-notes.md](tech-notes.md) | 技术点与设计决策 |

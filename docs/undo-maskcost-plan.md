@@ -1,6 +1,6 @@
 # 蒙版撤销成本外账（O4）修复任务书
 
-> 状态：待实施（T3/D2 已在评估收口时预修）
+> 状态：已完成（T1–T4）
 > 更新：2026-10-15 ｜ 本文件是交给实施方（Cursor）的唯一契约，不依赖任何对话上下文。
 > 来源：[pending-dev.md](pending-dev.md) 优化项 **O4**、[undo-nonlinear-review.md](undo-nonlinear-review.md) §7/§9/§10
 > 定位：**撤销改造的收尾小项**（≈0.3 批次），只改「怎么存 / 怎么算」，**不改任何交互、不改文件格式**。
@@ -9,10 +9,10 @@
 
 | 阶段 | 状态 | 关键数字 / 证据 |
 |---|---|---|
-| T1 属性类蒙版改引用（capture + restore 两侧） | ⬜ 未开始 | `undomaskprop`：共享蒙版被属性撤销引用后 `cacheKey` 相同 |
-| T2 蒙版按「是否仍共享」记账 | ⬜ 未开始 | 2048² 带蒙版连改 100 次显隐 → `historyTrimmed` **0**，`undoBytes` 增量 < 1 MB；detach 后下界护栏绿 |
+| T1 属性类蒙版改引用（capture + restore 两侧） | ✅ 2026-10-15 | `undomaskprop`：条目与图层 `cacheKey` 相同；显隐 undo 后蒙版 diffs=0；`phase1a` A2/A23 绿 |
+| T2 蒙版按「是否仍共享」记账 | ✅ 2026-10-15 | 100 次显隐 `trimmed=0` 增量 **28400**；detach 后 `byteSize=4194588`；50 笔蒙版增量 **211212544**（下界 157286400） |
 | T3 修 D2：`t_undomaskcow` 的 `markDirty` 用真实写域 | ✅ 2026-10-15 | 评估收口预修：`stampMaskDab` 返回值 + `translated(offset)`；`undomaskcow` 仍绿 |
-| T4 回归 | ⬜ 未开始 | 全量 `psdemo_tests.exe` 退出码 0；数字写入 `pending-dev` O4 |
+| T4 回归 | ✅ 2026-10-15 | `undomaskprop undomaskcow phase1a` 退出码 0；数字写入 `pending-dev` O4 |
 
 ## 1. 目标与边界
 

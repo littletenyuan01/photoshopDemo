@@ -1323,7 +1323,7 @@ void ImageDocument::markDirty(const QRect &rect)
 
     invalidateLayersIntersecting(m_layers, rect);
 
-    // T0：栈顶 TileRefs 像素条目按触碰矩形累加记账（undo/redo 回放中不记）
+    // T0 / O4：栈顶条目记账（undo/redo 回放中不记）
     if (shouldRecordHistory() && m_history) {
         if (auto *pix = dynamic_cast<LayerPixelsUndo *>(m_history->topUndoItem())) {
             const int n = m_layers.count();
@@ -1337,6 +1337,15 @@ void ImageDocument::markDirty(const QRect &rect)
                     rect.translated(-layer->offsetX(), -layer->offsetY()));
                 m_history->refreshTopBytes();
                 break;
+            }
+        } else if (auto *prop = dynamic_cast<LayerPropUndo *>(m_history->topUndoItem())) {
+            // O4：属性条目蒙版若已与图层 detach，翻转为整张记账
+            const int i = prop->layerIndexForMaskProbe();
+            if (Layer *layer = m_layers.layerAt(i);
+                layer && layer->hasMask() && layer->mask()
+                && !prop->maskSharedWith(layer->mask()->image())) {
+                prop->noteMaskDetached();
+                m_history->refreshTopBytes();
             }
         }
     }

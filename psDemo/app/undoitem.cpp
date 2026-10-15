@@ -105,7 +105,7 @@ LayerPropSnapshot captureLayerProps(const Layer &layer)
         s.hasMask = true;
         s.maskEnabled = layer.mask()->isEnabled();
         s.maskLinked = layer.mask()->isLinked();
-        s.maskGray = layer.mask()->image().copy();
+        s.maskGray = layer.mask()->image(); // O4：浅拷贝；写路径靠 COW detach
     }
     s.linkPath = layer.linkPath();
     s.kind = layer.kind();
@@ -124,7 +124,7 @@ void applyLayerProps(Layer &layer, const LayerPropSnapshot &s)
     layer.filters().replaceAll(s.filters);
     if (s.hasMask && !s.maskGray.isNull()) {
         auto mask = std::make_unique<LayerMask>();
-        mask->setFromImage(s.maskGray);
+        mask->image() = s.maskGray; // O4：引用赋值，避免 setFromImage 深拷贝
         mask->setEnabled(s.maskEnabled);
         mask->setLinked(s.maskLinked);
         layer.setMask(std::move(mask));
@@ -329,12 +329,25 @@ LayerPropUndo::LayerPropUndo(int layerIndex, LayerPropSnapshot before, const QSt
 {
 }
 
+bool LayerPropUndo::maskSharedWith(const QImage &liveMask) const
+{
+    return m_maskShared && m_snap.hasMask && !m_snap.maskGray.isNull()
+        && m_snap.maskGray.cacheKey() == liveMask.cacheKey();
+}
+
+void LayerPropUndo::noteMaskDetached()
+{
+    m_maskShared = false;
+}
+
 quint64 LayerPropUndo::byteSize() const
 {
     quint64 n = sizeof(*this) + quint64(m_snap.name.size()) * 2 + 64;
     n += quint64(m_snap.styles.size()) * sizeof(LayerStyleEffect);
     n += quint64(m_snap.filters.size()) * sizeof(FilterNode);
-    n += quint64(m_snap.maskGray.sizeInBytes());
+    // O4：仍共享 ⇒ 物理增量 0，不计整张；已 detach ⇒ 按整张计
+    if (!m_maskShared)
+        n += quint64(m_snap.maskGray.sizeInBytes());
     return n;
 }
 
@@ -348,6 +361,10 @@ void LayerPropUndo::pop(ImageDocument &doc)
     LayerPropSnapshot live = captureLayerProps(*layer);
     applyLayerProps(*layer, m_snap);
     m_snap = std::move(live);
+    // O4：交换后按 cacheKey 重算共享（undo 回放中 markDirty 不记账，须在此置位）
+    m_maskShared = m_snap.hasMask && layer->hasMask() && layer->mask()
+        && !m_snap.maskGray.isNull()
+        && m_snap.maskGray.cacheKey() == layer->mask()->image().cacheKey();
     const QRect newBounds = layer->styleBoundsInDocument().intersected(docRect);
     doc.markDirty(oldBounds.united(newBounds));
     // A23：撤销去掉蒙版后须清编辑蒙版标志（否则画笔静默失效）

@@ -133,10 +133,21 @@ public:
     quint64 byteSize() const override;
     void pop(ImageDocument &doc) override;
 
+    /** O4：供 markDirty / 用例探测栈顶条目所属层。 */
+    int layerIndexForMaskProbe() const { return m_layerIndex; }
+    /**
+     * O4：条目蒙版是否仍与 liveMask 共享缓冲（m_maskShared 且 cacheKey 相同）。
+     * 为 true 时 byteSize 不计整张蒙版。
+     */
+    bool maskSharedWith(const QImage &liveMask) const;
+    /** O4：由 markDirty 在检测到 detach 后调用（幂等）。 */
+    void noteMaskDetached();
+
 private:
     int m_layerIndex = -1;
     LayerPropSnapshot m_snap;
     QString m_label;
+    bool m_maskShared = true; ///< capture 时共享；写蒙版 detach 后 false
 };
 
 /**

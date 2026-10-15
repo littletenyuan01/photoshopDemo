@@ -22,7 +22,7 @@
 - **R2 / O5**：P13 记档、不改阈值
 - **O4**：另立 [undo-maskcost-plan.md](undo-maskcost-plan.md)（T1–T4；其中 T3/D2 已预修）
 
-**建议下一步**：按 [undo-maskcost-plan.md](undo-maskcost-plan.md) 实施 O4（T1→T2→T4）；空脏区仍压条目（undo-region R7）另议。
+**建议下一步**：空脏区仍压条目（undo-region R7）另议。**O4 已落地**（见 [undo-maskcost-plan.md](undo-maskcost-plan.md) §0）。
 
 ## 1. 逐任务核对
 
@@ -93,7 +93,7 @@ WaitCursor 阈值不必下调；O2 **不做**。
 |---|---|
 | R6 满幅记账吃深度 | **T0** 落地 |
 | 「需要层稳定 id」 | **证伪**，不做 |
-| 蒙版整张深拷贝 | **O4 已派单** → [undo-maskcost-plan.md](undo-maskcost-plan.md) |
+| 蒙版整张深拷贝 | **O4 已落地** → [undo-maskcost-plan.md](undo-maskcost-plan.md) |
 | 空脏区仍压条目 | undo-region R7（仍欠） |
 
 ## 9. 优化项落档与耗时口径
@@ -103,7 +103,7 @@ WaitCursor 阈值不必下调；O2 **不做**。
 | O1 | ChangeBatch 换 Blocker | **暂不做** |
 | O2 | `changedTilesDocRect` → O(触碰) | **不做** |
 | O3 | `byteSize` 每 dirty 重算 | **不做** |
-| O4 | 蒙版外账 | **已派单** [undo-maskcost-plan.md](undo-maskcost-plan.md) |
+| O4 | 蒙版外账 | **已落地** [undo-maskcost-plan.md](undo-maskcost-plan.md)（100 次显隐增量 28400） |
 | O5 | P13 抖动 | **已记档、不改阈值** |
 
 ### 9.1 耗时单次值不可复现 → 工程约定
