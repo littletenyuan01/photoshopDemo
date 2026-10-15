@@ -15,6 +15,7 @@
 #include "domain/tilebuffer.h"
 
 #include <QImage>
+#include <QRect>
 #include <QString>
 #include <QVector>
 #include <QtGlobal>
@@ -100,6 +101,11 @@ public:
     quint64 byteSize() const override;
     void pop(ImageDocument &doc) override;
 
+    /** 累加「本条目生效期间被写到的层内矩形」（由 ImageDocument::markDirty 调用）。 */
+    void noteTouchedLocalRect(const QRect &localRect);
+    /** 该条目是否正在跟踪某个图层（供 markDirty 判定）。 */
+    bool touchesLayer(int layerIndex) const;
+
 private:
     int m_layerIndex = -1;
     int m_offsetX = 0;
@@ -109,6 +115,7 @@ private:
     int m_extentW = 0;
     int m_extentH = 0;
     PixelUndoMode m_mode = PixelUndoMode::WholeLayer;
+    QRect m_touchedLocal; ///< TileRefs：已触碰层内矩形并集（空=尚未 markDirty）
     bool m_trackMask = false;
     bool m_hasMask = false;
     bool m_maskEnabled = true;

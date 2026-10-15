@@ -66,6 +66,11 @@ public:
     quint64 byteLimit() const { return m_byteLimit; }
     void setByteLimit(quint64 bytes);
 
+    /** 栈顶 undo 条目（无可返回 nullptr）；供 markDirty 累加触碰区。 */
+    UndoItem *topUndoItem() { return m_undo.empty() ? nullptr : m_undo.back().get(); }
+    /** 栈顶条目字节数变化后同步账面（T0；由 ImageDocument::markDirty 调用）。 */
+    void refreshTopBytes();
+
 signals:
     /** undo/redo 栈或 canUndo/canRedo 状态变化时发出。 */
     void changed();
@@ -75,12 +80,15 @@ signals:
 private:
     /** 当 m_undoBytes 超过 m_byteLimit 时丢弃最老条目。 */
     void trimUndo();
+    /** 换栈后把 m_topAccounted 对齐到当前 undo 栈顶。 */
+    void syncTopAccounted();
 
     std::vector<std::unique_ptr<UndoItem>> m_undo;  ///< undo 栈（底→顶 = 旧→新）
     std::vector<std::unique_ptr<UndoItem>> m_redo;  ///< redo 栈
     quint64 m_undoBytes = 0;                        ///< undo 栈累计字节（用于 trim）
     quint64 m_redoBytes = 0;                        ///< redo 栈累计字节（A26）
     quint64 m_byteLimit = 256ull * 1024ull * 1024ull; ///< 超限丢最老 undo
+    quint64 m_topAccounted = 0;                     ///< T0：栈顶条目的已记账字节
     bool m_applying = false;                        ///< pop 进行中，禁止嵌套 push
 };
 

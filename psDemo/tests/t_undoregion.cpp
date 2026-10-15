@@ -107,22 +107,54 @@ int tUndoRegion()
                        .arg(wl)
                        .arg(tr));
         }
-        // ①b 满幅白底（最常见）：TileRefs 仍持全部瓦片引用，byteSize≈触碰瓦片深拷贝前的共享记账
+        // ①b 满幅白底（最常见）：T0 后 TileRefs 按 markDirty 触碰瓦片记账（须走 markDirty）
         {
             auto d = ImageDocument::createBlank(2048, 2048, Qt::white);
             const quint64 wl = measureOneStroke(*d, PixelUndoMode::WholeLayer);
             d->undo();
-            // 重新白底一笔（undo 已恢复）
+            Layer *L = d->activeLayer();
             const quint64 b0 = d->history().undoBytes();
             d->pushLayerPixelsUndo(0, QStringLiteral("TR"), PixelUndoMode::TileRefs);
-            PaintEngine::stampDab(d->activeLayer()->tiles(), QPointF(40, 40), 14.0, Qt::red,
-                                  PaintMode::Paint);
+            const QRect loc = PaintEngine::stampDab(L->tiles(), QPointF(40, 40), 14.0, Qt::red,
+                                                    PaintMode::Paint);
+            L->invalidateContentBounds();
+            L->invalidateCompositeRaster();
+            d->markDirty(loc.translated(L->offsetX(), L->offsetY()));
             const quint64 tr = d->history().undoBytes() - b0;
-            const int touched = d->activeLayer()->tiles().allocatedTileCount(); // 参考：写后总槽数
-            Q_UNUSED(touched);
+            // 触碰瓦片量级：1 块 ≈16 KB；宽松上限与文件头护栏同口径
+            const quint64 touchCap = 16ull * 6144ull + 65536ull;
+            r.check(tr <= touchCap && tr < 256ull * 1024ull,
+                    QStringLiteral("T5①b TileRefs 满幅一笔按触碰瓦片计=%1 ≤ %2（非整层 16MB）")
+                        .arg(tr)
+                        .arg(touchCap));
             r.info(QStringLiteral("T5①b 2048 满幅白底一笔 undoBytes：WholeLayer=%1 TileRefs=%2")
                        .arg(wl)
                        .arg(tr));
+        }
+
+        // T0：2048² 满幅层连续 100 笔后不得 trim（触碰记账下远低于 256MB 上限）
+        {
+            auto d = ImageDocument::createBlank(2048, 2048, Qt::white);
+            Layer *L = d->activeLayer();
+            int trimCalls = 0;
+            QObject::connect(&d->history(), &HistoryStack::historyTrimmed,
+                             [&](int) { ++trimCalls; });
+            for (int i = 0; i < 100; ++i) {
+                d->pushLayerPixelsUndo(0, QStringLiteral("p%1").arg(i), PixelUndoMode::TileRefs);
+                const QRect loc =
+                    PaintEngine::stampDab(L->tiles(), QPointF(40 + (i % 20) * 8, 40 + (i / 20) * 8),
+                                          10.0, QColor(i % 200, 30, 30), PaintMode::Paint);
+                L->invalidateContentBounds();
+                L->invalidateCompositeRaster();
+                d->markDirty(loc.translated(L->offsetX(), L->offsetY()));
+            }
+            r.check(trimCalls == 0,
+                    QStringLiteral("T0 满幅 100 笔 historyTrimmed 次数=%1（期望 0）").arg(trimCalls));
+            r.check(d->history().undoDepth() == 100,
+                    QStringLiteral("T0 满幅 100 笔 undoDepth=%1").arg(d->history().undoDepth()));
+            r.info(QStringLiteral("T0 满幅 100 笔后 undoBytes=%1 historyBytes=%2")
+                       .arg(d->history().undoBytes())
+                       .arg(d->history().historyBytes()));
         }
 
         // ② 200 笔峰值：TileRefs vs WholeLayer（后者预期触 256MB 上限被 trim）

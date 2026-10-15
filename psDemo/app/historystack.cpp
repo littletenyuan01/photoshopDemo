@@ -31,6 +31,30 @@ QString HistoryStack::redoText() const
     return m_redo.empty() ? QString() : m_redo.back()->name();
 }
 
+void HistoryStack::syncTopAccounted()
+{
+    m_topAccounted = m_undo.empty() ? 0 : m_undo.back()->byteSize();
+}
+
+void HistoryStack::refreshTopBytes()
+{
+    if (m_undo.empty()) {
+        m_topAccounted = 0;
+        return;
+    }
+    const quint64 now = m_undo.back()->byteSize();
+    if (now >= m_topAccounted) {
+        m_undoBytes += (now - m_topAccounted);
+    } else {
+        const quint64 d = m_topAccounted - now;
+        if (m_undoBytes >= d)
+            m_undoBytes -= d;
+        else
+            m_undoBytes = 0;
+    }
+    m_topAccounted = now;
+}
+
 void HistoryStack::push(std::unique_ptr<UndoItem> item)
 {
     if (!item || m_applying)
@@ -39,6 +63,7 @@ void HistoryStack::push(std::unique_ptr<UndoItem> item)
     m_redoBytes = 0; // A26：新 push 清空 redo 时同步清记账
     m_undoBytes += item->byteSize();
     m_undo.push_back(std::move(item));
+    syncTopAccounted();
     trimUndo();
     // 静默点：undo push 之后可淘汰瓦片（文档指针由调用方持有；此处无 Projection）
     TileCache::instance().trim();
@@ -60,6 +85,7 @@ void HistoryStack::undo(ImageDocument &doc)
     item->pop(doc);
     m_redoBytes += sz; // A26：迁入 redo 后计入
     m_redo.push_back(std::move(item));
+    syncTopAccounted();
     m_applying = false;
     emit changed();
 }
@@ -79,6 +105,7 @@ void HistoryStack::redo(ImageDocument &doc)
     item->pop(doc);
     m_undoBytes += sz;
     m_undo.push_back(std::move(item));
+    syncTopAccounted();
     trimUndo();
     m_applying = false;
     emit changed();
@@ -90,6 +117,7 @@ void HistoryStack::clear()
     m_redo.clear();
     m_undoBytes = 0;
     m_redoBytes = 0;
+    m_topAccounted = 0;
     emit changed();
 }
 

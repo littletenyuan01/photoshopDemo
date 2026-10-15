@@ -1216,6 +1216,24 @@ void ImageDocument::markDirty(const QRect &rect)
 
     invalidateLayersIntersecting(m_layers, rect);
 
+    // T0：栈顶 TileRefs 像素条目按触碰矩形累加记账（undo/redo 回放中不记）
+    if (shouldRecordHistory() && m_history) {
+        if (auto *pix = dynamic_cast<LayerPixelsUndo *>(m_history->topUndoItem())) {
+            const int n = m_layers.count();
+            for (int i = 0; i < n; ++i) {
+                if (!pix->touchesLayer(i))
+                    continue;
+                Layer *layer = m_layers.layerAt(i);
+                if (!layer)
+                    break;
+                pix->noteTouchedLocalRect(
+                    rect.translated(-layer->offsetX(), -layer->offsetY()));
+                m_history->refreshTopBytes();
+                break;
+            }
+        }
+    }
+
     emit pixelsChanged(rect);
     emit contentChanged();
 }

@@ -187,10 +187,44 @@ LayerPixelsUndo::LayerPixelsUndo(int layerIndex, TileBuffer::TileRefSnapshot sna
 {
 }
 
+void LayerPixelsUndo::noteTouchedLocalRect(const QRect &localRect)
+{
+    if (m_mode != PixelUndoMode::TileRefs || localRect.isEmpty())
+        return;
+    m_touchedLocal = m_touchedLocal.isNull() ? localRect : m_touchedLocal.united(localRect);
+}
+
+bool LayerPixelsUndo::touchesLayer(int layerIndex) const
+{
+    return m_mode == PixelUndoMode::TileRefs && m_layerIndex == layerIndex;
+}
+
 quint64 LayerPixelsUndo::byteSize() const
 {
-    if (m_mode == PixelUndoMode::TileRefs)
-        return quint64(m_tileSnap.bytes()) + quint64(m_maskGray.sizeInBytes()) + 128;
+    if (m_mode == PixelUndoMode::TileRefs) {
+        // T0：按触碰瓦片几何字节计（非快照内全部引用的 sizeInBytes 累加）
+        quint64 tileBytes = 0;
+        const QRect area =
+            m_touchedLocal.intersected(QRect(0, 0, m_extentW, m_extentH));
+        if (!area.isEmpty() && m_extentW > 0 && m_extentH > 0) {
+            constexpr int ts = TileBuffer::kTileSize;
+            const int tx0 = area.left() / ts;
+            const int ty0 = area.top() / ts;
+            const int tx1 = area.right() / ts;
+            const int ty1 = area.bottom() / ts;
+            for (int ty = ty0; ty <= ty1; ++ty) {
+                for (int tx = tx0; tx <= tx1; ++tx) {
+                    const int x = tx * ts;
+                    const int y = ty * ts;
+                    const int w = qMin(ts, m_extentW - x);
+                    const int h = qMin(ts, m_extentH - y);
+                    if (w > 0 && h > 0)
+                        tileBytes += quint64(w) * quint64(h) * 4ull; // ARGB32
+                }
+            }
+        }
+        return tileBytes + quint64(m_maskGray.sizeInBytes()) + 128;
+    }
     return quint64(m_pixels.sizeInBytes()) + quint64(m_maskGray.sizeInBytes()) + 64;
 }
 
