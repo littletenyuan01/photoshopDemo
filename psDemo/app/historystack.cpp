@@ -44,6 +44,83 @@ QString HistoryStack::stepName(int step) const
     return m_redo[size_t(n - 1 - step)]->name();
 }
 
+bool HistoryStack::bookmarkAt(int step, QString *label) const
+{
+    for (const auto &p : m_bookmarks) {
+        if (p.first == step) {
+            if (label)
+                *label = p.second;
+            return true;
+        }
+    }
+    return false;
+}
+
+int HistoryStack::bookmarkStep(const QString &label) const
+{
+    for (const auto &p : m_bookmarks) {
+        if (p.second == label)
+            return p.first;
+    }
+    return -1;
+}
+
+bool HistoryStack::addBookmark(int step, const QString &label)
+{
+    if (label.isEmpty())
+        return false;
+    if (step < 0 || step > stepCount())
+        return false;
+    for (auto &p : m_bookmarks) {
+        if (p.first == step) {
+            if (p.second != label) {
+                p.second = label;
+                emit bookmarksChanged();
+            }
+            return true;
+        }
+    }
+    if (m_bookmarks.size() >= kMaxBookmarks)
+        return false;
+    // 按 step 升序插入
+    int insertAt = m_bookmarks.size();
+    for (int i = 0; i < m_bookmarks.size(); ++i) {
+        if (m_bookmarks[i].first > step) {
+            insertAt = i;
+            break;
+        }
+    }
+    m_bookmarks.insert(insertAt, qMakePair(step, label));
+    emit bookmarksChanged();
+    return true;
+}
+
+bool HistoryStack::removeBookmark(int step)
+{
+    for (int i = 0; i < m_bookmarks.size(); ++i) {
+        if (m_bookmarks[i].first == step) {
+            m_bookmarks.removeAt(i);
+            emit bookmarksChanged();
+            return true;
+        }
+    }
+    return false;
+}
+
+void HistoryStack::dropBookmarksBeyondCurrent()
+{
+    const int c = currentStep();
+    bool changed = false;
+    for (int i = m_bookmarks.size() - 1; i >= 0; --i) {
+        if (m_bookmarks[i].first > c) {
+            m_bookmarks.removeAt(i);
+            changed = true;
+        }
+    }
+    if (changed)
+        emit bookmarksChanged();
+}
+
 void HistoryStack::syncTopAccounted()
 {
     m_topAccounted = m_undo.empty() ? 0 : m_undo.back()->byteSize();
@@ -131,6 +208,8 @@ void HistoryStack::push(std::unique_ptr<UndoItem> item)
 {
     if (!item || m_applying)
         return;
+    // 清 redo 前先按位置删掉指向已不存在状态的书签
+    dropBookmarksBeyondCurrent();
     m_redo.clear();
     m_redoBytes = 0; // A26：新 push 清空 redo 时同步清记账
     m_undoBytes += item->byteSize();
@@ -167,9 +246,13 @@ void HistoryStack::clear()
 {
     m_undo.clear();
     m_redo.clear();
+    const bool hadBookmarks = !m_bookmarks.isEmpty();
+    m_bookmarks.clear();
     m_undoBytes = 0;
     m_redoBytes = 0;
     m_topAccounted = 0;
+    if (hadBookmarks)
+        emit bookmarksChanged();
     emit changed();
 }
 
@@ -186,10 +269,22 @@ void HistoryStack::trimUndo()
         ++dropped;
     }
     if (dropped > 0) {
+        bool bmChanged = false;
+        for (int i = m_bookmarks.size() - 1; i >= 0; --i) {
+            m_bookmarks[i].first -= dropped;
+            if (m_bookmarks[i].first < 0) {
+                m_bookmarks.removeAt(i);
+                bmChanged = true;
+            } else {
+                bmChanged = true;
+            }
+        }
         std::printf("[history] trimmed %d oldest undo entr%s (limit=%.0fMB)\n", dropped,
                     dropped == 1 ? "y" : "ies", m_byteLimit / (1024.0 * 1024.0));
         std::fflush(stdout);
         emit historyTrimmed(dropped);
+        if (bmChanged)
+            emit bookmarksChanged();
     }
 }
 

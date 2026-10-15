@@ -9,7 +9,9 @@
 #include "undoitem.h"
 
 #include <QObject>
+#include <QPair>
 #include <QString>
+#include <QVector>
 #include <memory>
 #include <vector>
 
@@ -81,11 +83,22 @@ public:
     /** 跳转到第 step 步（clamp 到 [0, stepCount()]）。返回是否真的发生了跳转。 */
     bool jumpToStep(int step, ImageDocument &doc);
 
+    /** 第 step 步是否是书签；是则同时输出书签名。 */
+    bool bookmarkAt(int step, QString *label = nullptr) const;
+    /** 按标签查书签步号；未找到返回 -1。 */
+    int bookmarkStep(const QString &label) const;
+    /** 书签（= 位置标记）。step 越界或不落在 [0, stepCount()] 返回 false。上限 64。 */
+    bool addBookmark(int step, const QString &label);
+    bool removeBookmark(int step);
+    QVector<QPair<int, QString>> bookmarks() const { return m_bookmarks; }
+
 signals:
     /** undo/redo 栈或 canUndo/canRedo 状态变化时发出。 */
     void changed();
     /** 因超限丢弃了最老 undo（至少一条）时发出。 */
     void historyTrimmed(int droppedCount);
+    /** 书签增删或重基后发出。 */
+    void bookmarksChanged();
 
 private:
     /** 当 m_undoBytes 超过 m_byteLimit 时丢弃最老条目。 */
@@ -96,14 +109,18 @@ private:
     void undoOne(ImageDocument &doc);
     /** 单步重做：无重入守卫、不发 changed()、不 trim。 */
     void redoOne(ImageDocument &doc);
+    /** push 清 redo 前：删除步号 > currentStep() 的书签。 */
+    void dropBookmarksBeyondCurrent();
 
     std::vector<std::unique_ptr<UndoItem>> m_undo;  ///< undo 栈（底→顶 = 旧→新）
     std::vector<std::unique_ptr<UndoItem>> m_redo;  ///< redo 栈
+    QVector<QPair<int, QString>> m_bookmarks;       ///< 按 step 升序；label 非空
     quint64 m_undoBytes = 0;                        ///< undo 栈累计字节（用于 trim）
     quint64 m_redoBytes = 0;                        ///< redo 栈累计字节（A26）
     quint64 m_byteLimit = 256ull * 1024ull * 1024ull; ///< 超限丢最老 undo
     quint64 m_topAccounted = 0;                     ///< T0：栈顶条目的已记账字节
     bool m_applying = false;                        ///< pop 进行中，禁止嵌套 push
+    static constexpr int kMaxBookmarks = 64;
 };
 
 } // namespace Ps

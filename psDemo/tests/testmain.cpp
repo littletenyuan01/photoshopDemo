@@ -66,6 +66,7 @@ int tUndoBatch();
 int tUndoJump();
 int tUndoMaskCow();
 int tUndoPanel();
+int tUndoBookmark();
 
 namespace {
 
@@ -121,6 +122,7 @@ const Case kCases[] = {
     { "undojump", "撤销非线性 T2：jumpToStep 任意跳转逐像素一致", tUndoJump },
     { "undomaskcow", "撤销非线性 T3：蒙版引用快照 COW（stampMaskDab/fill）", tUndoMaskCow },
     { "undopanel", "撤销非线性 T4：HistoryPanel 行数/跳转/trim 重建", tUndoPanel },
+    { "undobookmark", "撤销非线性 T5：命名书签重基/跳转/清 redo", tUndoBookmark },
 };
 
 } // namespace

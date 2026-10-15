@@ -9,7 +9,11 @@
 #include "domain/imagedocument.h"
 
 #include <QApplication>
+#include <QInputDialog>
+#include <QKeySequence>
+#include <QLineEdit>
 #include <QListWidgetItem>
+#include <QShortcut>
 #include <QSignalBlocker>
 #include <QtGlobal>
 
@@ -25,6 +29,9 @@ HistoryPanel::HistoryPanel(QWidget *parent)
     connect(ui->btnStepBack, &QToolButton::clicked, this, &HistoryPanel::onStepBack);
     connect(ui->btnStepForward, &QToolButton::clicked, this, &HistoryPanel::onStepForward);
     connect(ui->btnNewSnapshot, &QToolButton::clicked, this, &HistoryPanel::onNewBookmark);
+
+    auto *delShortcut = new QShortcut(QKeySequence::Delete, this);
+    connect(delShortcut, &QShortcut::activated, this, &HistoryPanel::onDeleteBookmark);
 
     refreshFromDocument();
 }
@@ -61,6 +68,8 @@ void HistoryPanel::bindDocument(Ps::ImageDocument *document)
                 Qt::UniqueConnection);
         connect(&hist, &Ps::HistoryStack::historyTrimmed, this, &HistoryPanel::refreshFromDocument,
                 Qt::UniqueConnection);
+        connect(&hist, &Ps::HistoryStack::bookmarksChanged, this, &HistoryPanel::refreshFromDocument,
+                Qt::UniqueConnection);
     }
     refreshFromDocument();
 }
@@ -83,11 +92,18 @@ void HistoryPanel::refreshFromDocument()
     const int n = hist.stepCount();
     const int cur = hist.currentStep();
 
-    // 行 0 = 初始状态；行 k = 到达第 k 步后的状态（显示第 k-1 步的条目名）
-    ui->itemList->addItem(tr("初始状态"));
+    // 行 0 = 初始状态（步 0）；行 k = 步 k（显示第 k-1 步条目名 + 可选书签）
+    auto rowText = [&](int step, const QString &base) {
+        QString label;
+        if (hist.bookmarkAt(step, &label))
+            return QStringLiteral("%1  [%2]").arg(base, label);
+        return base;
+    };
+    ui->itemList->addItem(rowText(0, tr("初始状态")));
     for (int i = 0; i < n; ++i) {
         const QString name = hist.stepName(i);
-        ui->itemList->addItem(name.isEmpty() ? tr("步骤 %1").arg(i + 1) : name);
+        const QString base = name.isEmpty() ? tr("步骤 %1").arg(i + 1) : name;
+        ui->itemList->addItem(rowText(i + 1, base));
     }
 
     if (cur >= 0 && cur <= n)
@@ -149,10 +165,26 @@ void HistoryPanel::onStepForward()
 
 void HistoryPanel::onNewBookmark()
 {
-    // T5 接线：命名书签
+    if (!m_document)
+        return;
+    Ps::HistoryStack &hist = m_document->history();
+    const int step = hist.currentStep();
+    QString existing;
+    const bool has = hist.bookmarkAt(step, &existing);
+    bool ok = false;
+    const QString label = QInputDialog::getText(
+        this, tr("新建快照"), tr("书签名称："), QLineEdit::Normal,
+        has ? existing : tr("快照 %1").arg(hist.bookmarks().size() + 1), &ok);
+    if (!ok || label.trimmed().isEmpty())
+        return;
+    if (!hist.addBookmark(step, label.trimmed())) {
+        // 上限或非法步号：静默失败（上限 64）
+    }
 }
 
 void HistoryPanel::onDeleteBookmark()
 {
-    // T5 接线
+    if (!m_document)
+        return;
+    m_document->history().removeBookmark(m_document->history().currentStep());
 }
