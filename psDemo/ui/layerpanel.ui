@@ -80,6 +80,11 @@
        <string>路径</string>
       </attribute>
      </widget>
+     <widget class="HistoryPanel" name="historyPanel" native="true">
+      <attribute name="title">
+       <string>历史</string>
+      </attribute>
+     </widget>
     </widget>
    </item>
   </layout>
@@ -101,6 +106,12 @@
    <class>PathTreePanel</class>
    <extends>QWidget</extends>
    <header>ui/pathtreepanel.h</header>
+   <container>1</container>
+  </customwidget>
+  <customwidget>
+   <class>HistoryPanel</class>
+   <extends>QWidget</extends>
+   <header>ui/historypanel.h</header>
    <container>1</container>
   </customwidget>
  </customwidgets>

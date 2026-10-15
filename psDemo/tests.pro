@@ -66,7 +66,8 @@ SOURCES += \
     tests/t_undodirty.cpp \
     tests/t_undobatch.cpp \
     tests/t_undojump.cpp \
-    tests/t_undomaskcow.cpp
+    tests/t_undomaskcow.cpp \
+    tests/t_undopanel.cpp
 
 HEADERS += \
     tests/testutil.h

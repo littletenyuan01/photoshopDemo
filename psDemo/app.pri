@@ -127,6 +127,7 @@ SOURCES += \
     ui/layertreepanel.cpp \
     ui/channeltreepanel.cpp \
     ui/pathtreepanel.cpp \
+    ui/historypanel.cpp \
     ui/dockpanel.cpp \
     ui/filterdialog.cpp \
     ui/filterstackwidget.cpp \
@@ -289,6 +290,7 @@ HEADERS += \
     ui/layertreepanel.h \
     ui/channeltreepanel.h \
     ui/pathtreepanel.h \
+    ui/historypanel.h \
     ui/dockpanel.h \
     ui/filterdialog.h \
     ui/filterstackwidget.h \
@@ -320,6 +322,7 @@ FORMS += \
     ui/layertreepanel.ui \
     ui/channeltreepanel.ui \
     ui/pathtreepanel.ui \
+    ui/historypanel.ui \
     ui/layerpanel.ui \
     ui/colorspanel.ui \
     ui/infopanel.ui \

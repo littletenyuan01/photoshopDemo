@@ -38,6 +38,9 @@ void DockPanel::setSession(Ps::AppSession *session)
         connect(m_session, &Ps::AppSession::documentChanged,
                 this, &DockPanel::onSessionDocumentChanged);
     }
+    // 历史面板自订 documentChanged；与树面板并行接会话
+    ui->historyPanel->setSession(session);
+
     // 立即对齐一次当前状态（对应 GIMP set_image 的即时同步语义）
     onSessionDocumentChanged(m_session ? m_session->document() : nullptr);
 }

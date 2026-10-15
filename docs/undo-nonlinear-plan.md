@@ -1,6 +1,6 @@
 # 非线性撤销（历史面板 + 任意跳转 + 命名书签）开发计划书
 
-> 状态：实施中（T0–T3 已完成）
+> 状态：实施中（T0–T4 已完成）
 > 更新：2026-10-15 ｜ 本文件是交给实施方（Cursor）的唯一契约，不依赖任何对话上下文。
 > 前置：0+1 档（瓦片引用快照 / 区域重投影）已落地并于 `a31be4a` 通过评估，见 [undo-region-plan.md](undo-region-plan.md)、[undo-region-review.md](undo-region-review.md)。
 > 相关：[pending-dev.md](pending-dev.md)、[tests.md](tests.md)、[architecture.md](architecture.md)
@@ -13,7 +13,7 @@
 | T1 `ChangeBatch`：跳转期信号批量 | ✅ 2026-10-15 | `.build-clean\release\psdemo_tests.exe undobatch phase1a filterundo` 退出码 0；批量内 10 dirty+2 增层 → content/structure/pixels 各 **1**；并集=10,20 75×51；批量外 3 次仍各发 3 次 |
 | T2 跳转 API（`stepCount/currentStep/jumpToStep`） | ✅ 2026-10-15 | `.build-clean\release\psdemo_tests.exe undojump undoregion phase1a` 退出码 0；k∈[0,10] 与 20 次随机跳 `diffCount==0`；每次跳转 `contentChanged==1`；clamp/空栈绿 |
 | T3 蒙版引用快照（跳转性能前置；**产品代码只有 2 行**） | ✅ 2026-10-15 | `.build-clean\release\psdemo_tests.exe undomaskcow phase1a` 退出码 0；stampMaskDab/fill COW 绿；undo diffs=0；A2 绿；带蒙版 512²×200 步 jump **1 ms** |
-| T4 历史面板 `HistoryPanel` | ⬜ 未开始 | `undopanel`：行数 = `stepCount+1`；点行跳到该步；`historyTrimmed` 后重建 |
+| T4 历史面板 `HistoryPanel` | ✅ 2026-10-15 | `.build-clean\release\psdemo_tests.exe undopanel` 退出码 0；5 笔后 count=6；点第 3 行 currentStep=3 且 diffCount=0；trim 后 count=stepCount+1 |
 | T5 命名书签（快照=位置标记） | ⬜ 未开始 | `undobookmark`：书签跨 trim 正确重基；失效书签被删并通知面板 |
 | T6 回归与实测记账 | ⬜ 未开始 | 全量用例退出码 0；跳转耗时/信号次数写入 `pending-dev.md` |
 
