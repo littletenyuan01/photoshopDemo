@@ -1685,6 +1685,37 @@ Custom ≈48 ns/px、Gauss ≈19。Q11–Q13 关闭。维持 opt-in。
 
 ---
 
+## 撤销粒度：整层 → 瓦片引用快照（2026-10）—— **已落地**
+
+**计划书**：[undo-region-plan.md](undo-region-plan.md)（T1–T5）
+
+**现象（改造前）**：像素类撤销 `pushLayerPixelsUndo` 一律 `materialize()` 整层深拷贝入栈；出栈 `markDirty()` 整幅。4000×4000 一笔 ≈ 64MB/条；历史深度一大就顶满 256MB 上限。
+
+**根因**：入栈在改动之前、当时不知脏区；整层快照与「写了几块瓦片」无关。
+
+**改法**：
+- `TileBuffer::TileRefSnapshot` + `takeRefSnapshot` / `swapWithRefSnapshot`（QImage 隐式共享，写时复制）
+- `LayerPixelsUndo` 默认 `PixelUndoMode::TileRefs`；会改 extent 的两处显式 `WholeLayer`（更新链接、自由变换）
+- 出栈脏区：TileRefs 按 cacheKey 不同的瓦片并集 + 样式 pad（勿并整层 `styleBounds`）
+
+**被否掉的方案**：按脏区矩形快照（需改压栈协议）；命令重放（位置相关/异步不等价）；蒙版也改引用（本期保留深拷贝）。
+
+**实测（同机，`undoregion` T5 info，2026-10-15）**：
+
+| 指标 | WholeLayer / 改造前口径 | TileRefs |
+|------|-------------------------|----------|
+| ① 2048 稀疏层一笔 `undoBytes` 增量 | **16 777 280**（整幅 materialize） | **128** |
+| ② 1024 稀疏层 200 笔 `historyBytes` 峰值 | （未重跑旧路径；按①外推单笔≥16MB 量级会秒顶上限） | **≈17.04 MB**（17 867 776） |
+| ③ 2048 白底小笔撤销后 `Projection::sync` | — | **0 ms**，`painted=2048×128`（非整幅高） |
+
+另：`undoregion` 护栏稀疏 512 一笔增量=128；`undodirty` 400 文档小笔 dirty=64×64。全量 `psdemo_tests.exe` **47/47**。
+
+**约定**：新增像素入栈点若会改层 extent，必须 `pushLayerPixelsUndo(..., PixelUndoMode::WholeLayer)`（见 `docs/cursor-role-prompt.md`）。
+
+**仍欠（2 档，另立计划）**：非线性历史 / 层稳定 id；空脏区仍压条目（R7）；蒙版粒度优化。
+
+---
+
 ## 瓦片页缓存（Tile Page Cache）—— **已缓解（A+B 落地，默认关）**
 
 **已落地**（`engine/cache/{tilecache,swapstore,memstats}.*`，用例 `tilecache`）：
@@ -1696,7 +1727,7 @@ Custom ≈48 ns/px、Gauss ≈19。Q11–Q13 关闭。维持 opt-in。
 
 **仍欠 / 非目标**：
 - 投影缓冲稀疏化（另一立项，风险大于页缓存）
-- undo 瓦片化（C 档，不做）
+- ~~undo 瓦片化（C 档，不做）~~ → **已由 [undo-region-plan.md](undo-region-plan.md) 落地（TileRefs）**
 - 完整文档交叉引用与性能护栏数字见 [page-cache-plan.md](page-cache-plan.md)
 
 ---

@@ -12,6 +12,7 @@
 #include "domain/layer.h"
 #include "domain/layerstyle.h"
 #include "domain/path.h"
+#include "domain/tilebuffer.h"
 
 #include <QImage>
 #include <QString>
@@ -67,9 +68,15 @@ LayerPropSnapshot captureLayerProps(const Layer &layer);
 /** 将快照写回 Layer（不触发 undo）。 */
 void applyLayerProps(Layer &layer, const LayerPropSnapshot &s);
 
+/** 像素撤销粒度：改 extent 必须 WholeLayer；普通绘制用 TileRefs。 */
+enum class PixelUndoMode {
+    WholeLayer, ///< 整层 materialize 快照（extent 会变的操作）
+    TileRefs,   ///< 瓦片引用快照（extent 不变）
+};
+
 /**
- * 图层像素 undo：pop 时与当前 materialize / offset 交换。
- * 存 offset：自由变换扩层后撤销能恢复几何。
+ * 图层像素 undo：pop 时与当前像素 / offset / 蒙版交换。
+ * TileRefs：只交换被写到的瓦片引用；WholeLayer：整幅图交换。
  */
 class LayerPixelsUndo final : public UndoItem
 {
@@ -83,6 +90,12 @@ public:
                     bool hasMask, bool maskEnabled, bool maskLinked, QImage maskGray,
                     const QString &label);
 
+    /** tile-ref 模式：pixels 不参与；蒙版语义与既有构造相同。 */
+    LayerPixelsUndo(int layerIndex, TileBuffer::TileRefSnapshot snap, int extentW, int extentH,
+                    int offsetX, int offsetY, bool hasMask, bool maskEnabled, bool maskLinked,
+                    QImage maskGray, const QString &label,
+                    PixelUndoMode mode = PixelUndoMode::TileRefs);
+
     QString name() const override { return m_label; }
     quint64 byteSize() const override;
     void pop(ImageDocument &doc) override;
@@ -92,6 +105,10 @@ private:
     int m_offsetX = 0;
     int m_offsetY = 0;
     QImage m_pixels;
+    TileBuffer::TileRefSnapshot m_tileSnap;
+    int m_extentW = 0;
+    int m_extentH = 0;
+    PixelUndoMode m_mode = PixelUndoMode::WholeLayer;
     bool m_trackMask = false;
     bool m_hasMask = false;
     bool m_maskEnabled = true;

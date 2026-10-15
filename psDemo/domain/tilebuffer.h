@@ -90,6 +90,39 @@ public:
     /** 供 TileCache LRU 扫描：只访问当前驻留内存的槽。 */
     void visitResidentSlots(const std::function<void(qint64 key, TileSlot &slot)> &fn);
 
+    /**
+     * 瓦片引用快照：只保存 QImage 的**共享引用**（隐式共享），不做像素深拷贝。
+     * images 里没有的 key = 当时该格「未分配」，语义为全透明。
+     * tilesX/tilesY/width/height 用于交换前校验网格一致（不一致必须拒绝）。
+     */
+    struct TileRefSnapshot {
+        int width = 0;
+        int height = 0;
+        int tilesX = 0;
+        int tilesY = 0;
+        QHash<qint64, QImage> images;
+        /** 快照当前持有的像素字节（含边缘块实际尺寸），供撤销条目记账。 */
+        qint64 bytes() const;
+    };
+
+    /**
+     * 取引用快照。会把「仅在 swap」的瓦片读回内存（换页开启时才有代价；
+     * 默认换页关闭 ⇒ 无代价）。
+     */
+    TileRefSnapshot takeRefSnapshot();
+
+    /**
+     * 与快照做双向交换（undo/redo 同一入口）：
+     *  · 两边都有的 key：交换 QImage（O(1) 引用交换）
+     *  · 只有快照有的 key：层内新建透明格后交换（= 恢复旧格）
+     *  · 只有层有的 key：把该 QImage 交给快照并从层内删除（= 回到「未分配」）
+     * 网格不一致时**不做任何改动**并返回 false。
+     */
+    bool swapWithRefSnapshot(TileRefSnapshot &snap);
+
+    /** 把当前持有像素的全透明格删除（预留；本计划不调用）。 */
+    void eraseFullyTransparentTiles();
+
 private:
     friend class TileCache;
 

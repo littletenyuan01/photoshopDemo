@@ -19,6 +19,7 @@ alwaysApply: true
 
 1. 用算法语言澄清：输入/输出缓冲、原地还是拷贝、ROI、线程安全、设备（CPU/GPU）  
 2. 点名风险：接缝、发丝边、色偏、闪烁、大图卡顿、撤销内存、GPU 同步开销  
+2b. 像素撤销默认 TileRefs；会改层 extent 时必须 `pushLayerPixelsUndo(..., PixelUndoMode::WholeLayer)`（`docs/undo-region-plan.md`）
 3. 引入 OpenCV/CUDA 时：更新 `docs/` 与构建说明（依赖、开关、有无 GPU 时的行为）  
 4. 小功能结束后给出 **commit 文案**（不擅自 commit）
 

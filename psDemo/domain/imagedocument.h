@@ -34,6 +34,7 @@ class LayerStructureUndo;
 class LayerMoveUndo;
 class DocumentGeomUndo;
 class PathUndo;
+enum class PixelUndoMode : int;
 
 /**
  * 图像文档：一张「可编辑图」的根对象（domain）。
@@ -284,8 +285,12 @@ public:
     void undo();
     void redo();
 
-    /** 绘制类改像素前：整层快照（对照 drawable push_undo；一笔一条）。 */
+    /**
+     * 绘制类改像素前压栈（对照 drawable push_undo；一笔一条）。
+     * 默认 TileRefs（瓦片引用）；会改层 extent 的操作须传 WholeLayer。
+     */
     void pushLayerPixelsUndo(int layerIndex, const QString &label);
+    void pushLayerPixelsUndo(int layerIndex, const QString &label, PixelUndoMode mode);
     /** 移动拖拽开始前：offset 属性快照。 */
     void pushLayerOffsetUndo(int layerIndex);
     /** 选区变更前：mask 快照。 */

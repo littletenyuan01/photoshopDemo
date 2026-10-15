@@ -4,7 +4,10 @@
 #include "tilebuffer.h"
 
 #include <QPainter>
+#include <QSet>
 #include <QtMath>
+
+#include <utility>
 
 namespace Ps {
 
@@ -374,6 +377,124 @@ void TileBuffer::visitResidentSlots(const std::function<void(qint64 key, TileSlo
         if (!it.value().img.isNull())
             fn(it.key(), it.value());
     }
+}
+
+qint64 TileBuffer::TileRefSnapshot::bytes() const
+{
+    qint64 sum = 0;
+    for (auto it = images.constBegin(); it != images.constEnd(); ++it)
+        sum += imageBytes(it.value());
+    return sum;
+}
+
+TileBuffer::TileRefSnapshot TileBuffer::takeRefSnapshot()
+{
+    TileRefSnapshot snap;
+    snap.width = m_width;
+    snap.height = m_height;
+    snap.tilesX = m_tilesX;
+    snap.tilesY = m_tilesY;
+    if (m_tilesX <= 0 || m_tilesY <= 0)
+        return snap;
+
+    for (auto it = m_tiles.begin(); it != m_tiles.end(); ++it) {
+        const qint64 k = it.key();
+        const int tx = int(k % m_tilesX);
+        const int ty = int(k / m_tilesX);
+        QImage *img = makeResident(k, it.value(), tx, ty);
+        if (!img)
+            continue;
+        // QImage 拷贝 = 隐式共享引用，非像素深拷贝
+        snap.images.insert(k, *img);
+    }
+    return snap;
+}
+
+bool TileBuffer::swapWithRefSnapshot(TileRefSnapshot &snap)
+{
+    if (snap.width != m_width || snap.height != m_height
+        || snap.tilesX != m_tilesX || snap.tilesY != m_tilesY) {
+        return false;
+    }
+    if (m_tilesX <= 0 || m_tilesY <= 0) {
+        // 空网格：两侧都应无瓦片
+        if (!m_tiles.isEmpty() || !snap.images.isEmpty())
+            return false;
+        return true;
+    }
+
+    TileCache &cache = TileCache::instance();
+    QSet<qint64> keys;
+    keys.reserve(m_tiles.size() + snap.images.size());
+    for (auto it = m_tiles.constBegin(); it != m_tiles.constEnd(); ++it)
+        keys.insert(it.key());
+    for (auto it = snap.images.constBegin(); it != snap.images.constEnd(); ++it)
+        keys.insert(it.key());
+
+    for (qint64 k : keys) {
+        const int tx = int(k % m_tilesX);
+        const int ty = int(k / m_tilesX);
+        const bool inLayer = m_tiles.contains(k);
+        const bool inSnap = snap.images.contains(k);
+
+        if (inLayer && inSnap) {
+            TileSlot &slot = m_tiles[k];
+            QImage *live = makeResident(k, slot, tx, ty);
+            if (!live)
+                continue;
+            const qint64 oldBytes = imageBytes(slot.img);
+            QImage &held = snap.images[k];
+            const qint64 newBytes = imageBytes(held);
+            using std::swap;
+            swap(slot.img, held);
+            if (oldBytes != newBytes) {
+                if (oldBytes > 0)
+                    cache.noteEvicted(oldBytes);
+                if (newBytes > 0)
+                    cache.noteResident(newBytes);
+            }
+            cache.markDirty(slot);
+            cache.touch(slot);
+        } else if (inSnap) {
+            // 层里没有：新建透明格再交换（恢复快照中的旧格）
+            QImage *created = ensureTile(tx, ty);
+            if (!created)
+                continue;
+            TileSlot &slot = m_tiles[k];
+            const qint64 oldBytes = imageBytes(slot.img);
+            QImage &held = snap.images[k];
+            const qint64 newBytes = imageBytes(held);
+            using std::swap;
+            swap(slot.img, held);
+            if (oldBytes != newBytes) {
+                if (oldBytes > 0)
+                    cache.noteEvicted(oldBytes);
+                if (newBytes > 0)
+                    cache.noteResident(newBytes);
+            }
+            cache.markDirty(slot);
+            cache.touch(slot);
+        } else {
+            // 只有层有：交给快照并删除（= 回到未分配/透明）
+            TileSlot &slot = m_tiles[k];
+            QImage *live = makeResident(k, slot, tx, ty);
+            if (!live) {
+                m_tiles.remove(k);
+                continue;
+            }
+            const qint64 bytes = imageBytes(slot.img);
+            snap.images.insert(k, std::move(slot.img));
+            m_tiles.remove(k);
+            if (bytes > 0)
+                cache.noteEvicted(bytes);
+        }
+    }
+    return true;
+}
+
+void TileBuffer::eraseFullyTransparentTiles()
+{
+    // 预留：本计划不调用。全透明回收属 out of scope。
 }
 
 } // namespace Ps

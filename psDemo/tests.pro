@@ -59,7 +59,11 @@ SOURCES += \
     tests/t_pathtree.cpp \
     tests/t_tilecache.cpp \
     tests/t_phase1a.cpp \
-    tests/t_projectionvalid.cpp
+    tests/t_projectionvalid.cpp \
+    tests/t_undocow.cpp \
+    tests/t_undotile.cpp \
+    tests/t_undoregion.cpp \
+    tests/t_undodirty.cpp
 
 HEADERS += \
     tests/testutil.h

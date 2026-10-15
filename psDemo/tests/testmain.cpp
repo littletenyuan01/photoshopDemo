@@ -58,6 +58,10 @@ int tPathTree();
 int tTileCache();
 int tPhase1A();
 int tProjectionValid();
+int tUndoCow();
+int tUndoTile();
+int tUndoRegion();
+int tUndoDirty();
 
 namespace {
 
@@ -105,6 +109,10 @@ const Case kCases[] = {
     { "tilecache", "瓦片页缓存：往返 bit-exact / 预算 / LRU / 失败降级 / COW 复制", tTileCache },
     { "phase1a", "phase1-audit A1–A8 高危回归（选区/蒙版/平移缓存/并行瓦片/直线/路径）", tPhase1A },
     { "projectionvalid", "A31/A32/A33/A36：投影半幅 adopt、改尺寸 idle、preview 图口径、路径 overlay", tProjectionValid },
+    { "undocow", "撤销 T1：scanLine/fill/QPainter 对共享 QImage 触发 COW", tUndoCow },
+    { "undotile", "撤销 T2：TileRefSnapshot 交换对称 + 换页路径", tUndoTile },
+    { "undoregion", "撤销 T3：tile-ref 撤销往返 + undoBytes 量级", tUndoRegion },
+    { "undodirty", "撤销 T4：像素撤销只标受影响矩形", tUndoDirty },
 };
 
 } // namespace

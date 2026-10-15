@@ -3,6 +3,7 @@
  */
 #include "transformtool.h"
 
+#include "app/undoitem.h"
 #include "domain/imagedocument.h"
 #include "domain/layer.h"
 #include "domain/selection.h"
@@ -668,7 +669,9 @@ bool TransformTool::commitSession(const ToolContext &ctx)
     m_lifted = false;
     m_previewDirtyDoc = {};
 
-    ctx.document->pushLayerPixelsUndo(m_layerIndex, QObject::tr("自由变换"));
+    // 随后 expandToIncludeLocal 可能改 extent → 必须 WholeLayer
+    ctx.document->pushLayerPixelsUndo(m_layerIndex, QObject::tr("自由变换"),
+                                      PixelUndoMode::WholeLayer);
 
     // 仅确认时扩层一次
     {

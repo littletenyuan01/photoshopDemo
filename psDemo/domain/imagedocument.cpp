@@ -120,13 +120,17 @@ void ImageDocument::redo()
 
 void ImageDocument::pushLayerPixelsUndo(int layerIndex, const QString &label)
 {
+    pushLayerPixelsUndo(layerIndex, label, PixelUndoMode::TileRefs);
+}
+
+void ImageDocument::pushLayerPixelsUndo(int layerIndex, const QString &label, PixelUndoMode mode)
+{
     if (!shouldRecordHistory())
         return;
     Layer *layer = m_layers.layerAt(layerIndex);
     if (!layer)
         return;
-    // 始终走「像素+蒙版」快照：replaceFromImage 在尺寸变化时会把蒙版重置为全白（A2）；
-    // 若不 trackMask，undo 后用户蒙版灰度无法恢复。无蒙版时 hasMask=false，pop 会清掉误建的 mask。
+    // 始终跟踪蒙版：replaceFromImage 在尺寸变化时会把蒙版重置为全白（A2）。
     const bool hasMask = layer->hasMask() && layer->mask() && !layer->mask()->isNull();
     QImage maskGray;
     bool maskEnabled = true;
@@ -135,6 +139,13 @@ void ImageDocument::pushLayerPixelsUndo(int layerIndex, const QString &label)
         maskGray = layer->mask()->image().copy();
         maskEnabled = layer->mask()->isEnabled();
         maskLinked = layer->mask()->isLinked();
+    }
+    if (mode == PixelUndoMode::TileRefs) {
+        m_history->push(std::make_unique<LayerPixelsUndo>(
+            layerIndex, layer->tiles().takeRefSnapshot(), layer->width(), layer->height(),
+            layer->offsetX(), layer->offsetY(), hasMask, maskEnabled, maskLinked,
+            std::move(maskGray), label, PixelUndoMode::TileRefs));
+        return;
     }
     m_history->push(std::make_unique<LayerPixelsUndo>(
         layerIndex, layer->materialize(), layer->offsetX(), layer->offsetY(), hasMask,
@@ -473,8 +484,8 @@ bool ImageDocument::updateLinkedLayer(int index)
     if (image.isNull())
         return false;
 
-    // 像素 + 属性（含 linkPath）一体可逆：尺寸可能变
-    pushLayerPixelsUndo(index, tr("更新链接"));
+    // 像素 + 属性（含 linkPath）一体可逆：尺寸可能变 → 必须 WholeLayer
+    pushLayerPixelsUndo(index, tr("更新链接"), PixelUndoMode::WholeLayer);
     const int ox = layer->offsetX();
     const int oy = layer->offsetY();
     layer->replaceFromImage(image);

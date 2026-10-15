@@ -69,6 +69,10 @@ release\psdemo_tests.exe composite regionraster   :: 只跑指定用例
 | `tilecache` | **瓦片页缓存**（[page-cache-plan.md](page-cache-plan.md)）：预算 0 行为不变；换页往返 bit-exact；预算遵守（+1 瓦片余量）；LRU 最久未用先出；`FailingSwapStore` 降级；复制图层 `cacheKey` 共享（P4 COW）；派生缓存淘汰后投影可重算；`PSLITE_MEM` 快照字段；**P13** 换页开启未淘汰时 materialize 退化粗护栏 ≤25%（目标 ≤5%，实测写入计划文档） |
 | `phase1a` | phase1-audit 回归（选区/蒙版/并行瓦片/历史字节/导出原子/空层 extent/预乘插值等） |
 | `projectionvalid` | A31/A32/A33/A36：半幅 `adoptImage`、改尺寸后 idle `processPending`、`compositePreview` 图口径、路径 overlay 无幽灵 |
+| `undocow` | 撤销 T1：scanLine / fill / QPainter 对共享 `QImage` 触发 COW |
+| `undotile` | 撤销 T2：`TileRefSnapshot` 交换对称 + 换页路径 |
+| `undoregion` | 撤销 T3：tile-ref 往返 + `undoBytes` 量级；附 T5 实测 info |
+| `undodirty` | 撤销 T4：像素撤销脏区小于整幅 / 样式 pad / 画布外回退 |
 
 ## 约定
 

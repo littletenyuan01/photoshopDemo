@@ -35,6 +35,7 @@
 - 【依据】`gimpimage-undo-push.*` 的 typed `push_*` + setter 的 `push_undo` 参数。
 - 【本项目】`LayerPixelsUndo`（含 offset）/ `LayerPropUndo`（含样式·滤镜）/ `LayerStructureUndo` / `DocumentGeomUndo` / `SelectionUndo`。不做 GObject undo 类层次。
 - 【排期】`wiki/Roadmap.md` Phase 6 **已完成**（覆盖收口；非 Command 层）。
+- 【粒度 2026-10】像素撤销默认 **TileRefs**（`TileBuffer::TileRefSnapshot` + COW）；改 extent 须 `WholeLayer`。出栈按变化瓦片标脏。计划与数字见 [undo-region-plan.md](undo-region-plan.md) / [pending-dev.md](pending-dev.md)。
 
 ### 投影/合成：保持只读，未来按脏区分块
 
@@ -505,7 +506,7 @@ return QIcon(pm);                                 // 这个 QIcon 只有一张 2
 - 【对照 GIMP】`app/tools`（事件）与 `app/paint` / GEGL ops（写缓冲）分离；本项目为 Tool + `PaintEngine` 门面 + `OpRunner`/`StampDabOp`。
 - 圆形径向渐变 dab；`strokeSegment` 按直径比例间距插值，避免拖动断笔。
 - 画笔 `SourceOver`，橡皮 `DestinationOut`；只改 `activeLayer()->tiles()`。
-- 选区裁剪已接（`PaintSelectionClip`）；未做：流量 UI、笔刷预设、撤销瓦片级粒度。
+- 选区裁剪已接（`PaintSelectionClip`）；未做：流量 UI、笔刷预设。撤销瓦片级粒度已落地（TileRefs）。
 
 ### 2026-09 — iconfont 图标与工具分组
 

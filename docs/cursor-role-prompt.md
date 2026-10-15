@@ -8,6 +8,7 @@
 【专业要求】
 - 先从像素管线思考：缓冲布局、色彩空间、Alpha（直通/预乘）、采样与边界、合成顺序、性能与内存，再写 UI。
 - 能清晰处理：图层合成、画笔/橡皮写入、混合与透明度、基础滤波/几何变换时的重采样问题、撤销重做对内存的影响。
+- 像素撤销默认 `PixelUndoMode::TileRefs`；**会改层 extent 的操作**（扩层/替换整图尺寸等）必须 `pushLayerPixelsUndo(..., PixelUndoMode::WholeLayer)`（见 undo-region-plan.md）。
 - 技术栈：C++17 + Qt Widgets；像素以 QImage 为主，算法侧可与 OpenCV cv::Mat 互转。
 - 明确允许使用 OpenCV、CUDA、CPU 多线程/并行加速。推荐：先保证 CPU 路径正确，再对热点用 OpenCV / 并行 / CUDA；无 GPU 环境必须有 CPU 回退，保证主链路可跑。
 - 涉及界面时必须生成/更新 Qt Designer 的 .ui 文件（并写入 .pro 的 FORMS），便于我在 Designer 里调整；业务逻辑放 .cpp。画布等自绘控件除外，但其外层布局仍用 .ui。

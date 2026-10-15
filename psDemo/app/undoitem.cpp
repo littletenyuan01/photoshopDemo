@@ -7,9 +7,88 @@
 #include "domain/layer.h"
 #include "domain/layermask.h"
 
+#include <QDebug>
+#include <QPainter>
 #include <utility>
 
 namespace Ps {
+namespace {
+
+/** 把瓦片引用快照画成整幅图（安全网兜底；不消费 snap）。 */
+QImage materializeTileSnap(const TileBuffer::TileRefSnapshot &snap)
+{
+    QImage out(snap.width, snap.height, QImage::Format_ARGB32_Premultiplied);
+    out.fill(Qt::transparent);
+    if (snap.tilesX <= 0 || snap.images.isEmpty())
+        return out;
+    QPainter p(&out);
+    p.setCompositionMode(QPainter::CompositionMode_Source);
+    for (auto it = snap.images.constBegin(); it != snap.images.constEnd(); ++it) {
+        const qint64 k = it.key();
+        const int tx = int(k % snap.tilesX);
+        const int ty = int(k / snap.tilesX);
+        const int x = tx * TileBuffer::kTileSize;
+        const int y = ty * TileBuffer::kTileSize;
+        p.drawImage(x, y, it.value());
+    }
+    return out;
+}
+
+/** TileRefs：交换前比较快照与活层，只并上 cacheKey 不同 / 仅一侧有的瓦片。 */
+QRect changedTilesDocRect(Layer *layer, const TileBuffer::TileRefSnapshot &snap)
+{
+    QRect u;
+    if (!layer || snap.tilesX <= 0)
+        return u;
+    TileBuffer &tiles = layer->tiles();
+    const int ox = layer->offsetX();
+    const int oy = layer->offsetY();
+
+    for (auto it = snap.images.constBegin(); it != snap.images.constEnd(); ++it) {
+        const qint64 k = it.key();
+        const int tx = int(k % snap.tilesX);
+        const int ty = int(k / snap.tilesX);
+        const QImage *live = tiles.tileAt(tx, ty);
+        if (!live || live->cacheKey() != it.value().cacheKey())
+            u = u.united(tiles.tileBounds(tx, ty).translated(ox, oy));
+    }
+    tiles.forEachAllocatedTile([&](int tx, int ty, const QImage &, const QRect &bounds) {
+        const qint64 k = qint64(ty) * snap.tilesX + tx;
+        if (!snap.images.contains(k))
+            u = u.united(bounds.translated(ox, oy));
+    });
+    return u;
+}
+
+void swapLayerMask(Layer *layer, bool *hasMask, bool *maskEnabled, bool *maskLinked,
+                   QImage *maskGray)
+{
+    bool curHasMask = false;
+    bool curMaskEnabled = true;
+    bool curMaskLinked = true;
+    QImage curMaskGray;
+    if (layer->hasMask() && layer->mask()) {
+        curHasMask = true;
+        curMaskEnabled = layer->mask()->isEnabled();
+        curMaskLinked = layer->mask()->isLinked();
+        curMaskGray = layer->mask()->image().copy();
+    }
+    if (*hasMask && !maskGray->isNull()) {
+        auto mask = std::make_unique<LayerMask>();
+        mask->setFromImage(*maskGray);
+        mask->setEnabled(*maskEnabled);
+        mask->setLinked(*maskLinked);
+        layer->setMask(std::move(mask));
+    } else {
+        layer->setMask(nullptr);
+    }
+    *hasMask = curHasMask;
+    *maskEnabled = curMaskEnabled;
+    *maskLinked = curMaskLinked;
+    *maskGray = std::move(curMaskGray);
+}
+
+} // namespace
 
 LayerPropSnapshot captureLayerProps(const Layer &layer)
 {
@@ -62,6 +141,9 @@ LayerPixelsUndo::LayerPixelsUndo(int layerIndex, QImage pixels, int offsetX, int
     , m_offsetX(offsetX)
     , m_offsetY(offsetY)
     , m_pixels(std::move(pixels))
+    , m_extentW(m_pixels.width())
+    , m_extentH(m_pixels.height())
+    , m_mode(PixelUndoMode::WholeLayer)
     , m_label(label)
 {
 }
@@ -73,6 +155,29 @@ LayerPixelsUndo::LayerPixelsUndo(int layerIndex, QImage pixels, int offsetX, int
     , m_offsetX(offsetX)
     , m_offsetY(offsetY)
     , m_pixels(std::move(pixels))
+    , m_extentW(m_pixels.width())
+    , m_extentH(m_pixels.height())
+    , m_mode(PixelUndoMode::WholeLayer)
+    , m_trackMask(true)
+    , m_hasMask(hasMask)
+    , m_maskEnabled(maskEnabled)
+    , m_maskLinked(maskLinked)
+    , m_maskGray(std::move(maskGray))
+    , m_label(label)
+{
+}
+
+LayerPixelsUndo::LayerPixelsUndo(int layerIndex, TileBuffer::TileRefSnapshot snap, int extentW,
+                                 int extentH, int offsetX, int offsetY, bool hasMask,
+                                 bool maskEnabled, bool maskLinked, QImage maskGray,
+                                 const QString &label, PixelUndoMode mode)
+    : m_layerIndex(layerIndex)
+    , m_offsetX(offsetX)
+    , m_offsetY(offsetY)
+    , m_tileSnap(std::move(snap))
+    , m_extentW(extentW)
+    , m_extentH(extentH)
+    , m_mode(mode)
     , m_trackMask(true)
     , m_hasMask(hasMask)
     , m_maskEnabled(maskEnabled)
@@ -84,6 +189,8 @@ LayerPixelsUndo::LayerPixelsUndo(int layerIndex, QImage pixels, int offsetX, int
 
 quint64 LayerPixelsUndo::byteSize() const
 {
+    if (m_mode == PixelUndoMode::TileRefs)
+        return quint64(m_tileSnap.bytes()) + quint64(m_maskGray.sizeInBytes()) + 128;
     return quint64(m_pixels.sizeInBytes()) + quint64(m_maskGray.sizeInBytes()) + 64;
 }
 
@@ -92,46 +199,86 @@ void LayerPixelsUndo::pop(ImageDocument &doc)
     Layer *layer = doc.m_layers.layerAt(m_layerIndex);
     if (!layer)
         return;
-    QImage current = layer->materialize();
+
+    // 交换前：活层几何 +（TileRefs）实际变化瓦片
+    const QRect curBoundsDoc = layer->boundsInDocument();
+    const QRect styleBefore = layer->styleBoundsInDocument();
     const int curOx = layer->offsetX();
     const int curOy = layer->offsetY();
+    const int entryW = (m_mode == PixelUndoMode::WholeLayer) ? m_pixels.width() : m_extentW;
+    const int entryH = (m_mode == PixelUndoMode::WholeLayer) ? m_pixels.height() : m_extentH;
+    const QRect entryBoundsDoc(m_offsetX, m_offsetY, entryW, entryH);
+    const QRect tileDiffDoc = (m_mode == PixelUndoMode::TileRefs)
+                                  ? changedTilesDocRect(layer, m_tileSnap)
+                                  : QRect();
 
-    bool curHasMask = false;
-    bool curMaskEnabled = true;
-    bool curMaskLinked = true;
-    QImage curMaskGray;
-    if (m_trackMask) {
-        if (layer->hasMask() && layer->mask()) {
-            curHasMask = true;
-            curMaskEnabled = layer->mask()->isEnabled();
-            curMaskLinked = layer->mask()->isLinked();
-            curMaskGray = layer->mask()->image().copy();
-        }
-    }
-
-    layer->replaceFromImage(m_pixels);
-    layer->setOffsetSilent(m_offsetX, m_offsetY);
-
-    if (m_trackMask) {
-        if (m_hasMask && !m_maskGray.isNull()) {
-            auto mask = std::make_unique<LayerMask>();
-            mask->setFromImage(m_maskGray);
-            mask->setEnabled(m_maskEnabled);
-            mask->setLinked(m_maskLinked);
-            layer->setMask(std::move(mask));
+    if (m_mode == PixelUndoMode::WholeLayer) {
+        QImage current = layer->materialize();
+        layer->replaceFromImage(m_pixels);
+        layer->setOffsetSilent(m_offsetX, m_offsetY);
+        if (m_trackMask)
+            swapLayerMask(layer, &m_hasMask, &m_maskEnabled, &m_maskLinked, &m_maskGray);
+        m_pixels = std::move(current);
+        m_extentW = m_pixels.width();
+        m_extentH = m_pixels.height();
+        m_offsetX = curOx;
+        m_offsetY = curOy;
+    } else {
+        const bool extentOk = layer->tiles().width() == m_extentW
+                              && layer->tiles().height() == m_extentH;
+        if (!extentOk) {
+            qWarning("undo: extent 变化与 tile-ref 模式不符（调用点应用 WholeLayer）");
+            Q_ASSERT(false);
+            QImage current = layer->materialize();
+            layer->replaceFromImage(materializeTileSnap(m_tileSnap));
+            if (m_trackMask)
+                swapLayerMask(layer, &m_hasMask, &m_maskEnabled, &m_maskLinked, &m_maskGray);
+            m_tileSnap = TileBuffer::TileRefSnapshot{};
+            m_pixels = std::move(current);
+            m_mode = PixelUndoMode::WholeLayer;
+            m_extentW = m_pixels.width();
+            m_extentH = m_pixels.height();
+            m_offsetX = curOx;
+            m_offsetY = curOy;
         } else {
-            layer->setMask(nullptr);
+            Q_ASSERT(curOx == m_offsetX && curOy == m_offsetY);
+            if (!layer->tiles().swapWithRefSnapshot(m_tileSnap)) {
+                qWarning("undo: swapWithRefSnapshot 失败，整层兜底");
+                Q_ASSERT(false);
+                QImage current = layer->materialize();
+                layer->replaceFromImage(materializeTileSnap(m_tileSnap));
+                m_pixels = std::move(current);
+                m_mode = PixelUndoMode::WholeLayer;
+            }
+            layer->invalidateContentBounds();
+            layer->invalidateCompositeRaster();
+            if (m_trackMask)
+                swapLayerMask(layer, &m_hasMask, &m_maskEnabled, &m_maskLinked, &m_maskGray);
         }
-        m_hasMask = curHasMask;
-        m_maskEnabled = curMaskEnabled;
-        m_maskLinked = curMaskLinked;
-        m_maskGray = std::move(curMaskGray);
     }
 
-    m_pixels = std::move(current);
-    m_offsetX = curOx;
-    m_offsetY = curOy;
-    doc.markDirty();
+    // T4：WholeLayer 用两侧 extent；TileRefs 用变化瓦片并集，样式只外扩 pad（勿并整层 styleBounds）
+    const QRect docRect(0, 0, doc.m_width, doc.m_height);
+    QRect dirty;
+    if (m_mode == PixelUndoMode::TileRefs && !tileDiffDoc.isEmpty()) {
+        dirty = tileDiffDoc;
+        const int pad = layer->styles().maxPadding();
+        if (pad > 0)
+            dirty.adjust(-pad, -pad, pad, pad);
+        // 样式在交换前后 pad 相同；若曾用整层 styleBounds 会把脏区胀回整幅
+        Q_UNUSED(styleBefore);
+        dirty = dirty.intersected(docRect);
+    } else {
+        dirty = entryBoundsDoc.united(curBoundsDoc)
+                    .united(styleBefore)
+                    .united(layer->styleBoundsInDocument())
+                    .intersected(docRect);
+    }
+    if (dirty.isEmpty())
+        doc.markDirty();
+    else
+        doc.markDirty(dirty);
+
     // A23：像素 undo 去掉蒙版时同步清编辑标志
     if (m_trackMask && m_layerIndex == doc.m_activeLayerIndex && doc.m_editingLayerMask
         && !layer->hasMask()) {

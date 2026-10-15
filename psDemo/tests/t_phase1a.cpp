@@ -11,6 +11,7 @@
  * A9：分段 blend + 调整层面算子须与整幅 composite 一致
  */
 #include "app/historystack.h"
+#include "app/undoitem.h"
 #include "domain/filternode.h"
 #include "domain/filterstack.h"
 #include "domain/imagedocument.h"
@@ -126,8 +127,8 @@ int checkA2MaskSurvivesExpandUndo(Reporter &r)
     layer->mask()->setFromImage(mask);
     const QImage snap = layer->mask()->image().copy();
 
-    // 模拟变换提交：push 像素 undo（4 参，不带 mask）→ 扩到 74×74 → replaceFromImage
-    doc->pushLayerPixelsUndo(0, QStringLiteral("自由变换"));
+    // 模拟变换提交：扩层会改 extent → WholeLayer（与 transformtool 一致）
+    doc->pushLayerPixelsUndo(0, QStringLiteral("自由变换"), PixelUndoMode::WholeLayer);
     QImage bigger(74, 74, QImage::Format_ARGB32_Premultiplied);
     bigger.fill(qRgba(10, 20, 30, 255));
     layer->replaceFromImage(bigger);
