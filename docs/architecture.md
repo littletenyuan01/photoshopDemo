@@ -290,11 +290,17 @@ flowchart LR
 
 ```text
 HistoryStack: undoStack / redoStack（含内存上限，超限丢最老）
+  + stepCount / currentStep / jumpToStep（任意跳转 = 重复 pop/redo）
+  + 位置书签（trim 重基；push 清 redo 时丢失效）
 ```
 
 **收口点已就位**：UI 已不直接改 `Layer`，一律走 `ImageDocument`；
 因此 push 集中在少数 domain API —— 这是 Phase 6 低成本落地的前提。
 不透明度滑条「松手才提交」，避免撤销栈被滑条淹没。
+
+**非线性跳转（2026-10）**：不另建分支树或真快照；`jumpToStep` 在既有双栈上重复交换，
+外包 `ImageDocument::ChangeBatch` 使一次跳转只发一次变更类信号（一次重投影）。
+UI：`HistoryPanel`（历史列表 + 书签）。细节与实测见 [undo-nonlinear-plan.md](undo-nonlinear-plan.md)。
 
 > 【对照 GIMP】`gimpimage-undo-push.h` 的 typed `push_*` + setter 内 `push_undo`；
 > `gimp_image_undo_group_start/end` 把多步合成一步（本项目暂未做 group，多步仍可能多条）。

@@ -8,6 +8,7 @@
 #include "engine/painttypes.h"
 #include "testutil.h"
 
+#include <QElapsedTimer>
 #include <QObject>
 #include <QVector>
 #include <QtGlobal>
@@ -121,5 +122,68 @@ int tUndoJump()
             QStringLiteral("stepName 越界为空"));
 
     r.info(QStringLiteral("undojump：10 步全覆盖 + 20 次随机跳 + clamp 均 diffCount==0"));
+
+    // T6 info：跳转 1/10/100/200 步耗时 + contentChanged 次数 + historyBytes 峰值
+    {
+        auto d = ImageDocument::createBlank(256, 256, Qt::white);
+        Layer *L = d->activeLayer();
+        for (int i = 0; i < 200; ++i) {
+            d->pushLayerPixelsUndo(0, QStringLiteral("t%1").arg(i));
+            const QRect loc = PaintEngine::stampDab(
+                L->tiles(), QPointF(20 + (i % 16) * 12, 20 + (i / 16) * 12), 6.0,
+                QColor(i % 200, 40, 80), PaintMode::Paint);
+            L->invalidateContentBounds();
+            L->invalidateCompositeRaster();
+            d->markDirty(loc.translated(L->offsetX(), L->offsetY()));
+        }
+        HistoryStack &h = d->history();
+        r.check(h.stepCount() == 200 && h.currentStep() == 200,
+                QStringLiteral("T6 建 200 笔 stepCount=%1").arg(h.stepCount()));
+
+        const int deltas[] = {1, 10, 100, 200};
+        for (int delta : deltas) {
+            h.jumpToStep(200, *d);
+            int contentN = 0;
+            QMetaObject::Connection conn = QObject::connect(
+                d.get(), &ImageDocument::contentChanged, [&]() { ++contentN; });
+            quint64 peak = h.historyBytes();
+            QElapsedTimer clock;
+            clock.start();
+            const bool ok = h.jumpToStep(200 - delta, *d);
+            const qint64 ms = clock.elapsed();
+            peak = qMax(peak, h.historyBytes());
+            QObject::disconnect(conn);
+            r.check(ok && contentN == 1,
+                    QStringLiteral("T6 Δ%1 步 jump contentChanged==1（%2）").arg(delta).arg(contentN));
+            r.info(QStringLiteral("T6 跳转 Δ%1 步：%2 ms，contentChanged=%3，historyBytes=%4")
+                       .arg(delta)
+                       .arg(ms)
+                       .arg(contentN)
+                       .arg(h.historyBytes()));
+            Q_UNUSED(peak);
+        }
+
+        // 专测 200 步跳转期间 historyBytes 峰值（从 200→0）
+        h.jumpToStep(200, *d);
+        quint64 peakBytes = h.historyBytes();
+        const quint64 before = peakBytes;
+        int contentN = 0;
+        QMetaObject::Connection conn = QObject::connect(
+            d.get(), &ImageDocument::contentChanged, [&]() { ++contentN; });
+        QElapsedTimer clock;
+        clock.start();
+        h.jumpToStep(0, *d);
+        const qint64 ms200 = clock.elapsed();
+        peakBytes = qMax(peakBytes, h.historyBytes());
+        QObject::disconnect(conn);
+        r.check(contentN == 1, QStringLiteral("T6 200→0 contentChanged==1（%1）").arg(contentN));
+        r.info(QStringLiteral("T6 200→0：%1 ms，contentChanged=%2，historyBytes 跳前=%3 跳后=%4 峰值≈%5")
+                   .arg(ms200)
+                   .arg(contentN)
+                   .arg(before)
+                   .arg(h.historyBytes())
+                   .arg(peakBytes));
+    }
+
     return r.fails;
 }

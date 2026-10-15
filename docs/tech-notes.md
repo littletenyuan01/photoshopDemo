@@ -36,6 +36,7 @@
 - 【本项目】`LayerPixelsUndo`（含 offset）/ `LayerPropUndo`（含样式·滤镜）/ `LayerStructureUndo` / `DocumentGeomUndo` / `SelectionUndo`。不做 GObject undo 类层次。
 - 【排期】`wiki/Roadmap.md` Phase 6 **已完成**（覆盖收口；非 Command 层）。
 - 【粒度 2026-10】像素撤销默认 **TileRefs**（`TileBuffer::TileRefSnapshot` + COW）；改 extent 须 `WholeLayer`。出栈按变化瓦片标脏。计划与数字见 [undo-region-plan.md](undo-region-plan.md) / [pending-dev.md](pending-dev.md)。
+- 【非线性 2026-10】**跳转 = 双栈上重复交换 + `ChangeBatch` 合并信号**（一次跳转一次重投影）；书签 = 游标位置标记（0 内存，trim 后重基）。面板 `HistoryPanel`。见 [undo-nonlinear-plan.md](undo-nonlinear-plan.md) / [pending-dev.md](pending-dev.md)。
 
 ### 投影/合成：保持只读，未来按脏区分块
 

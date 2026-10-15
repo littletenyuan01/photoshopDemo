@@ -1715,7 +1715,42 @@ Custom ≈48 ns/px、Gauss ≈19。Q11–Q13 关闭。维持 opt-in。
 
 **约定**：新增像素入栈点若会改层 extent，必须 `pushLayerPixelsUndo(..., PixelUndoMode::WholeLayer)`（见 `docs/cursor-role-prompt.md`）。
 
-**仍欠（2 档，另立计划）**：非线性历史 / 层稳定 id；空脏区仍压条目（R7）；蒙版粒度优化。
+**仍欠（2 档，另立计划）**：~~非线性历史~~ → 见下节；空脏区仍压条目（R7）；蒙版粒度/记账口径（见下节「仍欠」）。
+
+---
+
+## 非线性撤销：历史面板 + 跳转 + 书签（2026-10）—— **已落地**
+
+**计划书**：[undo-nonlinear-plan.md](undo-nonlinear-plan.md)（T0–T6）
+
+**现象（改造前）**：历史只有菜单逐步撤销；长跳转要连按 N 次 Ctrl+Z，每次 `contentChanged` 触发一次重投影；满幅层一笔 `undoBytes` 按整层引用记账（≈16.78 MB）易触 trim；蒙版随 `LayerPropUndo` 深拷贝，长跳转逐步拷贝拖慢。
+
+**改法**：
+- **T0**：`TileRefs` 账面按 `markDirty` 触碰瓦片累加（`HistoryStack::refreshTopBytes`）
+- **T1**：`ImageDocument::ChangeBatch` 合并 content/structure/pixels
+- **T2**：`jumpToStep` = 双栈上重复 `undoOne`/`redoOne` + 一批信号
+- **T3**：`swapLayerMask` 两行改为浅拷贝（蒙版 COW；写路径已 detach）
+- **T4–T5**：`HistoryPanel`（`panelTabs`）+ 位置书签（trim 重基 / push 清 redo 丢失效书签；上限 64）
+
+**被否掉的方案**：分支树；真·状态快照克隆；图层稳定 id / 条目下标重映射（本计划不需要）。
+
+**实测（同机 MinGW Release，`.build-clean`，2026-10-15）**：
+
+| # | 指标 | 数字 |
+|---|------|------|
+| ① | 256²×200 笔，跳转 Δ1 / Δ10 / Δ100 / Δ200 | **0 / 0 / 0 / 0 ms**；每次 `contentChanged==1` |
+| ② | 同上 200→0 跳转期间 `historyBytes` | 跳前=跳后=峰值 **4 531 200**（≈4.32 MB；条目在 undo/redo 间搬移，账面不阶梯暴涨） |
+| ③ | 2048² 满幅白底一笔 `undoBytes`（T0 前后） | WholeLayer / 记账前口径 **16 777 280** → TileRefs 触碰瓦片 **16 512** |
+| ④ | 带蒙版 512²×200 步 `jumpToStep(0)`（T3 后） | **1 ms**（改造前未保留同口径压测；产品改动仅 `swapLayerMask` 两行浅拷贝） |
+
+用例证据：`undojump`（①②）、`undoregion`（③）、`undomaskcow`（④）；面板/书签：`undopanel` / `undobookmark`。
+
+**全量回归**：`psdemo_tests.exe` 本计划相关用例全绿。连跑全套时 `tilecache` P13 计时粗护栏偶发超 25%（套件预热噪声；单独跑 `tilecache` 稳定绿）——与本计划改动无关，见 [page-cache-plan.md](page-cache-plan.md) §8.1。
+
+**仍欠**：
+- 蒙版成本外账：`LayerPropSnapshot` 整张深拷贝 + 蒙版记账口径（T3 明确不扩散）
+- 空脏区仍压条目（undo-region R7）
+- 分支树 / 历史画笔 / 真·状态快照克隆（本计划 Out of scope）
 
 ---
 
