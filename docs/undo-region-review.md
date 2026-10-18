@@ -83,3 +83,24 @@
 - 本报告：`docs/undo-region-review.md`（返修项已标 ✅）
 - 进度总览：0+1 档 **5/5 已收口**（含 T5 返修 R1–R4）
 - 下一步：决定是否开 2 档（非线性 + 层稳定 id）
+
+## 7. 评估方独立复核（2026-10-15，`a31be4a`）
+
+实施方已把 R1–R5 标为已修；评估方**独立重跑**确认，并新增一条 R6：
+
+- **复核结果**：全量 `psdemo_tests.exe` **47/47、退出码 0**；`undoregion` 单跑 1/1。R1 除改口径外还**加了真断言**（`TileRefs painted ≤128×128`、`WholeLayer == 2048×2048`），这点比原返修单要求更严，好。R4/R5 已落地。
+- **修正后的实测（本轮，同机）**：稀疏一笔 `undoBytes` 16 777 280 → **128**；满幅白底一笔 16 777 280 → **16 777 344（账面没降）**；1024 层 200 笔峰值 **≈252 MB（旧口径被 256MB 上限反复 trim）** → **17.9 MB（全留）**；撤销后重投影 **整幅 2048×2048 → 64×64**。
+
+### R6（中，新发现）记账口径把 TileRefs 的收益吃掉一半
+
+- **位置**：`psDemo/domain/tilebuffer.cpp` `TileRefSnapshot::bytes()`、`psDemo/app/undoitem.cpp:190` `LayerPixelsUndo::byteSize()`、`psDemo/app/historystack.cpp:96-107` `trimUndo()`
+- **现象**：`bytes()` 对快照里**每一块**按 `QImage::sizeInBytes` 累加，不分是否仍与图层共享缓冲 ⇒ 满幅层每笔仍按整层 ≈16.78 MB 计入 `undoBytes`（`pending-dev.md:1712` 已诚实注明）。
+- **后果（功能性）**：`trimUndo()` 按 `m_undoBytes > 256 MB` 丢最老条目 ⇒ **2048² 满幅层的可撤销深度仍只有约 15 步**，而物理内存只有被 detach 的几块瓦片。2 档的历史面板会把这个现象直接摊在用户面前。
+- **期望**：`markDirty(rect)` 时把"已触碰矩形"累加给栈顶的 TileRefs 条目（仅当该条目属于被改图层），`byteSize()` 按触碰瓦片字节计；`HistoryStack` 增 `refreshTopBytes()` 把差额同步进 `m_undoBytes`/`m_redoBytes`。整层操作（清除/填充/变换）自然退化为按整层计。
+- **验收方式**：`undoregion` 的 `T5①b` 满幅白底一笔 `TileRefs` 增量从 16.78 MB 降到"触碰瓦片字节"（1 块 ≈16 KB 量级）；新增断言 2048² 满幅层连续 100 笔不被 trim（`historyTrimmed` 槽计数 == 0）。
+- **优先级**：中（是 2 档面板体验的前置）　**置信度**：确定
+- **归属**：作为 2 档计划的 **T0** 实施（见 [undo-nonlinear-plan.md](undo-nonlinear-plan.md)）。
+
+### 对第 85 行"层稳定 id"的更正
+
+评估方在 2 档设计时**推翻了自己先前的判断**：跳转若用"重复 pop/redo"实现，条目的**绝对层下标在 LIFO 下始终自洽**，因此 **2 档不需要层稳定 id**。层 id 降级为独立的"健壮性/为将来分支预留"任务，不列入 2 档范围（理由见新计划 §3、§4）。

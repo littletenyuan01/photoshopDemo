@@ -1773,7 +1773,7 @@ Custom ≈48 ns/px、Gauss ≈19。Q11–Q13 关闭。维持 opt-in。
 | O3 | `refreshTopBytes` + TileRefs `byteSize` 触碰循环 | 每个 `markDirty` 重算触碰→字节 | 增量累加 | 微秒级 | 状态多一份、易与记账纠缠 | **不做**，仅留记 |
 | O4 | `LayerPropSnapshot::maskGray` + `LayerPropUndo` | **已落地**（[undo-maskcost-plan.md](undo-maskcost-plan.md)） | 属性类浅拷贝 + `m_maskShared`；`markDirty` detach 后按整张计 | 见下表 | — | **已落地** |
 | O5 | `tests/t_tilecache.cpp` P13 | 全套连跑偶发 >25%；单独跑绿 | 预热 / 阈值 25%→40% / 保持并记档 | 减少复评噪声误判 | 放宽阈值降灵敏度 | **已记档、暂不改阈值**（与评估 R2 一致；真回归仍靠 ≤25% 粗护栏） |
-
+| O6 | `domain/imagedocument.cpp:246`（`pushLayerPixelsUndo` 的蒙版捕获）、`:1162`（`applyLayerMask`）、`:1344-1349`（删蒙版后 `markDirty` 钩子跳过） | **像素路径**仍在深拷贝整张蒙版（2048² = **4 MB/笔**，且 `LayerPixelsUndo` 记账无条件按整张计）；`applyLayerMask` 同样多一次深拷贝；`removeLayerMask` 后 `layer->hasMask()==false` 使 O4 钩子不翻转 ⇒ 条目实际独持 4 MB 而账面 0（**低报**） | 与 O4 同法：捕获改浅拷贝 + 给 `LayerPixelsUndo` 也加"是否仍共享"分档 + 删蒙版场景一并翻转标志 | **带蒙版文档的画笔历史深度**（"层+蒙版+画像素"是最常见的蒙版用法，现在每笔仍 4 MB） | 与 O4 同一模式，方向已由 `undomaskprop`/`undomaskcow` 覆盖 | **建议做，≈0.2 批次**。⚠️ 出 O4 任务书时只枚举了**属性**路径 ⇒ 这是**评估方的计划漏项**（2026-10-15 复核 O4 时发现） |
 ### O4 落地实测（2026-10-15，`undomaskprop`）
 
 | 场景（2048²） | 数字 |

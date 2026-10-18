@@ -57,6 +57,7 @@
 
 - [x] `push` 入口最小集合（先做这 4 类即可闭环）：
   - [x] `pushDrawablePixels` — 像素改动（画笔/橡皮/滤镜），整层快照（脏矩形优化后置）
+    - [x] **后置项已于 2026-10 落地**：像素撤销改为**瓦片引用快照（TileRefs）**——`TileBuffer::takeRefSnapshot()` 只存 `QImage` 共享引用（Qt 隐式共享/写时复制），出栈 `swapWithRefSnapshot()` 双向交换，标脏按 `cacheKey` **差分**只重投影受影响矩形；记账按**触碰瓦片**（`HistoryStack::refreshTopBytes`）；会改层 extent 的两处（更新链接 / 自由变换）显式 `PixelUndoMode::WholeLayer`。用例 `undocow`/`undotile`/`undoregion`/`undodirty`；计划 [docs/undo-region-plan.md](../docs/undo-region-plan.md)、评估 [docs/undo-region-review.md](../docs/undo-region-review.md)
   - [x] `pushLayerProp` — 显隐 / 不透明度 / 名称 / 混合模式 / 偏移
   - [x] `pushLayerStructure` — 新建 / 删除 / 复制
   - [x] `pushDocumentProp` — 图像大小 / 画布大小（`DocumentGeomUndo`）
@@ -72,12 +73,22 @@
 > 【对照 GIMP】`app/core/gimpprojection.c`（`update_region` / `priority_rect` / `iter` / `idle_id`）、`app/gegl/gimptilehandlervalidate.c`（603 行，脏区核心）、`app/core/gimpchunkiterator.c`，以及 GIMP 3.x 把 tile 实现下沉给 GEGL 后 GIMP 侧仅剩 91 行适配壳（`gimptilehandlerprojectable.c`）。
 
 > 【本项目简化】不分块稀疏存储、不做优先级调度线程。只做「**脏矩形集合 + 分块缓存 + 按需重算**」。
+>
+> **复核（2026-10）**：两条简化**仍维持**——理由与"什么条件下才值得做"如下。
+>
+> | 简化项 | 现状 | 今天为什么仍不做 | 什么条件下才值得做 |
+> |---|---|---|---|
+> | 不分块稀疏存储（= 投影缓冲稀疏化） | **成立**：图层侧**已稀疏**（`TileBuffer` = `QHash` + 64×64 懒分配）；**投影侧稠密**（`m_buffer` = 整幅 `QImage` + `QBitArray` 有效位） | 投影内存 = 文档面积 × 4B（2048²→16MB、4000²→64MB），而**图层瓦片 / 撤销历史**才是内存大头（已降到触碰瓦片量级）；改造要动 `compositeRegion` 的连续写回、`CanvasView` 改按块取图、`adoptImage`、TileCache 记账，并**重验全部投影等价用例**（约 3–5 批次）——`pending-dev` 亦判定"风险大于页缓存" | 当"实际会打开的文档 > 4000²"**或**"投影缓冲字节 > 图层瓦片总字节"时 |
+> | 不做优先级调度线程 | **部分成立**：优先级**排序**后来做了（`setPriorityRect` + `ScanMode::PriorityOnly / NonPriorityOnly`，对齐 GIMP `priority_rect`）；**调度线程**始终没做 | 现状是"块数 + 时间双预算 + idle 定时器"分帧（每帧 48 块 / 8ms；实测视口级脏区 **1.6ms**、整幅 2048² 排空 **74ms**、2048²×200 步跳转 **5–40ms**），已够交互；上调度线程要把**并发一致性**重新引入渲染主路径，而本工程在 A5 / #1 / #15 / #21 已踩过同类事故 | 当"视口铺满需要 > 10 帧"**或**"主线程被合成阻塞 > 50ms/帧"（用 `dirtybudget` 量化）时 |
 
 - [x] **模型与投影严格分离**：`engine/Projection` 持有只读合成缓存；`CanvasView` 只 `sync` + 绘制
 - [x] 文档级脏区信令：`markDirty(QRect)` / `dirtyRect` / `clearDirtyRect`（既有）
 - [x] `Compositor::compositeRegion` + `Projection::sync` 按脏矩形就地重算（脏区对齐 64 块网格）
 - [x] 投影分块有效位图（`QBitArray`）；图层属性脏区收窄到内容包围盒；通道缩略图增量合成缓存
 - [x] 【成本约束】不引入后台渲染线程；保持同步，只减计算量
+  - **复核（2026-10）**：仍成立，但要区分两件事——**渲染/合成全程主线程同步**（`Projection::sync`；后来加的并行是 `QtConcurrent::blockingMap`，**阻塞式**并行，不是异步）；**异步只给了"计算"**：滤镜预览/定稿走 `LayerFilterJob`（`filterasync` / `filterpreview` / `jobteardown`），GPU 探测走 `RasterScheduler` 的单线程探测池。⇒ **"滤镜异步" ≠ "后台渲染线程"**。
+  - **什么条件下才值得做**：当"合成单帧 > 16ms 且已排除滤镜因素"时。当前不满足（视口级脏区 1.6ms；贵的从来是重滤镜，那个已经异步化了）。
+  - **想更跟手时的更省替代**：调常量 `kProjectionBudgetMs` 8→12ms、`kSyncPriorityBudget` 48→96（2 行，用 `dirtybudget` 做前后实测对比）。
 
 ## Phase 8 — 节点化非破坏编辑（架构核心 ③）
 
